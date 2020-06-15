@@ -1,0 +1,103 @@
+/*
+ * Copyright (2020) The Hyperspace Project Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.microsoft.hyperspace.index
+
+import java.util.NoSuchElementException
+
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileStatus, Path}
+import org.apache.spark.sql.internal.SQLConf
+
+/**
+ * Getter function to retrieve Hyperspace index related directory paths from spark config.
+ *
+ * @param conf SQL Configuration
+ */
+private[hyperspace] class PathResolver(conf: SQLConf) {
+
+  /**
+   * Get path for the given index name. It enumerates the file system to resolve
+   * case sensitivity - it matches the existing index name in a case-insensitive way.
+   *
+   * @param name index name
+   * @return resolved index path
+   */
+  def getIndexPath(name: String): Path = {
+    val root = systemPath
+    val fs = root.getFileSystem(new Configuration)
+    if (fs.exists(root)) {
+      // Note that fs.exists() is case-sensitive in some platforms and case-insensitive
+      // in others, thus the check is manually done to make the comparison case-insensitive.
+      val indexNames = fs.listStatus(root)
+      indexNames
+        .collectFirst {
+          case s: FileStatus if s.getPath.getName.toLowerCase.equals(name.toLowerCase) =>
+            s.getPath
+        }
+        .getOrElse(new Path(root, name))
+    } else {
+      new Path(root, name)
+    }
+  }
+
+  /**
+   * Get the Hyperspace index system path.
+   *
+   * @return Hyperspace index system path.
+   */
+  def systemPath: Path = {
+    val defaultIndexesPath =
+      new Path(conf.getConfString("spark.sql.warehouse.dir"), "indexes")
+    new Path(conf.getConfString(IndexConstants.INDEX_SYSTEM_PATH, defaultIndexesPath.toString))
+  }
+
+  /**
+   * Get the Hyperspace index creation path.
+   *
+   * @return Hyperspace index creation path.
+   */
+  def indexCreationPath: Path = {
+    getOption(IndexConstants.INDEX_CREATION_PATH)
+      .map(new Path(_, IndexConstants.INDEXES_DIR))
+      .getOrElse(new Path(systemPath, IndexConstants.INDEXES_DIR))
+  }
+
+  /**
+   * Get the Hyperspace index search paths.
+   *
+   * @return Hyperspace index search paths.
+   */
+  def indexSearchPaths: Option[Seq[String]] = {
+    getOption(IndexConstants.INDEX_SEARCH_PATHS)
+      .map(_.split(',').toSeq)
+  }
+
+  private def getOption(key: String): Option[String] = {
+    try {
+      Some(conf.getConfString(key))
+    } catch {
+      case _: NoSuchElementException =>
+        None
+    }
+  }
+}
+
+object PathResolver {
+  def apply(conf: SQLConf): PathResolver = {
+    new PathResolver(conf)
+  }
+}

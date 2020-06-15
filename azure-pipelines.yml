@@ -1,0 +1,36 @@
+# Hyperspace Build
+trigger:
+  batch: true
+  branches:
+    include:
+      - master
+
+variables:
+  buildConfiguration: 'Release'
+
+jobs:
+  - job: Build
+    displayName: 'Build sources and run unit tests'
+    pool:
+      demands: maven
+    steps:
+      - task: Maven@3
+        displayName: 'Build and test JARs'
+        inputs:
+          mavenPomFile: 'pom.xml'
+          goals: 'clean package'
+          testResultsFiles: '**/TEST-com.microsoft.hyperspace*.xml'
+
+      # If not a pull request, publish artifacts.
+      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+        - task: CopyFiles@2
+          displayName: 'Copy hyperspace-core JAR'
+          inputs:
+            sourceFolder: '$(Build.SourcesDirectory)/core/target/'
+            contents: '**/*.jar'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish Hyperspace artifacts'
+          inputs:
+            artifactName: 'hyperspace-core'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
