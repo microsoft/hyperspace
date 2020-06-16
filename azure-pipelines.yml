@@ -4,7 +4,6 @@ trigger:
   branches:
     include:
       - master
-
 jobs:
   - job: Build
     displayName: 'Build sources and run unit tests'
