@@ -23,6 +23,7 @@ import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
+
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 
@@ -137,13 +138,17 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"<----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[$joinIndexPath], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
+      .append(s"<----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[$joinIndexPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(2) Project [Col1#21, Col2#22]---->")
       .append(defaultDisplayMode.newLine)
       .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"      <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[$joinIndexPath], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
+      .append(s"      <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[$joinIndexPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")
@@ -162,7 +167,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:        +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"<----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[$sampleParquetDataFullPath], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->")
+      .append(s"<----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->")
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
@@ -213,7 +220,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
 
     val selfJoinDf = df.join(df, df("Col1") === df("Col1"))
-    verifyExplainOutput(selfJoinDf, expectedOutput.toString(), verbose = true) { df => df }
+    verifyExplainOutput(selfJoinDf, expectedOutput.toString(), verbose = true) { df =>
+      df
+    }
   }
 
   test("Testing subquery scenario") {
@@ -290,15 +299,14 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append("   :        +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
       .append(displayMode.newLine)
       .append("   <----:           +- *(1) FileScan parquet [Col2#136,Col1#135]")
-      .append(" Batched: true, Format: Parquet, Location: InMemoryFileIndex[" +
-        getIndexFilesPath("filterIndex") + "], ")
-      .append("PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
+      .append(" Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
       .append("ReadSchema: struct<Col2:int,Col1:string>---->")
       .append(displayMode.newLine)
       .append("   +- FileScan parquet [Col1#135] Batched: true, Format: Parquet, Location: " +
-        truncate("InMemoryFileIndex[" + sampleParquetDataFullPath + "]") + ", ")
-      .append("PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], " +
-        "ReadSchema: struct<Col1:string>")
+        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>")
       .append(displayMode.newLine)
       .append("         +- Subquery subquery145")
       .append(displayMode.newLine)
@@ -307,9 +315,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append("               +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
       .append(displayMode.newLine)
       .append("                  <----+- *(1) FileScan parquet [Col2#136,Col1#135] " +
-        "Batched: true, Format: Parquet, Location: InMemoryFileIndex[" +
-        getIndexFilesPath("filterIndex") + "], " +
-        "PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
+        "Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
       .append("ReadSchema: struct<Col2:int,Col1:string>---->")
       .append(displayMode.newLine)
       .append(displayMode.newLine)
@@ -331,13 +339,13 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("   <----:           +- *(1) FileScan parquet [Col1#135,Col2#136] Batched: true, " +
         "Format: Parquet, Location: " +
-        truncate("InMemoryFileIndex[" + sampleParquetDataFullPath + "]") + ", " +
-        "PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
+        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
       .append("ReadSchema: struct<Col1:string,Col2:int>---->")
       .append(displayMode.newLine)
       .append("   +- FileScan parquet [Col1#135] Batched: true, Format: Parquet, Location: " +
-        truncate("InMemoryFileIndex[" + sampleParquetDataFullPath + "]") + ", " +
-        "PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>")
+        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>")
       .append(displayMode.newLine)
       .append("         +- Subquery subquery145")
       .append(displayMode.newLine)
@@ -460,9 +468,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append("+- Filter (isnotnull(Col2#) && (Col2# = 2))")
       .append(displayMode.newLine)
       .append("   " + displayMode.highlightTag.open ++ "+- FileScan parquet [Col2#,Col1#] ")
-      .append("Batched: true, Format: Parquet, Location: InMemoryFileIndex[")
-      .append(getIndexFilesPath("filterIndex"))
-      .append("], PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
+      .append("Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]"))
+      .append(", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
       .append("ReadSchema: struct<Col2:int,Col1:string>" + displayMode.highlightTag.close)
       .append(displayMode.newLine)
       .append(displayMode.newLine)
@@ -479,7 +487,7 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append("   " + displayMode.highlightTag.open + "+- FileScan parquet [Col1#,Col2#] ")
       .append("Batched: true, Format: Parquet, Location: ")
       // Note: The below conversion converts relative path to absolute path for comparison.
-      .append(truncate("InMemoryFileIndex[" + sampleParquetDataFullPath + "]") + ", ")
+      .append(truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") + ", ")
       .append("PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
       .append("ReadSchema: struct<Col1:string,Col2:int>" + displayMode.highlightTag.close)
       .append(displayMode.newLine)
