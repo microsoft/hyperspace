@@ -62,7 +62,6 @@ parallelExecution in (ThisBuild, Test) := false
 
 fork in (ThisBuild, Test) := true
 
-// Configurations to speed up tests and reduce memory footprint
 javaOptions in (ThisBuild, Test) ++= Seq(
   "-Dspark.ui.enabled=false",
   "-Dspark.ui.showConsoleProgress=false",
