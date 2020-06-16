@@ -4,17 +4,18 @@ trigger:
   branches:
     include:
       - master
+
 jobs:
   - job: Build
     displayName: 'Build sources and run unit tests'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-      - script: sbt clean
-        displayName: 'Running $ sbt clean'
-      - script: sbt update
-        displayName: 'Running $ sbt update'
-      - script: sbt compile
-        displayName: 'Running $ sbt compile'
-      - script: sbt test
-        displayName: 'Running $ sbt test'
+      - script: sbt +clean
+        displayName: 'Running $sbt +clean'
+      - script: sbt +update
+        displayName: 'Running $sbt +update'
+      - script: sbt +compile
+        displayName: 'Running $sbt +compile'
+      - script: sbt +test
+        displayName: 'Running $sbt +test'
