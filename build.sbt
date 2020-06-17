@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-name := "hyperspace"
+name := "hyperspace-core"
 
-organization in ThisBuild := "com.microsoft"
+organization := "com.microsoft"
 
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
@@ -24,16 +24,11 @@ lazy val supportedScalaVersions = List(scala212, scala211)
 
 lazy val sparkVersion = "2.4.2"
 
-scalaVersion in ThisBuild := scala212
+scalaVersion := scala212
 
-crossScalaVersions in ThisBuild := supportedScalaVersions
+crossScalaVersions := supportedScalaVersions
 
-lazy val core = project
-  .settings(
-    libraryDependencies ++= commonDependencies
-  )
-
-lazy val commonDependencies = Seq(
+libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-catalyst" % sparkVersion % "provided",
@@ -47,21 +42,21 @@ lazy val commonDependencies = Seq(
   "org.apache.spark" %% "spark-hive" % sparkVersion % "test" classifier "tests"
 )
 
-scalacOptions in ThisBuild ++= Seq(
+scalacOptions ++= Seq(
   "-target:jvm-1.8"
 )
 
-javaOptions in ThisBuild += "-Xmx1024m"
+javaOptions += "-Xmx1024m"
 
 /********************************
  * Tests related configurations *
  ********************************/
 // Tests cannot be run in parallel since mutiple Spark contexts cannot run in the same JVM.
-parallelExecution in (ThisBuild, Test) := false
+parallelExecution in Test := false
 
-fork in (ThisBuild, Test) := true
+fork in Test := true
 
-javaOptions in (ThisBuild, Test) ++= Seq(
+javaOptions in Test ++= Seq(
   "-Dspark.ui.enabled=false",
   "-Dspark.ui.showConsoleProgress=false",
   "-Xmx1024m"
