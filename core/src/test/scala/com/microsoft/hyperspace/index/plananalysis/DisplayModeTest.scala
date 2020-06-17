@@ -16,13 +16,10 @@
 
 package com.microsoft.hyperspace.index.plananalysis
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.index.IndexConstants
 
-@RunWith(classOf[JUnitRunner])
 class DisplayModeTest extends FunSuite {
   test("Testing default tags in Display Mode.") {
     val htmlMode = new HTMLMode(Map.empty)

@@ -17,16 +17,13 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
-import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{mock, when}
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class IndexCollectionManagerTest extends FunSuite with SparkInvolvedSuite {
   private val indexSystemPath = "src/test/resources/indexLocation"
   private val testLogManagerFactory: IndexLogManagerFactory = new IndexLogManagerFactory {

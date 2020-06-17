@@ -21,13 +21,10 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.{DataFrame, Row}
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 
-@RunWith(classOf[JUnitRunner])
 class E2EHyperspaceRulesTests extends HyperspaceSuite {
 
   private val sampleData = SampleData.testData

@@ -20,15 +20,12 @@ import java.util.UUID
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
 
-@RunWith(classOf[JUnitRunner])
 class IndexLogManagerImplTest extends FunSuite with SparkInvolvedSuite with BeforeAndAfterAll {
   val testRoot = "src/test/resources/indexLogManagerTests"
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(

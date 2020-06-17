@@ -19,18 +19,15 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
-import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class RefreshActionTest extends FunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)

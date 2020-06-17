@@ -18,11 +18,8 @@ package com.microsoft.hyperspace.util
 
 import java.util.UUID
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class HashingUtilsTests extends FunSuite {
   test("For md5Hashing(), same input has the same output hash code.") {
     val randomUUID = UUID.randomUUID.toString

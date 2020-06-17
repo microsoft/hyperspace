@@ -23,9 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -34,7 +32,6 @@ import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
  * Some tests are adapted from examples in ExpressionParserSuite.scala, PlanParserSuite.scala,
  * and QueryPlanSuite.scala.
  */
-@RunWith(classOf[JUnitRunner])
 class LogicalPlanSerDeTests extends FunSuite with SparkInvolvedSuite {
   val c1: AttributeReference = AttributeReference("c1", StringType)()
   val c2: AttributeReference = AttributeReference("c2", StringType)()

@@ -19,15 +19,12 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class IndexCacheTest extends FunSuite with SparkInvolvedSuite {
   val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   val indexSystemPath = "src/test/resources/indexLocation"

@@ -21,13 +21,10 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
 import org.apache.spark.sql.catalyst.plans.physical.{Distribution, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.SparkPlan
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 
-@RunWith(classOf[JUnitRunner])
 class PhysicalOperatorAnalyzerTest extends FunSuite with SparkInvolvedSuite {
   test("Two plans are the same") {
     val plan = DummySparkPlan("plan1", Seq(DummySparkPlan("plan1"), DummySparkPlan("plan2")))

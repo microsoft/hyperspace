@@ -24,15 +24,12 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Row, SparkSession}
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
-@RunWith(classOf[JUnitRunner])
 class JoinIndexRuleTest extends HyperspaceSuite {
   val parentPath = new Path("src/test/resources/joinIndexTest")
   val systemPath = new Path(parentPath, "idroot")

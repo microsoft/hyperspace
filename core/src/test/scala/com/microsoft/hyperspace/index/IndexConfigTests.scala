@@ -16,11 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class IndexConfigTests extends FunSuite {
   test("Empty index name is not allowed.") {
     intercept[IllegalArgumentException](IndexConfig("", Seq("c1"), Seq("c2")))

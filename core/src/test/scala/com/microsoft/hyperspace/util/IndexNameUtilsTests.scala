@@ -16,11 +16,8 @@
 
 package com.microsoft.hyperspace.util
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class IndexNameUtilsTests extends FunSuite {
   test("Test normalizeIndexName() function.") {
     val indexName = "  my index   1     "

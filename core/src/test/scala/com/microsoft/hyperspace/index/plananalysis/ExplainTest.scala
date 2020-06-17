@@ -20,14 +20,11 @@ import org.apache.commons.lang.StringUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 
-@RunWith(classOf[JUnitRunner])
 class ExplainTest extends FunSuite with HyperspaceSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val indexStorageLocation = "src/test/resources/indexLocation"

@@ -26,15 +26,12 @@ import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row}
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.{SampleData, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class DataFrameWriterExtensionsTests extends FunSuite with SparkInvolvedSuite {
 
   private val sampleData = SampleData.testData

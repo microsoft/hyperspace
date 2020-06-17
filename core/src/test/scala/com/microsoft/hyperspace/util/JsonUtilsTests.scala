@@ -17,14 +17,11 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
-@RunWith(classOf[JUnitRunner])
 class JsonUtilsTests extends FunSuite {
   test("Test for JsonUtils.") {
     val schema = StructType(
