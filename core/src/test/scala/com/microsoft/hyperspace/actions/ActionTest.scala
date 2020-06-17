@@ -16,16 +16,13 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.index._
 
-@RunWith(classOf[JUnitRunner])
 class ActionTest extends FunSuite with SparkInvolvedSuite with BeforeAndAfter {
   var mockLogManager: IndexLogManager = _
   var testObject: Action = _

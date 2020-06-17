@@ -23,15 +23,12 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
-@RunWith(classOf[JUnitRunner])
 class FilterIndexRuleTest extends HyperspaceSuite {
   val originalLocation = new Path("baseTableLocation")
   val parentPath = new Path("src/test/resources/filterIndexTest")

@@ -18,17 +18,14 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
-import org.junit.runner.RunWith
 import org.mockito.Mockito._
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class CreateActionTest extends FunSuite with SparkInvolvedSuite {
   private val indexSystemPath = "src/test/resources/indexLocation"
   private val sampleData = SampleData.testData

@@ -40,7 +40,6 @@ lazy val commonDependencies = Seq(
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
-  "junit" % "junit" % "4.12" % "test",
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
   "org.apache.spark" %% "spark-catalyst" % sparkVersion % "test" classifier "tests",
   "org.apache.spark" %% "spark-core" % sparkVersion % "test" classifier "tests",
@@ -52,7 +51,7 @@ scalacOptions in ThisBuild ++= Seq(
   "-target:jvm-1.8"
 )
 
-javaOptions += "-Xmx1024m"
+javaOptions in ThisBuild += "-Xmx1024m"
 
 /********************************
  * Tests related configurations *

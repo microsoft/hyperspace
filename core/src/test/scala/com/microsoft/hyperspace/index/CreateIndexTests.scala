@@ -18,14 +18,11 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class CreateIndexTests extends FunSuite with SparkInvolvedSuite {
 
   private val sampleData = SampleData.testData

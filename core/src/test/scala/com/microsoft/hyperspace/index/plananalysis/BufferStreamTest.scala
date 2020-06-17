@@ -16,11 +16,8 @@
 
 package com.microsoft.hyperspace.index.plananalysis
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class BufferStreamTest extends FunSuite {
   test("Testing buffer stream highlight with spaces.") {
     val s = "   Please highlight me.  "

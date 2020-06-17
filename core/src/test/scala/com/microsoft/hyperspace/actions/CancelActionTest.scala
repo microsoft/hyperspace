@@ -16,17 +16,14 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 
-@RunWith(classOf[JUnitRunner])
 class CancelActionTest extends FunSuite with SparkInvolvedSuite {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
 

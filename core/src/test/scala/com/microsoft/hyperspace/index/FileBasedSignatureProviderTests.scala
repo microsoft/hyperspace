@@ -24,13 +24,10 @@ import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitionSpec, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.StructType
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 
-@RunWith(classOf[JUnitRunner])
 class FileBasedSignatureProviderTests extends FunSuite with SparkInvolvedSuite {
   private val fileLength = 100
   private val fileModificationTime = 10000

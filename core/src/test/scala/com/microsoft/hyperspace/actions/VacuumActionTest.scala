@@ -16,18 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito.{mock, verify, when}
 import org.mockito.internal.verification.Times
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 
-@RunWith(classOf[JUnitRunner])
 class VacuumActionTest extends FunSuite with SparkInvolvedSuite {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])

@@ -17,13 +17,10 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.actions.Constants
 
-@RunWith(classOf[JUnitRunner])
 class IndexTests extends FunSuite {
   val indexConfig1 = IndexConfig("myIndex1", Array("id"), Seq("name"))
   val indexConfig2 = IndexConfig("myIndex2", Array("id"), Seq("school"))

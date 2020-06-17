@@ -17,13 +17,10 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import com.microsoft.hyperspace.util.JsonUtils
 
-@RunWith(classOf[JUnitRunner])
 class IndexLogEntryTest extends FunSuite {
   test("IndexLogEntry spec example") {
     val schemaString =
