@@ -7,7 +7,7 @@ import com.microsoft.hyperspace.Implicits
 /**
  * Provides helper methods for python APIs.
  */
-object PythonUtils {
+private[hyperspace] object PythonUtils {
 
   /**
    * Wrapper for Implicits.enableHyperspace to be called from the Python API.
