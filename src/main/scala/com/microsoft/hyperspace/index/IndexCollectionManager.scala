@@ -80,7 +80,7 @@ class IndexCollectionManager(
     import spark.implicits._
     getIndexes()
       .filter(!_.state.equals(Constants.States.DOESNOTEXIST))
-      .map(IndexSummary(_))
+      .map(IndexSummary(spark, _))
       .toDF()
   }
 
@@ -159,11 +159,7 @@ private[hyperspace] case class IndexSummary(
     state: String)
 
 private[hyperspace] object IndexSummary {
-  def apply(entry: IndexLogEntry): IndexSummary = {
-    val spark = SparkSession.getActiveSession.getOrElse {
-      throw HyperspaceException("No active spark session found")
-    }
-
+  def apply(spark: SparkSession, entry: IndexLogEntry): IndexSummary = {
     IndexSummary(
       entry.name,
       entry.derivedDataset.properties.columns.indexed,
