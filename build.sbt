@@ -63,20 +63,20 @@ javaOptions in Test ++= Seq(
 /**************************
  * Release configurations *
  **************************/
-organization in ThisBuild := "com.microsoft.hyperspace"
-organizationName in ThisBuild := "Microsoft"
-organizationHomepage in ThisBuild := Some(url("http://www.microsoft.com/"))
+organization := "com.microsoft.hyperspace"
+organizationName := "Microsoft"
+organizationHomepage := Some(url("http://www.microsoft.com/"))
 
-releaseCrossBuild in ThisBuild := true
+releaseCrossBuild := true
 
-scmInfo in ThisBuild := Some(
+scmInfo := Some(
   ScmInfo(
     url("https://github.com/microsoft/hyperspace"),
     "scm:git@github.com:microsoft/hyperspace.git"
   )
 )
 
-developers in ThisBuild := List(
+developers := List(
   Developer(
     id    = "rapoth",
     name  = "Rahul Potharaju",
@@ -121,19 +121,19 @@ developers in ThisBuild := List(
   )
 )
 
-description in ThisBuild := "Hyperspace: An Indexing Subsystem for Apache Spark"
-licenses in ThisBuild := List("Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.txt"))
-homepage in ThisBuild := Some(url("https://github.com/microsoft/hyperspace"))
+description := "Hyperspace: An Indexing Subsystem for Apache Spark"
+licenses := List("Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+homepage := Some(url("https://github.com/microsoft/hyperspace"))
 
 // Remove all additional repository other than Maven Central from POM
-pomIncludeRepository in ThisBuild := { _ => false }
-publishTo in ThisBuild := {
+pomIncludeRepository := { _ => false }
+publishTo := {
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
   else Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
-publishMavenStyle in ThisBuild := true
+publishMavenStyle := true
 
 import ReleaseTransformations._
 
