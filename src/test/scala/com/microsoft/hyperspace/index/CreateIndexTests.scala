@@ -118,4 +118,19 @@ class CreateIndexTests extends FunSuite with SparkInvolvedSuite {
       exception.getMessage.contains(
         "Only creating index over HDFS file based scan nodes is supported."))
   }
+
+  test("Verify indexes are available across different hyperspace instances.") {
+    // Make a call so index cache gets populated
+    val originalCount = Hyperspace.getContext(spark).indexCollectionManager.indexes.count
+    assert(originalCount == 0)
+
+    // Create an index thru a new Hyperspace instance
+    val hs = new Hyperspace(spark)
+    hs.createIndex(df, indexConfig1)
+    val count = hs.indexes.count
+    assert(count == 1)
+
+    val finalCount = Hyperspace.getContext(spark).indexCollectionManager.indexes.count
+    assert(finalCount == 1)
+  }
 }

@@ -22,7 +22,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 
 class Hyperspace(spark: SparkSession) {
-  private val indexManager: IndexManager = IndexCollectionManager(spark)
+  private val indexManager: IndexManager = Hyperspace.getContext(spark).indexCollectionManager
 
   /**
    * Collect all the index metadata.
