@@ -241,11 +241,11 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
    *
    *
    * Background knowledge:
-   * An alias in a query plan is represented as [[Alias]] at the time of
+   * An alias in a query plan is represented as Alias at the time of
    * its creation. Unnecessary aliases get resolved and removed during query analysis phase by
-   * [[CleanupAliases]] rule. Some nodes still remain with alias definitions. E.g. [[Project]].
+   * [[CleanupAliases]] rule. Some nodes still remain with alias definitions. E.g. Project.
    *
-   * Secondly, the output of a logical plan is an [[AttributeSet]]. Alias objects get converted
+   * Secondly, the output of a logical plan is an AttributeSet. Alias objects get converted
    * to [[AttributeReference]]s at plan boundaries.
    *
    * From looking at the join condition, we can't know whether the attributes used in the
