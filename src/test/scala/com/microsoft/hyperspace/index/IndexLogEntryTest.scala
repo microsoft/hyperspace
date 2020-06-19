@@ -16,12 +16,12 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.scalatest.FunSuite
 
 import com.microsoft.hyperspace.util.JsonUtils
 
-class IndexLogEntryTest extends FunSuite {
+class IndexLogEntryTest extends SparkFunSuite {
   test("IndexLogEntry spec example") {
     val schemaString =
       """{\"type\":\"struct\",

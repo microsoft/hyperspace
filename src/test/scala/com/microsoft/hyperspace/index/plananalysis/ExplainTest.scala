@@ -19,13 +19,13 @@ package com.microsoft.hyperspace.index.plananalysis
 import org.apache.commons.lang.StringUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
-import org.scalatest.FunSuite
 
-import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
+import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 
-class ExplainTest extends FunSuite with HyperspaceSuite {
+class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val indexStorageLocation = "src/test/resources/indexLocation"
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
@@ -72,9 +72,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
 
     // Constructing expected output for given query from explain API
     val expectedOutput = new StringBuilder
-    //The format of the explain output looks as follows:
 
-    // Expected output looks like below for this case.
+    // The format of the explain output looks as follows:
+    // scalastyle:off filelinelengthchecker
     /**
      *=============================================================
      *Plan with indexes:
@@ -121,7 +121,11 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
      * |     SortMergeJoin|                  1|                 1|         0|
      * +------------------+-------------------+------------------+----------+
      */
+    // scalastyle:on filelinelengthchecker
+
     val joinIndexPath = getIndexFilesPath("joinIndex")
+
+    // scalastyle:off filelinelengthchecker
     expectedOutput
       .append("=============================================================")
       .append(defaultDisplayMode.newLine)
@@ -215,6 +219,7 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append("+------------------+-------------------+------------------+----------+")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
+    // scalastyle:on filelinelengthchecker
 
     val selfJoinDf = df.join(df, df("Col1") === df("Col1"))
     verifyExplainOutput(selfJoinDf, expectedOutput.toString(), verbose = true) { df =>
@@ -229,7 +234,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
     val displayMode = new PlainTextMode(getHighlightConf("<----", "---->"))
     // Constructing expected output for given query from explain API
     val expectedOutput = new StringBuilder
-    //The format of the explain output looks as follows:
+
+    // The format of the explain output looks as follows:
+    // scalastyle:off filelinelengthchecker
     /**
      * =============================================================
      * Plan with indexes:
@@ -278,6 +285,9 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
      * |WholeStageCodegen|                  1|                 1|         0|
      * +-----------------+-------------------+------------------+----------+
      */
+    // scalastyle:on filelinelengthchecker
+
+    // scalastyle:off filelinelengthchecker
     expectedOutput
       .append("=============================================================")
       .append(displayMode.newLine)
@@ -390,6 +400,7 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
       .append("+-----------------+-------------------+------------------+----------+")
       .append(displayMode.newLine)
       .append(displayMode.newLine)
+    // scalastyle:on filelinelengthchecker
 
     df.createOrReplaceTempView("query")
     hyperspace.createIndex(df, indexConfig)
@@ -428,6 +439,7 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
     val indexConfig = IndexConfig("filterIndex", Seq("Col2"), Seq("Col1"))
     hyperspace.createIndex(df, indexConfig)
 
+    // scalastyle:off filelinelengthchecker
     /**
      * Expected output with displayMode-specific strings substituted (not shown below):
      *
@@ -451,6 +463,7 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
      * filterIndex:src/test/resources/indexLocation/indexes/filterIndex
      *
      */
+    // scalastyle:on filelinelengthchecker
     val expectedOutput = new StringBuilder
     expectedOutput
       .append(displayMode.beginEndTag.open)
@@ -543,9 +556,10 @@ class ExplainTest extends FunSuite with HyperspaceSuite {
 
   /**
    * Helper method to truncate long string.
-   * Note: This method truncates long InMemoryFileIndex string to get the similar explainString for comparing
-   * with Hyperspace's explain API output. For reference, the similar truncation logic for InMemoryFileIndex string
-   * is in spark code base in DataSourceScanExec.scala in simpleString method.
+   * Note: This method truncates long InMemoryFileIndex string to get the similar explainString for
+   * comparing with Hyperspace's explain API output. For reference, the similar truncation logic for
+   * InMemoryFileIndex string is in spark code base in DataSourceScanExec.scala in simpleString
+   * method.
    *
    * @param s long string.
    * @return truncated string.

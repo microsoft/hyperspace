@@ -18,12 +18,12 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
-import org.apache.spark.sql.{DataFrame, Row}
 
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite {
 
@@ -66,8 +66,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     spark.disableHyperspace()
   }
 
-  test(
-    "enableHyperspace() plug in optimization rules, disableHyperspace() plug out optimization rules.") {
+  test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
     val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
 
     assert(

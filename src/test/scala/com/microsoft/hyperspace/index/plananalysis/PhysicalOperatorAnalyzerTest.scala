@@ -16,16 +16,16 @@
 
 package com.microsoft.hyperspace.index.plananalysis
 
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
 import org.apache.spark.sql.catalyst.plans.physical.{Distribution, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.SparkPlan
-import org.scalatest.FunSuite
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 
-class PhysicalOperatorAnalyzerTest extends FunSuite with SparkInvolvedSuite {
+class PhysicalOperatorAnalyzerTest extends SparkFunSuite with SparkInvolvedSuite {
   test("Two plans are the same") {
     val plan = DummySparkPlan("plan1", Seq(DummySparkPlan("plan1"), DummySparkPlan("plan2")))
     runPhysicalOperatorComparisonTest(

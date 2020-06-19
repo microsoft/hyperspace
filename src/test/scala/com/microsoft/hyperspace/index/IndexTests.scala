@@ -16,12 +16,12 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.scalatest.FunSuite
 
 import com.microsoft.hyperspace.actions.Constants
 
-class IndexTests extends FunSuite {
+class IndexTests extends SparkFunSuite {
   val indexConfig1 = IndexConfig("myIndex1", Array("id"), Seq("name"))
   val indexConfig2 = IndexConfig("myIndex2", Array("id"), Seq("school"))
 

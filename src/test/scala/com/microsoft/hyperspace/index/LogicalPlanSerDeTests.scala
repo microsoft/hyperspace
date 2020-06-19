@@ -17,13 +17,13 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Exists, InSubquery, IsNotNull, ListQuery, Literal, NamedExpression, ScalaUDF, ScalarSubquery}
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Exists, InSubquery, IsNotNull, ListQuery, Literal, NamedExpression, ScalarSubquery, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.scalatest.FunSuite
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -32,7 +32,7 @@ import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
  * Some tests are adapted from examples in ExpressionParserSuite.scala, PlanParserSuite.scala,
  * and QueryPlanSuite.scala.
  */
-class LogicalPlanSerDeTests extends FunSuite with SparkInvolvedSuite {
+class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
   val c1: AttributeReference = AttributeReference("c1", StringType)()
   val c2: AttributeReference = AttributeReference("c2", StringType)()
   val c3: AttributeReference = AttributeReference("c3", StringType)()

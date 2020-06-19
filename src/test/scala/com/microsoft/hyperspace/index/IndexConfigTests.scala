@@ -16,9 +16,9 @@
 
 package com.microsoft.hyperspace.index
 
-import org.scalatest.FunSuite
+import org.apache.spark.SparkFunSuite
 
-class IndexConfigTests extends FunSuite {
+class IndexConfigTests extends SparkFunSuite {
   test("Empty index name is not allowed.") {
     intercept[IllegalArgumentException](IndexConfig("", Seq("c1"), Seq("c2")))
     intercept[IllegalArgumentException](IndexConfig.builder.indexBy("c1").include("c2").create)

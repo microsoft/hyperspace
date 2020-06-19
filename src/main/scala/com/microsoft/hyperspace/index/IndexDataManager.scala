@@ -51,7 +51,7 @@ class IndexDataManagerImpl(indexPath: Path) extends IndexDataManager {
    * This method relies on the naming convention that directory name will be similar to hive
    * partitioning scheme, i.e. "root/v__=value/f1.parquet" etc. Here the value represents the
    * version id of the data.
-   **/
+   */
   override def getLatestVersionId(): Option[Int] = {
     if (!fs.exists(indexPath)) {
       return None

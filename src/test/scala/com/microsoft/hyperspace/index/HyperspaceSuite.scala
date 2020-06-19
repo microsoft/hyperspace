@@ -16,11 +16,11 @@
 
 package com.microsoft.hyperspace.index
 
-import org.scalatest.FunSuite
+import org.apache.spark.SparkFunSuite
 
 import com.microsoft.hyperspace.{Hyperspace, SparkInvolvedSuite}
 
-trait HyperspaceSuite extends FunSuite with SparkInvolvedSuite {
+trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     clearCache()

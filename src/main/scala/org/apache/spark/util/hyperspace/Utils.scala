@@ -14,8 +14,13 @@
  * limitations under the License.
  */
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
+package org.apache.spark.util.hyperspace
 
-addSbtPlugin("com.jsuereth" % "sbt-pgp" % "2.0.1")
-
-addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
+/**
+ * This class is used to expose package private methods from org.apache.spark.util.Utils.
+ */
+object Utils {
+  def classForName(className: String): Class[_] = {
+    org.apache.spark.util.Utils.classForName(className)
+  }
+}

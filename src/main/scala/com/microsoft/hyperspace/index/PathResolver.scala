@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import java.util.NoSuchElementException
+import java.util.{Locale, NoSuchElementException}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
@@ -45,7 +45,10 @@ private[hyperspace] class PathResolver(conf: SQLConf) {
       val indexNames = fs.listStatus(root)
       indexNames
         .collectFirst {
-          case s: FileStatus if s.getPath.getName.toLowerCase.equals(name.toLowerCase) =>
+          case s: FileStatus
+              if s.getPath.getName
+                .toLowerCase(Locale.ROOT)
+                .equals(name.toLowerCase(Locale.ROOT)) =>
             s.getPath
         }
         .getOrElse(new Path(root, name))

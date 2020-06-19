@@ -19,16 +19,16 @@ package com.microsoft.hyperspace.index
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.{FileStatus, Path}
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitionSpec, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.StructType
-import org.scalatest.FunSuite
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 
-class FileBasedSignatureProviderTests extends FunSuite with SparkInvolvedSuite {
+class FileBasedSignatureProviderTests extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength = 100
   private val fileModificationTime = 10000
   private val filePath = new Path("filePath")
@@ -140,10 +140,12 @@ class FileBasedSignatureProviderTests extends FunSuite with SparkInvolvedSuite {
   private class MockPartitioningAwareFileIndex(sparkSession: SparkSession, files: Seq[FileStatus])
       extends PartitioningAwareFileIndex(sparkSession, Map.empty, None) {
     override def partitionSpec(): PartitionSpec = PartitionSpec(StructType(Seq()), Seq())
-    override protected def leafFiles: mutable.LinkedHashMap[Path, FileStatus] = ???
-    override protected def leafDirToChildrenFiles: Map[Path, Array[FileStatus]] = ???
-    override def rootPaths: Seq[Path] = ???
-    override def refresh(): Unit = ???
+    override protected def leafFiles: mutable.LinkedHashMap[Path, FileStatus] =
+      throw new NotImplementedError
+    override protected def leafDirToChildrenFiles: Map[Path, Array[FileStatus]] =
+      throw new NotImplementedError
+    override def rootPaths: Seq[Path] = throw new NotImplementedError
+    override def refresh(): Unit = throw new NotImplementedError
     override def allFiles: Seq[FileStatus] = files
   }
 }

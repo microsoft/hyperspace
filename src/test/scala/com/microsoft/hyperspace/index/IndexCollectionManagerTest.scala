@@ -17,24 +17,24 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import org.apache.spark.SparkFunSuite
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{mock, when}
-import org.scalatest.FunSuite
 
-import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
+import com.microsoft.hyperspace.actions.Constants
 
-class IndexCollectionManagerTest extends FunSuite with SparkInvolvedSuite {
+class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   private val indexSystemPath = "src/test/resources/indexLocation"
   private val testLogManagerFactory: IndexLogManagerFactory = new IndexLogManagerFactory {
     override def create(indexPath: Path): IndexLogManager =
       new IndexLogManager {
         override def getLog(id: Int): Option[LogEntry] = Some(testLogEntry)
         override def getLatestId(): Option[Int] = Some(0)
-        override def getLatestStableLog(): Option[LogEntry] = ???
-        override def createLatestStableLog(id: Int): Boolean = ???
-        override def deleteLatestStableLog(): Boolean = ???
-        override def writeLog(id: Int, log: LogEntry): Boolean = ???
+        override def getLatestStableLog(): Option[LogEntry] = throw new NotImplementedError
+        override def createLatestStableLog(id: Int): Boolean = throw new NotImplementedError
+        override def deleteLatestStableLog(): Boolean = throw new NotImplementedError
+        override def writeLog(id: Int, log: LogEntry): Boolean = throw new NotImplementedError
         override def getLatestLog(): Option[LogEntry] = Some(testLogEntry)
 
         private val testLogEntry: IndexLogEntry = {

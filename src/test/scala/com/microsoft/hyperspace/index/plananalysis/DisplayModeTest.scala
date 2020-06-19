@@ -16,11 +16,11 @@
 
 package com.microsoft.hyperspace.index.plananalysis
 
-import org.scalatest.FunSuite
+import org.apache.spark.SparkFunSuite
 
 import com.microsoft.hyperspace.index.IndexConstants
 
-class DisplayModeTest extends FunSuite {
+class DisplayModeTest extends SparkFunSuite {
   test("Testing default tags in Display Mode.") {
     val htmlMode = new HTMLMode(Map.empty)
     assert(htmlMode.beginEndTag.open.equals("<pre>"))

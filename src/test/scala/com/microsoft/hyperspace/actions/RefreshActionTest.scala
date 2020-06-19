@@ -18,17 +18,17 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
-import org.scalatest.FunSuite
 
+import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
-import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 
-class RefreshActionTest extends FunSuite with SparkInvolvedSuite {
+class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])

@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import java.util.Locale
+
 /**
  * IndexConfig specifies the configuration of an index.
  *
@@ -71,7 +73,7 @@ case class IndexConfig(
       s"includedColumns: $includedColumnNames]"
   }
 
-  private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase)
+  private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
 }
 
 /**

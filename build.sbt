@@ -46,9 +46,24 @@ scalacOptions ++= Seq(
 
 javaOptions += "-Xmx1024m"
 
-/********************************
+/*****************************
+ * ScalaStyle configurations *
+ *****************************/
+scalastyleConfig := baseDirectory.value / "scalastyle-config.xml"
+
+// Run as part of compile task.
+lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
+compileScalastyle := scalastyle.in(Compile).toTask("").value
+(compile in Compile) := ((compile in Compile) dependsOn compileScalastyle).value
+
+// Run as part of test task.
+lazy val testScalastyle = taskKey[Unit]("testScalastyle")
+testScalastyle := scalastyle.in(Test).toTask("").value
+(test in Test) := ((test in Test) dependsOn testScalastyle).value
+
+/***********************
  * Test configurations *
- ********************************/
+ ***********************/
 // Tests cannot be run in parallel since mutiple Spark contexts cannot run in the same JVM.
 parallelExecution in Test := false
 

@@ -17,11 +17,12 @@
 package com.microsoft.hyperspace
 
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
 
 trait SparkInvolvedSuite extends BeforeAndAfterAll with BeforeAndAfter {
-  self: FunSuite =>
+  self: SparkFunSuite =>
 
   override def suiteName: String = getClass.getSimpleName
 

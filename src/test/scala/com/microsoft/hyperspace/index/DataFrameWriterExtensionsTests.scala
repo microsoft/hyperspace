@@ -21,18 +21,18 @@ import java.io.File
 import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.fs.Path
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, Row}
-import org.scalatest.FunSuite
 
+import com.microsoft.hyperspace.{SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.FileUtils
-import com.microsoft.hyperspace.{SampleData, SparkInvolvedSuite}
 
-class DataFrameWriterExtensionsTests extends FunSuite with SparkInvolvedSuite {
+class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSuite {
 
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
