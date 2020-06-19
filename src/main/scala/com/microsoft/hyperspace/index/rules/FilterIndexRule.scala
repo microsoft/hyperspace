@@ -120,10 +120,12 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
           Map())(spark)
 
         val filter = subplan.child.asInstanceOf[Filter]
-        val updatedPlan =
-          subplan.copy(child = filter.copy(child = logicalRelation.copy(relation = newRelation)))
+        val newOutput =
+          logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
 
-        updatedPlan
+        subplan.copy(
+          child =
+            filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput)))
 
       case None => subplan // No candidate index found
     }

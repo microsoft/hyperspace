@@ -152,7 +152,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
           _,
           Filter(
             _,
-            LogicalRelation(
+            l @ LogicalRelation(
               HadoopFsRelation(
                 newLocation: InMemoryFileIndex,
                 newPartitionSchema: StructType,
@@ -169,6 +169,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
         assert(newPartitionSchema.equals(new StructType()), "Invalid partition schema.")
         assert(dataSchema.equals(allIndexes.head.schema), "Invalid schema.")
         assert(bucketSpec.isEmpty, "Invalid bucket spec.")
+        assert(dataSchema.fieldNames.toSet.equals(l.output.map(_.name).toSet))
 
       case _ => fail("Unexpected plan.")
     }
