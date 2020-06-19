@@ -137,9 +137,12 @@ publishMavenStyle := true
 
 import ReleaseTransformations._
 
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
+  runClean,
   runTest,
   setReleaseVersion,
   commitReleaseVersion,
