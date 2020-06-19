@@ -59,7 +59,8 @@ class HyperspaceTests extends HyperspaceSuite {
   }
 
   test(
-    "Verify different hyperspace instances with the same Spark session can access all indexes (Scenario 1).") {
+    "Verify different hyperspace instances with the same Spark session " +
+      "can access all indexes (Scenario 1).") {
     // Make a call so index cache gets populated.
     val originalCount = Hyperspace.getContext(spark).indexCollectionManager.indexes.count
     assert(originalCount == 0)
@@ -74,7 +75,8 @@ class HyperspaceTests extends HyperspaceSuite {
   }
 
   test(
-    "Verify different hyperspace instances with the same Spark session can access all indexes (Scenario 2).") {
+    "Verify different hyperspace instances with the same Spark session " +
+      "can access all indexes (Scenario 2).") {
     val hs1 = new Hyperspace(spark)
     val hs2 = new Hyperspace(spark)
 
