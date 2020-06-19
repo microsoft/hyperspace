@@ -45,7 +45,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
     //  1. The index covers all columns from the filter predicate and project, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transform {
-      case subplan @ Project(
+      case project @ Project(
             _,
             Filter(
               condition: Expression,
@@ -55,11 +55,11 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
                 _,
                 _))) =>
         try {
-          // "CleanupAliases" cleans up Alias expression inside subplan
+          // "CleanupAliases" cleans up Alias expression inside a logical plan
           // such that its children would not have any Alias expressions.
           // Calling "references" on the expression in projectList ensures
           // we will get the correct (original) column names.
-          val projectColumnNames = CleanupAliases(subplan)
+          val projectColumnNames = CleanupAliases(project)
             .asInstanceOf[Project]
             .projectList
             .map(_.references.map(_.asInstanceOf[AttributeReference].name))
@@ -67,7 +67,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
           val filterColumnNames = condition.references.map(_.name).toSeq
 
           replaceWithIndexIfPlanCovered(
-            subplan,
+            project,
             projectColumnNames,
             filterColumnNames,
             logicalRelation,
@@ -76,7 +76,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
         } catch {
           case e: Exception =>
             logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
-            subplan
+            project
         }
     }
   }
@@ -85,7 +85,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
    * For a given relation, check its available indexes and replace it with the top-ranked index
    * (according to cost model).
    *
-   * @param subplan  top-most node in the logical plan that is being optimized.
+   * @param project  top-most node in the logical plan that is being optimized.
    * @param projectColumns List of project columns.
    * @param filterColumns  List of columns in filter predicate.
    * @param logicalRelation  child logical relation in the subplan.
@@ -95,16 +95,16 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
    *         the top-ranked index.
    */
   private def replaceWithIndexIfPlanCovered(
-      subplan: Project,
+      project: Project,
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       logicalRelation: LogicalRelation,
       fsRelation: HadoopFsRelation,
       location: FileIndex): Project = {
-    require(subplan.child.isInstanceOf[Filter])
+    require(project.child.isInstanceOf[Filter])
 
     val candidateIndexes =
-      findCoveringIndexes(subplan, projectColumns, filterColumns, fsRelation)
+      findCoveringIndexes(project, projectColumns, filterColumns, fsRelation)
     rank(candidateIndexes) match {
       case Some(index) =>
         val spark = fsRelation.sparkSession
@@ -119,15 +119,15 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
           new ParquetFileFormat,
           Map())(spark)
 
-        val filter = subplan.child.asInstanceOf[Filter]
+        val filter = project.child.asInstanceOf[Filter]
         val newOutput =
           logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
 
-        subplan.copy(
+        project.copy(
           child =
             filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput)))
 
-      case None => subplan // No candidate index found
+      case None => project // No candidate index found
     }
   }
 
@@ -137,14 +137,14 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
    *
    * TODO: This method is duplicated in FilterIndexRule and JoinIndexRule. Deduplicate.
    *
-   * @param subplan top-most node in the logical plan that is being optimized.
+   * @param project top-most node in the logical plan that is being optimized.
    * @param projectColumns List of project columns.
    * @param filterColumns List of columns in filter predicate.
    * @param fsRelation Input relation in the subplan.
    * @return List of available candidate indexes on fsRelation for the given columns.
    */
   private def findCoveringIndexes(
-      subplan: Project,
+      project: Project,
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
@@ -160,7 +160,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       if (!signatureMap.contains(sourcePlanSignature.provider)) {
         val signature = LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(subplan)
+          .signature(project)
         signatureMap.put(sourcePlanSignature.provider, signature)
       }
 
