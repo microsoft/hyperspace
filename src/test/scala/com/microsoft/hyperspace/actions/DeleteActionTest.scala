@@ -16,15 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.spark.SparkFunSuite
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito.{mock, when}
-import org.scalatest.FunSuite
 
+import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 
-class DeleteActionTest extends FunSuite with SparkInvolvedSuite {
+class DeleteActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
 
   override def beforeAll(): Unit = {

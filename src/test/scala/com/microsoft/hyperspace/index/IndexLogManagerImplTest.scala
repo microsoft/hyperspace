@@ -20,13 +20,14 @@ import java.util.UUID
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.apache.spark.SparkFunSuite
+import org.scalatest.BeforeAndAfterAll
 
+import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
-import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
 
-class IndexLogManagerImplTest extends FunSuite with SparkInvolvedSuite with BeforeAndAfterAll {
+class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with BeforeAndAfterAll {
   val testRoot = "src/test/resources/indexLogManagerTests"
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",

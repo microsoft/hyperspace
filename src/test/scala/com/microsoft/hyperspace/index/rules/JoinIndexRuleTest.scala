@@ -17,13 +17,13 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Row, SparkSession}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._

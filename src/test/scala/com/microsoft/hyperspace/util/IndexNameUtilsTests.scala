@@ -16,9 +16,9 @@
 
 package com.microsoft.hyperspace.util
 
-import org.scalatest.FunSuite
+import org.apache.spark.SparkFunSuite
 
-class IndexNameUtilsTests extends FunSuite {
+class IndexNameUtilsTests extends SparkFunSuite {
   test("Test normalizeIndexName() function.") {
     val indexName = "  my index   1     "
     val expectedIndexNameAfterNorm = "my_index_1"

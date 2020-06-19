@@ -16,9 +16,9 @@
 
 package com.microsoft.hyperspace.index.plananalysis
 
-import org.scalatest.FunSuite
+import org.apache.spark.SparkFunSuite
 
-class BufferStreamTest extends FunSuite {
+class BufferStreamTest extends SparkFunSuite {
   test("Testing buffer stream highlight with spaces.") {
     val s = "   Please highlight me.  "
     val testDisplayMode = new TestDisplayMode

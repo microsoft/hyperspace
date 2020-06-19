@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index
 import scala.util.{Success, Try}
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.util.hyperspace.Utils
 
 /**
  * This trait contains the interface that provides the signature of logical plan.
@@ -52,7 +53,7 @@ object LogicalPlanSignatureProvider {
    * @return signature provider.
    */
   def create(name: String): LogicalPlanSignatureProvider = {
-    Try(Class.forName(name).newInstance) match {
+    Try(Utils.classForName(name).newInstance) match {
       case Success(provider: LogicalPlanSignatureProvider) => provider
       case _ =>
         throw new IllegalArgumentException(

@@ -19,14 +19,14 @@ package com.microsoft.hyperspace.index.plananalysis
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.hyperspace.utils.DataFrameUtils
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import com.microsoft.hyperspace.index.IndexConstants
 import com.microsoft.hyperspace.{HyperspaceException, Implicits}
+import com.microsoft.hyperspace.index.IndexConstants
 
 /**
  * Provides helper methods for explain API.

@@ -18,9 +18,9 @@ package com.microsoft.hyperspace.util
 
 import java.util.UUID
 
-import org.scalatest.FunSuite
+import org.apache.spark.SparkFunSuite
 
-class HashingUtilsTests extends FunSuite {
+class HashingUtilsTests extends SparkFunSuite {
   test("For md5Hashing(), same input has the same output hash code.") {
     val randomUUID = UUID.randomUUID.toString
     val hashCode1 = HashingUtils.md5Hex(randomUUID)

@@ -16,14 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.spark.SparkFunSuite
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.index._
 
-class ActionTest extends FunSuite with SparkInvolvedSuite with BeforeAndAfter {
+class ActionTest extends SparkFunSuite with SparkInvolvedSuite with BeforeAndAfter {
   var mockLogManager: IndexLogManager = _
   var testObject: Action = _
   val testLogEntry: LogEntry = TestLogEntry(Constants.States.DOESNOTEXIST)

@@ -21,7 +21,7 @@ import java.util.Base64
 import org.apache.hadoop.fs.Path
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{Exists, InSubquery, ListQuery, ScalaUDF, ScalarSubquery}
+import org.apache.spark.sql.catalyst.expressions.{Exists, InSubquery, ListQuery, ScalarSubquery, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 

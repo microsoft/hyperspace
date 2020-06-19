@@ -17,13 +17,13 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
-import org.scalatest.FunSuite
 
-import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.util.FileUtils
 
-class CreateIndexTests extends FunSuite with SparkInvolvedSuite {
+class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
 
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"

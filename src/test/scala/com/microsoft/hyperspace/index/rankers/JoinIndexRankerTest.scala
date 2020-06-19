@@ -16,14 +16,14 @@
 
 package com.microsoft.hyperspace.index.rankers
 
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.scalatest.FunSuite
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
-class JoinIndexRankerTest extends FunSuite {
+class JoinIndexRankerTest extends SparkFunSuite {
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
