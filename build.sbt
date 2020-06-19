@@ -16,8 +16,6 @@
 
 name := "hyperspace-core"
 
-organization := "com.microsoft"
-
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
 lazy val supportedScalaVersions = List(scala212, scala211)
@@ -49,7 +47,7 @@ scalacOptions ++= Seq(
 javaOptions += "-Xmx1024m"
 
 /********************************
- * Tests related configurations *
+ * Test configurations *
  ********************************/
 // Tests cannot be run in parallel since mutiple Spark contexts cannot run in the same JVM.
 parallelExecution in Test := false
@@ -62,3 +60,91 @@ javaOptions in Test ++= Seq(
   "-Xmx1024m"
 )
 
+/**************************
+ * Release configurations *
+ **************************/
+organization in ThisBuild := "com.microsoft.hyperspace"
+organizationName in ThisBuild := "Microsoft"
+organizationHomepage in ThisBuild := Some(url("http://www.microsoft.com/"))
+
+releaseCrossBuild in ThisBuild := true
+
+scmInfo in ThisBuild := Some(
+  ScmInfo(
+    url("https://github.com/microsoft/hyperspace"),
+    "scm:git@github.com:microsoft/hyperspace.git"
+  )
+)
+
+developers in ThisBuild := List(
+  Developer(
+    id    = "rapoth",
+    name  = "Rahul Potharaju",
+    email = "",
+    url   = url("https://github.com/rapoth")
+  ),
+  Developer(
+    id    = "imback82",
+    name  = "Terry Kim",
+    email = "",
+    url   = url("https://github.com/imback82")
+  ),
+  Developer(
+    id    = "apoorvedave1",
+    name  = "Apoorve Dave",
+    email = "",
+    url   = url("https://github.com/apoorvedave1")
+  ),
+  Developer(
+    id    = "pirz",
+    name  = "Pouria Pirzadeh",
+    email = "",
+    url   = url("https://github.com/pirz")
+  ),
+  Developer(
+    id    = "thrajput",
+    name  = "Tarun Rajput",
+    email = "",
+    url   = url("https://github.com/thrajput")
+  ),
+  Developer(
+    id    = "AFFogarty",
+    name  = "Andrew Fogarty",
+    email = "",
+    url   = url("https://github.com/AFFogarty")
+  ),
+  Developer(
+    id    = "laserljy",
+    name  = "Jiying Li",
+    email = "",
+    url   = url("https://github.com/laserljy")
+  )
+)
+
+description in ThisBuild := "Hyperspace: An Indexing Subsystem for Apache Spark"
+licenses in ThisBuild := List("Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+homepage in ThisBuild := Some(url("https://github.com/microsoft/hyperspace"))
+
+// Remove all additional repository other than Maven Central from POM
+pomIncludeRepository in ThisBuild := { _ => false }
+publishTo in ThisBuild := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
+  else Some("releases" at nexus + "service/local/staging/deploy/maven2")
+}
+
+publishMavenStyle in ThisBuild := true
+
+import ReleaseTransformations._
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  publishArtifacts,
+  setNextVersion,
+  commitNextVersion
+)
