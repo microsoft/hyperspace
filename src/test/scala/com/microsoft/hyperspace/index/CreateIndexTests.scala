@@ -120,17 +120,30 @@ class CreateIndexTests extends FunSuite with SparkInvolvedSuite {
   }
 
   test("Verify indexes are available across different hyperspace instances.") {
-    // Make a call so index cache gets populated
+    // Make a call so index cache gets populated.
     val originalCount = Hyperspace.getContext(spark).indexCollectionManager.indexes.count
     assert(originalCount == 0)
 
-    // Create an index thru a new Hyperspace instance
+    // Create an index thru a new Hyperspace instance.
     val hs = new Hyperspace(spark)
     hs.createIndex(df, indexConfig1)
-    val count = hs.indexes.count
-    assert(count == 1)
+    assert(hs.indexes.count == 1)
 
-    val finalCount = Hyperspace.getContext(spark).indexCollectionManager.indexes.count
-    assert(finalCount == 1)
+    // Make sure new index is available to all.
+    assert(Hyperspace.getContext(spark).indexCollectionManager.indexes.count == 1)
+  }
+
+  test("Verify create index using different hyperspace instances.") {
+    val hs1 = new Hyperspace(spark)
+    val hs2 = new Hyperspace(spark)
+
+    assert(hs1.indexes.count == 0)
+    assert(hs2.indexes.count == 0)
+
+    hs1.createIndex(df, indexConfig1)
+    hs2.createIndex(df, indexConfig2)
+
+    assert(hs1.indexes.count == 2)
+    assert(hs2.indexes.count == 2)
   }
 }
