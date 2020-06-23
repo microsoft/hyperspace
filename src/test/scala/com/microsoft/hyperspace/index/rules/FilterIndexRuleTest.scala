@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -144,6 +145,30 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     val originalPlan = Project(Seq(c2, c3), filterNode)
     val transformedPlan = FilterIndexRule(originalPlan)
     assert(transformedPlan.equals(originalPlan), "Plan should not transform.")
+  }
+
+  test("Verify FilterIndex rule is applied when all columns are selected.") {
+    val filterCondition = And(IsNotNull(c3), EqualTo(c3, Literal("facebook")))
+    val originalPlan = Filter(filterCondition, scanNode)
+
+    val transformedPlan = FilterIndexRule(originalPlan)
+    assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
+  }
+
+  test("temp test.") {
+    import spark.implicits._
+    Seq((1, "name1"), (2, "name2")).toDF("id", "name").write.mode("overwrite").parquet("table")
+    val df = spark.read.parquet("table")
+
+    val hs = new Hyperspace(spark)
+
+    hs.createIndex(
+      df,
+      IndexConfig("index", indexedColumns = Seq("id"), includedColumns = Seq("name")))
+    hs.indexes.show
+
+    val query = df.filter(df("id") === 1).select("id", "name")
+    query.explain(true)
   }
 
   private def verifyTransformedPlan(logicalPlan: LogicalPlan): Unit = {
