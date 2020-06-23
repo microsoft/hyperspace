@@ -8,7 +8,7 @@ title                    : "Hyperspace"
 title_separator          : "-"
 subtitle                 : "An Indexing Subsystem for Apache Spark™"
 url                      : https://imback82.github.io
-baseurl                  : "/hyperspace"
+baseurl                  : "/hyperspace-1"
 repository               : "microsoft/hyperspace"
 breadcrumbs              : false
 words_per_minute         : 200
