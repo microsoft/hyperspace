@@ -1,0 +1,63 @@
+# main links
+main:
+  - title: "Quick-Start Guide"
+    url: /docs/ug-quick-start-guide/
+  - title: "Code"
+    url: https://github.com/microsoft/hyperspace
+  - title: "Releases" 
+    url: https://github.com/microsoft/hyperspace/releases
+
+# documentation links
+docs:
+  - title: User Guide
+    children:
+      - title: "Quick-Start Guide"
+        url: /docs/ug-quick-start-guide/
+      - title: "Configuration"
+        url: /docs/ug-configuration/
+      - title: "Release Notes"
+        url: https://github.com/microsoft/hyperspace/releases
+      - title: "Best Practices"
+        url: /docs/ug-best-practices/
+      - title: "Frequently asked Questions"
+        url: /docs/ug-faqs/
+      - title: "Upgrading"
+        url: /docs/ug-upgrading/
+  - title: Developer Guide
+    children:
+      - title: "Building from Source"
+        url: /docs/dg-building-from-source/
+      - title: "Understanding Code Structure"
+        url: /docs/dg-code-structure/
+      - title: "Hacking Hyperspace"
+        url: /docs/dg-hack-hyperspace/
+      - title: "Contributing"
+        url: /docs/dg-contributing/
+  - title: Tour of Hyperspace
+    children:
+      - title: "Introduction"
+        url: /docs/toh-introduction/
+      - title: "Design Goals"
+        url: /docs/toh-design-goals/
+      - title: "Indexes et al."
+        url: /docs/toh-indexes/
+      - title: "Architectural Overview"
+        url: /docs/toh-overview/
+      - title: "Indexes on the Lake"
+        url: /docs/toh-indexes-on-the-lake/
+  - title: Serverless Index Management
+    children:
+      - title: "Metadata on Lake"
+        url: /docs/sim-metadata-on-lake/
+      - title: "Index State Management"
+        url: /docs/sim-index-state-management/
+      - title: "Concurrency Control"
+        url: /docs/sim-concurrency-control/
+  - title: Query Processing
+    children:
+      - title: "Intuition"
+        url: /docs/qp-intuition/
+      - title: "Rule-based Optimization"
+        url: /docs/qp-rule-based-optimization/
+      - title: "Hyperspace & Spark's Catalyst"
+        url: /docs/qp-integration-with-spark-catalyst/
