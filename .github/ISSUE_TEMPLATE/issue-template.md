@@ -1,7 +1,7 @@
 ---
 name: Issue template
 about: Describe an issue that the user is facing.
-title: "[ISSUE]"
+title: ""
 labels: untriaged
 assignees: ''
 
