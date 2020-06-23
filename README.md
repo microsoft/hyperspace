@@ -62,6 +62,9 @@ To run tests:
 sbt test
 ```
 
+### For Development On Intellij
+Intellij -> Open -> Choose file `<root>/build.sbt` -> Open As Project
+
 <a name="samples"></a>
 ## Samples
 
