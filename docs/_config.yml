@@ -16,6 +16,7 @@ words_per_minute         : 200
 atom_feed:
   path                   : # blank
 
+
 # Site Footer
 footer:
   links:
