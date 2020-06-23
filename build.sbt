@@ -27,9 +27,9 @@ scalaVersion := scala212
 crossScalaVersions := supportedScalaVersions
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided" withSources(),
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
+  "org.apache.spark" %% "spark-catalyst" % sparkVersion % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
