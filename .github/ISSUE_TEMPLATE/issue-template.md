@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-### Describe the issue**
+### Describe the issue
 <!--
 A clear and concise description of what the issue is.
 -->
@@ -27,8 +27,9 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 -->
 
-### Environment (please complete the following information if applicable):
+### Environment 
 <!--
+Please complete the following information if applicable:
  - OS: [e.g. Windows, Linux, iOS]
  - IDE (and version) [e.g. IntelliJ v10.1, Eclipse v2.3]
  - Apache Spark Version [e.g., Apache Spark 2.4.2]
