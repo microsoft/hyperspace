@@ -27,11 +27,13 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 -->
 
-**Environment (please complete the following information):**
+**Environment (please complete the following information if applicable):**
+<!--
  - OS: [e.g. Windows, Linux, iOS]
  - IDE (and version) [e.g. IntelliJ v10.1, Eclipse v2.3]
  - Apache Spark Version [e.g., Apache Spark 2.4.2]
  - Platform [e.g. Local execution, Azure Synapse Analytics, Azure/AWS Databricks, HDInsight Spark]
+-->
 
 **Additional context**
 <!--
