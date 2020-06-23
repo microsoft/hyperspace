@@ -63,7 +63,9 @@ sbt test
 ```
 
 ### For Development On Intellij
-Intellij -> Open -> Choose file `<root>/build.sbt` -> Open As Project
+1. Download and install [Intellij](https://www.jetbrains.com/idea/) with [Scala plugin](https://plugins.jetbrains.com/plugin/1347-scala) enabled
+2. Intellij -> Open -> Choose file `<root>/build.sbt` -> Open As Project
+
 
 <a name="samples"></a>
 ## Samples
