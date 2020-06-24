@@ -7,12 +7,12 @@ toc: true
 ---
 
 Hyperspace code is written in Scala and it is using 'sbt' as the build tool. Below is the list of folders in the code base hierarchy:
-### docs
-“docs” folder contains useful documentation on different aspects of Hyperspace including coding, contribution and formatting guidelines, and information on how to build the project in various environments. You can access the documentation using the [Hyperspace Documentation](https://microsoft.github.io/hyperspace/docs/ug-quick-start-guide/) site. 
+
 ### src
 “src” folder contains Hyperspace’s source and test code. 
 The source code is available under:
 * src/main/scala/com/microsoft/hyperspace
+* src/main/scala/org/apache/spark
 
 The source code includes implementation of core functionality and features of Hyperspace and is organized in different packages:
 - **actions** : Implementation of Hyperspace actions to create, maintain and remove indexes in a concurrent manner.
@@ -25,9 +25,15 @@ The test code is available under:
 * src/test/scala/com/microsoft/hyperspace
 
 The test code has a similar structure as the source code and each package in the test code includes unit test cases for the corresponding feature or functionality from the source code. Any code change or additional feature implementation needs to add relevant cases which fully cover the modified code.
+
+### docs
+“docs” folder contains useful documentation on different aspects of Hyperspace including coding, contribution and formatting guidelines, and information on how to build the project in various environments. You can access the documentation using the [Hyperspace Documentation](https://microsoft.github.io/hyperspace/docs/ug-quick-start-guide/) site. 
+
 ### dev
 “dev” folder contains required resources for contributing code to the Hyperspace project as a developer. Currently, it includes the Scala formatting configuration file that is needed to make sure any new code change complies with the Hyperspace’s [coding guidelines](https://microsoft.github.io/hyperspace/docs/dg-contributing/).
+
 ### build
 Hyperspace uses “sbt” as the build tool for building its code. “build” folder contains sbt build scripts and configurations which are used to create an artifact from Hyperspace source code.
+
 ### project
-“project” folder contains additional sbt build properties and plugin configurations which are needed to correctly format Hyperspace code and build it to generate a Hyperspace artifact.
+“project” folder contains additional sbt build properties and plugin configurations.
