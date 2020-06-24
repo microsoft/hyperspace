@@ -28,4 +28,4 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## License
 
-Apache License 2.0, see [LICENSE](https://github.com/delta-io/delta/blob/master/LICENSE.txt).
+Apache License 2.0, see [LICENSE](https://github.com/microsoft/hyperspace/blob/master/LICENSE).
