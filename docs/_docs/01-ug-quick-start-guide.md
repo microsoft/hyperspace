@@ -10,7 +10,7 @@ toc_icon: "shipping-fast"
 
 This guide helps you quickly get started with Hyperspace with Apache Spark™.
 
-## Set up Apache Spark™ with Hyperspace
+## Set up Hyperspace
 Hyperspace is compatiable with Apache Spark™ 2.4.* (support for Apache Spark™ 3.0 is on the way) and is cross built against Scala 2.11 and 2.12.
 There are two ways to set up Apache Spark™ with Hyperspace:
 1. Run as a project: Create a SBT or Maven project with Hyperspace, copy [code snippet](https://microsoft.github.io/hyperspace/#hyperspace-usage-api-in-apache-spark), and run the project.
