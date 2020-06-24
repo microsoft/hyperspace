@@ -6,6 +6,8 @@ An open source indexing subsystem that brings index-based query acceleration to 
 
 [aka.ms/hyperspace](https://aka.ms/hyperspace)
 
+[![javadoc](https://javadoc.io/badge2/com.microsoft.hyperspace/hyperspace-core_2.12/javadoc.svg)](https://javadoc.io/doc/com.microsoft.hyperspace/hyperspace-core_2.12/latest/com/microsoft/hyperspace/index.html)
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
