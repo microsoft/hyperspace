@@ -31,8 +31,8 @@ docs:
         url: /docs/dg-building-from-source/
       - title: "Understanding Code Structure"
         url: /docs/dg-code-structure/
-      - title: "Hacking Hyperspace"
-        url: /docs/dg-hack-hyperspace/
+#      - title: "Hacking Hyperspace"
+#        url: /docs/dg-hack-hyperspace/
       - title: "Roadmap"
         url: https://github.com/microsoft/hyperspace/blob/master/ROADMAP.md
       - title: "Contributing"
