@@ -4,6 +4,7 @@ permalink: /docs/toh-indexes-on-the-lake/
 excerpt: "Index organization on the lake."
 last_modified_at: 2020-06-23
 toc: false
+classes: wide
 ---
 
 To accomplish the goals outlined in [Design Goals](/hyperspace/docs/toh-design-goals/), 
