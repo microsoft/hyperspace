@@ -37,6 +37,10 @@ html {
     }
 }
 
+.nav__title {
+    background: "black";   
+}
+
 .feature__wrapper___small {
   @include clearfix();
   margin-bottom: 1em;
