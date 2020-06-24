@@ -135,7 +135,7 @@ The following is a query that filters on the `id` column and projects the `name`
 val query = df.filter(df("id") === 1).select("name")
 ```
 
-Now, to check whether any index is used, you can run the following, which will print out the information on the indexes used, physical plan/operator differences, etc.:
+To check whether any index will be used, you can use the `explain` API, which will print out the information on the indexes used, physical plan/operator differences, etc.:
 
 ```Scala
 hs.explain(query, verbose = true)
