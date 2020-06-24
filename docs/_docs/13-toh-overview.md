@@ -12,7 +12,7 @@ At its core, Hyperspace envisions two layers: Indexing Infrastructure
 and Query Infrastructure. The following figure shows the layering:
 
 <p align="center">
-  <img width="720" height="643" src="/assets/images/hyperspace-architectural-overview.png">
+  <img width="720" height="643" src="/hyperspace/assets/images/hyperspace-architectural-overview.png">
 </p>
 
 We will cover the components in a bottom-up manner.
