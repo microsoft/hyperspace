@@ -4,6 +4,7 @@ permalink: /docs/toh-introduction/
 excerpt: "Introduction"
 last_modified_at: 2020-06-23
 toc: false
+classes: wide
 ---
 
 At large companies, it has now become typical to store datasets ranging in size
