@@ -29,7 +29,7 @@ docs:
     children:
       - title: "Building from Source"
         url: /docs/dg-building-from-source/
-      - title: "Understanding Code Structure"
+      - title: "Code Structure"
         url: /docs/dg-code-structure/
 #      - title: "Hacking Hyperspace"
 #        url: /docs/dg-hack-hyperspace/
