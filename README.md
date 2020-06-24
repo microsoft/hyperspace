@@ -4,6 +4,8 @@
 
 An open source indexing subsystem that brings index-based query acceleration to Apache Spark™ and big data workloads.
 
+[aka.ms/hyperspace](https://aka.ms/hyperspace)
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
