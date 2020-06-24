@@ -1,3 +1,5 @@
+![Icon](https://github.com/rapoth/hyperspace/blob/master/docs/assets/images/hyperspace-small-banner.png?raw=true)
+
 # Hyperspace
 
 An open source indexing subsystem that brings index-based query acceleration to Apache Spark™ and big data workloads.
