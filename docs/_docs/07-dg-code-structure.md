@@ -22,8 +22,7 @@ The source code files are available under `src/main/scala` and include implement
 
 If you are working on adding changes to Hyperspace, you would need to add or modify code in above packages.
 
-The test code is available under:
-**`src/test/scala/com/microsoft/hyperspace`**
+The test code files are available under `src/test/scala/com/microsoft/hyperspace`.
 
 The test code has a similar structure as the source code and each package in the test code includes unit test cases for the corresponding feature or functionality from the source code. Any code change or additional feature implementation needs to add relevant cases which fully cover the modified code.
 
