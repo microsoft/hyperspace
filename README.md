@@ -1,6 +1,6 @@
 # Hyperspace
 
-TODO: Description
+An open source indexing subsystem that brings index-based query acceleration to Apache Spark™ and big data workloads.
 
 ## Contributing
 
@@ -18,7 +18,11 @@ Please review our [contribution guide](CONTRIBUTING.md).
 
 This project would not have been possible without the outstanding work from the following communities:
 
-- TODO: Write inspiration.
+- [Apache Spark](https://spark.apache.org/): Unified Analytics Engine for Big Data, the engine that Hyperspace builds on top of.
+- [Delta Lake](https://delta.io): Delta Lake is an open-source storage layer that brings ACID transactions to Apache Spark™ and big data workloads. Hyperspace derives quite a bit of inspiration from the way the Delta Lake community operates, their novel use of optimistic concurrency. 
+- [Databricks](https://databricks.com/): Unified analytics platform. Many thanks to all the inspiration they have provided us.
+- [.NET for Apache Spark™](https://github.com/dotnet/spark): Hyperspace offers .NET bindings for developers, thanks to the efforts of this team in collaborating and releasing the bindings just-in-time.
+- [Minimal Mistakes](https://github.com/mmistakes/minimal-mistakes): The awesome theme behind Hyperspace documentation. 
 
 ## Code of Conduct
 
