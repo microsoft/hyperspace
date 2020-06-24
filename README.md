@@ -6,7 +6,6 @@ TODO: Description
 
 - [Get Started](#get-started)
 - [Build Status](#build-status)
-- [Building from Source](#building-from-source)
 - [Samples](#samples)
 - [FAQ](#faq)
 - [Contributing](#contributing)
@@ -31,36 +30,6 @@ In this section, we will show how to run a Hyperspace app.
 | :---:         |          :---: |
 | Ubuntu | Windows |
 | N/A | N/A |
-
-## Building from Source
-
-Hyperspace is built with [sbt](https://www.scala-sbt.org/). Run the following commands from the project root directory.
-
-### On *nix OS
-
-To compile:
-```
-./build/sbt compile
-```
-
-To run tests:
-```
-./build/sbt test
-```
-
-### On Windows
-
-Download and install [sbt](https://www.scala-sbt.org/download.html).
-
-To compile:
-```
-sbt compile
-```
-
-To run tests:
-```
-sbt test
-```
 
 <a name="samples"></a>
 ## Samples
