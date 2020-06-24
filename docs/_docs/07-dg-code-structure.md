@@ -9,15 +9,18 @@ toc: true
 Hyperspace code is written in Scala and it is using 'sbt' as the build tool. Below is the list of folders in the code base hierarchy:
 
 ### src
-“src” folder contains Hyperspace’s source and test code. 
-The source code is available under:
-* src/main/scala/com/microsoft/hyperspace
-* src/main/scala/org/apache/spark
+“src” folder contains Hyperspace’s source and test code.
 
-The source code includes implementation of core functionality and features of Hyperspace and is organized in different packages:
-- **actions** : Implementation of Hyperspace actions to create, maintain and remove indexes in a concurrent manner.
-- **index**: Implementation of Hyeprspace indexes, optimizations rules and other core features.  
-- **util**: Various utility functions that are used by different features and components.
+The source code files are available under 'src/main/scala' and include implementation of core functionality and features of Hyperspace.
+
+* **src/main/scala/com/microsoft/hyperspace**
+
+  |- **actions** : Implementation of Hyperspace actions to create, maintain and remove indexes in a concurrent manner.
+
+  |- **index**: Implementation of Hyeprspace indexes, optimizations rules and other core features. 
+
+  |- **util**: Various utility functions that are used by different features and components.
+* **src/main/scala/org/apache/spark**: A number of shared utility functions. 
 
 If you are working on adding changes to Hyperspace, you would need to add or modify code in above packages.
 
