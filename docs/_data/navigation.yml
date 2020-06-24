@@ -54,11 +54,11 @@ docs:
   - title: Meta
     children:
       - title: "License"
-        url: /LICENSE
+        url: https://github.com/microsoft/hyperspace/blob/master/LICENSE
       - title: "Notice"
-        url: /NOTICE.txt
+        url: https://github.com/microsoft/hyperspace/blob/master/NOTICE.txt
       - title: "Security"
-        url: /SECURITY.md
+        url: https://github.com/microsoft/hyperspace/blob/master/SECURITY.md
 
 # Need to be written
 #  - title: Serverless Index Management
