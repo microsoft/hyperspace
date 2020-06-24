@@ -6,7 +6,6 @@ TODO: Description
 
 - [Get Started](#get-started)
 - [Build Status](#build-status)
-- [Building from Source](#building-from-source)
 - [Samples](#samples)
 - [FAQ](#faq)
 - [Contributing](#contributing)
@@ -31,10 +30,6 @@ In this section, we will show how to run a Hyperspace app.
 | :---:         |          :---: |
 | Ubuntu | Windows |
 | N/A | N/A |
-
-## Building from Source
-
-Please refer [the docs](docs/_docs/06-dg-building-from-source.md) for the latest build instructions.
 
 <a name="samples"></a>
 ## Samples
