@@ -6,7 +6,8 @@ last_modified_at: 2020-06-20
 toc: true
 ---
 
-### What is an index?
+## General
+#### What is an index?
 Exploiting indexes is a widely used techniques to improve query performance in databases.
 An index is an auxiliary data structure which is organized and stored in a way that it 
 optimizes certain kinds of data retrieval operations. Any subset of the fields of 
@@ -14,7 +15,7 @@ original data records can serve as the fields for an index. An index normally sp
 search operations that are not efficiently supported on original data records due to 
 their physical arrangement in the storage.
 
-### What type of an index does Hyperspace create? Do I have any control over it?
+#### What type of an index does Hyperspace create? Do I have any control over it?
 Hyperspace currently uses **covering indexes** although we have active plans on supporting
 other kinds of indexes in the future. Covering Indexes are known to be efficient in 
 scenarios where co-occurrence of certain columns happens frequently in query activities 
@@ -31,7 +32,7 @@ command in which he specifies data records to be indexed along with the index na
 and lists of indexed and included columns. For a simple example on how to do this,
 you can refer to our [Quick-Start Guide](https://microsoft.github.io/hyperspace/docs/ug-quick-start-guide/).
 
-### How do I decide which columns to index?
+#### How do I decide which columns to index?
 A number of factors in your data and query workload determine which columns to index. 
 There are two cases in a query's predicate where Spark would exploit Hyperspace indexes: 
 * Lookup or range selection filter.
@@ -49,20 +50,21 @@ If your queries combine records from large tables using equi-join with a predica
 
 then ColumnA and ColumnB are good candidates to create index on.
 
-### How can I force Hyperspace to use my index?
+#### How can I force Hyperspace to use my index?
 Hyperspace provides commands to enable and disable index usage. Using “enableHyperspace” 
 command, existing indexes become visible to the query optimizer and Hyperspace would 
 exploit them, if applicable to a given query. By using “disableHyperspace” command, 
 Hyperspace will no longer consider using indexes during query optimization.
 
-### How can I check if Hyperspace indexes are used in my query?
+#### How can I check if Hyperspace indexes are used in my query?
 You can use the "explain" command in Hyperspace to check if a given query would use 
 indexes when running. Assuming your query dataFrame is DF, running `hyperspace.explain(DF)` 
 prints out the query plan for two cases: when Hyperspace is enabled and disabled. 
 If any Hyperspace index is used for the enable case, explain's output lists all such 
 indexes and highlights portion(s) of the plan where those indexes make a difference.
 
-### I am running a query which uses Hyperspace indexes, but I do not see significant performance improvement. What could be the reason?
+# Debugging
+#### I am running a query which uses Hyperspace indexes, but I do not see significant performance improvement. What could be the reason?
 How much an index could help a query depends on many factors including the total 
 data size, total index size, value distribution for indexed and non-indexed columns, 
 and different expressions and predicates appearing in the query. Assuming that the 
@@ -97,7 +99,9 @@ several cases you can check:
   80% of total query time then any improvement in other parts of the query 
   (e.g., that an index has provided) would not be noticeable.
 
-### What else can I do to tune my index?
+# Advanced
+
+#### What can I do to tune my index?
 While there is no single set of recommendation that will tune an index for all
 use cases, it is useful to understand what is happening in Hyperspace. 
 
