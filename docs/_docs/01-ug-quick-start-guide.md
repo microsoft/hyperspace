@@ -18,7 +18,7 @@ There are two ways to set up Hyperspace with Apache Spark™:
 If you want to create a project using Hyperspace, you can get the artifacts from the [Maven Central Repository](https://search.maven.org/search?q=hyperspace) using the Maven coordinates as follows:
 
 #### Maven
-For your Maven project, add the following line to your `pom.xml` file:
+For your Maven project, add the following lines to your `pom.xml` file:
 
 * For Scala 2.11:
 ```
