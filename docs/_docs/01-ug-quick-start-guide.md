@@ -2,8 +2,8 @@
 title: "Quick-Start Guide"
 permalink: /docs/ug-quick-start-guide/
 excerpt: "How to quickly get started with Hyperspace for use with Apache Spark™."
-last_modified_at: 2020-06-23
-toc: true
+last_modified_at: 2020-06-24
+toc: false
 toc_label: "Quick-Start Guide"
 toc_icon: "shipping-fast"
 ---
@@ -72,7 +72,7 @@ You can run the code snippets in the following sections to explore the main feat
 
 To begin with, create a `DataFrame` from the data files (required to detect source data changes and to perform index refresh across sessions):
 
-```Scala
+```scala
 import org.apache.spark.sql._
 import spark.implicits._
 
@@ -82,7 +82,7 @@ val df = spark.read.parquet("table")
 
 Also, create a `Hyperspace` object, which provides index management APIs:
 
-```Scala
+```scala
 import com.microsoft.hyperspace._
 
 val hs = new Hyperspace(spark)
