@@ -92,7 +92,7 @@ val hs = new Hyperspace(spark)
 
 To create a Hyperspace Index, specify a `DataFrame` along with index configurations. `indexedColumns` are the column names used for join or filter operations, and `includedColumns` are the ones used for project operations. In this example, we will have a query that filters on the `id` column and projects the `name` column.
 
-```Scala
+```scala
 hs.createIndex(df, IndexConfig("index", indexedColumns = Seq("id"), includedColumns = Seq("name")))
 ```
 
@@ -100,7 +100,7 @@ hs.createIndex(df, IndexConfig("index", indexedColumns = Seq("id"), includedColu
 
 `Hyperspace.indexes` returns a `DataFrame` that captures the metadata of the available indexes, thus you can perform any `DataFrame` operations to display, filter, etc.:
 
-```Scala
+```scala
 val indexes: DataFrame = hs.indexes
 indexes.show
 ```
@@ -109,7 +109,7 @@ indexes.show
 
 These are the additional APIs for managing (delete, refresh, etc.) indexes:
 
-```Scala
+```scala
 // Refreshes the given index if the source data changes.
 hs.refreshIndex("index")
 
@@ -131,13 +131,13 @@ hs.vacuumIndex("index")
 
 The following is a query that filters on the `id` column and projects the `name` column:
 
-```Scala
+```scala
 val query = df.filter(df("id") === 1).select("name")
 ```
 
 To check whether any index will be used, you can use the `explain` API, which will print out the information on the indexes used, physical plan/operator differences, etc.:
 
-```Scala
+```scala
 hs.explain(query, verbose = true)
 ```
 
@@ -145,7 +145,7 @@ hs.explain(query, verbose = true)
 
 Now that you have created an index that your query can utilize, you can enable Hyperspace and execute your query:
 
-```Scala
+```scala
 spark.enableHyperspace
 query.show 
 ```
