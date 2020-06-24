@@ -17,12 +17,14 @@ docs:
         url: /docs/ug-configuration/
       - title: "Release Notes"
         url: https://github.com/microsoft/hyperspace/releases
-      - title: "Best Practices"
-        url: /docs/ug-best-practices/
+# Needs to be written later
+#      - title: "Best Practices"
+#        url: /docs/ug-best-practices/
       - title: "Frequently asked Questions"
         url: /docs/ug-faqs/
-      - title: "Upgrading"
-        url: /docs/ug-upgrading/
+# Needs to be written for next version
+#      - title: "Upgrading"
+#        url: /docs/ug-upgrading/
   - title: Developer Guide
     children:
       - title: "Building from Source"
