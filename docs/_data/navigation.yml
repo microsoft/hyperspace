@@ -45,19 +45,20 @@ docs:
         url: /docs/toh-overview/
       - title: "Indexes on the Lake"
         url: /docs/toh-indexes-on-the-lake/
-  - title: Serverless Index Management
-    children:
-      - title: "Metadata on Lake"
-        url: /docs/sim-metadata-on-lake/
-      - title: "Index State Management"
-        url: /docs/sim-index-state-management/
-      - title: "Concurrency Control"
-        url: /docs/sim-concurrency-control/
-  - title: Query Processing
-    children:
-      - title: "Intuition"
-        url: /docs/qp-intuition/
-      - title: "Rule-based Optimization"
-        url: /docs/qp-rule-based-optimization/
-      - title: "Hyperspace & Spark's Catalyst"
-        url: /docs/qp-integration-with-spark-catalyst/
+# Need to be written
+#  - title: Serverless Index Management
+#    children:
+#      - title: "Metadata on Lake"
+#        url: /docs/sim-metadata-on-lake/
+#      - title: "Index State Management"
+#        url: /docs/sim-index-state-management/
+#      - title: "Concurrency Control"
+#        url: /docs/sim-concurrency-control/
+#  - title: Query Processing
+#    children:
+#      - title: "Intuition"
+#        url: /docs/qp-intuition/
+#      - title: "Rule-based Optimization"
+#        url: /docs/qp-rule-based-optimization/
+#      - title: "Hyperspace & Spark's Catalyst"
+#        url: /docs/qp-integration-with-spark-catalyst/
