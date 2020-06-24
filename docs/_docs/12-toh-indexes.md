@@ -1,9 +1,11 @@
 ---
 title: "Indexes et al."
 permalink: /docs/toh-indexes/
-excerpt: "How to configure Hyperspace for your needs."
-last_modified_at: 2020-06-20
+excerpt: "Indexes, derived datasets and the whole mile of index types"
+last_modified_at: 2020-06-23
 toc: true
+toc_label: "FAQs"
+toc_icon: "brain"
 ---
 
 ## Viewing indexes as *derived datasets*
