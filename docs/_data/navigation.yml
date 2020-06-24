@@ -34,11 +34,11 @@ docs:
       - title: "Hacking Hyperspace"
         url: /docs/dg-hack-hyperspace/
       - title: "Roadmap"
-        url: /ROADMAP.md
+        url: https://github.com/microsoft/hyperspace/blob/master/ROADMAP.md
       - title: "Contributing"
-        url: /CONTRIBUTING.md
+        url: https://github.com/microsoft/hyperspace/blob/master/CONTRIBUTING.md
       - title: "Code of Conduct"
-        url: /CODE_OF_CONDUCT.md
+        url: https://github.com/microsoft/hyperspace/blob/master/CODE_OF_CONDUCT.md
   - title: Tour of Hyperspace
     children:
       - title: "Introduction"
