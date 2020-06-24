@@ -58,6 +58,8 @@ command, existing indexes become visible to the query optimizer and Hyperspace w
 exploit them, if applicable to a given query. By using “disableHyperspace” command, 
 Hyperspace will no longer consider using indexes during query optimization.
 
+## Debugging
+
 ### How can I check if Hyperspace indexes are used in my query?
 You can use the "explain" command in Hyperspace to check if a given query would use 
 indexes when running. Assuming your query dataFrame is DF, running `hyperspace.explain(DF)` 
@@ -65,8 +67,7 @@ prints out the query plan for two cases: when Hyperspace is enabled and disabled
 If any Hyperspace index is used for the enable case, explain's output lists all such 
 indexes and highlights portion(s) of the plan where those indexes make a difference.
 
-## Debugging
-### I am running a query which uses Hyperspace indexes, but I do not see significant performance improvement. What could be the reason?
+### Why am I not seeing any performance improvement?
 How much an index could help a query depends on many factors including the total 
 data size, total index size, value distribution for indexed and non-indexed columns, 
 and different expressions and predicates appearing in the query. Assuming that the 
