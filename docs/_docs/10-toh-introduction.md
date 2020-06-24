@@ -17,7 +17,7 @@ many of our customers, who are constantly exploring
 ways to reducing their operational costs – incurring unchecked 
 expenses are their worst nightmare. One way to alleviate this
 issue would be to bring in ‘indexing’ capabilities (which come 
-*de facto* in the traditional database systems world) into Apache Spark.
+*de facto* in the traditional database systems world) into Apache Spark™.
 
 Among many ways to improve query performance and lowering resource 
 consumption in database systems, indexes are particularly efficient in 
@@ -31,6 +31,6 @@ multi-user concurrency model) and leverage indexes (automatically,
 without any changes to their existing code) on their data (e.g., CSV, 
 JSON, Parquet etc.) for query/workload acceleration. 
 
-The rest of the articles cover the necessary foundations behind Hyperspace 
-including the API design, and how it leverages Spark’s Catalyst optimizer to 
+The rest of the documentation covers the necessary foundations behind Hyperspace 
+including the API design, and how it leverages Apache Spark™ Catalyst optimizer to 
 provide a transparent user experience.
