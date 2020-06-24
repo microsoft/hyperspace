@@ -21,6 +21,7 @@ If you want to create a project using Hyperspace, you can get the artifacts from
 For your Maven project, add the following lines to your `pom.xml` file:
 
 * For Scala 2.11:
+
 ```
 <dependency>
     <groupId>com.microsoft.hyperspace</groupId>
@@ -30,6 +31,7 @@ For your Maven project, add the following lines to your `pom.xml` file:
 ```
 
 * For Scala 2.12:
+
 ```
 <dependency>
     <groupId>com.microsoft.hyperspace</groupId>
@@ -40,6 +42,7 @@ For your Maven project, add the following lines to your `pom.xml` file:
 
 #### SBT
 For you SBT project, add the following line to your `build.sbt` file:
+
 ```
 libraryDependencies += "com.microsoft.hyperspace" %% "hyperspace-core" % "0.1.0"
 ```
@@ -49,6 +52,7 @@ To use Hyperspace with a Spark's interactive shell, you need to download/install
 
 #### Spark Scala Shell
 Start the Spark Scala shell as follows:
+
 ```
 ./bin/spark-shell --packages com.microsoft:hyperspace-core_2.11:0.1.0
 ```
