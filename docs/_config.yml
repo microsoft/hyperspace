@@ -7,8 +7,8 @@ locale                   : "en-US"
 title                    : "Hyperspace"
 title_separator          : "-"
 subtitle                 : "An Indexing Subsystem for Apache Spark™"
-url                      : https://apoorvedave1.github.io
-baseurl                  : "/hyperspace-1"
+url                      : https://microsoft.github.io
+baseurl                  : "/hyperspace"
 repository               : "microsoft/hyperspace"
 breadcrumbs              : false
 words_per_minute         : 200
