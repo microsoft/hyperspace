@@ -33,7 +33,7 @@ The test code has a similar structure as the source code and each package in the
 “docs” folder contains useful documentation on different aspects of Hyperspace including coding, contribution and formatting guidelines, and information on how to build the project in various environments. You can access the documentation using the [Hyperspace Documentation](https://microsoft.github.io/hyperspace/docs/ug-quick-start-guide/) site. 
 
 ### dev
-“dev” folder contains required resources for contributing code to the Hyperspace project as a developer. Currently, it includes the Scala formatting configuration file that is needed to make sure any new code change complies with the Hyperspace’s [coding guidelines](https://microsoft.github.io/hyperspace/docs/dg-contributing/).
+“dev” folder contains required resources for contributing code to the Hyperspace project as a developer. Currently, it includes the Scala formatting configuration file that is needed to make sure any new code change complies with the Hyperspace’s [coding guidelines](https://github.com/microsoft/hyperspace/blob/master/CONTRIBUTING.md).
 
 ### build
 Hyperspace uses “sbt” as the build tool for building its code. “build” folder contains sbt build scripts and configurations which are used to create an artifact from Hyperspace source code.

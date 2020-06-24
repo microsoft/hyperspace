@@ -4,6 +4,8 @@ permalink: /docs/ug-quick-start-guide/
 excerpt: "How to quickly get started with Hyperspace for use with Apache Spark™."
 last_modified_at: 2020-06-23
 toc: true
+toc_label: "Quick-Start Guide"
+toc_icon: "shipping-fast"
 ---
 
 This guide helps you quickly get started with Hyperspace with Apache Spark™.

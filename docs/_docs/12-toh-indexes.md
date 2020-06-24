@@ -4,7 +4,7 @@ permalink: /docs/toh-indexes/
 excerpt: "Indexes, derived datasets and the whole mile of index types"
 last_modified_at: 2020-06-23
 toc: true
-toc_label: "FAQs"
+toc_label: "Indexes et al."
 toc_icon: "brain"
 ---
 
