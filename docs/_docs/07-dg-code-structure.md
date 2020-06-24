@@ -15,7 +15,7 @@ The source code is available under:
 * src/main/scala/com/microsoft/hyperspace
 
 The source code includes implementation of core functionality and features of Hyperspace and is organized in different packages:
-- **actions** : It includes the implementaion of Hyperspace actions to create, maintain and remove indexes in a concurrent manner.
+- **actions** : It includes the implementation of Hyperspace actions to create, maintain and remove indexes in a concurrent manner.
 - **index**: It includes implementation of Hyeprspace indexes, optimizations rules and other core features. 
 - **util**: Various utility codes that are used by different features and components are added here.
 
