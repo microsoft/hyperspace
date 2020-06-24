@@ -1,11 +1,9 @@
 ---
 title: "Indexes on the Lake"
 permalink: /docs/toh-indexes-on-the-lake/
-excerpt: "How to configure Hyperspace for your needs."
+excerpt: "Index organization on the lake."
 last_modified_at: 2020-06-23
-toc: true
-toc_label: "FAQs"
-toc_icon: "glasses"
+toc: false
 ---
 
 To accomplish the goals outlined in [Design Goals](/hyperspace/docs/toh-design-goals/), 
