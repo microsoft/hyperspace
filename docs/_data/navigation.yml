@@ -17,12 +17,14 @@ docs:
         url: /docs/ug-configuration/
       - title: "Release Notes"
         url: https://github.com/microsoft/hyperspace/releases
-      - title: "Best Practices"
-        url: /docs/ug-best-practices/
+# Needs to be written later
+#      - title: "Best Practices"
+#        url: /docs/ug-best-practices/
       - title: "Frequently asked Questions"
         url: /docs/ug-faqs/
-      - title: "Upgrading"
-        url: /docs/ug-upgrading/
+# Needs to be written for next version
+#      - title: "Upgrading"
+#        url: /docs/ug-upgrading/
   - title: Developer Guide
     children:
       - title: "Building from Source"
@@ -31,8 +33,12 @@ docs:
         url: /docs/dg-code-structure/
       - title: "Hacking Hyperspace"
         url: /docs/dg-hack-hyperspace/
+      - title: "Roadmap"
+        url: https://github.com/microsoft/hyperspace/blob/master/ROADMAP.md
       - title: "Contributing"
-        url: /docs/dg-contributing/
+        url: https://github.com/microsoft/hyperspace/blob/master/CONTRIBUTING.md
+      - title: "Code of Conduct"
+        url: https://github.com/microsoft/hyperspace/blob/master/CODE_OF_CONDUCT.md
   - title: Tour of Hyperspace
     children:
       - title: "Introduction"
@@ -45,19 +51,29 @@ docs:
         url: /docs/toh-overview/
       - title: "Indexes on the Lake"
         url: /docs/toh-indexes-on-the-lake/
-  - title: Serverless Index Management
+  - title: Meta
     children:
-      - title: "Metadata on Lake"
-        url: /docs/sim-metadata-on-lake/
-      - title: "Index State Management"
-        url: /docs/sim-index-state-management/
-      - title: "Concurrency Control"
-        url: /docs/sim-concurrency-control/
-  - title: Query Processing
-    children:
-      - title: "Intuition"
-        url: /docs/qp-intuition/
-      - title: "Rule-based Optimization"
-        url: /docs/qp-rule-based-optimization/
-      - title: "Hyperspace & Spark's Catalyst"
-        url: /docs/qp-integration-with-spark-catalyst/
+      - title: "License"
+        url: https://github.com/microsoft/hyperspace/blob/master/LICENSE
+      - title: "Notice"
+        url: https://github.com/microsoft/hyperspace/blob/master/NOTICE.txt
+      - title: "Security"
+        url: https://github.com/microsoft/hyperspace/blob/master/SECURITY.md
+
+# Need to be written
+#  - title: Serverless Index Management
+#    children:
+#      - title: "Metadata on Lake"
+#        url: /docs/sim-metadata-on-lake/
+#      - title: "Index State Management"
+#        url: /docs/sim-index-state-management/
+#      - title: "Concurrency Control"
+#        url: /docs/sim-concurrency-control/
+#  - title: Query Processing
+#    children:
+#      - title: "Intuition"
+#        url: /docs/qp-intuition/
+#      - title: "Rule-based Optimization"
+#        url: /docs/qp-rule-based-optimization/
+#      - title: "Hyperspace & Spark's Catalyst"
+#        url: /docs/qp-integration-with-spark-catalyst/
