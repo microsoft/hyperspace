@@ -8,7 +8,7 @@ toc: true
 
 Hyperspace code is written in Scala and it is using 'sbt' as the build tool. Below is the list of folders in the code base hierarchy:
 
-### src
+### /src
 `src` folder contains Hyperspace’s source and test code.
 
 The source code files are available under `src/main/scala` and include implementation of core functionality and features of Hyperspace.
@@ -27,14 +27,14 @@ The test code is available under:
 
 The test code has a similar structure as the source code and each package in the test code includes unit test cases for the corresponding feature or functionality from the source code. Any code change or additional feature implementation needs to add relevant cases which fully cover the modified code.
 
-### docs
+### /docs
 `docs` folder contains useful documentation on different aspects of Hyperspace including coding, contribution and formatting guidelines, and information on how to build the project in various environments. You can access the documentation using the [Hyperspace Documentation](https://microsoft.github.io/hyperspace/docs/ug-quick-start-guide/) site. 
 
-### dev
+### /dev
 `dev` folder contains required resources for contributing code to the Hyperspace project as a developer. Currently, it includes the Scala formatting configuration file that is needed to make sure any new code change complies with the Hyperspace’s [coding guidelines](https://github.com/microsoft/hyperspace/blob/master/CONTRIBUTING.md).
 
-### build
+### /build
 `build` folder contains sbt build scripts and configurations which are used to build the Hyperspace code base.
 
-### project
+### /project
 `project` folder contains additional sbt build properties and plugin configurations.
