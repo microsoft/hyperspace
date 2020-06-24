@@ -33,8 +33,12 @@ docs:
         url: /docs/dg-code-structure/
       - title: "Hacking Hyperspace"
         url: /docs/dg-hack-hyperspace/
+      - title: "Roadmap"
+        url: /ROADMAP.md
       - title: "Contributing"
-        url: /docs/dg-contributing/
+        url: /CONTRIBUTING.md
+      - title: "Code of Conduct"
+        url: /CODE_OF_CONDUCT.md
   - title: Tour of Hyperspace
     children:
       - title: "Introduction"
@@ -64,3 +68,11 @@ docs:
 #        url: /docs/qp-rule-based-optimization/
 #      - title: "Hyperspace & Spark's Catalyst"
 #        url: /docs/qp-integration-with-spark-catalyst/
+    - title: Meta
+      children:
+       - title: "License"
+         url: /LICENSE
+       - title: "Notice"
+         url: /NOTICE.txt
+       - title: "Security"
+         url: /SECURITY.md
