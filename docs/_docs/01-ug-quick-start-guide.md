@@ -4,8 +4,7 @@ permalink: /docs/ug-quick-start-guide/
 excerpt: "How to quickly get started with Hyperspace for use with Apache Spark™."
 last_modified_at: 2020-06-24
 toc: false
-toc_label: "Quick-Start Guide"
-toc_icon: "shipping-fast"
+classes: wide
 ---
 
 This guide helps you quickly get started with Hyperspace with Apache Spark™.
@@ -64,7 +63,7 @@ Support for Pyspark is [on the way](https://github.com/microsoft/hyperspace/pull
 
 ## Hyperspace APIs
 
-You can run the code snippets in the following sections to explore the main features of Hyperspace. The full, standalone sample is available [here](https://microsoft.github.io/hyperspace/#hyperspace-usage-api-in-apache-spark).
+You can run the code snippets in the following sections to explore the main features of Hyperspace. The full, standalone sample is available [here](https://microsoft.github.io/hyperspace/#hyperspace-usage-api-in-apache-spark). Please refer to [API docs](https://javadoc.io/doc/com.microsoft.hyperspace/hyperspace-core_2.12/latest/com/microsoft/hyperspace/index.html) for more details.
 
 ### Index Management APIs
 
