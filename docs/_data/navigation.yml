@@ -51,6 +51,15 @@ docs:
         url: /docs/toh-overview/
       - title: "Indexes on the Lake"
         url: /docs/toh-indexes-on-the-lake/
+  - title: Meta
+    children:
+      - title: "License"
+        url: /LICENSE
+      - title: "Notice"
+        url: /NOTICE.txt
+      - title: "Security"
+        url: /SECURITY.md
+
 # Need to be written
 #  - title: Serverless Index Management
 #    children:
@@ -68,11 +77,3 @@ docs:
 #        url: /docs/qp-rule-based-optimization/
 #      - title: "Hyperspace & Spark's Catalyst"
 #        url: /docs/qp-integration-with-spark-catalyst/
-    - title: Meta
-      children:
-       - title: "License"
-         url: /LICENSE
-       - title: "Notice"
-         url: /NOTICE.txt
-       - title: "Security"
-         url: /SECURITY.md
