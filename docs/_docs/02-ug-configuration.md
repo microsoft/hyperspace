@@ -4,6 +4,7 @@ permalink: /docs/ug-configuration/
 excerpt: "How to configure Hyperspace for your needs."
 last_modified_at: 2020-06-23
 toc: false
+classes: wide
 ---
 | Property name                                        | Default                                                                                          | Meaning                                                                                               | Since Version |
 |------------------------------------------------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|---------------|
