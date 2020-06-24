@@ -4,10 +4,12 @@ permalink: /docs/ug-faqs/
 excerpt: "Frequently asked questions about Hyperspace"
 last_modified_at: 2020-06-20
 toc: true
+toc_label: "FAQs"
+toc_icon: "cogs"
 ---
 
 ## General
-#### What is an index?
+### What is an index?
 Exploiting indexes is a widely used techniques to improve query performance in databases.
 An index is an auxiliary data structure which is organized and stored in a way that it 
 optimizes certain kinds of data retrieval operations. Any subset of the fields of 
@@ -15,7 +17,7 @@ original data records can serve as the fields for an index. An index normally sp
 search operations that are not efficiently supported on original data records due to 
 their physical arrangement in the storage.
 
-#### What type of an index does Hyperspace create? Do I have any control over it?
+### What type of an index does Hyperspace create? Do I have any control over it?
 Hyperspace currently uses **covering indexes** although we have active plans on supporting
 other kinds of indexes in the future. Covering Indexes are known to be efficient in 
 scenarios where co-occurrence of certain columns happens frequently in query activities 
