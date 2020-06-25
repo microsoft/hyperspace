@@ -95,6 +95,17 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
   }
 
+  test("E2E test for filter query when all columns are selected.") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("filterIndex", Seq("c4", "c3"), Seq("c1", "c2", "c5"))
+
+    hyperspace.createIndex(df, indexConfig)
+
+    def query(): DataFrame = df.filter("c4 == 1").select("c3", "c1", "c2", "c5", "c4")
+
+    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+  }
+
   test("E2E test for join query.") {
     val leftDf = spark.read.parquet(sampleParquetDataLocation)
     val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))

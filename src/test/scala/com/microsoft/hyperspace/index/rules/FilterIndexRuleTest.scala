@@ -24,7 +24,6 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -35,7 +34,8 @@ class FilterIndexRuleTest extends HyperspaceSuite {
   val parentPath = new Path("src/test/resources/filterIndexTest")
   val systemPath = new Path(parentPath, "systemPath")
 
-  val indexName = "filterIxTestIndex"
+  val indexName1 = "filterIxTestIndex1"
+  val indexName2 = "filterIxTestIndex2"
 
   val c1 = AttributeReference("c1", StringType)()
   val c2 = AttributeReference("c2", StringType)()
@@ -91,8 +91,11 @@ class FilterIndexRuleTest extends HyperspaceSuite {
       indexLogEntry
     }
 
-    val indexPlan = Project(Seq(c1, c2, c3), scanNode)
-    createIndex(indexName, Seq(c3, c2), Seq(c1), indexPlan)
+    val index1Plan = Project(Seq(c1, c2, c3), scanNode)
+    createIndex(indexName1, Seq(c3, c2), Seq(c1), index1Plan)
+
+    val index2Plan = Project(Seq(c1, c2, c3, c4), scanNode)
+    createIndex(indexName2, Seq(c4, c2), Seq(c1, c3), index2Plan)
   }
 
   before {
@@ -113,7 +116,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     val transformedPlan = FilterIndexRule(originalPlan)
 
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
-    verifyTransformedPlan(transformedPlan)
+    verifyTransformedPlanWithIndex1(transformedPlan)
   }
 
   test("Verify FilterIndex rule is applied correctly to plans with alias.") {
@@ -125,7 +128,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     val transformedPlan = FilterIndexRule(originalPlan)
 
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
-    verifyTransformedPlan(transformedPlan)
+    verifyTransformedPlanWithIndex1(transformedPlan)
   }
 
   test("Verify FilterIndex rule does not apply if all columns are not covered.") {
@@ -148,30 +151,15 @@ class FilterIndexRuleTest extends HyperspaceSuite {
   }
 
   test("Verify FilterIndex rule is applied when all columns are selected.") {
-    val filterCondition = And(IsNotNull(c3), EqualTo(c3, Literal("facebook")))
+    val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
     val originalPlan = Filter(filterCondition, scanNode)
 
     val transformedPlan = FilterIndexRule(originalPlan)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
+    verifyTransformedPlanWithIndex2(transformedPlan)
   }
 
-  test("temp test.") {
-    import spark.implicits._
-    Seq((1, "name1"), (2, "name2")).toDF("id", "name").write.mode("overwrite").parquet("table")
-    val df = spark.read.parquet("table")
-
-    val hs = new Hyperspace(spark)
-
-    hs.createIndex(
-      df,
-      IndexConfig("index", indexedColumns = Seq("id"), includedColumns = Seq("name")))
-    hs.indexes.show
-
-    val query = df.filter(df("id") === 1).select("id", "name")
-    query.explain(true)
-  }
-
-  private def verifyTransformedPlan(logicalPlan: LogicalPlan): Unit = {
+  private def verifyTransformedPlanWithIndex1(logicalPlan: LogicalPlan): Unit = {
     logicalPlan match {
       case Project(
           _,
@@ -188,16 +176,49 @@ class FilterIndexRuleTest extends HyperspaceSuite {
               _,
               _,
               _))) =>
-        val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-        val expectedLocation = getIndexDataFilesPath(indexName)
-        assert(newLocation.rootPaths.head.equals(expectedLocation), "Invalid location.")
-        assert(newPartitionSchema.equals(new StructType()), "Invalid partition schema.")
-        assert(dataSchema.equals(allIndexes.head.schema), "Invalid schema.")
-        assert(bucketSpec.isEmpty, "Invalid bucket spec.")
+        verifyIndexProperties(indexName1, newLocation, newPartitionSchema, dataSchema, bucketSpec)
         assert(dataSchema.fieldNames.toSet.equals(l.output.map(_.name).toSet))
 
       case _ => fail("Unexpected plan.")
     }
+  }
+
+  private def verifyTransformedPlanWithIndex2(logicalPlan: LogicalPlan): Unit = {
+    logicalPlan match {
+      case Filter(
+          _,
+          l @ LogicalRelation(
+            HadoopFsRelation(
+              newLocation: InMemoryFileIndex,
+              newPartitionSchema: StructType,
+              dataSchema: StructType,
+              bucketSpec: Option[BucketSpec],
+              _: ParquetFileFormat,
+              _),
+            _,
+            _,
+            _)) =>
+        verifyIndexProperties(indexName2, newLocation, newPartitionSchema, dataSchema, bucketSpec)
+        assert(dataSchema.fieldNames.toSet.equals(l.output.map(_.name).toSet))
+
+      case _ => fail("Unexpected plan.")
+    }
+  }
+
+  private def verifyIndexProperties(
+      indexName: String,
+      newLocation: InMemoryFileIndex,
+      newPartitionSchema: StructType,
+      dataSchema: StructType,
+      bucketSpec: Option[BucketSpec]): Unit = {
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val expectedLocation = getIndexDataFilesPath(indexName)
+    assert(newLocation.rootPaths.head.equals(expectedLocation), "Invalid location.")
+    assert(newPartitionSchema.equals(new StructType()), "Invalid partition schema.")
+    assert(
+      dataSchema.equals(allIndexes.filter(_.name.equals(indexName)).head.schema),
+      "Invalid schema.")
+    assert(bucketSpec.isEmpty, "Invalid bucket spec.")
   }
 
   private def baseRelation(location: FileIndex, schema: StructType): HadoopFsRelation = {
