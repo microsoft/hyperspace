@@ -19,27 +19,27 @@ class Hyperspace:
         self.jvm = spark._jvm
         self.hyperspace = self.jvm.com.microsoft.hyperspace.Hyperspace(spark._jsparkSession)
 
-    def __getJavaIndexConfig(self, index_config):
+    def _getJavaIndexConfig(self, index_config):
         """
         Constructs IndexConfig Java object from python wrapper IndexConfig object.
         :param index_config: IndexConfig java object
         :return: IndexConfig python object
 
-        >>> __getJavaIndexConfig(idx_config)
+        >>> _getJavaIndexConfig(idx_config)
         """
-        indexed_columns = self.__getScalaSeqFromList(index_config.indexedColumns)
-        included_columns = self.__getScalaSeqFromList(index_config.includedColumns)
+        indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
+        included_columns = self._getScalaSeqFromList(index_config.includedColumns)
         _jindexConfig = self.jvm.com.microsoft.hyperspace.index.IndexConfig(
                      self.jvm.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig
 
-    def __getScalaSeqFromList(self, list):
+    def _getScalaSeqFromList(self, list):
         """
         Constructs scala sequence from Java's List object.
         :param list: List object in Java
         :return: Seq object in scala
 
-        >>> __getScalaSeqFromList(list)
+        >>> _getScalaSeqFromList(list)
         """
         java_import(self.jvm, "scala.collection.JavaConversions._")
         java_import(self.jvm, "scala.collection.Seq")
@@ -71,7 +71,7 @@ class Hyperspace:
         >>> df = spark.read.parquet("./sample.parquet").toDF("c1", "c2", "c3")
         >>> hyperspace.createIndex(df, indexConfig)
         """
-        self.hyperspace.createIndex(dataFrame._jdf, self.__getJavaIndexConfig(indexConfig))
+        self.hyperspace.createIndex(dataFrame._jdf, self._getJavaIndexConfig(indexConfig))
 
     def deleteIndex(self, indexName):
         """
