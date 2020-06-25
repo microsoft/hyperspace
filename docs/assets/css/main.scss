@@ -7,7 +7,43 @@
 @import "minimal-mistakes/skins/{{ site.minimal_mistakes_skin | default: 'default' }}"; // skin
 @import "minimal-mistakes"; // main partials
 
+html {
+    font-size: 16px; // originally 16px
+    @include breakpoint($medium) {
+        font-size: 16px; // originally 18px
+    }
 
+    @include breakpoint($large) {
+        font-size: 18px; // originally 20px
+    }
+
+    @include breakpoint($x-large) {
+        font-size: 20px; // originally 22px
+    }
+}
+
+.page__inner-wrap {
+    font-size: 14px; // originally 16px
+    @include breakpoint($medium) {
+        font-size: 14px; // originally 18px
+    }
+
+    @include breakpoint($large) {
+        font-size: 14px; // originally 20px
+    }
+
+    @include breakpoint($x-large) {
+        font-size: 16px; // originally 22px
+    }
+}
+
+.toc .nav__title {
+    color:#fff;
+    font-size:.75em;
+    background:black;
+    border-top-left-radius:4px;
+    border-top-right-radius:4px
+}
 
 .feature__wrapper___small {
   @include clearfix();
