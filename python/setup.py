@@ -2,9 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="hyperspace",
-    version="0.0.1",
-    author="charm-devs",
-    author_email="charm-devs@microsoft.com",
+    version="0.1.0",
     description="Python bindings for hyperspace.",
     url="https://github.com/microsoft/hyperspace",
     packages=setuptools.find_packages(),

@@ -1,8 +1,9 @@
 import sys
 
 from pyspark.sql import SparkSession, DataFrame
-from hyperspace import *
 from py4j.java_gateway import java_import
+
+from hyperspace import *
 
 
 class Hyperspace:
@@ -14,7 +15,6 @@ class Hyperspace:
 
         >>> hyperspace = Hyperspace(spark)
         """
-        self.sparkContext = spark.sparkContext
         self.spark = spark
         self.jvm = spark._jvm
         self.hyperspace = self.jvm.com.microsoft.hyperspace.Hyperspace(spark._jsparkSession)
@@ -157,8 +157,7 @@ class Hyperspace:
 
         >>> Hyperspace.disable(spark)
         """
-        spark._jvm.com.microsoft.hyperspace.util.PythonUtils. \
-                                                 disableHyperspace(spark._jsparkSession)
+        spark._jvm.com.microsoft.hyperspace.util.PythonUtils.disableHyperspace(spark._jsparkSession)
         return spark
 
     @staticmethod
@@ -170,4 +169,4 @@ class Hyperspace:
         >>> Hyperspace.isEnabled(spark)
         """
         return spark._jvm.com.microsoft.hyperspace.util.PythonUtils. \
-                                                        isHyperspaceEnabled(spark._jsparkSession)
+            isHyperspaceEnabled(spark._jsparkSession)
