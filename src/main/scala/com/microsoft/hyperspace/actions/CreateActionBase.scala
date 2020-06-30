@@ -51,8 +51,19 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = {
+      val dfColumnNames = df.schema.fieldNames
+      try {
+        // Try creating log entry with resolved column names.
+        (indexConfig.indexedColumns.map(resolve(spark, _, dfColumnNames)),
+          indexConfig.includedColumns.map(resolve(spark, _, dfColumnNames)))
+      } catch {
+        // Try creating index log entry with whatever the user passed.
+        case _: Exception => (indexConfig.indexedColumns, indexConfig.includedColumns)
+      }
+    }
     val schema = {
-      val allColumns = indexConfig.indexedColumns ++ indexConfig.includedColumns
+      val allColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
       df.select(allColumns.head, allColumns.tail: _*).schema
     }
 
@@ -80,7 +91,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       CoveringIndex(
         CoveringIndex.Properties(
           CoveringIndex.Properties
-            .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+            .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
           IndexLogEntry.schemaString(schema),
           numBuckets)),
       Content(path.toString, Seq()),
