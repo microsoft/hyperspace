@@ -40,7 +40,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
   val c3 = AttributeReference("c3", StringType)()
   val c4 = AttributeReference("c4", IntegerType)()
 
-  val tableSchema = schemaFromAttributes(c1, c2, c3, c4)
+  val tableSchema = RuleTestHelper.schemaFromAttributes(c1, c2, c3, c4)
   var scanNode: LogicalRelation = _
 
   override def beforeAll(): Unit = {
@@ -128,7 +128,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
               _,
               _))) =>
         val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-        val expectedLocation = getIndexDataFilesPath(indexName)
+        val expectedLocation = RuleTestHelper.getIndexDataFilesPath(indexName, systemPath)
         assert(newLocation.rootPaths.head.equals(expectedLocation), "Invalid location.")
         assert(newPartitionSchema.equals(new StructType()), "Invalid partition schema.")
         assert(dataSchema.equals(allIndexes.head.schema), "Invalid schema.")
@@ -138,10 +138,4 @@ class FilterIndexRuleTest extends HyperspaceSuite {
       case _ => fail("Unexpected plan.")
     }
   }
-
-  private def schemaFromAttributes(attributes: Attribute*): StructType =
-    RuleTestHelper.schemaFromAttributes(attributes: _*)
-
-  private def getIndexDataFilesPath(indexName: String): Path =
-    RuleTestHelper.getIndexDataFilesPath(indexName, systemPath)
 }
