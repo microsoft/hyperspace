@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import scala.collection.mutable.WrappedArray
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
@@ -87,8 +89,14 @@ class CreateIndexTests extends HyperspaceSuite {
 
   test("Index creation passes with columns of different case if case-sensitivity is false.") {
     hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
-    val count = hyperspace.indexes.where(s"""name = "${indexConfig1.indexName}" """).count
-    assert(count == 1)
+    val indexes = hyperspace.indexes.where(s"""name = "${indexConfig1.indexName}" """)
+    assert(indexes.count == 1)
+    assert(
+      indexes.head.getAs[WrappedArray[String]]("indexedColumns").head.equals("Query"),
+      "Indexed columns with wrong case are stored in metadata")
+    assert(
+      indexes.head.getAs[WrappedArray[String]]("includedColumns").head.equals("imprs"),
+      "Included columns with wrong case are stored in metadata")
   }
 
   test("Index creation fails with columns of different case if case-sensitivity is true.") {
