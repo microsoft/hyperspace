@@ -95,6 +95,18 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
   }
 
+  test("E2E test for case insensitive filter query utilizing indexes.") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("filterIndex", Seq("C3"), Seq("C1"))
+
+    hyperspace.createIndex(df, indexConfig)
+
+    def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
+
+    // verify if case-insensitive index works with case-insensitive query
+    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+  }
+
   test("E2E test for join query.") {
     val leftDf = spark.read.parquet(sampleParquetDataLocation)
     val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
