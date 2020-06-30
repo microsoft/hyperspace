@@ -16,6 +16,9 @@
 
 package com.microsoft.hyperspace.util
 
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.analysis.Resolver
+
 /**
  * [[IndexNameUtils]] provides utility functions to format the index name as need.
  */
@@ -30,5 +33,21 @@ object IndexNameUtils {
    */
   def normalizeIndexName(indexName: String): String = {
     indexName.trim.replaceAll("\\s+", "_")
+  }
+
+  def resolve(spark: SparkSession, firstString: String, secondString: String): Boolean = {
+    val resolver: Resolver = spark.sessionState.conf.resolver
+    resolver(firstString, secondString)
+  }
+
+  def resolve(spark: SparkSession, firstString: String, secondStrings: Seq[String]): Boolean = {
+    secondStrings.exists(resolve(spark, firstString, _))
+  }
+
+  def resolve(
+      spark: SparkSession,
+      firstStrings: Seq[String],
+      secondStrings: Seq[String]): Boolean = {
+    firstStrings.forall(resolve(spark, _, secondStrings))
   }
 }

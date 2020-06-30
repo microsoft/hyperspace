@@ -17,12 +17,13 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.analysis.Resolver
 import org.apache.spark.sql.types.StructType
-
 import com.microsoft.hyperspace.HyperspaceException
+
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.LogicalPlanUtils
+import com.microsoft.hyperspace.util.{IndexNameUtils, LogicalPlanUtils}
 
 class CreateAction(
     spark: SparkSession,
@@ -33,7 +34,7 @@ class CreateAction(
     extends CreateActionBase(dataManager)
     with Action {
   final override lazy val logEntry: LogEntry =
-  getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
 
   final override val transientState: String = CREATING
 
@@ -65,8 +66,11 @@ class CreateAction(
     val validColumnNames = schema.fieldNames
     val indexedColumns = indexConfig.indexedColumns
     val includedColumns = indexConfig.includedColumns
-    indexedColumns.forall(validColumnNames.contains) && includedColumns.forall(
-      validColumnNames.contains)
+
+    IndexNameUtils.resolve(spark, indexedColumns ++ includedColumns, validColumnNames)
+
+    // indexedColumns.forall(validColumnNames.contains) && includedColumns.forall(
+    //  validColumnNames.contains)
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().

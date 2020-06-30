@@ -20,9 +20,11 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.util.IndexNameUtils
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -102,13 +104,17 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS,
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
-    val selectedColumns = indexConfig.indexedColumns ++ indexConfig.includedColumns
+
+    val dfColumnNames = df.schema.fieldNames
+    val resolvedIndexedColumns = indexConfig.indexedColumns.map(resolve(spark, _, dfColumnNames))
+    val resolvedIncludedColumns =
+      indexConfig.includedColumns.map(resolve(spark, _, dfColumnNames))
+    val selectedColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
     val indexDataFrame = df.select(selectedColumns.head, selectedColumns.tail: _*)
-    val indexColNames = indexConfig.indexedColumns
 
     // run job
     val repartitionedIndexDataFrame =
-      indexDataFrame.repartition(numBuckets, indexColNames.map(df(_)): _*)
+      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(df(_)): _*)
 
     // Save the index with the number of buckets specified.
     repartitionedIndexDataFrame.write
@@ -116,6 +122,15 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         repartitionedIndexDataFrame,
         indexDataPath.toString,
         numBuckets,
-        indexColNames)
+        resolvedIndexedColumns)
+  }
+
+  private def resolve(spark: SparkSession, dst: String, srcs: Array[String]): String = {
+    srcs
+      .find(src => IndexNameUtils.resolve(spark, dst, src))
+      .getOrElse {
+        throw HyperspaceException(
+          s"Column $dst could not be resolved from available columns $srcs")
+      }
   }
 }
