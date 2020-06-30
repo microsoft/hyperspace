@@ -22,7 +22,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -228,41 +228,46 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       schema: StructType,
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
-    val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
-    val sourcePlanProperties = SparkPlan.Properties(
-      serializedPlan,
-      LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(
-          Seq(Signature(
-            LogicalPlanSignatureProvider.create().name,
-            LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan))))))
-    val sourceFiles = df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
+
+    LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
+      case Some(s) =>
+        val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
+        val sourcePlanProperties = SparkPlan.Properties(
+          serializedPlan,
+          LogicalPlanFingerprint(
+            LogicalPlanFingerprint.Properties(
+              Seq(Signature(
+                LogicalPlanSignatureProvider.create().name,
+                s)))))
+        val sourceFiles = df.queryExecution.optimizedPlan.collect {
+          case LogicalRelation(
           HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
           _,
           _,
           _) =>
-        location.allFiles.map(_.getPath.toString)
-    }.flatten
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
+            location.allFiles.map(_.getPath.toString)
+        }.flatten
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
 
-    val entry = IndexLogEntry(
-      indexConfig.indexName,
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
-          IndexLogEntry.schemaString(schema),
-          IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-      Content(
-        s"$indexStorageLocation/${indexConfig.indexName}" +
-          s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-        Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-      Map())
-    entry.state = state
-    entry
+        val entry = IndexLogEntry(
+          indexConfig.indexName,
+          CoveringIndex(
+            CoveringIndex.Properties(
+              CoveringIndex.Properties
+                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+              IndexLogEntry.schemaString(schema),
+              IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
+          Content(
+            s"$indexStorageLocation/${indexConfig.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
+            Seq()),
+          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Map())
+        entry.state = state
+        entry
+      case None => throw HyperspaceException("Invalid plan for index dataFrame.")
+    }
   }
 
   // Verify if the indexes currently stored in Hyperspace matches the given indexes.

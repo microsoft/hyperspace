@@ -329,27 +329,36 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       plan: LogicalPlan,
       allIndexes: Seq[IndexLogEntry]): Seq[IndexLogEntry] = {
 
-    /* map of signature provider to signature for this subplan */
-    val signatureMap: mutable.Map[String, String] = mutable.Map()
+    RulesHelper.getLogicalRelation(plan) match {
+      case Some(r) =>
+        /* map of signature provider to signature for this subplan */
+        val signatureMap: mutable.Map[String, String] = mutable.Map()
 
-    def signatureValid(entry: IndexLogEntry): Boolean = {
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
+        def signatureValid(entry: IndexLogEntry): Boolean = {
+          val sourcePlanSignatures =
+            entry.source.plan.properties.fingerprint.properties.signatures
+          assert(sourcePlanSignatures.length == 1)
+          val sourcePlanSignature = sourcePlanSignatures.head
 
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature: String = LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(plan)
-        signatureMap.put(sourcePlanSignature.provider, signature)
-      }
+          if (!signatureMap.contains(sourcePlanSignature.provider)) {
+            val signature: String = LogicalPlanSignatureProvider
+              .create(sourcePlanSignature.provider)
+              .signature(r)
+              .get // It is safe to call Option.get as signature() is
+            // called on a LogicalRelation node which is
+            // valid for signature computation
+            signatureMap.put(sourcePlanSignature.provider, signature)
+          }
 
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
+          signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
+        }
+
+        // TODO: the following check only considers indexes in ACTIVE state for usage. Update
+        //  the code to support indexes in transitioning states as well.
+        allIndexes.filter(index => signatureValid(index) && index.created)
+
+      case None => Seq[IndexLogEntry]()
     }
-
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    allIndexes.filter(index => signatureValid(index) && index.created)
   }
 
   /**

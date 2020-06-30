@@ -17,17 +17,14 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
-import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
 class JoinIndexRuleTest extends HyperspaceSuite {
@@ -79,8 +76,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     val t2Location =
       new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t2Schema), NoopCache)
 
-    t1Relation = baseRelation(t1Location, t1Schema, spark)
-    t2Relation = baseRelation(t2Location, t2Schema, spark)
+    t1Relation = RuleTestHelper.baseRelation(t1Location, t1Schema, spark)
+    t2Relation = RuleTestHelper.baseRelation(t2Location, t2Schema, spark)
 
     t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
     t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, false)
@@ -426,51 +423,15 @@ class JoinIndexRuleTest extends HyperspaceSuite {
       name: String,
       indexCols: Seq[AttributeReference],
       includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry = {
-    val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
-    val sign: LogicalPlan => String = LogicalPlanSignatureProvider.create(signClass).signature
-
-    val sourcePlanProperties = SparkPlan.Properties(
-      LogicalPlanSerDeUtils.serialize(plan, spark),
-      LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature(signClass, sign(plan))))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
-
-    val indexLogEntry = IndexLogEntry(
-      name,
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(indexCols.map(_.name), includedCols.map(_.name)),
-          IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-          10)),
-      Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-      Map())
-
-    val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
-    indexLogEntry.state = Constants.States.ACTIVE
-    logManager.writeLog(0, indexLogEntry)
-    indexLogEntry
-  }
+      plan: LogicalPlan): IndexLogEntry =
+    RuleTestHelper.createIndex(spark, systemPath, name, indexCols, includedCols, plan)
 
   private def schemaFromAttributes(attributes: Attribute*): StructType =
-    StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
+    RuleTestHelper.schemaFromAttributes(attributes: _*)
 
-  private def baseRelation(
-      location: FileIndex,
-      schema: StructType,
-      spark: SparkSession): HadoopFsRelation = {
-    HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
-      spark)
-  }
+  private def getIndexDataFilesPath(indexName: String): Path =
+    RuleTestHelper.getIndexDataFilesPath(indexName, systemPath)
 
-  private def getIndexDataFilesPath(indexName: String): Path = {
-    new Path(getIndexRootPath(indexName), s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-  }
-
-  private def getIndexRootPath(indexName: String): Path = {
-    new Path(systemPath, indexName)
-  }
+  private def getIndexRootPath(indexName: String): Path =
+    RuleTestHelper.getIndexRootPath(indexName, systemPath)
 }
