@@ -115,6 +115,19 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     verifyTransformedPlan(transformedPlan)
   }
 
+  test("Verify FilterIndex rule is applied correctly for case insensitive query.") {
+    val c2Caps = c2.withName("C2")
+    val c3Caps = c3.withName("C3")
+    val filterCondition = And(IsNotNull(c3Caps), EqualTo(c3Caps, Literal("facebook")))
+    val filterNode = Filter(filterCondition, scanNode)
+
+    val originalPlan = Project(Seq(c2Caps, c3Caps), filterNode)
+    val transformedPlan = FilterIndexRule(originalPlan)
+
+    assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
+    verifyTransformedPlan(transformedPlan)
+  }
+
   test("Verify FilterIndex rule is applied correctly to plans with alias.") {
     val aliasExpr = Alias(c3, "QueryAlias")().asInstanceOf[NamedExpression]
     val filterCondition = And(IsNotNull(aliasExpr), EqualTo(aliasExpr, Literal("facebook")))

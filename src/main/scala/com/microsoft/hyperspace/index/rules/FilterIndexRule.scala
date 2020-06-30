@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
@@ -59,22 +59,12 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
           // such that its children would not have any Alias expressions.
           // Calling "references" on the expression in projectList ensures
           // we will get the correct (original) column names.
-          val baseRelationColumns: Seq[AttributeReference] = logicalRelation.output
-          val projectColumns: Seq[Option[AttributeReference]] = CleanupAliases(project)
+          val projectColumnNames = CleanupAliases(project)
             .asInstanceOf[Project]
             .projectList
-            .map(_.references.map(_.asInstanceOf[AttributeReference]))
+            .map(_.references.map(_.asInstanceOf[AttributeReference].name))
             .flatMap(_.toSeq)
-            .map(findBaseReference(_, baseRelationColumns))
-          val filterColumns: Seq[Option[AttributeReference]] = condition.references.toSeq
-            .map(findBaseReference(_, baseRelationColumns))
-
-          if (projectColumns.exists(_.isEmpty) || filterColumns.exists(_.isEmpty)) {
-            return project
-          }
-
-          val projectColumnNames = projectColumns.map(_.get.name)
-          val filterColumnNames = filterColumns.map(_.get.name)
+          val filterColumnNames = condition.references.map(_.name).toSeq
 
           replaceWithIndexIfPlanCovered(
             project,
@@ -89,24 +79,6 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
             project
         }
     }
-  }
-
-  /**
-   * This method is useful in finding an attribute from a list, which is semantically equal to
-   * a given attribute. This is required for e.g. to find the base attribute name for an
-   * attribute.
-   * For e.g. if the data source has column names in lower case e.g. c1, c2, c3...
-   * and a case-insensitive query looks for column C1, we can use this method to find which of the
-   * base columns (c1, c2, c3...) matches with the query column C1.
-   *
-   * @param attribute attribute searched for.
-   * @param baseReferences available set of base attributes to look from.
-   * @return optional matching attribute from base references.
-   */
-  private def findBaseReference(
-      attribute: Attribute,
-      baseReferences: Seq[AttributeReference]): Option[AttributeReference] = {
-    baseReferences.find(_.semanticEquals(attribute))
   }
 
   /**
@@ -212,6 +184,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
         index.includedColumns,
         fsRelation.fileFormat)
     }
+
   }
 
   /**
