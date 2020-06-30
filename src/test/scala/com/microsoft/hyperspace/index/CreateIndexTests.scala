@@ -17,14 +17,12 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
-class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
-
+class CreateIndexTests extends HyperspaceSuite {
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val indexSystemPath = "src/test/resources/indexLocation"
@@ -85,6 +83,21 @@ class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
       hyperspace.createIndex(df, IndexConfig("index1", Seq("IllegalColA"), Seq("IllegalColB")))
     }
     assert(exception.getMessage.contains("Index config is not applicable to dataframe schema"))
+  }
+
+  test("Index creation passes with columns of different case if case-sensitivity is false.") {
+    hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
+    val count = hyperspace.indexes.where(s"""name = "${indexConfig1.indexName}" """).count
+    assert(count == 1)
+  }
+
+  test("Index creation fails with columns of different case if case-sensitivity is true.") {
+    withSparkConf("spark.sql.caseSensitive", true) {
+      val exception = intercept[HyperspaceException] {
+        hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
+      }
+      assert(exception.getMessage.contains("Index config is not applicable to dataframe schema."))
+    }
   }
 
   test("Index creation fails since the dataframe has a filter node.") {

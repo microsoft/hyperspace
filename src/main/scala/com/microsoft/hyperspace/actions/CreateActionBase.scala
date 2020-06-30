@@ -130,7 +130,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .find(src => IndexNameUtils.resolve(spark, dst, src))
       .getOrElse {
         throw HyperspaceException(
-          s"Column $dst could not be resolved from available columns $srcs")
+          s"Unexpected Exception: Column $dst could not be resolved from available columns $srcs")
       }
   }
 }

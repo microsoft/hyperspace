@@ -62,4 +62,14 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
       }
     }
   }
+
+  protected def withSparkConf(confName: String, confValue: Any)(f: => Unit): Unit = {
+    val original = spark.conf.get(confName)
+    try {
+      spark.conf.set(confName, confValue.toString)
+      f
+    } finally {
+      spark.conf.set(confName, original)
+    }
+  }
 }
