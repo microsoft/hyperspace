@@ -32,6 +32,7 @@ import org.apache.spark.sql.types.StructType
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.util.IndexNameUtils
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -178,6 +179,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       index.created &&
       signatureValid(index) &&
       indexCoversPlan(
+        fsRelation.sparkSession,
         projectColumns,
         filterColumns,
         index.indexedColumns,
@@ -201,6 +203,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
    *         2. Filter predicate contains first column in index's 'indexed' columns.
    */
   private def indexCoversPlan(
+      spark: SparkSession,
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       indexedColumns: Seq[String],
@@ -210,8 +213,8 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
     val allColumnsInIndex = indexedColumns ++ includedColumns
 
     // TODO: Normalize predicates into CNF and incorporate more conditions.
-    filterColumns.contains(indexedColumns.head) &&
-    allColumnsInPlan.forall(allColumnsInIndex.contains)
+    IndexNameUtils.resolve(spark, indexedColumns.head, filterColumns) &&
+    IndexNameUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex)
   }
 
   /**

@@ -125,6 +125,18 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
+  test("Join rule works if indexes exist for case insensitive index and query") {
+    val t1c1Caps = t1c1.withName("T1C1")
+
+    val joinCondition = EqualTo(t1c1Caps, t2c1)
+    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val updatedPlan = JoinIndexRule(originalPlan)
+    assert(!updatedPlan.equals(originalPlan))
+
+    val indexPaths = Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
+    verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
+  }
+
   test("Join rule does not update plan if index location is not set") {
     spark.conf.unset(IndexConstants.INDEX_SYSTEM_PATH)
 
