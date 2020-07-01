@@ -594,7 +594,7 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
 
-  private lazy val spark: SparkSession = SparkSession.getActiveSession.getOrElse {
+  private def spark: SparkSession = SparkSession.getActiveSession.getOrElse {
     throw HyperspaceException("Could not find active SparkSession")
   }
 }
