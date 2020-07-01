@@ -34,6 +34,7 @@ import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.util.IndexNameUtils
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -377,8 +378,9 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
     val rRequiredAllCols = allRequiredCols(right)
 
     // Make sure required indexed columns are subset of all required columns for a subplan
-    require(lRequiredIndexedCols.forall(lRequiredAllCols.contains))
-    require(rRequiredIndexedCols.forall(rRequiredAllCols.contains))
+    val spark = SparkSession.getActiveSession.get
+    require(IndexNameUtils.resolve(spark, lRequiredIndexedCols, lRequiredAllCols))
+    require(IndexNameUtils.resolve(spark, rRequiredIndexedCols, rRequiredAllCols))
 
     val lUsable = getUsableIndexes(lIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
@@ -516,10 +518,15 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       indexes: Seq[IndexLogEntry],
       requiredIndexCols: Seq[String],
       allRequiredCols: Seq[String]): Seq[IndexLogEntry] = {
+    val spark = SparkSession.getActiveSession.get
     indexes.filter { idx =>
       val allCols = idx.indexedColumns ++ idx.includedColumns
-      requiredIndexCols.toSet.equals(idx.indexedColumns.toSet) &&
-      allRequiredCols.forall(allCols.contains)
+
+      // All required index columns should match one-to-one with all indexed columns and
+      // vice-versa. All required columns must be present in the available index columns.
+      IndexNameUtils.resolve(spark, requiredIndexCols, idx.indexedColumns) &&
+      requiredIndexCols.distinct.size == idx.indexedColumns.distinct.size &&
+      IndexNameUtils.resolve(spark, allRequiredCols, allCols)
     }
   }
 
@@ -586,10 +593,13 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       lIndex: IndexLogEntry,
       rIndex: IndexLogEntry,
       columnMapping: Map[String, String]): Boolean = {
-    require(columnMapping.keys.toSet.equals(lIndex.indexedColumns.toSet))
-    require(columnMapping.values.toSet.equals(rIndex.indexedColumns.toSet))
+    val spark = SparkSession.getActiveSession.get
+    require(IndexNameUtils.resolve(spark, columnMapping.keys, lIndex.indexedColumns))
+    require(IndexNameUtils.resolve(spark, columnMapping.values, rIndex.indexedColumns))
 
-    val requiredRightIndexedCols = lIndex.indexedColumns.map(columnMapping)
+    val requiredRightIndexedCols = lIndex.indexedColumns.map(c =>
+      columnMapping(IndexNameUtils.resolvedString(spark, c, columnMapping.keys).get))
+    //IndexNameUtils.resolve(spark, rIndex.indexedColumns, requiredRightIndexedCols)
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
 }
