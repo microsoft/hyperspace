@@ -32,7 +32,7 @@ import org.apache.spark.sql.types.StructType
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
-import com.microsoft.hyperspace.util.IndexNameUtils
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -213,8 +213,8 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
     val allColumnsInIndex = indexedColumns ++ includedColumns
 
     // TODO: Normalize predicates into CNF and incorporate more conditions.
-    IndexNameUtils.resolve(spark, indexedColumns.head, filterColumns) &&
-    IndexNameUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex)
+    ResolverUtils.isResolved(spark, indexedColumns.head, filterColumns) &&
+    ResolverUtils.isResolved(spark, allColumnsInPlan, allColumnsInIndex)
   }
 
   /**
