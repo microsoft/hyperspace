@@ -128,6 +128,26 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
         getIndexFilesPath(rightDfIndexConfig.indexName)))
   }
 
+  test("E2E test for join query with case-insensitive column names.") {
+    val leftDf = spark.read.parquet(sampleParquetDataLocation)
+    val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
+    hyperspace.createIndex(leftDf, leftDfIndexConfig)
+
+    val rightDf = spark.read.parquet(sampleParquetDataLocation)
+    val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
+    hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+    def query(): DataFrame = {
+      leftDf.join(rightDf, leftDf("c3") === rightDf("C3")).select(leftDf("C1"), rightDf("c4"))
+    }
+
+    verifyIndexUsage(
+      query,
+      Seq(
+        getIndexFilesPath(leftDfIndexConfig.indexName),
+        getIndexFilesPath(rightDfIndexConfig.indexName)))
+  }
+
   test("E2E test for join query on catalog temp tables/views") {
     withView("t1", "t2") {
       val leftDf = spark.read.parquet(sampleParquetDataLocation)

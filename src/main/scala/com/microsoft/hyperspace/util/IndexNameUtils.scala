@@ -35,19 +35,43 @@ object IndexNameUtils {
     indexName.trim.replaceAll("\\s+", "_")
   }
 
-  def resolve(spark: SparkSession, firstString: String, secondString: String): Boolean = {
+  def resolve(spark: SparkSession, requiredString: String, availableStrings: String): Boolean = {
     val resolver: Resolver = spark.sessionState.conf.resolver
-    resolver(firstString, secondString)
-  }
-
-  def resolve(spark: SparkSession, firstString: String, secondStrings: Seq[String]): Boolean = {
-    secondStrings.exists(resolve(spark, firstString, _))
+    resolver(requiredString, availableStrings)
   }
 
   def resolve(
       spark: SparkSession,
-      firstStrings: Seq[String],
-      secondStrings: Seq[String]): Boolean = {
-    firstStrings.forall(resolve(spark, _, secondStrings))
+      requiredString: String,
+      availableStrings: Iterable[String]): Boolean = {
+    availableStrings.exists(resolve(spark, requiredString, _))
+  }
+
+  def resolve(
+      spark: SparkSession,
+      requiredStrings: Iterable[String],
+      availableStrings: Iterable[String]): Boolean = {
+    requiredStrings.forall(resolve(spark, _, availableStrings))
+  }
+
+  def resolvedString(
+      spark: SparkSession,
+      firstString: String,
+      secondString: String): Option[String] = {
+    if (resolve(spark, firstString, secondString)) Some(secondString) else None
+  }
+
+  def resolvedString(
+      spark: SparkSession,
+      requiredString: String,
+      availableStrings: Iterable[String]): Option[String] = {
+    availableStrings.find(resolve(spark, requiredString, _))
+  }
+
+  def resolvedString(
+      spark: SparkSession,
+      requiredStrings: Iterable[String],
+      availableStrings: Iterable[String]): Iterable[Option[String]] = {
+    requiredStrings.map(resolvedString(spark, _, availableStrings))
   }
 }
