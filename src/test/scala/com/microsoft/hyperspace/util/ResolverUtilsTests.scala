@@ -18,10 +18,10 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.SparkFunSuite
 
-class IndexNameUtilsTests extends SparkFunSuite {
+class ResolverUtilsTests extends SparkFunSuite {
   test("Test normalizeIndexName() function.") {
     val indexName = "  my index   1     "
     val expectedIndexNameAfterNorm = "my_index_1"
-    assert(IndexNameUtils.normalizeIndexName(indexName).equals(expectedIndexNameAfterNorm))
+    assert(ResolverUtils.normalizeIndexName(indexName).equals(expectedIndexNameAfterNorm))
   }
 }

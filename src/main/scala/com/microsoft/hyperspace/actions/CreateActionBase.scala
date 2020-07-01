@@ -24,7 +24,7 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
-import com.microsoft.hyperspace.util.IndexNameUtils
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -51,14 +51,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
+    // Resolve the passed column names with existing column names from the dataframe if possible.
     val (resolvedIndexedColumns, resolvedIncludedColumns) = {
-      val dfColumnNames = df.schema.fieldNames
       try {
         // Try creating log entry with resolved column names.
-        (indexConfig.indexedColumns.map(resolve(spark, _, dfColumnNames)),
-          indexConfig.includedColumns.map(resolve(spark, _, dfColumnNames)))
+        resolveConfig(df, indexConfig)
       } catch {
-        // Try creating index log entry with whatever the user passed.
+        // Creating index log entry with whatever the user passed.
         case _: Exception => (indexConfig.indexedColumns, indexConfig.includedColumns)
       }
     }
@@ -116,10 +115,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
 
-    val dfColumnNames = df.schema.fieldNames
-    val resolvedIndexedColumns = indexConfig.indexedColumns.map(resolve(spark, _, dfColumnNames))
-    val resolvedIncludedColumns =
-      indexConfig.includedColumns.map(resolve(spark, _, dfColumnNames))
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val selectedColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
     val indexDataFrame = df.select(selectedColumns.head, selectedColumns.tail: _*)
 
@@ -136,12 +132,23 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         resolvedIndexedColumns)
   }
 
-  private def resolve(spark: SparkSession, dst: String, srcs: Array[String]): String = {
-    srcs
-      .find(src => IndexNameUtils.resolve(spark, dst, src))
-      .getOrElse {
-        throw HyperspaceException(
-          s"Unexpected Exception: Column $dst could not be resolved from available columns $srcs")
-      }
+  private def resolveConfig(
+      df: DataFrame,
+      indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
+    val spark = df.sparkSession
+    val dfColumnNames = df.schema.fieldNames
+    val resolvedIndexedColumns =
+      ResolverUtils.resolve(spark, indexConfig.indexedColumns, dfColumnNames)
+    val resolvedIncludedColumns =
+      ResolverUtils.resolve(spark, indexConfig.includedColumns, dfColumnNames)
+
+    val allColumns = resolvedIncludedColumns ++ resolvedIncludedColumns
+    if ((resolvedIncludedColumns ++ resolvedIncludedColumns).exists(_.isEmpty)) {
+      throw HyperspaceException(
+        s"Unexpected Exception: Some of the columns from $allColumns could not be resolved from " +
+          s"available source columns $dfColumnNames")
+    }
+
+    (resolvedIndexedColumns.map(_.get), resolvedIncludedColumns.map(_.get))
   }
 }
