@@ -55,7 +55,7 @@ To use Hyperspace with a Spark's interactive shell, you need to download/install
 Start the Spark Scala shell as follows:
 
 ```
-./bin/spark-shell --packages com.microsoft:hyperspace-core_2.11:0.1.0
+./bin/spark-shell --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.1.0
 ```
 
 #### PySpark
