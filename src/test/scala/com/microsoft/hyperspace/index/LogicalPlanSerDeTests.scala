@@ -90,7 +90,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
     KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
 
-    // Confirm that isSplittable makes serialization fail
+    // Confirm that isSplittable makes serialization fail.
     fileFormat.isSplitable(spark, Map(), new Path("path"))
     if (expectSerializationError) {
       intercept[KryoException](KryoSerDeUtils.serialize(kryoSerializer, fileFormat))
@@ -98,32 +98,28 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
       KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
     }
 
-    // Now verify if Hyperspace serialization still works with this format
+    // Now verify if Hyperspace serialization still works with this format.
     verifyPlanSerde(updatedScanNode, "hadoopFsRelation.plan")
   }
 
   test("Serde query with Hadoop file system parquet relation.") {
-    val parquetFormat = new ParquetFileFormat
-    // CSVFormat is unserializable due to internal unserializable members. Verify as below.
-    verifyFileFormat(parquetFormat, false)
+    // Parquet is serializable due to no internal unserializable members. Verify as below.
+    verifyFileFormat(new ParquetFileFormat, false)
   }
 
   test("Serde query with Hadoop file system csv relation.") {
-    val csvFormat = new CSVFileFormat
     // CSVFormat is unserializable due to internal unserializable members. Verify as below.
-    verifyFileFormat(csvFormat, true)
+    verifyFileFormat(new CSVFileFormat, true)
   }
 
   test("Serde query with Hadoop file system json relation.") {
-    val jsonFormat = new JsonFileFormat
     // JsonFileFormat is unserializable due to internal unserializable members. Verify as below.
-    verifyFileFormat(jsonFormat, true)
+    verifyFileFormat(new JsonFileFormat, true)
   }
 
   test("Serde query with Hadoop file system orc relation.") {
-    val orcFormat = new OrcFileFormat
-    // OrcFileFormat is serializable due to no internal unserializable members. Verify as below.
-    verifyFileFormat(orcFormat, false)
+    // Orc is serializable due to no internal unserializable members. Verify as below.
+    verifyFileFormat(new OrcFileFormat, false)
   }
 
   test("Serde query with scalar subquery.") {
