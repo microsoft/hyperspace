@@ -24,6 +24,8 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Exists, InSubquery, ListQuery, ScalarSubquery, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 
 /**
  * Utility functions for logical plan serialization/deserialization.
@@ -119,7 +121,7 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat,
+            fileFormat: ParquetFileFormat,
             options),
           output,
           catalogTable,
@@ -131,6 +133,28 @@ object LogicalPlanSerDeUtils {
             dataSchema,
             bucketSpec,
             fileFormat,
+            options),
+          output,
+          catalogTable,
+          isStreaming)
+      case LogicalRelation(
+          HadoopFsRelation(
+            location: InMemoryFileIndex,
+            partitionSchema,
+            dataSchema,
+            bucketSpec,
+            _: CSVFileFormat,
+            options),
+          output,
+          catalogTable,
+          isStreaming) =>
+        LogicalRelationWrapper(
+          HadoopFsRelationWrapper(
+            InMemoryFileIndexWrapper(location.rootPaths.map(path => path.toString)),
+            partitionSchema,
+            dataSchema,
+            bucketSpec,
+            CSVFileFormatWrapper,
             options),
           output,
           catalogTable,
@@ -165,7 +189,7 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat,
+            fileFormat: ParquetFileFormat,
             options),
           output,
           catalogTable,
@@ -181,6 +205,32 @@ object LogicalPlanSerDeUtils {
             dataSchema,
             bucketSpec,
             fileFormat,
+            options)(spark),
+          output,
+          catalogTable,
+          isStreaming)
+      case LogicalRelationWrapper(
+          HadoopFsRelationWrapper(
+            location: InMemoryFileIndexWrapper,
+            partitionSchema,
+            dataSchema,
+            bucketSpec,
+            CSVFileFormatWrapper,
+            options),
+          output,
+          catalogTable,
+          isStreaming) =>
+        LogicalRelation(
+          HadoopFsRelation(
+            new InMemoryFileIndex(
+              spark,
+              location.rootPathStrings.map(path => new Path(path)),
+              Map(),
+              None),
+            partitionSchema,
+            dataSchema,
+            bucketSpec,
+            new CSVFileFormat,
             options)(spark),
           output,
           catalogTable,
