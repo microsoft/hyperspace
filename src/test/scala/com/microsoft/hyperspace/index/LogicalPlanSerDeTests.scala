@@ -43,7 +43,6 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
 
   var scanNode: LogicalRelation = _
   var singleTablePlan: LogicalPlan = _
-  var csvScanNode: LogicalRelation = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -67,15 +66,6 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     singleTablePlan = Project(
       Seq(c1, c2, c3),
       Filter(And(IsNotNull(c3), EqualTo(c3, Literal("facebook"))), scanNode))
-
-    val csvRelation = HadoopFsRelation(
-      tableLocation,
-      new StructType(),
-      tableSchema,
-      None,
-      new CSVFileFormat,
-      Map.empty)(spark)
-    val csvScanNode = LogicalRelation(csvRelation, Seq(c1, c2, c3, c4), None, isStreaming = false)
   }
 
   private def schemaFromAttributes(attributes: Attribute*): StructType = {
@@ -87,7 +77,10 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Serde query with Hadoop file system csv relation.") {
-    val csvFormat = csvScanNode.relation.asInstanceOf[HadoopFsRelation].fileFormat
+    val csvFormat = new CSVFileFormat
+    val csvRelation: HadoopFsRelation =
+      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = csvFormat)(spark)
+    val csvScanNode = scanNode.copy(relation = csvRelation)
 
     // Csv file format is serializable unless isSplittable is called on it. isSplittable api
     // initializes internal objects which break serialization logic.
