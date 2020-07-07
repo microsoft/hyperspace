@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
 import org.apache.spark.sql.execution.datasources.json.JsonFileFormat
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
@@ -116,6 +117,22 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     }
 
     // Now verify if Hyperspace serialization still works with json format
+    verifyPlanSerde(csvScanNode, "hadoopFsRelation.plan")
+  }
+
+  test("Serde query with Hadoop file system orc relation.") {
+    val orcFormat = new OrcFileFormat
+    val relation: HadoopFsRelation =
+      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = orcFormat)(spark)
+    val csvScanNode = scanNode.copy(relation = relation)
+
+    // Orc file format is serializable by default, so materialization should not affect.
+    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
+    KryoSerDeUtils.serialize(kryoSerializer, orcFormat)
+    orcFormat.isSplitable(spark, Map(), new Path("path"))
+    KryoSerDeUtils.serialize(kryoSerializer, orcFormat)
+
+    // Now verify if Hyperspace serialization still works with csv format
     verifyPlanSerde(csvScanNode, "hadoopFsRelation.plan")
   }
 

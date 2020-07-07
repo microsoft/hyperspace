@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
 import org.apache.spark.sql.execution.datasources.json.JsonFileFormat
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -225,7 +226,7 @@ object LogicalPlanSerDeUtils {
     def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
       case CSVFileFormatWrapper => Some(new CSVFileFormat)
       case JsonFileFormatWrapper => Some(new JsonFileFormat)
-      case f: ParquetFileFormat => Some(f)
+      case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
       case _ => throw HyperspaceException("Unsupported File Format found.")
     }
   }
@@ -234,7 +235,7 @@ object LogicalPlanSerDeUtils {
     def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
       case _: CSVFileFormat => Some(CSVFileFormatWrapper)
       case _: JsonFileFormat => Some(JsonFileFormatWrapper)
-      case f: ParquetFileFormat => Some(f)
+      case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
       case _ => throw HyperspaceException("Unsupported File Format found.")
     }
   }
