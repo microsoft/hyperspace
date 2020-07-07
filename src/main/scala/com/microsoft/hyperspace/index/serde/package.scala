@@ -179,4 +179,17 @@ package object serde {
         options: Map[String, String],
         dataSchema: StructType): OutputWriterFactory = throw new UnsupportedOperationException()
   }
+
+  case object JsonFileFormatWrapper extends FileFormat {
+    override def inferSchema(
+      sparkSession: SparkSession,
+      options: Map[String, String],
+      files: Seq[FileStatus]): Option[StructType] = throw new UnsupportedOperationException()
+
+    override def prepareWrite(
+      sparkSession: SparkSession,
+      job: Job,
+      options: Map[String, String],
+      dataSchema: StructType): OutputWriterFactory = throw new UnsupportedOperationException()
+  }
 }
