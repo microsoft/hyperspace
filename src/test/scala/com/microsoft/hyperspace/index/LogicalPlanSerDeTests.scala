@@ -103,7 +103,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     val jsonFormat = new JsonFileFormat
     val relation: HadoopFsRelation =
       scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = jsonFormat)(spark)
-    val csvScanNode = scanNode.copy(relation = relation)
+    val jsonScanNode = scanNode.copy(relation = relation)
 
     // Json file format is serializable unless isSplittable is called on it. isSplittable api
     // initializes internal objects which break serialization logic.
@@ -117,14 +117,14 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     }
 
     // Now verify if Hyperspace serialization still works with json format
-    verifyPlanSerde(csvScanNode, "hadoopFsRelation.plan")
+    verifyPlanSerde(jsonScanNode, "hadoopFsRelation.plan")
   }
 
   test("Serde query with Hadoop file system orc relation.") {
     val orcFormat = new OrcFileFormat
     val relation: HadoopFsRelation =
       scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = orcFormat)(spark)
-    val csvScanNode = scanNode.copy(relation = relation)
+    val orcScanNode = scanNode.copy(relation = relation)
 
     // Orc file format is serializable by default, so materialization should not affect.
     val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
@@ -132,8 +132,8 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     orcFormat.isSplitable(spark, Map(), new Path("path"))
     KryoSerDeUtils.serialize(kryoSerializer, orcFormat)
 
-    // Now verify if Hyperspace serialization still works with csv format
-    verifyPlanSerde(csvScanNode, "hadoopFsRelation.plan")
+    // Now verify if Hyperspace serialization works with orc format
+    verifyPlanSerde(orcScanNode, "hadoopFsRelation.plan")
   }
 
   test("Serde query with scalar subquery.") {

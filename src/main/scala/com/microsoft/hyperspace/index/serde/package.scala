@@ -167,20 +167,7 @@ package object serde {
       extends LeafNode
       with LogicalPlanWrapperWithInMemoryStates
 
-  case object CSVFileFormatWrapper extends FileFormat {
-    override def inferSchema(
-        sparkSession: SparkSession,
-        options: Map[String, String],
-        files: Seq[FileStatus]): Option[StructType] = throw new UnsupportedOperationException()
-
-    override def prepareWrite(
-        sparkSession: SparkSession,
-        job: Job,
-        options: Map[String, String],
-        dataSchema: StructType): OutputWriterFactory = throw new UnsupportedOperationException()
-  }
-
-  case object JsonFileFormatWrapper extends FileFormat {
+  abstract class FileFormatWrapper extends FileFormat {
     override def inferSchema(
       sparkSession: SparkSession,
       options: Map[String, String],
@@ -192,4 +179,8 @@ package object serde {
       options: Map[String, String],
       dataSchema: StructType): OutputWriterFactory = throw new UnsupportedOperationException()
   }
+
+  case object CSVFileFormatWrapper extends FileFormatWrapper
+
+  case object JsonFileFormatWrapper extends FileFormatWrapper
 }
