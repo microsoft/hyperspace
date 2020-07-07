@@ -16,17 +16,20 @@
 
 package com.microsoft.hyperspace.index
 
+import com.esotericsoftware.kryo.KryoException
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Exists, InSubquery, IsNotNull, ListQuery, Literal, NamedExpression, ScalarSubquery, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.index.serde.{KryoSerDeUtils, LogicalPlanSerDeUtils}
 
 /**
  * Some tests are adapted from examples in ExpressionParserSuite.scala, PlanParserSuite.scala,
@@ -40,6 +43,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
 
   var scanNode: LogicalRelation = _
   var singleTablePlan: LogicalPlan = _
+  var csvScanNode: LogicalRelation = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -63,14 +67,41 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     singleTablePlan = Project(
       Seq(c1, c2, c3),
       Filter(And(IsNotNull(c3), EqualTo(c3, Literal("facebook"))), scanNode))
+
+    val csvRelation = HadoopFsRelation(
+      tableLocation,
+      new StructType(),
+      tableSchema,
+      None,
+      new CSVFileFormat,
+      Map.empty)(spark)
+    val csvScanNode = LogicalRelation(csvRelation, Seq(c1, c2, c3, c4), None, isStreaming = false)
   }
 
   private def schemaFromAttributes(attributes: Attribute*): StructType = {
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
   }
 
-  test("Serde query with Hadoop file system relation.") {
+  test("Serde query with Hadoop file system parquet relation.") {
     verifyPlanSerde(scanNode, "hadoopFsRelation.plan")
+  }
+
+  test("Serde query with Hadoop file system csv relation.") {
+    val csvFormat = csvScanNode.relation.asInstanceOf[HadoopFsRelation].fileFormat
+
+    // Csv file format is serializable unless isSplittable is called on it. isSplittable api
+    // initializes internal objects which break serialization logic.
+    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
+    KryoSerDeUtils.serialize(kryoSerializer, csvFormat)
+
+    // Confirm that isSplittable makes serialization fail
+    intercept[KryoException] {
+      csvFormat.isSplitable(spark, Map(), new Path("path"))
+      KryoSerDeUtils.serialize(kryoSerializer, csvFormat)
+    }
+
+    // Now verify if Hyperspace serialization still works with csv format
+    verifyPlanSerde(csvScanNode, "hadoopFsRelation.plan")
   }
 
   test("Serde query with scalar subquery.") {
