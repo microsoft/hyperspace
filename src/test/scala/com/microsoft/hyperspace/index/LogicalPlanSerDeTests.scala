@@ -78,46 +78,36 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     verifyPlanSerde(scanNode, "hadoopFsRelation.plan")
   }
 
-  test("Serde query with Hadoop file system csv relation.") {
-    val csvFormat = new CSVFileFormat
+  private def verifyUnSerializableFileFormat(fileFormat: FileFormat): Unit = {
     val relation: HadoopFsRelation =
-      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = csvFormat)(spark)
-    val csvScanNode = scanNode.copy(relation = relation)
+      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = fileFormat)(spark)
+    val updatedScanNode = scanNode.copy(relation = relation)
 
-    // Csv file format is serializable unless isSplittable is called on it. isSplittable api
-    // initializes internal objects which break serialization logic.
+    // This file format is serializable unless isSplittable is called on it. isSplittable api
+    // initializes some unserializable internal objects which break the serialization logic.
     val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
-    KryoSerDeUtils.serialize(kryoSerializer, csvFormat)
+    KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
 
     // Confirm that isSplittable makes serialization fail
     intercept[KryoException] {
-      csvFormat.isSplitable(spark, Map(), new Path("path"))
-      KryoSerDeUtils.serialize(kryoSerializer, csvFormat)
+      fileFormat.isSplitable(spark, Map(), new Path("path"))
+      KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
     }
 
-    // Now verify if Hyperspace serialization still works with csv format
-    verifyPlanSerde(csvScanNode, "hadoopFsRelation.plan")
+    // Now verify if Hyperspace serialization still works with this format
+    verifyPlanSerde(updatedScanNode, "hadoopFsRelation.plan")
+  }
+
+  test("Serde query with Hadoop file system csv relation.") {
+    val csvFormat = new CSVFileFormat
+    // CSVFormat is unserializable due to internal unserializable members. Verify as below.
+    verifyUnSerializableFileFormat(csvFormat)
   }
 
   test("Serde query with Hadoop file system json relation.") {
     val jsonFormat = new JsonFileFormat
-    val relation: HadoopFsRelation =
-      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = jsonFormat)(spark)
-    val jsonScanNode = scanNode.copy(relation = relation)
-
-    // Json file format is serializable unless isSplittable is called on it. isSplittable api
-    // initializes internal objects which break serialization logic.
-    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
-    KryoSerDeUtils.serialize(kryoSerializer, jsonFormat)
-
-    // Confirm that isSplittable makes serialization fail
-    intercept[KryoException] {
-      jsonFormat.isSplitable(spark, Map(), new Path("path"))
-      KryoSerDeUtils.serialize(kryoSerializer, jsonFormat)
-    }
-
-    // Now verify if Hyperspace serialization still works with json format
-    verifyPlanSerde(jsonScanNode, "hadoopFsRelation.plan")
+    // JsonFileFormat is unserializable due to internal unserializable members. Verify as below.
+    verifyUnSerializableFileFormat(jsonFormat)
   }
 
   test("Serde query with Hadoop file system orc relation.") {
@@ -126,7 +116,8 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
       scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = orcFormat)(spark)
     val orcScanNode = scanNode.copy(relation = relation)
 
-    // Orc file format is serializable by default, so materialization should not affect.
+    // Orc file format is serializable as it doesn't contain unserializable objects like in csv or
+    // json.
     val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
     KryoSerDeUtils.serialize(kryoSerializer, orcFormat)
     orcFormat.isSplitable(spark, Map(), new Path("path"))
