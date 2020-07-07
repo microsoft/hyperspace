@@ -27,6 +27,8 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 
+import com.microsoft.hyperspace.HyperspaceException
+
 /**
  * Utility functions for logical plan serialization/deserialization.
  */
@@ -121,40 +123,23 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat: ParquetFileFormat,
-            options),
-          output,
-          catalogTable,
-          isStreaming) =>
-        LogicalRelationWrapper(
-          HadoopFsRelationWrapper(
-            InMemoryFileIndexWrapper(location.rootPaths.map(path => path.toString)),
-            partitionSchema,
-            dataSchema,
-            bucketSpec,
             fileFormat,
             options),
           output,
           catalogTable,
-          isStreaming)
-      case LogicalRelation(
-          HadoopFsRelation(
-            location: InMemoryFileIndex,
-            partitionSchema,
-            dataSchema,
-            bucketSpec,
-            _: CSVFileFormat,
-            options),
-          output,
-          catalogTable,
           isStreaming) =>
+        val format = fileFormat match {
+          case f: ParquetFileFormat => f
+          case _: CSVFileFormat => CSVFileFormatWrapper
+          case _ => throw HyperspaceException("Unsupported File Format found.")
+        }
         LogicalRelationWrapper(
           HadoopFsRelationWrapper(
             InMemoryFileIndexWrapper(location.rootPaths.map(path => path.toString)),
             partitionSchema,
             dataSchema,
             bucketSpec,
-            CSVFileFormatWrapper,
+            format,
             options),
           output,
           catalogTable,
@@ -189,11 +174,16 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat: ParquetFileFormat,
+            fileFormat,
             options),
           output,
           catalogTable,
           isStreaming) =>
+        val format = fileFormat match {
+          case f: ParquetFileFormat => f
+          case CSVFileFormatWrapper => new CSVFileFormat
+          case _ => throw HyperspaceException("Unsupported File Format found.")
+        }
         LogicalRelation(
           HadoopFsRelation(
             new InMemoryFileIndex(
@@ -205,32 +195,6 @@ object LogicalPlanSerDeUtils {
             dataSchema,
             bucketSpec,
             fileFormat,
-            options)(spark),
-          output,
-          catalogTable,
-          isStreaming)
-      case LogicalRelationWrapper(
-          HadoopFsRelationWrapper(
-            location: InMemoryFileIndexWrapper,
-            partitionSchema,
-            dataSchema,
-            bucketSpec,
-            CSVFileFormatWrapper,
-            options),
-          output,
-          catalogTable,
-          isStreaming) =>
-        LogicalRelation(
-          HadoopFsRelation(
-            new InMemoryFileIndex(
-              spark,
-              location.rootPathStrings.map(path => new Path(path)),
-              Map(),
-              None),
-            partitionSchema,
-            dataSchema,
-            bucketSpec,
-            new CSVFileFormat,
             options)(spark),
           output,
           catalogTable,
