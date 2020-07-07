@@ -74,11 +74,13 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
   }
 
-  test("Serde query with Hadoop file system parquet relation.") {
+  test("Serde query with Hadoop file system relation.") {
     verifyPlanSerde(scanNode, "hadoopFsRelation.plan")
   }
 
-  private def verifyUnSerializableFileFormat(fileFormat: FileFormat): Unit = {
+  private def verifyFileFormat(
+      fileFormat: FileFormat,
+      expectSerializationError: Boolean): Unit = {
     val relation: HadoopFsRelation =
       scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = fileFormat)(spark)
     val updatedScanNode = scanNode.copy(relation = relation)
@@ -89,8 +91,10 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
 
     // Confirm that isSplittable makes serialization fail
-    intercept[KryoException] {
-      fileFormat.isSplitable(spark, Map(), new Path("path"))
+    fileFormat.isSplitable(spark, Map(), new Path("path"))
+    if (expectSerializationError) {
+      intercept[KryoException](KryoSerDeUtils.serialize(kryoSerializer, fileFormat))
+    } else {
       KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
     }
 
@@ -98,33 +102,28 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     verifyPlanSerde(updatedScanNode, "hadoopFsRelation.plan")
   }
 
+  test("Serde query with Hadoop file system parquet relation.") {
+    val parquetFormat = new ParquetFileFormat
+    // CSVFormat is unserializable due to internal unserializable members. Verify as below.
+    verifyFileFormat(parquetFormat, false)
+  }
+
   test("Serde query with Hadoop file system csv relation.") {
     val csvFormat = new CSVFileFormat
     // CSVFormat is unserializable due to internal unserializable members. Verify as below.
-    verifyUnSerializableFileFormat(csvFormat)
+    verifyFileFormat(csvFormat, true)
   }
 
   test("Serde query with Hadoop file system json relation.") {
     val jsonFormat = new JsonFileFormat
     // JsonFileFormat is unserializable due to internal unserializable members. Verify as below.
-    verifyUnSerializableFileFormat(jsonFormat)
+    verifyFileFormat(jsonFormat, true)
   }
 
   test("Serde query with Hadoop file system orc relation.") {
     val orcFormat = new OrcFileFormat
-    val relation: HadoopFsRelation =
-      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = orcFormat)(spark)
-    val orcScanNode = scanNode.copy(relation = relation)
-
-    // Orc file format is serializable as it doesn't contain unserializable objects like in csv or
-    // json.
-    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
-    KryoSerDeUtils.serialize(kryoSerializer, orcFormat)
-    orcFormat.isSplitable(spark, Map(), new Path("path"))
-    KryoSerDeUtils.serialize(kryoSerializer, orcFormat)
-
-    // Now verify if Hyperspace serialization works with orc format
-    verifyPlanSerde(orcScanNode, "hadoopFsRelation.plan")
+    // OrcFileFormat is serializable due to no internal unserializable members. Verify as below.
+    verifyFileFormat(orcFormat, false)
   }
 
   test("Serde query with scalar subquery.") {
