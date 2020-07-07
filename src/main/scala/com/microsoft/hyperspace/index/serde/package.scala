@@ -16,13 +16,14 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SQLContext
+import org.apache.hadoop.fs.{FileStatus, Path}
+import org.apache.hadoop.mapreduce.Job
+import org.apache.spark.sql.{SparkSession, SQLContext}
 import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogTable}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, ExprId, Predicate, Unevaluable}
 import org.apache.spark.sql.catalyst.plans.logical.{BinaryNode, LeafNode, LogicalPlan}
 import org.apache.spark.sql.execution.FileRelation
-import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, PartitionDirectory}
+import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, OutputWriterFactory, PartitionDirectory}
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types.{DataType, StructType}
 
@@ -165,4 +166,17 @@ package object serde {
       override val isStreaming: Boolean)
       extends LeafNode
       with LogicalPlanWrapperWithInMemoryStates
+
+  case object CSVFileFormatWrapper extends FileFormat {
+    override def inferSchema(
+        sparkSession: SparkSession,
+        options: Map[String, String],
+        files: Seq[FileStatus]): Option[StructType] = throw new UnsupportedOperationException()
+
+    override def prepareWrite(
+        sparkSession: SparkSession,
+        job: Job,
+        options: Map[String, String],
+        dataSchema: StructType): OutputWriterFactory = throw new UnsupportedOperationException()
+  }
 }
