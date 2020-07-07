@@ -123,23 +123,18 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat,
+            ExtractSerializableFileFormat(fileFormat),
             options),
           output,
           catalogTable,
           isStreaming) =>
-        val format = fileFormat match {
-          case f: ParquetFileFormat => f
-          case _: CSVFileFormat => CSVFileFormatWrapper
-          case _ => throw HyperspaceException("Unsupported File Format found.")
-        }
         LogicalRelationWrapper(
           HadoopFsRelationWrapper(
             InMemoryFileIndexWrapper(location.rootPaths.map(path => path.toString)),
             partitionSchema,
             dataSchema,
             bucketSpec,
-            format,
+            fileFormat,
             options),
           output,
           catalogTable,
@@ -174,16 +169,11 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat,
+            ExtractFileFormat(fileFormat),
             options),
           output,
           catalogTable,
           isStreaming) =>
-        val format = fileFormat match {
-          case f: ParquetFileFormat => f
-          case CSVFileFormatWrapper => new CSVFileFormat
-          case _ => throw HyperspaceException("Unsupported File Format found.")
-        }
         LogicalRelation(
           HadoopFsRelation(
             new InMemoryFileIndex(
@@ -227,6 +217,22 @@ object LogicalPlanSerDeUtils {
             e.query.children,
             e.query.exprId,
             e.query.childOutputs))
+    }
+  }
+
+  object ExtractFileFormat {
+    def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
+      case f: ParquetFileFormat => Some(f)
+      case _: CSVFileFormat => Some(CSVFileFormatWrapper)
+      case _ => throw HyperspaceException("Unsupported File Format found.")
+    }
+  }
+
+  object ExtractSerializableFileFormat {
+    def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
+      case f: ParquetFileFormat => Some(f)
+      case CSVFileFormatWrapper => Some(new CSVFileFormat)
+      case _ => throw HyperspaceException("Unsupported File Format found.")
     }
   }
 }
