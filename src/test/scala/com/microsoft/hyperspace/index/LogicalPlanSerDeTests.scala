@@ -16,17 +16,22 @@
 
 package com.microsoft.hyperspace.index
 
+import com.esotericsoftware.kryo.KryoException
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Exists, InSubquery, IsNotNull, ListQuery, Literal, NamedExpression, ScalarSubquery, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
+import org.apache.spark.sql.execution.datasources.json.JsonFileFormat
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.index.serde.{KryoSerDeUtils, LogicalPlanSerDeUtils}
 
 /**
  * Some tests are adapted from examples in ExpressionParserSuite.scala, PlanParserSuite.scala,
@@ -71,6 +76,50 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
 
   test("Serde query with Hadoop file system relation.") {
     verifyPlanSerde(scanNode, "hadoopFsRelation.plan")
+  }
+
+  private def verifyFileFormat(
+      fileFormat: FileFormat,
+      expectSerializationError: Boolean): Unit = {
+    val relation =
+      scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = fileFormat)(spark)
+    val updatedScanNode = scanNode.copy(relation = relation)
+
+    // This file format is serializable unless isSplittable is called on it. isSplittable api
+    // initializes some unserializable internal objects which break the serialization logic.
+    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
+    KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
+
+    // Confirm that isSplittable makes serialization fail.
+    fileFormat.isSplitable(spark, Map(), new Path("path"))
+    if (expectSerializationError) {
+      intercept[KryoException](KryoSerDeUtils.serialize(kryoSerializer, fileFormat))
+    } else {
+      KryoSerDeUtils.serialize(kryoSerializer, fileFormat)
+    }
+
+    // Now verify if Hyperspace serialization still works with this format.
+    verifyPlanSerde(updatedScanNode, "hadoopFsRelation.plan")
+  }
+
+  test("Serde query with Hadoop file system parquet relation.") {
+    // Parquet is serializable due to no internal unserializable members. Verify as below.
+    verifyFileFormat(new ParquetFileFormat, false)
+  }
+
+  test("Serde query with Hadoop file system csv relation.") {
+    // CSVFormat is unserializable due to internal unserializable members. Verify as below.
+    verifyFileFormat(new CSVFileFormat, true)
+  }
+
+  test("Serde query with Hadoop file system json relation.") {
+    // JsonFileFormat is unserializable due to internal unserializable members. Verify as below.
+    verifyFileFormat(new JsonFileFormat, true)
+  }
+
+  test("Serde query with Hadoop file system orc relation.") {
+    // Orc is serializable due to no internal unserializable members. Verify as below.
+    verifyFileFormat(new OrcFileFormat, false)
   }
 
   test("Serde query with scalar subquery.") {

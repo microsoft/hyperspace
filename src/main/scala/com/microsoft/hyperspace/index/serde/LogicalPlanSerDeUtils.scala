@@ -24,6 +24,12 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Exists, InSubquery, ListQuery, ScalarSubquery, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
+import org.apache.spark.sql.execution.datasources.json.JsonFileFormat
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+
+import com.microsoft.hyperspace.HyperspaceException
 
 /**
  * Utility functions for logical plan serialization/deserialization.
@@ -119,7 +125,7 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat,
+            ExtractSerializableFileFormat(fileFormat),
             options),
           output,
           catalogTable,
@@ -165,7 +171,7 @@ object LogicalPlanSerDeUtils {
             partitionSchema,
             dataSchema,
             bucketSpec,
-            fileFormat,
+            ExtractFileFormat(fileFormat),
             options),
           output,
           catalogTable,
@@ -213,6 +219,26 @@ object LogicalPlanSerDeUtils {
             e.query.children,
             e.query.exprId,
             e.query.childOutputs))
+    }
+  }
+
+  object ExtractFileFormat {
+    def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
+      case CSVFileFormatWrapper => Some(new CSVFileFormat)
+      case JsonFileFormatWrapper => Some(new JsonFileFormat)
+      case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
+      case other =>
+        throw HyperspaceException(s"Unsupported file format found: ${other.toString}.")
+    }
+  }
+
+  object ExtractSerializableFileFormat {
+    def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
+      case _: CSVFileFormat => Some(CSVFileFormatWrapper)
+      case _: JsonFileFormat => Some(JsonFileFormatWrapper)
+      case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
+      case other =>
+        throw HyperspaceException(s"Unsupported file format found: ${other.toString}.")
     }
   }
 }
