@@ -81,7 +81,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
   private def verifyFileFormat(
       fileFormat: FileFormat,
       expectSerializationError: Boolean): Unit = {
-    val relation: HadoopFsRelation =
+    val relation =
       scanNode.relation.asInstanceOf[HadoopFsRelation].copy(fileFormat = fileFormat)(spark)
     val updatedScanNode = scanNode.copy(relation = relation)
 

@@ -227,7 +227,8 @@ object LogicalPlanSerDeUtils {
       case CSVFileFormatWrapper => Some(new CSVFileFormat)
       case JsonFileFormatWrapper => Some(new JsonFileFormat)
       case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
-      case f => throw HyperspaceException(s"Unsupported File Format found: ${f.toString}.")
+      case other =>
+        throw HyperspaceException(s"Unsupported file format found: ${other.toString}.")
     }
   }
 
@@ -236,7 +237,8 @@ object LogicalPlanSerDeUtils {
       case _: CSVFileFormat => Some(CSVFileFormatWrapper)
       case _: JsonFileFormat => Some(JsonFileFormatWrapper)
       case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
-      case f => throw HyperspaceException(s"Unsupported File Format found: ${f.toString}.")
+      case other =>
+        throw HyperspaceException(s"Unsupported file format found: ${other.toString}.")
     }
   }
 }
