@@ -344,6 +344,12 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     val schemaWithHyperspaceDisabled = dfWithHyperspaceDisabled.schema
     val sortedRowsWithHyperspaceDisabled = getSortedRows(dfWithHyperspaceDisabled)
 
+    // scalastyle:off println
+    println("Results wout index")
+    dfWithHyperspaceDisabled.explain(true)
+    dfWithHyperspaceDisabled.show(100)
+    // scalastyle:on println
+
     spark.enableHyperspace()
     val dfWithHyperspaceEnabled = f()
 
@@ -353,6 +359,14 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
         expectedRootPaths))
 
     assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
-    assert(sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))
+
+    // scalastyle:off println
+    println("Results with index")
+    dfWithHyperspaceEnabled.explain(true)
+    dfWithHyperspaceEnabled.show(100)
+    val withIxResults = getSortedRows(dfWithHyperspaceEnabled)
+    // scalastyle:on println
+
+    assert(sortedRowsWithHyperspaceDisabled.sameElements(withIxResults))
   }
 }
