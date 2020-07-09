@@ -64,6 +64,9 @@ case class SparkPlan(properties: SparkPlan.Properties) {
 
   override def equals(o: Any): Boolean = o match {
     case that: SparkPlan =>
+      // When a logical plan is serialized, some of the fields can be 'lazy' (e.g.,
+      // Metadata._hashCode), meaning that the same logical plan can result in different serialized
+      // stings. Thus, the serialized strings are deserialized to logical plans and compared.
       val isPlanEqual = if (!properties.rawPlan.isEmpty) {
         val sparkSession = SparkSession.getActiveSession.getOrElse {
           throw HyperspaceException("Could not find active SparkSession.")
