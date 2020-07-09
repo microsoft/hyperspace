@@ -19,9 +19,10 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
+import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.util.JsonUtils
 
-class IndexLogEntryTest extends SparkFunSuite {
+class IndexLogEntryTest extends SparkFunSuite with SparkInvolvedSuite {
   test("IndexLogEntry spec example") {
     val schemaString =
       """{\"type\":\"struct\",
@@ -53,7 +54,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         |    "plan" : {
         |      "kind" : "Spark",
         |      "properties" : {
-        |        "rawPlan" : "planString",
+        |        "rawPlan" : "",
         |        "fingerprint" : {
         |          "kind" : "LogicalPlan",
         |          "properties" : {

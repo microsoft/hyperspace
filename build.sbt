@@ -16,15 +16,9 @@
 
 name := "hyperspace-core"
 
-lazy val scala212 = "2.12.8"
-lazy val scala211 = "2.11.12"
-lazy val supportedScalaVersions = List(scala212, scala211)
+lazy val sparkVersion = "3.0.0"
 
-lazy val sparkVersion = "2.4.2"
-
-scalaVersion := scala212
-
-crossScalaVersions := supportedScalaVersions
+scalaVersion := "2.12.10"
 
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided" withSources(),

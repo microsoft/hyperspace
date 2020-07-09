@@ -20,6 +20,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.sql.{SparkSession, SQLContext}
 import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogTable}
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, ExprId, Predicate, Unevaluable}
 import org.apache.spark.sql.catalyst.plans.logical.{BinaryNode, LeafNode, LogicalPlan}
 import org.apache.spark.sql.execution.FileRelation
@@ -103,8 +104,7 @@ package object serde {
       function: AnyRef,
       dataType: DataType,
       children: Seq[Expression],
-      inputsNullSafe: Seq[Boolean],
-      inputTypes: Seq[DataType],
+      inputEncoders: Seq[Option[ExpressionEncoder[_]]],
       udfName: Option[String],
       nullable: Boolean,
       udfDeterministic: Boolean)

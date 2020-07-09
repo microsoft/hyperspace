@@ -19,10 +19,11 @@ package com.microsoft.hyperspace.util
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
+import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
-class JsonUtilsTests extends SparkFunSuite {
+class JsonUtilsTests extends SparkFunSuite with SparkInvolvedSuite {
   test("Test for JsonUtils.") {
     val schema = StructType(
       Seq(
@@ -31,7 +32,7 @@ class JsonUtilsTests extends SparkFunSuite {
         StructField("school", StringType)))
 
     val sourcePlanProperties = SparkPlan.Properties(
-      "plan",
+      "",
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
     val sourceDataProperties =

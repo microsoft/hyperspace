@@ -53,7 +53,7 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
  */
 object JoinIndexRule extends Rule[LogicalPlan] with Logging {
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
-    case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
+    case join @ Join(l, r, _, Some(condition), _) if isApplicable(l, r, condition) =>
       try {
         getUsableIndexPair(l, r, condition)
           .map {

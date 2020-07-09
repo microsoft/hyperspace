@@ -93,8 +93,7 @@ object LogicalPlanSerDeUtils {
           e.function,
           e.dataType,
           e.children,
-          e.inputsNullSafe,
-          e.inputTypes,
+          e.inputEncoders,
           e.udfName,
           e.nullable,
           e.udfDeterministic)
@@ -206,8 +205,7 @@ object LogicalPlanSerDeUtils {
           e.function,
           e.dataType,
           e.children,
-          e.inputsNullSafe,
-          e.inputTypes,
+          e.inputEncoders,
           e.udfName,
           e.nullable,
           e.udfDeterministic)

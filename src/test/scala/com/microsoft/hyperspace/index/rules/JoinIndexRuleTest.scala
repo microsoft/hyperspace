@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
@@ -117,7 +118,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
 
   test("Join rule works if indexes exist and configs are set correctly") {
     val joinCondition = EqualTo(t1c1, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -129,34 +131,38 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     spark.conf.unset(IndexConstants.INDEX_SYSTEM_PATH)
 
     val joinCondition = EqualTo(t1c1, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
   test("Join rule does not update plan if join condition does not exist") {
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
+    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None, JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
   test("Join rule does not update plan if join condition is not equality") {
     val joinCondition = GreaterThan(t1c1, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
   test("Join rule does not update plan if join condition contains And or Or") {
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
   test("Join rule does not update plan if join condition contains Literals") {
     val joinCondition = EqualTo(t1c2, Literal(10, IntegerType))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
@@ -170,7 +176,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
 
     // Index exists with t1c2 as indexed columns but not for t2c2. Plan should not update
     val joinCondition = EqualTo(t1c2, t2c2)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
@@ -182,7 +189,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     val t1ProjectNode = Project(Seq(t1c1, t1c4), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c4), t2FilterNode)
     val joinCondition = EqualTo(t1c1, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     // The plan requires t1c4 and t4c4 columns for projection. These columns are not part of any
     // index. Since no index satisfies the requirement, the plan should not change.
 
@@ -199,7 +207,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // t1c1, t1c2, t1c3, t1c4, t2c1, t2c2, t2c3, t2c4.
     // The below query is same as
     // SELECT * FROM T1, T2 WHERE T1.C1 = T2.C1
-    val originalPlan = Join(t1FilterNode, t2FilterNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1FilterNode, t2FilterNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
 
     {
       // Test: should not update plan if no index exist to cover all implicit columns
@@ -234,7 +243,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     val t1ProjectNode = Project(Seq(t1c1Alias, t1c3), t1FilterNode)
 
     val joinCondition = EqualTo(t1c1Alias.toAttribute, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
@@ -254,7 +264,7 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // Here, join condition contains a column from a LocalRelation and one from a LogicalRelation
     val joinCondition = EqualTo(t1c1, localCol1)
     val originalPlan =
-      Join(t1ProjectNode, localProjectNode, JoinType("inner"), Some(joinCondition))
+      Join(t1ProjectNode, localProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
 
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
@@ -268,7 +278,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // FROM t1, t2
     // WHERE t1c1 = t2c1 and t1c2 = t2c2
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -285,7 +296,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // WHERE t1c2 = t2c2 and t1c1 = t2c1 >> order of predicates changed. The rule should make sure
     // if any usable index can be found irrespective of order of predicates
     val joinCondition = And(EqualTo(t1c2, t2c2), EqualTo(t1c1, t2c1))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -301,7 +313,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // FROM t1, t2
     // WHERE t1c1 = t2c1 and t2c2 = t1c2 >> Swapped order of query columns
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t2c2, t1c2))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -319,7 +332,7 @@ class JoinIndexRuleTest extends HyperspaceSuite {
       // WHERE t1c1 = t2c1 and t1c1 = t2c2  >> t1c1 compared against both t2c1 and t2c2
       val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1, t2c2))
       val originalPlan =
-        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
       val updatedPlan = JoinIndexRule(originalPlan)
       assert(updatedPlan.equals(originalPlan))
     }
@@ -329,7 +342,7 @@ class JoinIndexRuleTest extends HyperspaceSuite {
       // WHERE t1c1 = t2c1 and t1c2 = t2c1  >> t2c1 compared against both t1c1 and t1c2
       val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c1))
       val originalPlan =
-        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
       val updatedPlan = JoinIndexRule(originalPlan)
       assert(updatedPlan.equals(originalPlan))
     }
@@ -343,7 +356,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // FROM t1, t2
     // WHERE t1c1 = t2c1 and t1c1 = t2c2 and t1c1 = t2c1 >> one predicate repeated twice
     val joinCondition = And(And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2)), EqualTo(t1c1, t2c1))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -359,7 +373,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     // FROM t1, t2
     // WHERE t1c1 = t1c2 and t1c1 = t2c2  >> two columns of t1 compared against each other
     val joinCondition = And(EqualTo(t1c1, t1c2), EqualTo(t1c2, t2c2))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
@@ -374,7 +389,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     val t2c1Qualified = t2c1.copy()(t2c1.exprId, Seq("Table2"))
 
     val joinCondition = EqualTo(t1c1Qualified, t2c1Qualified)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -403,7 +419,10 @@ class JoinIndexRuleTest extends HyperspaceSuite {
           case _: LogicalRelation => plan2(i).isInstanceOf[LogicalRelation]
 
           // for other node types, we compare exact matching between original and updated plans
-          case node => node.simpleString.equals(plan2(i).simpleString)
+          case node =>
+            // The default is 25, and should be big enough for this purpose.
+            val maxFields = SQLConf.get.maxToStringFields
+            node.simpleString(maxFields).equals(plan2(i).simpleString(maxFields))
         }
       }
     } else {

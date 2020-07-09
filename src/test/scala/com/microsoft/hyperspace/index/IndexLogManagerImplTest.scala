@@ -44,7 +44,7 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     Source(
       SparkPlan(
         SparkPlan.Properties(
-          rawPlan = "spark plan",
+          rawPlan = "",
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature")))))),
       Seq(

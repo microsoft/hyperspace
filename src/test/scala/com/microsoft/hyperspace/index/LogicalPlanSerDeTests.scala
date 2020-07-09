@@ -151,7 +151,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Serde query with scala UDF.") {
-    val intUdf = ScalaUDF(null, IntegerType, Literal(1) :: Nil, true :: Nil)
+    val intUdf = ScalaUDF(null, IntegerType, Literal(1) :: Nil)
     val plan = Filter(intUdf, scanNode)
     verifyPlanSerde(plan, "scalaUdf.plan")
   }
@@ -179,7 +179,12 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
 
   test("Serde query with join.") {
     val joinCondition = EqualTo(c1, c2)
-    val plan = Join(singleTablePlan, singleTablePlan, JoinType("inner"), Some(joinCondition))
+    val plan = Join(
+      singleTablePlan,
+      singleTablePlan,
+      JoinType("inner"),
+      Some(joinCondition),
+      JoinHint.NONE)
     verifyPlanSerde(plan, "join.plan")
   }
 

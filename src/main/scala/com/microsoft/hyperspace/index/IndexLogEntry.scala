@@ -20,6 +20,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 
@@ -60,7 +61,28 @@ object LogicalPlanFingerprint {
 // IndexLogEntry-specific SparkPlan that represents the source plan.
 case class SparkPlan(properties: SparkPlan.Properties) {
   val kind = "Spark"
+
+  override def equals(o: Any): Boolean = o match {
+    case that: SparkPlan =>
+      val isPlanEqual = if (!properties.rawPlan.isEmpty) {
+        val sparkSession = SparkSession.getActiveSession.getOrElse {
+          throw HyperspaceException("Could not find active SparkSession.")
+        }
+        val thisPlan = LogicalPlanSerDeUtils.deserialize(properties.rawPlan, sparkSession)
+        val thatPlan = LogicalPlanSerDeUtils.deserialize(that.properties.rawPlan, sparkSession)
+        thisPlan.fastEquals(thatPlan)
+      } else {
+        true
+      }
+      isPlanEqual && properties.fingerprint.equals(that.properties.fingerprint)
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    properties.fingerprint.hashCode
+  }
 }
+
 object SparkPlan {
   case class Properties(rawPlan: String, fingerprint: LogicalPlanFingerprint)
 }

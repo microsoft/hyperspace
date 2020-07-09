@@ -74,7 +74,7 @@ object DataFrameWriterExtensions {
     private def runCommand(session: SparkSession)(command: LogicalPlan): Unit = {
       val qe = session.sessionState.executePlan(command)
       // Call `QueryExecution.toRDD` to trigger the execution of commands.
-      SQLExecution.withNewExecutionId(session, qe)(qe.toRdd)
+      SQLExecution.withNewExecutionId(qe)(qe.toRdd)
     }
   }
 }

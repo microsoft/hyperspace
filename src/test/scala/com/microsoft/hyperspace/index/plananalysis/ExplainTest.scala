@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
@@ -37,6 +38,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val sparkSession = spark
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexStorageLocation)
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+    spark.sessionState.conf.setConf(SQLConf.LEGACY_BUCKETED_TABLE_SCAN_OUTPUT_ORDERING, true)
 
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
@@ -51,6 +53,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
 
   override def afterAll(): Unit = {
     fileSystem.delete(new Path(sampleParquetDataLocation), true)
+    spark.sessionState.conf.unsetConf(SQLConf.LEGACY_BUCKETED_TABLE_SCAN_OUTPUT_ORDERING)
     super.afterAll()
   }
 
@@ -76,50 +79,58 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     // The format of the explain output looks as follows:
     // scalastyle:off filelinelengthchecker
     /**
-     *=============================================================
-     *Plan with indexes:
-     *=============================================================
-     * SortMergeJoin [Col1#11], [Col1#21], Inner
-     * <----:- *(1) Project [Col1#11, Col2#12]---->
-     * <----:  +- *(1) Filter isnotnull(Col1#11)---->
-     * <----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
-     * <----+- *(2) Project [Col1#21, Col2#22]---->
-     *    <----+- *(2) Filter isnotnull(Col1#21)---->
-     *       <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
+     * =============================================================
+     * Plan with indexes:
+     * =============================================================
+     * SortMergeJoin [Col1#13], [Col1#23], Inner
+     * <----:- *(1) Project [Col1#13, Col2#14]---->
+     * <----:  +- *(1) Filter isnotnull(Col1#13)---->
+     * <----:     +- *(1) ColumnarToRow---->
+     * <----:        +- FileScan parquet [Col1#13,Col2#14] Batched: true, DataFilters: [isnotnull(Col1#13)], Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
+     * <----+- *(2) Project [Col1#23, Col2#24]---->
+     *    <----+- *(2) Filter isnotnull(Col1#23)---->
+     *       <----+- *(2) ColumnarToRow---->
+     *          <----+- FileScan parquet [Col1#23,Col2#24] Batched: true, DataFilters: [isnotnull(Col1#23)], Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
      *
-     *=============================================================
-     *Plan without indexes:
-     *=============================================================
-     * SortMergeJoin [Col1#11], [Col1#21], Inner
-     * <----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->
-     * <----:  +- Exchange hashpartitioning(Col1#11, 200)---->
-     * <----:     +- *(1) Project [Col1#11, Col2#12]---->
-     * <----:        +- *(1) Filter isnotnull(Col1#11)---->
-     * <----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/sampleparquet], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->
-     * <----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->
-     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->
+     * =============================================================
+     * Plan without indexes:
+     * =============================================================
+     * SortMergeJoin [Col1#13], [Col1#23], Inner
+     * <----:- *(2) Sort [Col1#13 ASC NULLS FIRST], false, 0---->
+     * <----:  +- Exchange hashpartitioning(Col1#13, 200), true, [id=#68]---->
+     * <----:     +- *(1) Project [Col1#13, Col2#14]---->
+     * <----:        +- *(1) Filter isnotnull(Col1#13)---->
+     * <----:           +- *(1) ColumnarToRow---->
+     * <----:              +- FileScan parquet [Col1#13,Col2#14] Batched: true, DataFilters: [isnotnull(Col1#13)], Format: Parquet, Location: InMemoryFileIndex[src/test/resources/samplepa..., PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->
+     * <----+- *(4) Sort [Col1#23 ASC NULLS FIRST], false, 0---->
+     *    <----+- ReusedExchange [Col1#23, Col2#24], Exchange hashpartitioning(Col1#13, 200), true, [id=#68]---->
      *
-     *=============================================================
-     *Indexes used:
-     *=============================================================
-     *joinIndex:src/test/resources/indexLocation/joinIndex/v__=0
+     * =============================================================
+     * Indexes used:
+     * =============================================================
+     * joinIndex:src/test/resources/indexLocation/joinIndex/v__=0
      *
      * =============================================================
      * Physical operator stats:
      * =============================================================
-     * +------------------+-------------------+------------------+----------+
-     * | Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|
-     * +------------------+-------------------+------------------+----------+
-     * |           *Filter|                  1|                 2|         1|
-     * |     *InputAdapter|                  4|                 2|        -2|
-     * |          *Project|                  1|                 2|         1|
-     * |   *ReusedExchange|                  1|                 0|        -1|
-     * |     *Scan parquet|                  1|                 2|         1|
-     * |  *ShuffleExchange|                  1|                 0|        -1|
-     * |             *Sort|                  2|                 0|        -2|
-     * |*WholeStageCodegen|                  4|                 3|        -1|
-     * |     SortMergeJoin|                  1|                 1|         0|
-     * +------------------+-------------------+------------------+----------+
+     * +----------------------+-------------------+------------------+----------+
+     * |     Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|
+     * +----------------------+-------------------+------------------+----------+
+     * |        *ColumnarToRow|                  1|                 2|         1|
+     * |               *Filter|                  1|                 2|         1|
+     * |         *InputAdapter|                  5|                 4|        -1|
+     * |              *Project|                  1|                 2|         1|
+     * |       *ReusedExchange|                  1|                 0|        -1|
+     * |         *Scan parquet|                  1|                 2|         1|
+     * |      *ShuffleExchange|                  1|                 0|        -1|
+     * |                 *Sort|                  2|                 0|        -2|
+     * |*WholeStageCodegen (3)|                  0|                 1|         1|
+     * |*WholeStageCodegen (4)|                  1|                 0|        -1|
+     * |*WholeStageCodegen (5)|                  1|                 0|        -1|
+     * |         SortMergeJoin|                  1|                 1|         0|
+     * | WholeStageCodegen (1)|                  1|                 1|         0|
+     * | WholeStageCodegen (2)|                  1|                 1|         0|
+     * +----------------------+-------------------+------------------+----------+
      */
     // scalastyle:on filelinelengthchecker
 
@@ -139,7 +150,9 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"<----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+      .append("<----:     +- *(1) ColumnarToRow---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:        +- FileScan parquet [Col1#11,Col2#12] Batched: true, DataFilters: [isnotnull(Col1#)], Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$joinIndexPath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
@@ -147,7 +160,9 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"      <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
+      .append("      <----+- *(2) ColumnarToRow---->")
+      .append(defaultDisplayMode.newLine)
+      .append("         <----+- FileScan parquet [Col1#21,Col2#22] Batched: true, DataFilters: [isnotnull(Col1#)], Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$joinIndexPath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
@@ -162,19 +177,21 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200), true, [id=#]---->")
       .append(defaultDisplayMode.newLine)
       .append("<----:     +- *(1) Project [Col1#11, Col2#12]---->")
       .append(defaultDisplayMode.newLine)
       .append("<----:        +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"<----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+      .append("<----:           +- *(1) ColumnarToRow---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:              +- FileScan parquet [Col1#11,Col2#12] Batched: true, DataFilters: [isnotnull(Col1#)], Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->")
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200), true, [id=#]---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")
@@ -192,31 +209,41 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")
       .append(defaultDisplayMode.newLine)
-      .append("+------------------+-------------------+------------------+----------+")
+      .append("+----------------------+-------------------+------------------+----------+")
       .append(defaultDisplayMode.newLine)
-      .append("| Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|")
+      .append("|     Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|")
       .append(defaultDisplayMode.newLine)
-      .append("+------------------+-------------------+------------------+----------+")
+      .append("+----------------------+-------------------+------------------+----------+")
       .append(defaultDisplayMode.newLine)
-      .append("|           *Filter|                  1|                 2|         1|")
+      .append("|        *ColumnarToRow|                  1|                 2|         1|")
       .append(defaultDisplayMode.newLine)
-      .append("|     *InputAdapter|                  4|                 2|        -2|")
+      .append("|               *Filter|                  1|                 2|         1|")
       .append(defaultDisplayMode.newLine)
-      .append("|          *Project|                  1|                 2|         1|")
+      .append("|         *InputAdapter|                  5|                 4|        -1|")
       .append(defaultDisplayMode.newLine)
-      .append("|   *ReusedExchange|                  1|                 0|        -1|")
+      .append("|              *Project|                  1|                 2|         1|")
       .append(defaultDisplayMode.newLine)
-      .append("|     *Scan parquet|                  1|                 2|         1|")
+      .append("|       *ReusedExchange|                  1|                 0|        -1|")
       .append(defaultDisplayMode.newLine)
-      .append("|  *ShuffleExchange|                  1|                 0|        -1|")
+      .append("|         *Scan parquet|                  1|                 2|         1|")
       .append(defaultDisplayMode.newLine)
-      .append("|             *Sort|                  2|                 0|        -2|")
+      .append("|      *ShuffleExchange|                  1|                 0|        -1|")
       .append(defaultDisplayMode.newLine)
-      .append("|*WholeStageCodegen|                  4|                 3|        -1|")
+      .append("|                 *Sort|                  2|                 0|        -2|")
       .append(defaultDisplayMode.newLine)
-      .append("|     SortMergeJoin|                  1|                 1|         0|")
+      .append("|*WholeStageCodegen (3)|                  0|                 1|         1|")
       .append(defaultDisplayMode.newLine)
-      .append("+------------------+-------------------+------------------+----------+")
+      .append("|*WholeStageCodegen (4)|                  1|                 0|        -1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|*WholeStageCodegen (5)|                  1|                 0|        -1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|         SortMergeJoin|                  1|                 1|         0|")
+      .append(defaultDisplayMode.newLine)
+      .append("| WholeStageCodegen (1)|                  1|                 1|         0|")
+      .append(defaultDisplayMode.newLine)
+      .append("| WholeStageCodegen (2)|                  1|                 1|         0|")
+      .append(defaultDisplayMode.newLine)
+      .append("+----------------------+-------------------+------------------+----------+")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
     // scalastyle:on filelinelengthchecker
@@ -297,35 +324,28 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("Project [Col1#135]")
       .append(displayMode.newLine)
-      .append("+- Filter (isnotnull(Col1#135) && (Col1#135 = Subquery subquery145))")
+      .append("+- Filter (isnotnull(Col1#13) AND (Col1#13 = Subquery scalar-subquery#23, [id=#83]))")
       .append(displayMode.newLine)
-      .append("   :  +- Subquery subquery145")
+      .append("   :  +- Subquery scalar-subquery#23, [id=#83]")
       .append(displayMode.newLine)
-      .append("   :     +- *(1) Project [Col1#135]")
+      .append("   :     +- *(1) Project [Col1#13]")
       .append(displayMode.newLine)
-      .append("   :        +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
+      .append("   :        +- *(1) Filter (isnotnull(Col2#14) AND (Col2#14 = 1))")
       .append(displayMode.newLine)
-      .append("   <----:           +- *(1) FileScan parquet [Col2#136,Col1#135]")
-      .append(" Batched: true, Format: Parquet, Location: " +
+      .append("   :           +- *(1) ColumnarToRow")
+      .append(displayMode.newLine)
+      .append("   <----:              +- FileScan parquet [Col2#136,Col1#135]")
+      .append(" Batched: true, DataFilters: [isnotnull(Col2#14), (Col2#14 = 1)], Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
       .append("ReadSchema: struct<Col2:int,Col1:string>---->")
       .append(displayMode.newLine)
-      .append("   +- FileScan parquet [Col1#135] Batched: true, Format: Parquet, Location: " +
+      .append("   +- ColumnarToRow")
+      .append(displayMode.newLine)
+      .append("      +- FileScan parquet [Col1#135] Batched: true, DataFilters: [isnotnull(Col1#13)], " +
+        "Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>")
-      .append(displayMode.newLine)
-      .append("         +- Subquery subquery145")
-      .append(displayMode.newLine)
-      .append("            +- *(1) Project [Col1#135]")
-      .append(displayMode.newLine)
-      .append("               +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
-      .append(displayMode.newLine)
-      .append("                  <----+- *(1) FileScan parquet [Col2#136,Col1#135] " +
-        "Batched: true, Format: Parquet, Location: " +
-        truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
-        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
-      .append("ReadSchema: struct<Col2:int,Col1:string>---->")
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append("=============================================================")
@@ -336,36 +356,28 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("Project [Col1#135]")
       .append(displayMode.newLine)
-      .append("+- Filter (isnotnull(Col1#135) && (Col1#135 = Subquery subquery145))")
+      .append("+- Filter (isnotnull(Col1#13) AND (Col1#13 = Subquery scalar-subquery#23, [id=#53]))")
       .append(displayMode.newLine)
-      .append("   :  +- Subquery subquery145")
+      .append("   :  +- Subquery scalar-subquery#23, [id=#53]")
       .append(displayMode.newLine)
-      .append("   :     +- *(1) Project [Col1#135]")
+      .append("   :     +- *(1) Project [Col1#13]")
       .append(displayMode.newLine)
-      .append("   :        +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
+      .append("   :        +- *(1) Filter (isnotnull(Col2#14) AND (Col2#14 = 1))")
       .append(displayMode.newLine)
-      .append("   <----:           +- *(1) FileScan parquet [Col1#135,Col2#136] Batched: true, " +
-        "Format: Parquet, Location: " +
+      .append("   :           +- *(1) ColumnarToRow")
+      .append(displayMode.newLine)
+      .append("   <----:              +- FileScan parquet [Col1#135,Col2#136] Batched: true, " +
+        "DataFilters: [isnotnull(Col2#14), (Col2#14 = 1)], Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
       .append("ReadSchema: struct<Col1:string,Col2:int>---->")
       .append(displayMode.newLine)
-      .append("   +- FileScan parquet [Col1#135] Batched: true, Format: Parquet, Location: " +
+      .append("   +- ColumnarToRow")
+      .append(displayMode.newLine)
+      .append("      +- FileScan parquet [Col1#135] Batched: true, DataFilters: [isnotnull(Col1#13)], " +
+        "Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>")
-      .append(displayMode.newLine)
-      .append("         +- Subquery subquery145")
-      .append(displayMode.newLine)
-      .append("            +- *(1) Project [Col1#135]")
-      .append(displayMode.newLine)
-      .append("               +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
-      .append(displayMode.newLine)
-      .append(
-        "                  <----+- *(1) FileScan parquet [Col1#135,Col2#136] Batched: true, " +
-          "Format: Parquet, Location: ")
-      .append(truncate("InMemoryFileIndex[" + sampleParquetDataFullPath + "]") +
-        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], " +
-        "ReadSchema: struct<Col1:string,Col2:int>---->")
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append("=============================================================")
@@ -383,21 +395,25 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("=============================================================")
       .append(displayMode.newLine)
-      .append("+-----------------+-------------------+------------------+----------+")
+      .append("+---------------------+-------------------+------------------+----------+")
       .append(displayMode.newLine)
-      .append("|Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|")
+      .append("|    Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|")
       .append(displayMode.newLine)
-      .append("+-----------------+-------------------+------------------+----------+")
+      .append("+---------------------+-------------------+------------------+----------+")
       .append(displayMode.newLine)
-      .append("|           Filter|                  1|                 1|         0|")
+      .append("|        ColumnarToRow|                  1|                 1|         0|")
       .append(displayMode.newLine)
-      .append("|          Project|                  1|                 1|         0|")
+      .append("|               Filter|                  1|                 1|         0|")
       .append(displayMode.newLine)
-      .append("|     Scan parquet|                  1|                 1|         0|")
+      .append("|         InputAdapter|                  1|                 1|         0|")
       .append(displayMode.newLine)
-      .append("|WholeStageCodegen|                  1|                 1|         0|")
+      .append("|              Project|                  1|                 1|         0|")
       .append(displayMode.newLine)
-      .append("+-----------------+-------------------+------------------+----------+")
+      .append("|         Scan parquet|                  1|                 1|         0|")
+      .append(displayMode.newLine)
+      .append("|WholeStageCodegen (1)|                  1|                 1|         0|")
+      .append(displayMode.newLine)
+      .append("+---------------------+-------------------+------------------+----------+")
       .append(displayMode.newLine)
       .append(displayMode.newLine)
     // scalastyle:on filelinelengthchecker
@@ -475,10 +491,13 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("Project [Col1#]")
       .append(displayMode.newLine)
-      .append("+- Filter (isnotnull(Col2#) && (Col2# = 2))")
+      .append("+- Filter (isnotnull(Col2#) AND (Col2# = 2))")
       .append(displayMode.newLine)
-      .append("   " + displayMode.highlightTag.open ++ "+- FileScan parquet [Col2#,Col1#] ")
-      .append("Batched: true, Format: Parquet, Location: " +
+      .append("   +- ColumnarToRow")
+      .append(displayMode.newLine)
+      .append("      " + displayMode.highlightTag.open ++ "+- FileScan parquet [Col2#,Col1#] ")
+      .append("Batched: true, DataFilters: [isnotnull(Col2#14), (Col2#14 = 2)], " +
+        "Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]"))
       .append(", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
       .append("ReadSchema: struct<Col2:int,Col1:string>" + displayMode.highlightTag.close)
@@ -492,10 +511,13 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("Project [Col1#]")
       .append(displayMode.newLine)
-      .append("+- Filter (isnotnull(Col2#) && (Col2# = 2))")
+      .append("+- Filter (isnotnull(Col2#) AND (Col2# = 2))")
       .append(displayMode.newLine)
-      .append("   " + displayMode.highlightTag.open + "+- FileScan parquet [Col1#,Col2#] ")
-      .append("Batched: true, Format: Parquet, Location: ")
+      .append("   +- ColumnarToRow")
+      .append(displayMode.newLine)
+      .append("      " + displayMode.highlightTag.open + "+- FileScan parquet [Col1#,Col2#] ")
+      .append("Batched: true, DataFilters: [isnotnull(Col2#14), (Col2#14 = 2)], ")
+      .append("Format: Parquet, Location: ")
       // Note: The below conversion converts relative path to absolute path for comparison.
       .append(truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") + ", ")
       .append("PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
