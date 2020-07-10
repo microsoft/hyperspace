@@ -224,10 +224,11 @@ object LogicalPlanSerDeUtils {
 
   object ExtractFileFormat {
     def unapply(fileFormat: FileFormat): Option[FileFormat] = fileFormat match {
+      case CSVFileFormatWrapper => Some(new CSVFileFormat)
+      case JsonFileFormatWrapper => Some(new JsonFileFormat)
       // Add CSVFileFormat and JsonFileFormat in below checks for backward compatibility.
-      case CSVFileFormatWrapper | _: CSVFileFormat => Some(new CSVFileFormat)
-      case JsonFileFormatWrapper | _: JsonFileFormat => Some(new JsonFileFormat)
-      case _: ParquetFileFormat | _: OrcFileFormat => Some(fileFormat)
+      case _: ParquetFileFormat | _: OrcFileFormat | _: CSVFileFormat | _: JsonFileFormat =>
+        Some(fileFormat)
       case other =>
         throw HyperspaceException(s"Unsupported file format found: ${other.toString}.")
     }
