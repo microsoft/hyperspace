@@ -23,15 +23,13 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.util.LogicalPlanUtils

@@ -16,11 +16,8 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
@@ -29,7 +26,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{IndexLogEntry}
+import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 /**
