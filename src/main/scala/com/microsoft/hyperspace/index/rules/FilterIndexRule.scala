@@ -29,9 +29,8 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexLogEntry}
+import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -148,35 +147,9 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
+    val cIndexes = LogicalPlanUtils.getCandidateIndexesForPlan(project)
 
-    // map of signature provider to signature for this subplan
-    val signatureMap: mutable.Map[String, String] = mutable.Map()
-
-    def signatureValid(entry: IndexLogEntry): Boolean = {
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
-
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature = LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(project)
-        signatureMap.put(sourcePlanSignature.provider, signature)
-      }
-
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
-    }
-
-    val allIndexes = Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
-      .indexCollectionManager
-      .getIndexes(Seq(Constants.States.ACTIVE))
-
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    allIndexes.filter { index =>
-      index.created &&
-      signatureValid(index) &&
+    cIndexes.filter { index =>
       indexCoversPlan(
         projectColumns,
         filterColumns,
@@ -184,7 +157,6 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
         index.includedColumns,
         fsRelation.fileFormat)
     }
-
   }
 
   /**
