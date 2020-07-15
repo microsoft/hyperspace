@@ -116,7 +116,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
       FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration)
     } catch {
       case ex: Exception =>
-        logError("", ex)
+        logError(s"Failed to create the latest stable log with id = '$id'", ex)
         false
     }
   }
@@ -130,7 +130,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
       }
     } catch {
       case ex: Exception =>
-        logError("", ex)
+        logError("Failed to delete the latest stable log", ex)
         false
     }
   }
@@ -147,7 +147,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
         fs.rename(tempPath, pathFromId(id))
       } catch {
         case ex: Exception =>
-          logError("", ex)
+          logError(s"Failed to write log with id = '$id'", ex)
           false
       }
     }
