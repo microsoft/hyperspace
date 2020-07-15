@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.logging
+package com.microsoft.hyperspace.telemetry
 
 object Constants {
-  val HYPERSPACE_LOGGER_CLASS = "spark.hyperspace.logger"
-  val DEFAULT_HYPERSPACE_LOGGER_CLASS = classOf[GenericHyperspaceLogging].getName
+  val HYPERSPACE_EVENT_LOGGER_CLASS_KEY = "spark.hyperspace.eventloggerclass"
+  val DEFAULT_HYPERSPACE_EVENT_LOGGER_CLASS = classOf[NoOpEventLogger].getName
 }
