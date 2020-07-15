@@ -26,15 +26,14 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
-import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, HyperspaceEventLogging}
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -52,7 +51,7 @@ import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, HyperspaceEventLoggi
  * These indexes are indexed by the join columns and can improve the query performance by
  * avoiding full shuffling of T1 and T2.
  */
-object JoinIndexRule extends Rule[LogicalPlan] with Logging with HyperspaceEventLogging {
+object JoinIndexRule extends Rule[LogicalPlan] with Logging {
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
     case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
       try {
