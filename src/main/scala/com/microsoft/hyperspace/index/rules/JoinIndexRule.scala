@@ -32,7 +32,6 @@ import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
-import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -87,12 +86,12 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
 
-    val lIndexes = LogicalPlanUtils.getCandidateIndexesForPlan(left)
+    val lIndexes = RuleUtils.getCandidateIndexesForPlan(left)
     if (lIndexes.isEmpty) {
       return None
     }
 
-    val rIndexes = LogicalPlanUtils.getCandidateIndexesForPlan(right)
+    val rIndexes = RuleUtils.getCandidateIndexesForPlan(right)
     if (rIndexes.isEmpty) {
       return None
     }

@@ -16,15 +16,8 @@
 
 package com.microsoft.hyperspace.util
 
-import scala.collection.mutable
-
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-
-import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
 
 /**
  * Utility functions for logical plan.
@@ -41,36 +34,5 @@ object LogicalPlanUtils {
       case _: LogicalRelation => true
       case _ => false
     }
-  }
-
-  def getAllAvailableIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
-    Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
-      .indexCollectionManager
-      .getIndexes(states)
-  }
-
-  def getCandidateIndexesForPlan(plan: LogicalPlan): Seq[IndexLogEntry] = {
-    val signatureMap: mutable.Map[String, String] = mutable.Map()
-
-    def signatureValid(entry: IndexLogEntry): Boolean = {
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
-
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature = LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(plan)
-        signatureMap.put(sourcePlanSignature.provider, signature)
-      }
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
-    }
-
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    val allIndexes = getAllAvailableIndexes(Seq(Constants.States.ACTIVE))
-
-    allIndexes.filter(index => index.created && signatureValid(index))
   }
 }

@@ -27,7 +27,6 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -144,9 +143,9 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
-    val cIndexes = LogicalPlanUtils.getCandidateIndexesForPlan(project)
+    val candidateIndexes = RuleUtils.getCandidateIndexesForPlan(project)
 
-    cIndexes.filter { index =>
+    candidateIndexes.filter { index =>
       indexCoversPlan(
         projectColumns,
         filterColumns,
