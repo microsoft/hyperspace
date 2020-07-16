@@ -16,8 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
@@ -77,11 +77,15 @@ class RefreshAction(
     write(spark, df, indexConfig)
   }
 
-  final override protected def event(message: String): HyperspaceEvent = {
+  final override protected def event(
+      sparkUser: String,
+      applicationId: String,
+      appName: String,
+      message: String): HyperspaceEvent = {
     RefreshActionEvent(
-      sparkContext.sparkUser,
-      sparkContext.applicationId,
-      sparkContext.appName,
+      sparkUser,
+      applicationId,
+      appName,
       logEntry.asInstanceOf[IndexLogEntry],
       message)
   }

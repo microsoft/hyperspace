@@ -65,11 +65,15 @@ class CancelAction(final override protected val logManager: IndexLogManager) ext
    */
   final override def op(): Unit = {}
 
-  final override protected def event(message: String): HyperspaceEvent = {
+  final override protected def event(
+      sparkUser: String,
+      applicationId: String,
+      appName: String,
+      message: String): HyperspaceEvent = {
     CancelActionEvent(
-      sparkContext.sparkUser,
-      sparkContext.applicationId,
-      sparkContext.appName,
+      sparkUser,
+      applicationId,
+      appName,
       logEntry.asInstanceOf[IndexLogEntry],
       message)
   }

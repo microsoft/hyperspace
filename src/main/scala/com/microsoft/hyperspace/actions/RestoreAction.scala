@@ -42,11 +42,15 @@ class RestoreAction(final override protected val logManager: IndexLogManager) ex
 
   final override def op(): Unit = { /* Do nothing */ }
 
-  final override protected def event(message: String): HyperspaceEvent = {
+  final override protected def event(
+      sparkUser: String,
+      applicationId: String,
+      appName: String,
+      message: String): HyperspaceEvent = {
     RestoreActionEvent(
-      sparkContext.sparkUser,
-      sparkContext.applicationId,
-      sparkContext.appName,
+      sparkUser,
+      applicationId,
+      appName,
       logEntry.asInstanceOf[IndexLogEntry],
       message)
   }

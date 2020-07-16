@@ -51,11 +51,15 @@ class VacuumAction(
     }
   }
 
-  final override protected def event(message: String): HyperspaceEvent = {
+  final override protected def event(
+      sparkUser: String,
+      applicationId: String,
+      appName: String,
+      message: String): HyperspaceEvent = {
     VacuumActionEvent(
-      sparkContext.sparkUser,
-      sparkContext.applicationId,
-      sparkContext.appName,
+      sparkUser,
+      applicationId,
+      appName,
       logEntry.asInstanceOf[IndexLogEntry],
       message)
   }

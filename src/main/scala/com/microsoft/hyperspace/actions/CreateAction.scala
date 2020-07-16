@@ -76,7 +76,11 @@ class CreateAction(
   //   This needs to be refactored to mark this as protected.
   final override def op(): Unit = write(spark, df, indexConfig)
 
-  final override protected def event(message: String): HyperspaceEvent = {
+  final override protected def event(
+      sparkUser: String,
+      applicationId: String,
+      appName: String,
+      message: String): HyperspaceEvent = {
     // logEntry may or may not exist the first time an index is being created.
     // This can happen, for example, if index config we receive is incompatible with the
     // dataframe. So we use Try here. We still need an index object with empty values for event
@@ -110,9 +114,9 @@ class CreateAction(
     }
 
     CreateActionEvent(
-      sparkContext.sparkUser,
-      sparkContext.applicationId,
-      sparkContext.appName,
+      sparkUser,
+      applicationId,
+      appName,
       index,
       df.queryExecution.logical.toString,
       message)
