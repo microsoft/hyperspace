@@ -21,13 +21,14 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.util.hyperspace.Utils
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.telemetry.Constants._
 
 /**
  * Hyperspace event logging interface. Extend this to enable emitting hyperspace events.
  */
 trait HyperspaceEventLogging {
-  def logEvent(event: HyperspaceEvent): Unit = EventLogger.getLogger.logEvent(event)
+  def logEvent(event: HyperspaceEvent): Unit = EventLogger.logger.logEvent(event)
 }
 
 /**
@@ -40,32 +41,25 @@ trait EventLogger {
 
 object EventLogger extends Logging {
   // Singleton logger instance for event logging.
-  private var logger: EventLogger = _
-
-  def getLogger: EventLogger = {
-    if (logger != null) {
-      return logger
-    }
-
-    val className: String = SparkSession.getActiveSession
-      .map { spark =>
-        spark.conf.get(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, DEFAULT_HYPERSPACE_EVENT_LOGGER_CLASS)
+  private[telemetry] lazy val logger: EventLogger = SparkSession.getActiveSession
+    .flatMap(_.conf.getOption(HYPERSPACE_EVENT_LOGGER_CLASS_KEY))
+    .map { className =>
+      Try(Utils.classForName(className).newInstance) match {
+        case Success(logger: EventLogger) =>
+          logInfo(s"Setting hyperspace event logger to $className")
+          logger
+        case _ =>
+          logError(s"Unable to instantiate hyperspace logger from provided class $className")
+          throw HyperspaceException(
+            "Unable to instantiate hyperspace logger from provided class $className")
       }
-      .getOrElse(DEFAULT_HYPERSPACE_EVENT_LOGGER_CLASS)
-
-    logger = Try(Utils.classForName(className).newInstance) match {
-      case Success(emitter: EventLogger) => emitter
-      case _ =>
-        logDebug(s"Hyperspace logger is not appropriately set, using default logger.")
-        Utils
-          .classForName(DEFAULT_HYPERSPACE_EVENT_LOGGER_CLASS)
-          .newInstance()
-          .asInstanceOf[EventLogger]
     }
-    logger
-  }
+    .getOrElse {
+      logInfo(s"Setting hyperspace event logger to $NoOpEventLogger")
+      NoOpEventLogger
+    }
 }
 
-class NoOpEventLogger extends EventLogger {
+object NoOpEventLogger extends EventLogger {
   override def logEvent(event: HyperspaceEvent): Unit = {}
 }
