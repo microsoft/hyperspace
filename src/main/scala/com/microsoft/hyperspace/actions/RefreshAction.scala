@@ -78,14 +78,10 @@ class RefreshAction(
   }
 
   final override protected def event(message: String): HyperspaceEvent = {
-    val sc = SparkSession.getActiveSession.getOrElse {
-      throw HyperspaceException("No spark session found")
-    }.sparkContext
-
     RefreshActionEvent(
-      sc.sparkUser,
-      sc.applicationId,
-      sc.appName,
+      sparkContext.sparkUser,
+      sparkContext.applicationId,
+      sparkContext.appName,
       logEntry.asInstanceOf[IndexLogEntry],
       message)
   }

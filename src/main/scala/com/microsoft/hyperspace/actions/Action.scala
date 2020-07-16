@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.internal.Logging
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
 import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, HyperspaceEventLogging}
 
@@ -31,7 +31,7 @@ import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, HyperspaceEventLoggi
  *     1. Any metadata dependent logic should be passed in as functions instead.
  *     2. IndexLogEntry specific code should be removed.
  */
-trait Action extends HyperspaceEventLogging with Logging {
+trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession {
   protected val baseId: Int = logManager.getLatestId().getOrElse(-1)
 
   def logEntry: LogEntry

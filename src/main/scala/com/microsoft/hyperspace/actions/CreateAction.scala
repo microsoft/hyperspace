@@ -109,14 +109,10 @@ class CreateAction(
         Map())
     }
 
-    val sc = SparkSession.getActiveSession.getOrElse {
-      throw HyperspaceException("No spark session found")
-    }.sparkContext
-
     CreateActionEvent(
-      sc.sparkUser,
-      sc.applicationId,
-      sc.appName,
+      sparkContext.sparkUser,
+      sparkContext.applicationId,
+      sparkContext.appName,
       index,
       df.queryExecution.logical.toString,
       message)
