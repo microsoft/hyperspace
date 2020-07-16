@@ -16,8 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
