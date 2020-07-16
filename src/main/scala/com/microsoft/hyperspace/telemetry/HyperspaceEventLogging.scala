@@ -39,25 +39,27 @@ trait EventLogger {
   def logEvent(event: HyperspaceEvent): Unit
 }
 
-object EventLogger extends Logging {
+private[telemetry] object EventLogger extends Logging {
   // Singleton logger instance for event logging.
-  private[telemetry] lazy val logger: EventLogger = SparkSession.getActiveSession
-    .flatMap(_.conf.getOption(HYPERSPACE_EVENT_LOGGER_CLASS_KEY))
-    .map { className =>
-      Try(Utils.classForName(className).newInstance) match {
-        case Success(logger: EventLogger) =>
-          logInfo(s"Setting hyperspace event logger to $className")
-          logger
-        case _ =>
-          logError(s"Unable to instantiate hyperspace logger from provided class $className")
-          throw HyperspaceException(
-            "Unable to instantiate hyperspace logger from provided class $className")
+  lazy val logger: EventLogger = {
+    SparkSession.getActiveSession
+      .flatMap(_.conf.getOption(HYPERSPACE_EVENT_LOGGER_CLASS_KEY))
+      .map { className =>
+        Try(Utils.classForName(className).newInstance) match {
+          case Success(logger: EventLogger) =>
+            logInfo(s"Setting event logger to $className")
+            logger
+          case _ =>
+            logError(s"Unable to instantiate event logger from provided class $className")
+            throw HyperspaceException(
+              s"Unable to instantiate event logger from provided class $className")
+        }
       }
-    }
-    .getOrElse {
-      logInfo(s"Setting hyperspace event logger to $NoOpEventLogger")
-      NoOpEventLogger
-    }
+      .getOrElse {
+        logInfo(s"Defaulting to the $NoOpEventLogger event logger")
+        NoOpEventLogger
+      }
+  }
 }
 
 object NoOpEventLogger extends EventLogger {

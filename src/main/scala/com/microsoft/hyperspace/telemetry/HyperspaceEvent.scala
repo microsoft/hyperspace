@@ -21,7 +21,7 @@ import org.apache.commons.lang.StringUtils
 import com.microsoft.hyperspace.index.IndexLogEntry
 
 /**
- * Base class for all Hyperspace events.
+ * Trait for all Hyperspace events.
  */
 trait HyperspaceEvent
 
@@ -42,6 +42,16 @@ class HyperspaceIndexCRUDEvent(
     message: String = StringUtils.EMPTY)
     extends HyperspaceEvent
 
+/**
+ * Index creation event. Emitted on index creation.
+ *
+ * @param sparkUser user of spark application.
+ * @param appId spark application id.
+ * @param appName spark application name.
+ * @param index related indexes.
+ * @param originalPlan original plan which is getting indexed.
+ * @param message message about event.
+ */
 case class CreateActionEvent(
     sparkUser: String,
     appId: String,
@@ -51,6 +61,15 @@ case class CreateActionEvent(
     message: String)
     extends HyperspaceIndexCRUDEvent(sparkUser, appId, appName, index, message)
 
+/**
+ * Index deletion event. Emitted when delete is called on an index.
+ *
+ * @param sparkUser user of spark application.
+ * @param appId spark application id.
+ * @param appName spark application name.
+ * @param index related indexes.
+ * @param message message about event.
+ */
 case class DeleteActionEvent(
     sparkUser: String,
     appId: String,
@@ -59,6 +78,15 @@ case class DeleteActionEvent(
     message: String)
     extends HyperspaceIndexCRUDEvent(sparkUser, appId, appName, index, message)
 
+/**
+ * Index restore event. Emitted when restore is called on an index.
+ *
+ * @param sparkUser user of spark application.
+ * @param appId spark application id.
+ * @param appName spark application name.
+ * @param index related indexes.
+ * @param message message about event.
+ */
 case class RestoreActionEvent(
     sparkUser: String,
     appId: String,
@@ -67,6 +95,15 @@ case class RestoreActionEvent(
     message: String)
     extends HyperspaceIndexCRUDEvent(sparkUser, appId, appName, index)
 
+/**
+ * Index Vacuum Event. Emitted when vacuum is called on an index.
+ *
+ * @param sparkUser user of spark application.
+ * @param appId spark application id.
+ * @param appName spark application name.
+ * @param index related indexes.
+ * @param message message about event.
+ */
 case class VacuumActionEvent(
     sparkUser: String,
     appId: String,
@@ -75,6 +112,15 @@ case class VacuumActionEvent(
     message: String)
     extends HyperspaceIndexCRUDEvent(sparkUser, appId, appName, index, message)
 
+/**
+ * Index Refresh Event. Emitted when refresh is called on an index.
+ *
+ * @param sparkUser user of spark application.
+ * @param appId spark application id.
+ * @param appName spark application name.
+ * @param index related indexes.
+ * @param message message about event.
+ */
 case class RefreshActionEvent(
     sparkUser: String,
     appId: String,
@@ -83,6 +129,16 @@ case class RefreshActionEvent(
     message: String)
     extends HyperspaceIndexCRUDEvent(sparkUser, appId, appName, index, message)
 
+/**
+ * Index cancel event. This event is emitted when the user cancels an ongoing or failed CRUD
+ * operation.
+ *
+ * @param sparkUser user of spark application.
+ * @param appId spark application id.
+ * @param appName spark application name.
+ * @param index related indexes.
+ * @param message message about event.
+ */
 case class CancelActionEvent(
     sparkUser: String,
     appId: String,
@@ -91,6 +147,18 @@ case class CancelActionEvent(
     message: String)
     extends HyperspaceIndexCRUDEvent(sparkUser, appId, appName, index, message)
 
+/**
+ * Index usage event. This event is emitted when an index is picked instead of original data
+ * source by one of the hyperspace rules.
+ *
+ * @param sparkUser
+ * @param appId
+ * @param appName
+ * @param indexes
+ * @param planBeforeRule
+ * @param planAfterRule
+ * @param message
+ */
 case class HyperspaceIndexUsageEvent(
     sparkUser: String,
     appId: String,

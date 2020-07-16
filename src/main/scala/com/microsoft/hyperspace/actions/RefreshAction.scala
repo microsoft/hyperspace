@@ -23,6 +23,7 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, RefreshActionEvent}
 
 // TODO: This class depends directly on LogEntry. This should be updated such that
 //   it works with IndexLogEntry only. (for example, this class can take in
@@ -74,5 +75,18 @@ class RefreshAction(
     //   This should be user-configurable to allow maintain the existing bucket numbers
     //   in the index log entry.
     write(spark, df, indexConfig)
+  }
+
+  final override protected def event(message: String): HyperspaceEvent = {
+    val sc = SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No spark session found")
+    }.sparkContext
+
+    RefreshActionEvent(
+      sc.sparkUser,
+      sc.applicationId,
+      sc.appName,
+      logEntry.asInstanceOf[IndexLogEntry],
+      message)
   }
 }

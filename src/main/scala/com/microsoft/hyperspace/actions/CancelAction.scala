@@ -16,9 +16,12 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.spark.sql.SparkSession
+
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States._
-import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.telemetry.{CancelActionEvent, HyperspaceEvent}
 
 /**
  * Cancelling an action. This action is used if index maintenance operations fail and leave the
@@ -63,4 +66,17 @@ class CancelAction(final override protected val logManager: IndexLogManager) ext
    * TODO: Can be improved to clean up partially created files in previous incomplete operations
    */
   final override def op(): Unit = {}
+
+  final override protected def event(message: String): HyperspaceEvent = {
+    val sc = SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No spark session found")
+    }.sparkContext
+
+    CancelActionEvent(
+      sc.sparkUser,
+      sc.applicationId,
+      sc.appName,
+      logEntry.asInstanceOf[IndexLogEntry],
+      message)
+  }
 }

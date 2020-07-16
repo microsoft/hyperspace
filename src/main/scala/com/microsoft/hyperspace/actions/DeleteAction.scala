@@ -16,9 +16,12 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.spark.sql.SparkSession
+
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, DELETED, DELETING}
-import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.telemetry.{DeleteActionEvent, HyperspaceEvent}
 
 class DeleteAction(final override protected val logManager: IndexLogManager) extends Action {
   final override lazy val logEntry: LogEntry = {
@@ -40,4 +43,17 @@ class DeleteAction(final override protected val logManager: IndexLogManager) ext
   }
 
   final override def op(): Unit = { /* Do nothing */ }
+
+  final override protected def event(message: String): HyperspaceEvent = {
+    val sc = SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No spark session found")
+    }.sparkContext
+
+    DeleteActionEvent(
+      sc.sparkUser,
+      sc.applicationId,
+      sc.appName,
+      logEntry.asInstanceOf[IndexLogEntry],
+      message)
+  }
 }

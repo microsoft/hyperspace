@@ -16,9 +16,12 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.spark.sql.SparkSession
+
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{DELETED, DOESNOTEXIST, VACUUMING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, VacuumActionEvent}
 
 class VacuumAction(
     final override protected val logManager: IndexLogManager,
@@ -48,5 +51,18 @@ class VacuumAction(
         dataManager.delete(id)
       }
     }
+  }
+
+  final override protected def event(message: String): HyperspaceEvent = {
+    val sc = SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No spark session found")
+    }.sparkContext
+
+    VacuumActionEvent(
+      sc.sparkUser,
+      sc.applicationId,
+      sc.appName,
+      logEntry.asInstanceOf[IndexLogEntry],
+      message)
   }
 }

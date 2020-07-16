@@ -16,12 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.util.Try
+
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.telemetry.{CreateActionEvent, HyperspaceEvent}
 import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 class CreateAction(
@@ -33,7 +36,7 @@ class CreateAction(
     extends CreateActionBase(dataManager)
     with Action {
   final override lazy val logEntry: LogEntry =
-  getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
 
   final override val transientState: String = CREATING
 
@@ -72,4 +75,50 @@ class CreateAction(
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
   final override def op(): Unit = write(spark, df, indexConfig)
+
+  final override protected def event(message: String): HyperspaceEvent = {
+    // logEntry may or may not exist the first time an index is being created.
+    // This can happen, for example, if index config we receive is incompatible with the
+    // dataframe. So we use Try here. We still need an index object with empty values for event
+    // logging.
+    val index: IndexLogEntry = Try {
+      // if a logEntry exists, we can create a valid index object directly
+      logEntry.asInstanceOf[IndexLogEntry]
+    }.getOrElse {
+      val sourcePlanProperties = SparkPlan.Properties(
+        rawPlan = "",
+        LogicalPlanFingerprint(
+          LogicalPlanFingerprint.Properties(Seq(Signature(provider = "", value = "")))))
+      val sourceDataProperties =
+        Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
+
+      IndexLogEntry(
+        indexConfig.indexName,
+        CoveringIndex(
+          CoveringIndex.Properties(
+            CoveringIndex.Properties
+              .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+            schemaString = "",
+            numBuckets = spark.conf
+              .get(
+                IndexConstants.INDEX_NUM_BUCKETS,
+                IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
+              .toInt)),
+        Content(indexDataPath.toString, Seq()),
+        Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+        Map())
+    }
+
+    val sc = SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No spark session found")
+    }.sparkContext
+
+    CreateActionEvent(
+      sc.sparkUser,
+      sc.applicationId,
+      sc.appName,
+      index,
+      df.queryExecution.logical.toString,
+      message)
+  }
 }

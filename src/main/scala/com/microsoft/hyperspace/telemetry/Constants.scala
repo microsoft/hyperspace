@@ -17,6 +17,5 @@
 package com.microsoft.hyperspace.telemetry
 
 object Constants {
-  val HYPERSPACE_EVENT_LOGGER_CLASS_KEY = "spark.hyperspace.eventloggerclass"
-  val DEFAULT_HYPERSPACE_EVENT_LOGGER_CLASS = NoOpEventLogger.getClass.getName
+  val HYPERSPACE_EVENT_LOGGER_CLASS_KEY = "spark.hyperspace.eventLoggerClass"
 }
