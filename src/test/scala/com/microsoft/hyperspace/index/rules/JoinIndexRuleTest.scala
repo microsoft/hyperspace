@@ -347,6 +347,23 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     }
   }
 
+  test("Join rule doesn't update plan if columns don't have one-to-one mapping case insensitive") {
+    val t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
+    val t2ProjectNode = Project(Seq(t2c1, t2c3), t2FilterNode)
+
+    val t1c1Caps = t1c1.withName("T1C1")
+    val t2c1Caps = t2c1.withName("T2C1")
+
+    val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1Caps, t2c1Caps))
+    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val updatedPlan = JoinIndexRule(originalPlan)
+    assert(!updatedPlan.equals(originalPlan))
+
+    val indexPaths = Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
+    verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
+  }
+
+
   test("Join rule updates plan for composite query for repeated predicates") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)

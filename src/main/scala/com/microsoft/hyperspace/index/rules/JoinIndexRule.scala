@@ -17,6 +17,7 @@
 package com.microsoft.hyperspace.index.rules
 
 import scala.collection.mutable
+import scala.util.Try
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
@@ -206,6 +207,10 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
   private def isPlanLinear(plan: LogicalPlan): Boolean =
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
 
+  private def find(attributes: Seq[Attribute], column: Expression): Option[Attribute] = {
+    attributes.find(_.semanticEquals(column))
+  }
+
   /**
    * Requirements to support join optimizations using join indexes are as follows:
    *
@@ -221,9 +226,6 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
    *    FROM newT1, T2
    *    WHERE newT1.aliasCol = T2.b
    * Here, aliasCol is not directly from the base relation T1
-   *
-   * TODO: add alias resolver for supporting aliases in join condition. Until then,
-   *   make sure this scenario isn't supported
    *
    * 2. For each equality condition in the join predicate, one attribute must belong to the left
    * subplan, and another from right subplan.
@@ -275,35 +277,49 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       l: LogicalPlan,
       r: LogicalPlan,
       condition: Expression): Boolean = {
-
+    val conditions = extractConditions(condition)
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes
     val lBaseAttrs = l.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
     val rBaseAttrs = r.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
+    val allBaseAttrs = lBaseAttrs ++ rBaseAttrs
+    val base = new mutable.HashMap[Expression, Expression]()
 
-    def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
-      def contains(attributes: Seq[Attribute], column: Expression): Boolean = {
-        attributes.exists(_.semanticEquals(column))
-      }
-      (contains(lBaseAttrs, c1) && contains(rBaseAttrs, c2)) ||
-      (contains(lBaseAttrs, c2) && contains(rBaseAttrs, c1))
+    conditions.foreach {
+      case EqualTo(c1, c2) =>
+        (find(allBaseAttrs, c1), find(allBaseAttrs, c2)) match {
+          case (Some(b1), Some(b2)) =>
+            base.put(c1, b1)
+            base.put(c2, b2)
+          case _ =>
+            // Found a join column not present in any base relation.
+            return false
+        }
     }
 
-    // Map to maintain and check one-to-one relation between join condition attributes
+    def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
+      (lBaseAttrs.contains(base(c1)) && rBaseAttrs.contains(base(c2))) ||
+      (lBaseAttrs.contains(base(c2)) && rBaseAttrs.contains(base(c1)))
+    }
+
+    // Map to maintain and check one-to-one relation between join condition attributes. For join
+    // condition attributes, we store their corresponding base relation attributes in the map.
+    // This ensures uniqueness of attributes in case of case-insensitive system. E.g. We want to
+    // store just one copy of column 'A' when join condition contains column 'A' as well as 'a'.
     val attrMap = new mutable.HashMap[Expression, Expression]()
 
-    extractConditions(condition).forall {
+    conditions.forall {
       case EqualTo(c1, c2) =>
         // c1 and c2 should belong to l and r respectively, or r and l respectively.
         if (!fromDifferentBaseRelations(c1, c2)) {
           return false
         }
         // The following validates that c1 is compared only against c2 and vice versa
-        if (attrMap.contains(c1) && attrMap.contains(c2)) {
-          attrMap(c1).equals(c2) && attrMap(c2).equals(c1)
-        } else if (!attrMap.contains(c1) && !attrMap.contains(c2)) {
-          attrMap.put(c1, c2)
-          attrMap.put(c2, c1)
+        if (attrMap.contains(base(c1)) && attrMap.contains(base(c2))) {
+          attrMap(base(c1)).equals(base(c2)) && attrMap(base(c2)).equals(base(c1))
+        } else if (!attrMap.contains(base(c1)) && !attrMap.contains(base(c2))) {
+          attrMap.put(base(c1), base(c2))
+          attrMap.put(base(c2), base(c1))
           true
         } else {
           false
@@ -364,13 +380,20 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       joinCondition: Expression,
       lIndexes: Seq[IndexLogEntry],
       rIndexes: Seq[IndexLogEntry]): Option[(IndexLogEntry, IndexLogEntry)] = {
+    val lBaseAttrs =
+      left.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output).map(_.name)
+    val rBaseAttrs =
+      right.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output).map(_.name)
 
-    val lRequiredIndexedCols = requiredIndexedCols(left, joinCondition)
-    val rRequiredIndexedCols = requiredIndexedCols(right, joinCondition)
-    val lRMap = getLRColumnMapping(lRequiredIndexedCols, rRequiredIndexedCols, joinCondition)
+    // Map of left resolved columns with their corresponding right resolved
+    // columns from condition.
+    val lRMap = getLRColumnMapping(lBaseAttrs, rBaseAttrs, joinCondition)
+    val lRequiredIndexedCols = lRMap.keys.toSeq
+    val rRequiredIndexedCols = lRMap.values.toSeq
 
-    val lRequiredAllCols = allRequiredCols(left)
-    val rRequiredAllCols = allRequiredCols(right)
+    // All required columns resolved with base relation.
+    val lRequiredAllCols: Seq[String] = resolve(spark, allRequiredCols(left), lBaseAttrs).get
+    val rRequiredAllCols: Seq[String] = resolve(spark, allRequiredCols(right), rBaseAttrs).get
 
     // Make sure required indexed columns are subset of all required columns for a subplan
     require(resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined)
@@ -381,27 +404,6 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
     val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
 
     compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
-  }
-
-  /**
-   * Returns list of column names which must be in the indexed columns config of a selected
-   * index.
-   *
-   * @param plan logical plan
-   * @param condition join condition used to pull out required indexed columns in the plan
-   * @return list of column names from this plan which must be part of indexed columns in a chosen
-   *         index
-   */
-  private def requiredIndexedCols(plan: LogicalPlan, condition: Expression): Seq[String] = {
-    val cleanedPlan = CleanupAliases(plan)
-    CleanupAliases
-      .trimNonTopLevelAliases(condition)
-      .references
-      .collect {
-        case column if cleanedPlan.references.contains(column) => column.name
-      }
-      .toSeq
-      .distinct
   }
 
   /**
@@ -471,16 +473,18 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       rRequiredIndexedCols: Seq[String],
       condition: Expression): Map[String, String] = {
     extractConditions(condition).map {
-      case EqualTo(attr1: AttributeReference, attr2: AttributeReference)
-          if lRequiredIndexedCols.contains(attr1.name) && rRequiredIndexedCols.contains(
-            attr2.name) =>
-        (attr1.name, attr2.name)
-      case EqualTo(attr1: AttributeReference, attr2: AttributeReference)
-          if lRequiredIndexedCols.contains(attr2.name) && rRequiredIndexedCols.contains(
-            attr1.name) =>
-        (attr2.name, attr1.name)
-      case _ =>
-        throw new IllegalStateException("Unexpected exception while using join rule")
+      case EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
+        Try {
+          (resolve(spark, attr1.name, lRequiredIndexedCols).get,
+            resolve(spark, attr2.name, rRequiredIndexedCols).get)
+        }.getOrElse {
+          Try {
+            (resolve(spark, attr2.name, lRequiredIndexedCols).get,
+              resolve(spark, attr1.name, rRequiredIndexedCols).get)
+          }.getOrElse {
+            throw new IllegalStateException("Unexpected exception while using join rule")
+          }
+        }
     }.toMap
   }
 
@@ -502,9 +506,12 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
   /**
    * Get usable indexes which satisfy indexed and included column requirements.
    *
+   * Pre-requisite: the indexed and included columns required must be already resolved with their
+   * corresponding base relation columns at this point.
+   *
    * @param indexes All available indexes for the logical plan
-   * @param requiredIndexCols required indexed columns
-   * @param allRequiredCols required included columns
+   * @param requiredIndexCols required indexed columns resolved with their base relation column.
+   * @param allRequiredCols required included columns resolved with their base relation column.
    * @return Indexes which satisfy the indexed and covering column requirements from the logical
    *         plan and join condition
    */
@@ -517,9 +524,8 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
 
       // All required index columns should match one-to-one with all indexed columns and
       // vice-versa. All required columns must be present in the available index columns.
-      resolve(spark, requiredIndexCols, idx.indexedColumns).isDefined &&
-      requiredIndexCols.distinct.size == idx.indexedColumns.distinct.size &&
-      resolve(spark, allRequiredCols, allCols).isDefined
+      requiredIndexCols.toSet.equals(idx.indexedColumns.toSet) &&
+      allRequiredCols.forall(allCols.contains)
     }
   }
 
@@ -586,13 +592,7 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       lIndex: IndexLogEntry,
       rIndex: IndexLogEntry,
       columnMapping: Map[String, String]): Boolean = {
-    require(resolve(spark, columnMapping.keys.toSeq, lIndex.indexedColumns).isDefined)
-    require(resolve(spark, columnMapping.values.toSeq, rIndex.indexedColumns).isDefined)
-
-    val requiredRightIndexedCols =
-      lIndex.indexedColumns.map { c =>
-        columnMapping(resolve(spark, c, columnMapping.keys.toSeq).get)
-      }
+    val requiredRightIndexedCols = lIndex.indexedColumns.map(columnMapping)
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
 
