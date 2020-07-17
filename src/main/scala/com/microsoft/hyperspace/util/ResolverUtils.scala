@@ -52,7 +52,7 @@ object ResolverUtils {
   def resolve(
       spark: SparkSession,
       requiredString: String,
-      availableStrings: Iterable[String]): Option[String] = {
+      availableStrings: Seq[String]): Option[String] = {
     availableStrings.find(resolve(spark.sessionState.conf.resolver, requiredString, _).isDefined)
   }
 
@@ -67,9 +67,9 @@ object ResolverUtils {
    */
   def resolve(
       spark: SparkSession,
-      requiredStrings: Iterable[String],
-      availableStrings: Iterable[String]): Option[Seq[String]] = {
+      requiredStrings: Seq[String],
+      availableStrings: Seq[String]): Option[Seq[String]] = {
     val resolved = requiredStrings.map(resolve(spark, _, availableStrings))
-    if (resolved.forall(_.nonEmpty)) Some(resolved.map(_.get).toSeq) else None
+    if (resolved.forall(_.nonEmpty)) Some(resolved.map(_.get)) else None
   }
 }

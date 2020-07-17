@@ -586,11 +586,13 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       lIndex: IndexLogEntry,
       rIndex: IndexLogEntry,
       columnMapping: Map[String, String]): Boolean = {
-    require(resolve(spark, columnMapping.keys, lIndex.indexedColumns).isDefined)
-    require(resolve(spark, columnMapping.values, rIndex.indexedColumns).isDefined)
+    require(resolve(spark, columnMapping.keys.toSeq, lIndex.indexedColumns).isDefined)
+    require(resolve(spark, columnMapping.values.toSeq, rIndex.indexedColumns).isDefined)
 
     val requiredRightIndexedCols =
-      lIndex.indexedColumns.map(c => columnMapping(resolve(spark, c, columnMapping.keys).get))
+      lIndex.indexedColumns.map { c =>
+        columnMapping(resolve(spark, c, columnMapping.keys.toSeq).get)
+      }
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
 
