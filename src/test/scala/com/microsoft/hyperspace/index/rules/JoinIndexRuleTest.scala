@@ -23,11 +23,9 @@ import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
-import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
 class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
@@ -42,8 +40,8 @@ class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
   val t2c3 = AttributeReference("t2c3", IntegerType)()
   val t2c4 = AttributeReference("t2c4", StringType)()
 
-  val t1Schema = schemaFromAttributes(t1c1, t1c2, t1c3, t1c4)
-  val t2Schema = schemaFromAttributes(t2c1, t2c2, t2c3, t2c4)
+  val t1Schema = RuleTestHelper.schemaFromAttributes(t1c1, t1c2, t1c3, t1c4)
+  val t2Schema = RuleTestHelper.schemaFromAttributes(t2c1, t2c2, t2c3, t2c4)
 
   var t1Relation: HadoopFsRelation = _
   var t2Relation: HadoopFsRelation = _
@@ -74,8 +72,8 @@ class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
     val t2Location =
       new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t2Schema), NoopCache)
 
-    t1Relation = baseRelation(t1Location, t1Schema, spark)
-    t2Relation = baseRelation(t2Location, t2Schema, spark)
+    t1Relation = RuleTestHelper.baseRelation(t1Location, t1Schema, spark)
+    t2Relation = RuleTestHelper.baseRelation(t2Location, t2Schema, spark)
 
     t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
     t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, false)
@@ -93,11 +91,11 @@ class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    RuleTestHelper.createIndex(systemPath, spark, "t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    RuleTestHelper.createIndex(systemPath, spark, "t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    RuleTestHelper.createIndex(systemPath, spark, "t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    RuleTestHelper.createIndex(systemPath, spark, "t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    RuleTestHelper.createIndex(systemPath, spark, "t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   before {
@@ -198,10 +196,10 @@ class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
 
     {
       // Test: should update plan if index exists to cover all implicit columns
-      val t1TestIndex =
-        createIndex("t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
-      val t2TestIndex =
-        createIndex("t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
+      val t1TestIndex = RuleTestHelper
+        .createIndex(systemPath, spark, "t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
+      val t2TestIndex = RuleTestHelper
+        .createIndex(systemPath, spark, "t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
 
       // clear cache so the new indexes gets added to it
       clearCache()
@@ -411,52 +409,9 @@ class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
       .flatten
   }
 
-  private def createIndex(
-      name: String,
-      indexCols: Seq[AttributeReference],
-      includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry = {
-    val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
-    val sign: LogicalPlan => String = LogicalPlanSignatureProvider.create(signClass).signature
-
-    val sourcePlanProperties = SparkPlan.Properties(
-      LogicalPlanSerDeUtils.serialize(plan, spark),
-      LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature(signClass, sign(plan))))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
-
-    val indexLogEntry = IndexLogEntry(
-      name,
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(indexCols.map(_.name), includedCols.map(_.name)),
-          IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-          10)),
-      Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-      Map())
-
-    val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
-    indexLogEntry.state = Constants.States.ACTIVE
-    logManager.writeLog(0, indexLogEntry)
-    indexLogEntry
-  }
-
-  private def schemaFromAttributes(attributes: Attribute*): StructType =
-    StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
-
-  private def baseRelation(
-      location: FileIndex,
-      schema: StructType,
-      spark: SparkSession): HadoopFsRelation = {
-    HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
-      spark)
-  }
 
   private def getIndexDataFilesPath(indexName: String): Path = {
-    new Path(getIndexRootPath(indexName), s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    RuleTestHelper.getIndexDataFilesPath(indexName, systemPath)
   }
 
   private def getIndexRootPath(indexName: String): Path = {

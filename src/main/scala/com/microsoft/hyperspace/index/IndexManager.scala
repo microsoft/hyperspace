@@ -78,4 +78,6 @@ trait IndexManager {
    * @param indexName Name of the index to cancel.
    */
   def cancel(indexName: String): Unit
+
+  def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry]
 }

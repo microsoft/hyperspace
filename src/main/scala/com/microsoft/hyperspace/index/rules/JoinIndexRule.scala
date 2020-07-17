@@ -30,6 +30,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 
@@ -86,12 +87,16 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
 
-    val lIndexes = RuleUtils.getCandidateIndexesForPlan(left)
+    val indexManager = Hyperspace
+      .getContext(SparkSession.getActiveSession.get)
+      .indexCollectionManager
+
+    val lIndexes = RuleUtils.getCandidateIndexes(indexManager, left)
     if (lIndexes.isEmpty) {
       return None
     }
 
-    val rIndexes = RuleUtils.getCandidateIndexesForPlan(right)
+    val rIndexes = RuleUtils.getCandidateIndexes(indexManager, right)
     if (rIndexes.isEmpty) {
       return None
     }

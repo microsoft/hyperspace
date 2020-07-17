@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
@@ -26,6 +27,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.IndexLogEntry
 
 /**
@@ -143,7 +145,10 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
-    val candidateIndexes = RuleUtils.getCandidateIndexesForPlan(project)
+    val indexManager = Hyperspace
+      .getContext(SparkSession.getActiveSession.get)
+      .indexCollectionManager
+    val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, project)
 
     candidateIndexes.filter { index =>
       indexCoversPlan(

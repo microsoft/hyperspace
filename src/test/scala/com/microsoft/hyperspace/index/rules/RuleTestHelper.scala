@@ -16,10 +16,17 @@
 
 package com.microsoft.hyperspace.index.rules
 
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.types.{StructField, StructType}
 
-import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
+import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 
 object RuleTestHelper {
   // TODO: Refactor common test code for Rules
@@ -32,5 +39,55 @@ object RuleTestHelper {
         }
         .get
         .toString
+  }
+
+  def createIndex(
+      systemPath: Path,
+      spark: SparkSession,
+      name: String,
+      indexCols: Seq[AttributeReference],
+      includedCols: Seq[AttributeReference],
+      plan: LogicalPlan): IndexLogEntry = {
+    val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
+    val sign: LogicalPlan => String = LogicalPlanSignatureProvider.create(signClass).signature
+
+    val sourcePlanProperties = SparkPlan.Properties(
+      LogicalPlanSerDeUtils.serialize(plan, spark),
+      LogicalPlanFingerprint(
+        LogicalPlanFingerprint.Properties(Seq(Signature(signClass, sign(plan))))))
+    val sourceDataProperties =
+      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
+
+    val indexLogEntry = IndexLogEntry(
+      name,
+      CoveringIndex(
+        CoveringIndex.Properties(
+          CoveringIndex.Properties
+            .Columns(indexCols.map(_.name), includedCols.map(_.name)),
+          IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
+          10)),
+      Content(getIndexDataFilesPath(name, systemPath).toUri.toString, Seq()),
+      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Map())
+
+    val logManager = new IndexLogManagerImpl(new Path(systemPath, name))
+    indexLogEntry.state = Constants.States.ACTIVE
+    logManager.writeLog(0, indexLogEntry)
+    indexLogEntry
+  }
+
+  def getIndexDataFilesPath(indexName: String, systemPath: Path): Path = {
+    new Path(new Path(systemPath, indexName), s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+  }
+
+  def schemaFromAttributes(attributes: Attribute*): StructType =
+    StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
+
+  def baseRelation(
+      location: FileIndex,
+      schema: StructType,
+      spark: SparkSession): HadoopFsRelation = {
+    HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
+      spark)
   }
 }

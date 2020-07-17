@@ -18,22 +18,21 @@ package com.microsoft.hyperspace.index.rules
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 
 object RuleUtils {
 
   /**
-   * Get ACTIVE indexes for this logical plan.
+   * Get active indexes for the given logical plan by matching signatures.
    *
+   * @param indexManager indexManager
    * @param plan logical plan
    * @return indexes built for this plan
    */
-  def getCandidateIndexesForPlan(plan: LogicalPlan): Seq[IndexLogEntry] = {
+  def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, String]()
 
@@ -53,16 +52,8 @@ object RuleUtils {
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
-    val allIndexes = getAllAvailableIndexes(Seq(Constants.States.ACTIVE))
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
     allIndexes.filter(index => index.created && signatureValid(index))
   }
-
-  private def getAllAvailableIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
-    Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
-      .indexCollectionManager
-      .getIndexes(states)
-  }
-
 }
