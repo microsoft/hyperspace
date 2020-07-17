@@ -82,7 +82,7 @@ trait IndexManager {
   /**
    * Get index objects on default index storage location and additional index path
    *
-   * @return all the metadata for indexes
+   * @return list of all indexes
    */
   def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry]
 }

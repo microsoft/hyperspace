@@ -113,6 +113,11 @@ class RuleUtilsTest extends HyperspaceSuite {
 
     assert(resultLen == 3)
     assert(resultsLen2 == 2)
+
+    indexManager.delete("t1i1")
+
+    val resultLen3 = RuleUtils.getCandidateIndexes(indexManager, indexPlan).length
+    assert(resultLen3 == 2)
   }
 
 }
