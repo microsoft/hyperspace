@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.FileUtils
 
-class FilterIndexRuleTest extends HyperspaceSuite {
+class FilterIndexRuleTest extends HyperspaceSuite with RuleTestUtils {
   override val systemPath = new Path("src/test/resources/joinIndexTest")
   val indexName = "filterIxTestIndex"
 
@@ -37,7 +37,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
   val c3 = AttributeReference("c3", StringType)()
   val c4 = AttributeReference("c4", IntegerType)()
 
-  val tableSchema = RuleTestHelper.schemaFromAttributes(c1, c2, c3, c4)
+  val tableSchema = schemaFromAttributes(c1, c2, c3, c4)
   var scanNode: LogicalRelation = _
 
   override def beforeAll(): Unit = {
@@ -46,11 +46,11 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     val originalLocation = new Path("baseTableLocation")
     val tableLocation =
       new InMemoryFileIndex(spark, Seq(originalLocation), Map.empty, Some(tableSchema), NoopCache)
-    val relation = RuleTestHelper.baseRelation(tableLocation, tableSchema, spark)
+    val relation = baseRelation(tableLocation, tableSchema, spark)
     scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
 
     val indexPlan = Project(Seq(c1, c2, c3), scanNode)
-    RuleTestHelper.createIndex(systemPath, spark, indexName, Seq(c3, c2), Seq(c1), indexPlan)
+    createIndex(systemPath, spark, indexName, Seq(c3, c2), Seq(c1), indexPlan)
   }
 
   before {
@@ -129,7 +129,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
   }
 
   private def getIndexDataFilesPath(indexName: String): Path = {
-    RuleTestHelper.getIndexDataFilesPath(indexName, systemPath)
+    getIndexDataFilesPathImpl(indexName, systemPath)
   }
 
   private def getIndexRootPath(indexName: String): Path = {

@@ -17,17 +17,15 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConstants}
+import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexCollectionManager, IndexConstants}
 import com.microsoft.hyperspace.util.FileUtils
 
-class RuleUtilsTest extends HyperspaceSuite {
+class RuleUtilsTest extends HyperspaceSuite with RuleTestUtils {
   val parentPath = new Path("src/test/resources/ruleUtilsTest")
   val systemPath = new Path(parentPath, "systemPath")
 
@@ -40,8 +38,8 @@ class RuleUtilsTest extends HyperspaceSuite {
   val t2c3 = AttributeReference("t2c3", IntegerType)()
   val t2c4 = AttributeReference("t2c4", StringType)()
 
-  val t1Schema = RuleTestHelper.schemaFromAttributes(t1c1, t1c2, t1c3, t1c4)
-  val t2Schema = RuleTestHelper.schemaFromAttributes(t2c1, t2c2, t2c3, t2c4)
+  val t1Schema = schemaFromAttributes(t1c1, t1c2, t1c3, t1c4)
+  val t2Schema = schemaFromAttributes(t2c1, t2c2, t2c3, t2c4)
 
   var t1Relation: HadoopFsRelation = _
   var t2Relation: HadoopFsRelation = _
@@ -64,8 +62,8 @@ class RuleUtilsTest extends HyperspaceSuite {
     val t2Location =
       new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t2Schema), NoopCache)
 
-    t1Relation = RuleTestHelper.baseRelation(t1Location, t1Schema, spark)
-    t2Relation = RuleTestHelper.baseRelation(t2Location, t2Schema, spark)
+    t1Relation = baseRelation(t1Location, t1Schema, spark)
+    t2Relation = baseRelation(t2Location, t2Schema, spark)
 
     t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
     t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, false)
@@ -83,11 +81,11 @@ class RuleUtilsTest extends HyperspaceSuite {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    RuleTestHelper.createIndex(systemPath, spark, "t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    RuleTestHelper.createIndex(systemPath, spark, "t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    RuleTestHelper.createIndex(systemPath, spark, "t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    RuleTestHelper.createIndex(systemPath, spark, "t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    RuleTestHelper.createIndex(systemPath, spark, "t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndex(systemPath, spark, "t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndex(systemPath, spark, "t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndex(systemPath, spark, "t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndex(systemPath, spark, "t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndex(systemPath, spark, "t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   override def afterAll(): Unit = {
@@ -97,26 +95,19 @@ class RuleUtilsTest extends HyperspaceSuite {
 
   before {
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
-    clearCache()
   }
 
   test("Verify indexes are matched by signature correctly.") {
-    val indexManager = Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
-      .indexCollectionManager
+    val indexManager = IndexCollectionManager(spark)
 
-    val indexPlan = Project(Seq(t1c1, t1c2, t1c3), t1ProjectNode)
-    val resultLen = RuleUtils.getCandidateIndexes(indexManager, indexPlan).length
-
-    val indexPlan2 = Project(Seq(t2c1, t2c4), t2ProjectNode)
-    val resultsLen2 = RuleUtils.getCandidateIndexes(indexManager, indexPlan2).length
-
-    assert(resultLen == 3)
-    assert(resultsLen2 == 2)
+    val resultLen1 = RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode).length
+    assert(resultLen1 == 3)
+    val resultLen2 = RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode).length
+    assert(resultLen2 == 2)
 
     indexManager.delete("t1i1")
 
-    val resultLen3 = RuleUtils.getCandidateIndexes(indexManager, indexPlan).length
+    val resultLen3 = RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode).length
     assert(resultLen3 == 2)
   }
 
