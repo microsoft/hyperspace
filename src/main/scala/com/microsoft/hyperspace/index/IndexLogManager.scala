@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index
 
 import java.util.UUID
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
@@ -71,7 +71,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
       return None
     }
     val contents = FileUtils.readContents(fs, path)
-    Some(LogEntry.fromJson(contents))
+    Try(LogEntry.fromJson(contents)).toOption
   }
 
   override def getLog(id: Int): Option[LogEntry] = {
@@ -111,13 +111,16 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
   }
 
   override def createLatestStableLog(id: Int): Boolean = {
-    // TODO: make sure log with the id has a stable state.
-    try {
-      FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration)
-    } catch {
-      case ex: Exception =>
-        logError(s"Failed to create the latest stable log with id = '$id'", ex)
-        false
+    getLog(id) match {
+      case Some(logEntry) if Constants.STABLE_STATES.contains(logEntry.state) =>
+        Try(FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration))
+          match {
+            case Success(v) => v
+            case Failure(e) =>
+              logError(s"Failed to create the latest stable log with id = '$id'", e)
+               false
+          }
+      case _ => false
     }
   }
 
