@@ -105,6 +105,7 @@ class RuleUtilsTest extends HyperspaceSuite with RuleTestUtils {
     val resultLen2 = RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode).length
     assert(resultLen2 == 2)
 
+    // Delete an index for plan1
     indexManager.delete("t1i1")
 
     val resultLen3 = RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode).length
