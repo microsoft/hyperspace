@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
@@ -30,9 +30,8 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
-class JoinIndexRuleTest extends HyperspaceSuite {
-  val parentPath = new Path("src/test/resources/joinIndexTest")
-  val systemPath = new Path(parentPath, "idroot")
+class JoinIndexRuleTest extends HyperspaceSuite with SQLHelper {
+  override val systemPath = new Path("src/test/resources/joinIndexRuleTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -69,13 +68,9 @@ class JoinIndexRuleTest extends HyperspaceSuite {
    */
   override def beforeAll(): Unit = {
     super.beforeAll()
-    FileUtils.delete(parentPath)
-
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
 
     val t1Location =
       new InMemoryFileIndex(spark, Seq(new Path("t1")), Map.empty, Some(t1Schema), NoopCache)
-
     val t2Location =
       new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t2Schema), NoopCache)
 
@@ -105,13 +100,7 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
-  override def afterAll(): Unit = {
-    FileUtils.delete(parentPath)
-    super.afterAll()
-  }
-
   before {
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
   }
 
@@ -126,12 +115,12 @@ class JoinIndexRuleTest extends HyperspaceSuite {
   }
 
   test("Join rule does not update plan if index location is not set") {
-    spark.conf.unset(IndexConstants.INDEX_SYSTEM_PATH)
-
-    val joinCondition = EqualTo(t1c1, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
-    assert(updatedPlan.equals(originalPlan))
+    withSQLConf(IndexConstants.INDEX_SYSTEM_PATH -> "") {
+      val joinCondition = EqualTo(t1c1, t2c1)
+      val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val updatedPlan = JoinIndexRule(originalPlan)
+      assert(updatedPlan.equals(originalPlan))
+    }
   }
 
   test("Join rule does not update plan if join condition does not exist") {
