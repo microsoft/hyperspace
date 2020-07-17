@@ -39,77 +39,6 @@ import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvid
  * filter predicate.
  */
 object FilterIndexRule extends Rule[LogicalPlan] with Logging {
-//  override def apply(plan: LogicalPlan): LogicalPlan = {
-//    // FilterIndex rule looks for below patterns, in ordered manner, to trigger a transformation:
-//    //  Pattern-1: Scan -> Filter -> Project
-//    //  Pattern-2: Scan -> Filter
-//    // Pattern-2 covers the case where project node is eliminated or not present. An example is
-//    // when all columns are selected.
-//    // Currently, this rule replaces a relation with an index when:
-//    //  1. The index covers all columns from the filter predicate and output columns list, and
-//    //  2. Filter predicate's columns include the first 'indexed' column of the index.
-//    plan transform {
-//      case project @ Project(
-//            _,
-//            filter @ Filter(
-//              condition: Expression,
-//              logicalRelation @ LogicalRelation(
-//                fsRelation @ HadoopFsRelation(location, _, _, _, _, _),
-//                _,
-//                _,
-//                _))) =>
-//        try {
-//          // "CleanupAliases" cleans up Alias expression inside a logical plan
-//          // such that its children would not have any Alias expressions.
-//          // Calling "references" on the expression in projectList ensures
-//          // we will get the correct (original) column names.
-//          val projectColumnNames = CleanupAliases(project)
-//            .asInstanceOf[Project]
-//            .projectList
-//            .map(_.references.map(_.asInstanceOf[AttributeReference].name))
-//            .flatMap(_.toSeq)
-//          val filterColumnNames = condition.references.map(_.name).toSeq
-//
-//          val transformedPlan = replaceWithIndexIfPlanCovered(
-//            filter,
-//            projectColumnNames,
-//            filterColumnNames,
-//            logicalRelation,
-//            fsRelation,
-//            location)
-//          project.copy(child = transformedPlan)
-//        } catch {
-//          case e: Exception =>
-//            logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
-//            project
-//        }
-//
-//      case filter @ Filter(
-//            condition: Expression,
-//            logicalRelation @ LogicalRelation(
-//              fsRelation @ HadoopFsRelation(location, _, _, _, _, _),
-//              _,
-//              _,
-//              _)) =>
-//        try {
-//          val relationColumnsName = logicalRelation.output.map(_.name)
-//          val filterColumnNames = condition.references.map(_.name).toSeq
-//
-//          replaceWithIndexIfPlanCovered(
-//            filter,
-//            relationColumnsName,
-//            filterColumnNames,
-//            logicalRelation,
-//            fsRelation,
-//            location)
-//        } catch {
-//          case e: Exception =>
-//            logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
-//            filter
-//        }
-//    }
-//  }
-
   override def apply(plan: LogicalPlan): LogicalPlan = {
     // FilterIndex rule looks for below patterns, in ordered manner, to trigger a transformation:
     //  Pattern-1: Scan -> Filter -> Project
@@ -121,6 +50,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
       case FilterRuleExtractor(
+          planHandle,
           filter,
           outputColumns,
           filterColumns,
@@ -136,17 +66,16 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
             fsRelation,
             location)
 
-          plan match {
-            case project @ Project(_, _) =>
-              return project.copy(child = transformedPlan)
+          planHandle match {
+            case p @ Project(_, _) =>
+              p.copy(child = transformedPlan)
             case _ =>
-              return transformedPlan
+              transformedPlan
           }
-
         } catch {
           case e: Exception =>
             logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
-            plan
+            planHandle
         }
     }
   }
@@ -295,13 +224,13 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
 
 object FilterRuleExtractor extends Logging {
   type returnType = (
+      LogicalPlan,
       Filter,
-      Seq[String], // outputColumns
-      Seq[String], // filterColumns
+      Seq[String], // output columns
+      Seq[String], // filter columns
       LogicalRelation,
       HadoopFsRelation,
-      FileIndex // location
-  )
+      FileIndex)
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
     case project @ Project(
@@ -321,6 +250,7 @@ object FilterRuleExtractor extends Logging {
       val filterColumnNames = condition.references.map(_.name).toSeq
 
       Some(
+        project,
         filter,
         projectColumnNames,
         filterColumnNames,
@@ -340,12 +270,13 @@ object FilterRuleExtractor extends Logging {
 
       Some(
         filter,
+        filter,
         relationColumnsName,
         filterColumnNames,
         logicalRelation,
         fsRelation,
         location)
 
-    case _ => None
+    case _ => None // plan does not match with any of filter index rule patterns
   }
 }

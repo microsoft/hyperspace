@@ -116,7 +116,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     val transformedPlan = FilterIndexRule(originalPlan)
 
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
-    verifyTransformedPlanWithIndex1(transformedPlan)
+    verifyTransformedPlanWithIndex(transformedPlan, indexName1)
   }
 
   test("Verify FilterIndex rule is applied correctly to plans with alias.") {
@@ -128,7 +128,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
     val transformedPlan = FilterIndexRule(originalPlan)
 
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
-    verifyTransformedPlanWithIndex1(transformedPlan)
+    verifyTransformedPlanWithIndex(transformedPlan, indexName1)
   }
 
   test("Verify FilterIndex rule does not apply if all columns are not covered.") {
@@ -156,38 +156,18 @@ class FilterIndexRuleTest extends HyperspaceSuite {
 
     val transformedPlan = FilterIndexRule(originalPlan)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
-    verifyTransformedPlanWithIndex2(transformedPlan)
+    verifyTransformedPlanWithIndex(transformedPlan, indexName2)
   }
 
-  private def verifyTransformedPlanWithIndex1(logicalPlan: LogicalPlan): Unit = {
-    logicalPlan match {
-      case Project(
-          _,
-          Filter(
-            _,
-            l @ LogicalRelation(
-              HadoopFsRelation(
-                newLocation: InMemoryFileIndex,
-                newPartitionSchema: StructType,
-                dataSchema: StructType,
-                bucketSpec: Option[BucketSpec],
-                _: ParquetFileFormat,
-                _),
-              _,
-              _,
-              _))) =>
-        verifyIndexProperties(indexName1, newLocation, newPartitionSchema, dataSchema, bucketSpec)
-        assert(dataSchema.fieldNames.toSet.equals(l.output.map(_.name).toSet))
-
-      case _ => fail("Unexpected plan.")
+  private def verifyTransformedPlanWithIndex(
+      logicalPlan: LogicalPlan,
+      indexName: String): Unit = {
+    val relation = logicalPlan.collect {
+      case l: LogicalRelation => l
     }
-  }
-
-  private def verifyTransformedPlanWithIndex2(logicalPlan: LogicalPlan): Unit = {
-    logicalPlan match {
-      case Filter(
-          _,
-          l @ LogicalRelation(
+    assert(relation.length == 1)
+    relation.head match {
+      case l @ LogicalRelation(
             HadoopFsRelation(
               newLocation: InMemoryFileIndex,
               newPartitionSchema: StructType,
@@ -197,10 +177,9 @@ class FilterIndexRuleTest extends HyperspaceSuite {
               _),
             _,
             _,
-            _)) =>
-        verifyIndexProperties(indexName2, newLocation, newPartitionSchema, dataSchema, bucketSpec)
+            _) =>
+        verifyIndexProperties(indexName, newLocation, newPartitionSchema, dataSchema, bucketSpec)
         assert(dataSchema.fieldNames.toSet.equals(l.output.map(_.name).toSet))
-
       case _ => fail("Unexpected plan.")
     }
   }
