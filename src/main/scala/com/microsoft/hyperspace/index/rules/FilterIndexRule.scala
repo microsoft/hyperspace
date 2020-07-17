@@ -213,8 +213,8 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
     val allColumnsInIndex = indexedColumns ++ includedColumns
 
     // TODO: Normalize predicates into CNF and incorporate more conditions.
-    ResolverUtils.isResolved(spark, indexedColumns.head, filterColumns) &&
-    ResolverUtils.isResolved(spark, allColumnsInPlan, allColumnsInIndex)
+    ResolverUtils.resolve(spark, indexedColumns.head, filterColumns).isDefined &&
+    ResolverUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex).isDefined
   }
 
   /**

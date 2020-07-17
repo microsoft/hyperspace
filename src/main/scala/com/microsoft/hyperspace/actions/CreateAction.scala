@@ -66,7 +66,7 @@ class CreateAction(
     val indexedColumns = indexConfig.indexedColumns
     val includedColumns = indexConfig.includedColumns
 
-    ResolverUtils.isResolved(spark, indexedColumns ++ includedColumns, validColumnNames)
+    ResolverUtils.resolve(spark, indexedColumns ++ includedColumns, validColumnNames).isDefined
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().

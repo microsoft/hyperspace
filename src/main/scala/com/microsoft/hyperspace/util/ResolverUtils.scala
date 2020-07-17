@@ -20,86 +20,23 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.Resolver
 
 /**
- * [[ResolverUtils]] provides utility functions to
- * - format the index name as needed.
- * - resolve strings based on spark's resolver.
+ * [[ResolverUtils]] provides utility functions to resolve strings based on spark's resolver.
  */
 object ResolverUtils {
 
   /**
-   * Normalize the index name by trimming space(s) at both ends, and replacing internal space(s)
-   * with an underscore.
-   *
-   * @param indexName the name of index passed in by user.
-   * @return a normalized index name.
-   */
-  def normalizeIndexName(indexName: String): String = {
-    indexName.trim.replaceAll("\\s+", "_")
-  }
-
-  /**
-   * Resolve two strings based on spark's resolver. Returns true if both are resolved.
-   *
-   * @param spark Spark session.
-   * @param requiredString First string.
-   * @param availableString Second string.
-   * @return True if both are equivalent based on the current spark resolver.
-   */
-  def isResolved(
-      spark: SparkSession,
-      requiredString: String,
-      availableString: String): Boolean = {
-    val resolver: Resolver = spark.sessionState.conf.resolver
-    resolver(requiredString, availableString)
-  }
-
-  /**
-   * Resolve first string from available collection of strings based on spark's resolver. Returns
-   * true if any resolved string is found in the collection.
-   *
-   * @param spark Spark session.
-   * @param requiredString String to resolve.
-   * @param availableStrings Available strings.
-   * @return True if any of the available strings can be resolved with the passed string.
-   */
-  def isResolved(
-      spark: SparkSession,
-      requiredString: String,
-      availableStrings: Iterable[String]): Boolean = {
-    availableStrings.exists(isResolved(spark, requiredString, _))
-  }
-
-  /**
-   * Resolves ALL of the requiredStrings with availableStrings based on spark's resolver. Returns
-   * true if all the requiredStrings can be resolved with some string from availableStrings.
-   * Returns false otherwise.
-   *
-   * @param spark Spark session.
-   * @param requiredStrings List of strings to resolve.
-   * @param availableStrings List of availble strings to resolve from.
-   * @return True if every one of requiredStrings can be resolved from availableStrings. False
-   *         otherwise.
-   */
-  def isResolved(
-      spark: SparkSession,
-      requiredStrings: Iterable[String],
-      availableStrings: Iterable[String]): Boolean = {
-    requiredStrings.forall(isResolved(spark, _, availableStrings))
-  }
-
-  /**
    * Return available string if required string can be resolved with it, based on spark resolver.
    *
-   * @param spark Spark Session.
+   * @param resolver Resolver.
    * @param requiredString The string that requires resolution.
    * @param availableString Available list of strings to resolve from.
    * @return Optional available string if resolution is successful, else None
    */
   def resolve(
-      spark: SparkSession,
+      resolver: Resolver,
       requiredString: String,
       availableString: String): Option[String] = {
-    if (isResolved(spark, requiredString, availableString)) Some(availableString) else None
+    if (resolver(requiredString, availableString)) Some(availableString) else None
   }
 
   /**
@@ -116,7 +53,7 @@ object ResolverUtils {
       spark: SparkSession,
       requiredString: String,
       availableStrings: Iterable[String]): Option[String] = {
-    availableStrings.find(isResolved(spark, requiredString, _))
+    availableStrings.find(resolve(spark.sessionState.conf.resolver, requiredString, _).isDefined)
   }
 
   /**
@@ -131,7 +68,8 @@ object ResolverUtils {
   def resolve(
       spark: SparkSession,
       requiredStrings: Iterable[String],
-      availableStrings: Iterable[String]): Seq[Option[String]] = {
-    requiredStrings.map(resolve(spark, _, availableStrings)).toSeq
+      availableStrings: Iterable[String]): Option[Seq[String]] = {
+    val resolved = requiredStrings.map(resolve(spark, _, availableStrings))
+    if (resolved.forall(_.nonEmpty)) Some(resolved.map(_.get).toSeq) else None
   }
 }
