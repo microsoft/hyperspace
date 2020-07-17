@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.actions
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, LogEntry}
-import com.microsoft.hyperspace.telemetry.{CancelActionEvent, HyperspaceEvent}
+import com.microsoft.hyperspace.telemetry.{AppInfo, CancelActionEvent, HyperspaceEvent}
 
 /**
  * Cancelling an action. This action is used if index maintenance operations fail and leave the
@@ -66,14 +66,10 @@ class CancelAction(final override protected val logManager: IndexLogManager) ext
   final override def op(): Unit = {}
 
   final override protected def event(
-      sparkUser: String,
-      applicationId: String,
-      appName: String,
+      appInfo: AppInfo,
       message: String): HyperspaceEvent = {
     CancelActionEvent(
-      sparkUser,
-      applicationId,
-      appName,
+      appInfo,
       logEntry.asInstanceOf[IndexLogEntry],
       message)
   }

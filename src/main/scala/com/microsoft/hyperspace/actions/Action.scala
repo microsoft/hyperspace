@@ -20,7 +20,7 @@ import org.apache.spark.internal.Logging
 
 import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
-import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, HyperspaceEventLogging}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, HyperspaceEventLogging}
 
 /**
  * This is a generic Index-Modifying Action interface. It provides APIs to begin and commit
@@ -99,8 +99,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
   }
 
   protected def event(
-      sparkUser: String = sparkContext.sparkUser,
-      applicationId: String = sparkContext.applicationId,
-      appName: String = sparkContext.appName,
+      appInfo: AppInfo =
+        AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
       message: String): HyperspaceEvent
 }

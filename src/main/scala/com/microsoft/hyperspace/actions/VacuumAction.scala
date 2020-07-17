@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.actions
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{DELETED, DOESNOTEXIST, VACUUMING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, VacuumActionEvent}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, VacuumActionEvent}
 
 class VacuumAction(
     final override protected val logManager: IndexLogManager,
@@ -51,16 +51,7 @@ class VacuumAction(
     }
   }
 
-  final override protected def event(
-      sparkUser: String,
-      applicationId: String,
-      appName: String,
-      message: String): HyperspaceEvent = {
-    VacuumActionEvent(
-      sparkUser,
-      applicationId,
-      appName,
-      logEntry.asInstanceOf[IndexLogEntry],
-      message)
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    VacuumActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

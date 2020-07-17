@@ -24,7 +24,7 @@ import org.apache.spark.sql.types.StructType
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.telemetry.{CreateActionEvent, HyperspaceEvent}
+import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
 import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 class CreateAction(
@@ -76,11 +76,7 @@ class CreateAction(
   //   This needs to be refactored to mark this as protected.
   final override def op(): Unit = write(spark, df, indexConfig)
 
-  final override protected def event(
-      sparkUser: String,
-      applicationId: String,
-      appName: String,
-      message: String): HyperspaceEvent = {
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // logEntry may or may not exist the first time an index is being created.
     // This can happen, for example, if index config we receive is incompatible with the
     // dataframe. So we use Try here. We still need an index object with empty values for event
@@ -113,12 +109,6 @@ class CreateAction(
         Map())
     }
 
-    CreateActionEvent(
-      sparkUser,
-      applicationId,
-      appName,
-      index,
-      df.queryExecution.logical.toString,
-      message)
+    CreateActionEvent(appInfo, index, df.queryExecution.logical.toString, message)
   }
 }

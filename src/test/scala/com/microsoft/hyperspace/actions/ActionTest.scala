@@ -23,7 +23,7 @@ import org.scalatest.BeforeAndAfter
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.telemetry.HyperspaceEvent
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent}
 
 class ActionTest extends SparkFunSuite with SparkInvolvedSuite with BeforeAndAfter {
   var mockLogManager: IndexLogManager = _
@@ -47,7 +47,8 @@ class ActionTest extends SparkFunSuite with SparkInvolvedSuite with BeforeAndAft
 
       override def op(): Unit = {}
 
-      override protected def event(message: String): HyperspaceEvent = new HyperspaceEvent {}
+      override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent =
+        new HyperspaceEvent {}
     }
   }
 

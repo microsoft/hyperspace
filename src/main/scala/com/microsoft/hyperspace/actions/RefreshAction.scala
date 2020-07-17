@@ -23,7 +23,7 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
-import com.microsoft.hyperspace.telemetry.{HyperspaceEvent, RefreshActionEvent}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActionEvent}
 
 // TODO: This class depends directly on LogEntry. This should be updated such that
 //   it works with IndexLogEntry only. (for example, this class can take in
@@ -77,16 +77,7 @@ class RefreshAction(
     write(spark, df, indexConfig)
   }
 
-  final override protected def event(
-      sparkUser: String,
-      applicationId: String,
-      appName: String,
-      message: String): HyperspaceEvent = {
-    RefreshActionEvent(
-      sparkUser,
-      applicationId,
-      appName,
-      logEntry.asInstanceOf[IndexLogEntry],
-      message)
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

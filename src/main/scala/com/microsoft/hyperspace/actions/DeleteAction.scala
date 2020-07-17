@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.actions
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, DELETED, DELETING}
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, LogEntry}
-import com.microsoft.hyperspace.telemetry.{DeleteActionEvent, HyperspaceEvent}
+import com.microsoft.hyperspace.telemetry.{AppInfo, DeleteActionEvent, HyperspaceEvent}
 
 class DeleteAction(final override protected val logManager: IndexLogManager) extends Action {
   final override lazy val logEntry: LogEntry = {
@@ -42,16 +42,7 @@ class DeleteAction(final override protected val logManager: IndexLogManager) ext
 
   final override def op(): Unit = { /* Do nothing */ }
 
-  final override protected def event(
-      sparkUser: String,
-      applicationId: String,
-      appName: String,
-      message: String): HyperspaceEvent = {
-    DeleteActionEvent(
-      sparkUser,
-      applicationId,
-      appName,
-      logEntry.asInstanceOf[IndexLogEntry],
-      message)
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    DeleteActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }
