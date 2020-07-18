@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index
 import java.util.UUID
 
 import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
@@ -71,7 +72,13 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
       return None
     }
     val contents = FileUtils.readContents(fs, path)
-    Try(LogEntry.fromJson(contents)).toOption
+    Try(LogEntry.fromJson(contents)) match {
+      case Success(s) => Some(s)
+      case Failure(NonFatal(e)) =>
+        logError(s"Error reading LogEntry json from $path, $e")
+        None
+      case Failure(e) => throw e
+    }
   }
 
   override def getLog(id: Int): Option[LogEntry] = {
@@ -110,19 +117,23 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
     }
   }
 
-  override def createLatestStableLog(id: Int): Boolean = {
+  override def createLatestStableLog(id: Int): Boolean =
     getLog(id) match {
       case Some(logEntry) if Constants.STABLE_STATES.contains(logEntry.state) =>
         Try(FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration))
-          match {
-            case Success(v) => v
-            case Failure(e) =>
-              logError(s"Failed to create the latest stable log with id = '$id'", e)
-               false
-          }
-      case _ => false
+        match {
+          case Success(v) => v
+          case Failure(e) =>
+            logError(s"Failed to create the latest stable log with id = '$id'", e)
+            false
+        }
+      case Some(logEntry) =>
+        logError(s"Found LogEntry with non stable state = ${logEntry.state}")
+        false
+      case None =>
+        logError(s"Unable to get LogEntry for id = $id")
+        false
     }
-  }
 
   override def deleteLatestStableLog(): Boolean = {
     try {
