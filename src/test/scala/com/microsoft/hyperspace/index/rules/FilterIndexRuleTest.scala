@@ -18,17 +18,16 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, EqualTo, IsNotNull, Literal, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference, EqualTo, IsNotNull, Literal, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.FileUtils
 
-class FilterIndexRuleTest extends HyperspaceSuite with RuleTestUtils {
+class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
   override val systemPath = new Path("src/test/resources/joinIndexTest")
   val indexName = "filterIxTestIndex"
 
@@ -46,11 +45,11 @@ class FilterIndexRuleTest extends HyperspaceSuite with RuleTestUtils {
     val originalLocation = new Path("baseTableLocation")
     val tableLocation =
       new InMemoryFileIndex(spark, Seq(originalLocation), Map.empty, Some(tableSchema), NoopCache)
-    val relation = baseRelation(tableLocation, tableSchema, spark)
+    val relation = baseRelation(tableLocation, tableSchema)
     scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
 
     val indexPlan = Project(Seq(c1, c2, c3), scanNode)
-    createIndex(systemPath, spark, indexName, Seq(c3, c2), Seq(c1), indexPlan)
+    createIndex(indexName, Seq(c3, c2), Seq(c1), indexPlan)
   }
 
   before {
@@ -126,13 +125,5 @@ class FilterIndexRuleTest extends HyperspaceSuite with RuleTestUtils {
 
       case _ => fail("Unexpected plan.")
     }
-  }
-
-  private def getIndexDataFilesPath(indexName: String): Path = {
-    getIndexDataFilesPathImpl(indexName, systemPath)
-  }
-
-  private def getIndexRootPath(indexName: String): Path = {
-    new Path(systemPath, indexName)
   }
 }
