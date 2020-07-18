@@ -30,10 +30,7 @@ import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
 class FilterIndexRuleTest extends HyperspaceSuite {
-  val originalLocation = new Path("baseTableLocation")
-  val parentPath = new Path("src/test/resources/filterIndexTest")
-  val systemPath = new Path(parentPath, "systemPath")
-
+  override val systemPath = new Path("src/test/resources/joinIndexTest")
   val indexName = "filterIxTestIndex"
 
   val c1 = AttributeReference("c1", StringType)()
@@ -46,10 +43,8 @@ class FilterIndexRuleTest extends HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    FileUtils.delete(parentPath)
 
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
-
+    val originalLocation = new Path("baseTableLocation")
     val tableLocation =
       new InMemoryFileIndex(spark, Seq(originalLocation), Map.empty, Some(tableSchema), NoopCache)
     val relation = baseRelation(tableLocation, tableSchema)
@@ -95,13 +90,7 @@ class FilterIndexRuleTest extends HyperspaceSuite {
   }
 
   before {
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
-  }
-
-  override def afterAll(): Unit = {
-    FileUtils.delete(parentPath)
-    super.afterAll()
   }
 
   test("Verify FilterIndex rule is applied correctly.") {
