@@ -22,8 +22,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexCollectionManager, IndexConstants}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.index.IndexCollectionManager
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite {
   override val systemPath = new Path("src/test/resources/ruleUtilsTest")

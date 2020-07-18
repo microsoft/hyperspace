@@ -196,7 +196,6 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     {
       // Test: should update plan if index exists to cover all implicit columns
       val t1TestIndex = createIndex("t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
-
       val t2TestIndex = createIndex("t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
 
       // clear cache so the new indexes gets added to it

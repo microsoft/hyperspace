@@ -86,7 +86,6 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       left: LogicalPlan,
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-
     val indexManager = Hyperspace
       .getContext(SparkSession.getActiveSession.get)
       .indexCollectionManager
