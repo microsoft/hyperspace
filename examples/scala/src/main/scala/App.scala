@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace._
 import com.microsoft.hyperspace.Hyperspace
@@ -72,14 +72,13 @@ object App {
     // Create Hyperspace indexes
     val hyperspace = new Hyperspace(spark)
 
-    val deptDF: DataFrame = spark.read.parquet(deptLocation)
-    val empDF: DataFrame = spark.read.parquet(empLocation)
+    val deptDF = spark.read.parquet(deptLocation)
+    val empDF = spark.read.parquet(empLocation)
 
-    val deptIndexConfig: IndexConfig = IndexConfig("deptIndex", Seq("deptId"), Seq("deptName"))
-    val empIndexConfig: IndexConfig = IndexConfig("empIndex", Seq("deptId"), Seq("empName"))
+    val deptIndexConfig = IndexConfig("deptIndex", Seq("deptId"), Seq("deptName"))
+    val empIndexConfig = IndexConfig("empIndex", Seq("deptId"), Seq("empName"))
     hyperspace.createIndex(deptDF, deptIndexConfig)
     hyperspace.createIndex(empDF, empIndexConfig)
-
 
     // List all indexes
     hyperspace.indexes.show
@@ -88,16 +87,18 @@ object App {
     spark.enableHyperspace()
 
     // Example of index usage for filtered selection
-    val eqFilter: DataFrame = deptDF.filter("deptId = 20").select("deptName")
+    val eqFilter = deptDF.filter("deptId = 20").select("deptName")
     eqFilter.show()
     hyperspace.explain(eqFilter)
 
     // Example of index usage for join
-    val eqJoin: DataFrame =
-      empDF
+    val eqJoin = empDF
         .join(deptDF, empDF("deptId") === deptDF("deptId"))
         .select(empDF("empName"), deptDF("deptName"))
     eqJoin.show()
     hyperspace.explain(eqJoin)
+
+    // Stop Spark session
+    spark.stop()
   }
 }

@@ -16,7 +16,3 @@ libraryDependencies += "com.microsoft.hyperspace" %% "hyperspace-core" % "0.1.0"
 scalacOptions ++= Seq(
   "-target:jvm-1.8"
 )
-
-javaOptions += "-Xmx1024m"
-
-publishMavenStyle := true
