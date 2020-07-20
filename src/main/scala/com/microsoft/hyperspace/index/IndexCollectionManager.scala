@@ -84,7 +84,7 @@ class IndexCollectionManager(
       .toDF()
   }
 
-  def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
+  override def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
     indexLogManagers
       .map(_.getLatestLog())
       .filter(_.isDefined)
