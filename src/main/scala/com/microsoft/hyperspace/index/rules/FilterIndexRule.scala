@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
@@ -30,8 +28,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 
 /**
@@ -164,35 +161,12 @@ object FilterIndexRule
       projectColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
-
-    // map of signature provider to signature for this subplan
-    val signatureMap: mutable.Map[String, String] = mutable.Map()
-
-    def signatureValid(entry: IndexLogEntry): Boolean = {
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
-
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature = LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(project)
-        signatureMap.put(sourcePlanSignature.provider, signature)
-      }
-
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
-    }
-
-    val allIndexes = Hyperspace
+    val indexManager = Hyperspace
       .getContext(SparkSession.getActiveSession.get)
       .indexCollectionManager
-      .getIndexes(Seq(Constants.States.ACTIVE))
+    val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, project)
 
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    allIndexes.filter { index =>
-      index.created &&
-      signatureValid(index) &&
+    candidateIndexes.filter { index =>
       indexCoversPlan(
         projectColumns,
         filterColumns,
@@ -200,7 +174,6 @@ object FilterIndexRule
         index.includedColumns,
         fsRelation.fileFormat)
     }
-
   }
 
   /**
