@@ -23,10 +23,10 @@ import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConsta
 import com.microsoft.hyperspace.util.FileUtils
 
 class HyperspaceTests extends HyperspaceSuite {
+  override val systemPath = new Path("src/test/resources/indexLocation")
 
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexSystemPath = "src/test/resources/indexLocation"
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private var df: DataFrame = _
@@ -38,14 +38,12 @@ class HyperspaceTests extends HyperspaceSuite {
     val sparkSession = spark
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
-    FileUtils.delete(new Path(indexSystemPath))
     FileUtils.delete(new Path(sampleParquetDataLocation))
 
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     dfFromSample.write.parquet(sampleParquetDataLocation)
 
     df = spark.read.parquet(sampleParquetDataLocation)
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
   }
 
   override def afterAll(): Unit = {
@@ -55,7 +53,7 @@ class HyperspaceTests extends HyperspaceSuite {
 
   after {
     clearCache()
-    FileUtils.delete(new Path(indexSystemPath))
+    FileUtils.delete(systemPath)
   }
 
   test(
