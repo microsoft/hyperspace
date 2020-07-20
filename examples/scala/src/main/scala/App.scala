@@ -24,10 +24,10 @@ object App {
   def main(args: Array[String]): Unit = {
     // Create Spark session
     val spark = SparkSession
-    .builder()
-    .appName("Hyperspace example")
-    .config("spark.some.config.option", "some-value")
-    .getOrCreate()
+      .builder()
+      .appName("Hyperspace example")
+      .config("spark.some.config.option", "some-value")
+      .getOrCreate()
 
     // Sample department records
     val departments = Seq(
@@ -87,17 +87,15 @@ object App {
     spark.enableHyperspace()
 
     // Example of index usage for filtered selection
-    val empDFrame: DataFrame = spark.read.parquet(empLocation)
-    val deptDFrame: DataFrame = spark.read.parquet(deptLocation)
-    val eqFilter: DataFrame = deptDFrame.filter("deptId = 20").select("deptName")
+    val eqFilter: DataFrame = deptDF.filter("deptId = 20").select("deptName")
     eqFilter.show()
     hyperspace.explain(eqFilter)
 
     // Example of index usage for join
     val eqJoin: DataFrame =
-      empDFrame
-        .join(deptDFrame, empDFrame("deptId") === deptDFrame("deptId"))
-        .select(empDFrame("empName"), deptDFrame("deptName"))
+      empDF
+        .join(deptDF, empDF("deptId") === deptDF("deptId"))
+        .select(empDF("empName"), deptDF("deptName"))
     eqJoin.show()
     hyperspace.explain(eqJoin)
   }
