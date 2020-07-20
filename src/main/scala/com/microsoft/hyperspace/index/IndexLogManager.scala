@@ -72,13 +72,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
       return None
     }
     val contents = FileUtils.readContents(fs, path)
-    Try(LogEntry.fromJson(contents)) match {
-      case Success(s) => Some(s)
-      case Failure(NonFatal(e)) =>
-        logError(s"Error reading LogEntry json from $path, $e")
-        None
-      case Failure(e) => throw e
-    }
+    Some(LogEntry.fromJson(contents))
   }
 
   override def getLog(id: Int): Option[LogEntry] = {
