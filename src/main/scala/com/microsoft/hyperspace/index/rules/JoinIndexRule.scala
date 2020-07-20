@@ -30,10 +30,11 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -51,7 +52,11 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
  * These indexes are indexed by the join columns and can improve the query performance by
  * avoiding full shuffling of T1 and T2.
  */
-object JoinIndexRule extends Rule[LogicalPlan] with Logging {
+object JoinIndexRule
+    extends Rule[LogicalPlan]
+    with Logging
+    with HyperspaceEventLogging
+    with ActiveSparkSession {
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
     case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
       try {
@@ -60,6 +65,15 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
             case (lIndex, rIndex) =>
               val updatedPlan = join
                 .copy(left = getReplacementPlan(lIndex, l), right = getReplacementPlan(rIndex, r))
+
+              // TODO: implement scrubber to remove PII from plans before adding plans to events.
+              logEvent(HyperspaceIndexUsageEvent(
+                AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
+                Seq(lIndex, rIndex),
+                "", // Blank until scrubber implementation
+                "", // Blank until scrubber implementation
+                "Join index rule applied."))
+
               updatedPlan
           }
           .getOrElse(join)

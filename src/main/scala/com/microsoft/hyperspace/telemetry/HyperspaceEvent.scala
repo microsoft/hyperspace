@@ -104,7 +104,8 @@ case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
 /**
  * Index usage event. This event is emitted when an index is picked instead of original data
  * source by one of the hyperspace rules.
- * @param appInfo AppInfo for spark application.* @param indexes List of selected indexes for this plan.
+ * @param appInfo AppInfo for spark application.
+ * @param indexes List of selected indexes for this plan.
  * @param planBeforeRule Original plan before application of indexes.
  * @param planAfterRule Plan after using indexes.
  * @param message Message about event.

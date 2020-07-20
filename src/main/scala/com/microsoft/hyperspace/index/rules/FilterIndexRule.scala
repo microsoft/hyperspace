@@ -29,16 +29,21 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
  * a relation with an available covering index according to columns in
  * filter predicate.
  */
-object FilterIndexRule extends Rule[LogicalPlan] with Logging {
+object FilterIndexRule
+    extends Rule[LogicalPlan]
+    with Logging
+    with HyperspaceEventLogging
+    with ActiveSparkSession {
   override def apply(plan: LogicalPlan): LogicalPlan = {
     // FilterIndex rule looks for (Scan -> Filter -> Project) pattern to trigger
     // a transformation. Currently, this rule replaces a relation with an index when:
@@ -123,9 +128,20 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
         val newOutput =
           logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
 
-        project.copy(
+        val updatedPlan = project.copy(
           child =
             filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput)))
+
+        // TODO: implement scrubber to remove PII from plans before adding plans to events.
+        logEvent(
+          HyperspaceIndexUsageEvent(
+            AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
+            Seq(index),
+            "", // Blank until scrubber implementation
+            "", // Blank until scrubber implementation
+            "Filter index rule applied."))
+
+        updatedPlan
 
       case None => project // No candidate index found
     }
