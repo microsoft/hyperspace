@@ -78,4 +78,13 @@ trait IndexManager {
    * @param indexName Name of the index to cancel.
    */
   def cancel(indexName: String): Unit
+
+  /**
+   * Get index objects on default index storage location and additional index path that matches
+   * any of given states.
+   *
+   * @param states list of index states of interest
+   * @return all indexes that match any of the given states
+   */
+  def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry]
 }

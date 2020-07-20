@@ -18,22 +18,17 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, EqualTo, IsNotNull, Literal, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference, EqualTo, IsNotNull, Literal, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
-import com.microsoft.hyperspace.util.FileUtils
 
-class FilterIndexRuleTest extends HyperspaceSuite {
-  val originalLocation = new Path("baseTableLocation")
-  val parentPath = new Path("src/test/resources/filterIndexTest")
-  val systemPath = new Path(parentPath, "systemPath")
-
+class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
+  override val systemPath = new Path("src/test/resources/joinIndexTest")
   val indexName = "filterIxTestIndex"
 
   val c1 = AttributeReference("c1", StringType)()
@@ -46,62 +41,19 @@ class FilterIndexRuleTest extends HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    FileUtils.delete(parentPath)
 
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
-
+    val originalLocation = new Path("baseTableLocation")
     val tableLocation =
       new InMemoryFileIndex(spark, Seq(originalLocation), Map.empty, Some(tableSchema), NoopCache)
     val relation = baseRelation(tableLocation, tableSchema)
     scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
-
-    // TODO: Refactor common test code for Rules
-    def createIndex(
-        name: String,
-        indexCols: Seq[AttributeReference],
-        includedCols: Seq[AttributeReference],
-        plan: LogicalPlan): IndexLogEntry = {
-      val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
-      val sign: LogicalPlan => String = LogicalPlanSignatureProvider.create(signClass).signature
-
-      val sourcePlanProperties = SparkPlan.Properties(
-        LogicalPlanSerDeUtils.serialize(plan, spark),
-        LogicalPlanFingerprint(
-          LogicalPlanFingerprint.Properties(Seq(Signature(signClass, sign(plan))))))
-      val sourceDataProperties =
-        Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
-
-      val indexLogEntry = IndexLogEntry(
-        name,
-        CoveringIndex(
-          CoveringIndex.Properties(
-            CoveringIndex.Properties
-              .Columns(indexCols.map(_.name), includedCols.map(_.name)),
-            IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-            10)),
-        Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
-        Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-        Map())
-
-      val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
-      indexLogEntry.state = Constants.States.ACTIVE
-      logManager.writeLog(0, indexLogEntry)
-
-      indexLogEntry
-    }
 
     val indexPlan = Project(Seq(c1, c2, c3), scanNode)
     createIndex(indexName, Seq(c3, c2), Seq(c1), indexPlan)
   }
 
   before {
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
-  }
-
-  override def afterAll(): Unit = {
-    FileUtils.delete(parentPath)
-    super.afterAll()
   }
 
   test("Verify FilterIndex rule is applied correctly.") {
@@ -173,22 +125,5 @@ class FilterIndexRuleTest extends HyperspaceSuite {
 
       case _ => fail("Unexpected plan.")
     }
-  }
-
-  private def baseRelation(location: FileIndex, schema: StructType): HadoopFsRelation = {
-    HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
-      spark)
-  }
-
-  private def schemaFromAttributes(attributes: Attribute*): StructType = {
-    StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
-  }
-
-  private def getIndexDataFilesPath(indexName: String): Path = {
-    new Path(getIndexRootPath(indexName), s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-  }
-
-  private def getIndexRootPath(indexName: String): Path = {
-    new Path(systemPath, indexName)
   }
 }
