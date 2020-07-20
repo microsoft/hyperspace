@@ -22,7 +22,6 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
 object RuleTestHelper {
-  // TODO: Refactor common test code for Rules
   class TestSignatureProvider extends LogicalPlanSignatureProvider {
     def signature(plan: LogicalPlan): String =
       plan
