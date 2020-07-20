@@ -26,25 +26,21 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite {
-
   private val sampleData = SampleData.testData
   private val testDir = "src/test/resources/e2eTests/"
   private val sampleParquetDataLocation = testDir + "sampleparquet"
-  private val indexStorageLocation = testDir + "indexLocation"
+  override val systemPath = new Path(testDir + "indexLocation")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val sparkSession = spark
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexStorageLocation)
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
 
-    import sparkSession.implicits._
-    hyperspace = new Hyperspace(sparkSession)
+    import spark.implicits._
+    hyperspace = new Hyperspace(spark)
 
-    fileSystem.delete(new Path(indexStorageLocation), true)
     fileSystem.delete(new Path(sampleParquetDataLocation), true)
 
     val dfFromSample = sampleData.toDF("c1", "c2", "c3", "c4", "c5")
@@ -62,7 +58,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
   }
 
   after {
-    fileSystem.delete(new Path(indexStorageLocation), true)
+    fileSystem.delete(systemPath, true)
     spark.disableHyperspace()
   }
 
@@ -311,9 +307,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
   }
 
   private def getIndexFilesPath(indexName: String): Path = {
-    new Path(
-      indexStorageLocation,
-      s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
   }
 
   /**
