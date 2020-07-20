@@ -32,7 +32,6 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
-import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.util.ResolverUtils._
@@ -89,21 +88,16 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       left: LogicalPlan,
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val allIndexes = Hyperspace
-      .getContext(spark)
+    val indexManager = Hyperspace
+      .getContext(SparkSession.getActiveSession.get)
       .indexCollectionManager
-      .getIndexes(Seq(Constants.States.ACTIVE))
 
-    if (allIndexes.isEmpty) {
-      return None
-    }
-
-    val lIndexes = getIndexesForPlan(left, allIndexes)
+    val lIndexes = RuleUtils.getCandidateIndexes(indexManager, left)
     if (lIndexes.isEmpty) {
       return None
     }
 
-    val rIndexes = getIndexesForPlan(right, allIndexes)
+    val rIndexes = RuleUtils.getCandidateIndexes(indexManager, right)
     if (rIndexes.isEmpty) {
       return None
     }
@@ -317,42 +311,6 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
         }
       case _ => throw new IllegalStateException("Unsupported condition found")
     }
-  }
-
-  /**
-   * Get indexes for this logical plan.
-   *
-   * TODO: This method is duplicated in FilterIndexRule and JoinIndexRule. Deduplicate.
-   *
-   * @param plan logical plan
-   * @param allIndexes all indexes in the system
-   * @return indexes built for this plan
-   */
-  private def getIndexesForPlan(
-      plan: LogicalPlan,
-      allIndexes: Seq[IndexLogEntry]): Seq[IndexLogEntry] = {
-
-    /* map of signature provider to signature for this subplan */
-    val signatureMap: mutable.Map[String, String] = mutable.Map()
-
-    def signatureValid(entry: IndexLogEntry): Boolean = {
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
-
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature: String = LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(plan)
-        signatureMap.put(sourcePlanSignature.provider, signature)
-      }
-
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
-    }
-
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    allIndexes.filter(index => signatureValid(index) && index.created)
   }
 
   /**

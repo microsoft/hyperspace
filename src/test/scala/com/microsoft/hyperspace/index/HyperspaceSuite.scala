@@ -16,18 +16,28 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 
 import com.microsoft.hyperspace.{Hyperspace, SparkInvolvedSuite}
+import com.microsoft.hyperspace.util.FileUtils
 
 trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
+  // This is the system path that PathResolver uses to get the root of the indexes.
+  // Each test suite that extends HyperspaceSuite should define this.
+  val systemPath: Path
+
   override def beforeAll(): Unit = {
     super.beforeAll()
+    FileUtils.delete(systemPath)
+    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
   }
 
   override def afterAll(): Unit = {
     clearCache()
+    spark.conf.unset(IndexConstants.INDEX_SYSTEM_PATH)
+    FileUtils.delete(systemPath)
     super.afterAll()
   }
 
