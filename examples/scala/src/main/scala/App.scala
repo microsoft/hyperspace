@@ -72,13 +72,14 @@ object App {
     // Create Hyperspace indexes
     val hyperspace = new Hyperspace(spark)
 
-    val empDF: DataFrame = spark.read.parquet(empLocation)
     val deptDF: DataFrame = spark.read.parquet(deptLocation)
+    val empDF: DataFrame = spark.read.parquet(empLocation)
 
-    val empIndexConfig: IndexConfig = IndexConfig("empIndex", Seq("deptId"), Seq("empName"))
     val deptIndexConfig: IndexConfig = IndexConfig("deptIndex", Seq("deptId"), Seq("deptName"))
-    hyperspace.createIndex(empDF, empIndexConfig)
+    val empIndexConfig: IndexConfig = IndexConfig("empIndex", Seq("deptId"), Seq("empName"))
     hyperspace.createIndex(deptDF, deptIndexConfig)
+    hyperspace.createIndex(empDF, empIndexConfig)
+
 
     // List all indexes
     hyperspace.indexes.show
