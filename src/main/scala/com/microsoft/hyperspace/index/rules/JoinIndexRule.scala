@@ -20,7 +20,6 @@ import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
@@ -65,17 +64,12 @@ object JoinIndexRule
               val updatedPlan = join
                 .copy(left = getReplacementPlan(lIndex, l), right = getReplacementPlan(rIndex, r))
 
-              // TODO: implement scrubber to remove PII from plans before adding plans to events.
-              logEvent(
-                HyperspaceIndexUsageEvent(
-                  AppInfo(
-                    sparkContext.sparkUser,
-                    sparkContext.applicationId,
-                    sparkContext.appName),
-                  Seq(lIndex, rIndex),
-                  "", // Blank until scrubber implementation
-                  "", // Blank until scrubber implementation
-                  "Join index rule applied."))
+              logEvent(HyperspaceIndexUsageEvent(
+                AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
+                Seq(lIndex, rIndex),
+                "",
+                "",
+                "Join index rule applied."))
 
               updatedPlan
           }
@@ -105,7 +99,7 @@ object JoinIndexRule
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
     val indexManager = Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
+      .getContext(spark)
       .indexCollectionManager
 
     val lIndexes = RuleUtils.getCandidateIndexes(indexManager, left)
@@ -138,10 +132,6 @@ object JoinIndexRule
       numBuckets = index.numBuckets,
       bucketColumnNames = index.indexedColumns,
       sortColumnNames = index.indexedColumns)
-
-    val spark = SparkSession.getActiveSession.getOrElse {
-      throw new IllegalArgumentException("Could not find active SparkSession")
-    }
 
     val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
     val relation = HadoopFsRelation(

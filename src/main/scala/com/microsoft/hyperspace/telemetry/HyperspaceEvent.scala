@@ -34,17 +34,14 @@ trait HyperspaceEvent
 
 /**
  * General index CRUD event.
- *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
- * @param message Message about event.
  */
-class HyperspaceIndexCRUDEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceEvent
+trait HyperspaceIndexCRUDEvent extends HyperspaceEvent
 
 /**
  * Index creation event. Emitted on index creation.
  *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
+ * @param appInfo AppInfo for spark application.
+ * @param index Related indexes.
  * @param originalPlan Original plan which is getting indexed.
  * @param message Message about event.
  */
@@ -53,53 +50,58 @@ case class CreateActionEvent(
     index: IndexLogEntry,
     originalPlan: String,
     message: String)
-    extends HyperspaceIndexCRUDEvent(appInfo, index, message)
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index deletion event. Emitted when delete is called on an index.
  *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
+ * @param appInfo AppInfo for spark application.
+ * @param index Related indexes.
  * @param message Message about event.
  */
 case class DeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceIndexCRUDEvent(appInfo, index, message)
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index restore event. Emitted when restore is called on an index.
  *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
+ * @param appInfo AppInfo for spark application.
+ * @param index Related indexes.
  * @param message Message about event.
  */
 case class RestoreActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceIndexCRUDEvent(appInfo, index, message)
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index Vacuum Event. Emitted when vacuum is called on an index.
  *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
+ * @param appInfo AppInfo for spark application.
+ * @param index Related indexes.
  * @param message Message about event.
  */
 case class VacuumActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceIndexCRUDEvent(appInfo, index, message)
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index Refresh Event. Emitted when refresh is called on an index.
  *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
+ * @param appInfo AppInfo for spark application.
+ * @param index Related indexes.
  * @param message Message about event.
  */
 case class RefreshActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceIndexCRUDEvent(appInfo, index, message)
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index cancel event. This event is emitted when the User cancels an ongoing or failed CRUD
  * operation.
  *
- * @param appInfo AppInfo for spark application.* @param index Related indexes.
+ * @param appInfo AppInfo for spark application.
+ * @param index Related indexes.
  * @param message Message about event.
  */
 case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceIndexCRUDEvent(appInfo, index, message)
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index usage event. This event is emitted when an index is picked instead of original data

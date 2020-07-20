@@ -22,7 +22,7 @@ import org.apache.spark.sql.SparkSession
 trait ActiveSparkSession {
   def spark: SparkSession = {
     SparkSession.getActiveSession.getOrElse {
-      throw HyperspaceException("No spark session found")
+      throw HyperspaceException("No active spark session found")
     }
   }
 

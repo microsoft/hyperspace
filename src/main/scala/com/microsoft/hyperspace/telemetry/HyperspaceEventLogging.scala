@@ -56,7 +56,8 @@ private[telemetry] object EventLogger extends Logging {
         }
       }
       .getOrElse {
-        logInfo(s"Defaulting to the $NoOpEventLogger event logger")
+        logInfo(
+          s"Defaulting to the ${NoOpEventLogger.getClass.getName.stripSuffix("$")} event logger")
         NoOpEventLogger
       }
   }

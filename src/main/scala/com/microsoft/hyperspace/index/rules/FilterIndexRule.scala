@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
@@ -129,13 +128,12 @@ object FilterIndexRule
           child =
             filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput)))
 
-        // TODO: implement scrubber to remove PII from plans before adding plans to events.
         logEvent(
           HyperspaceIndexUsageEvent(
             AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
             Seq(index),
-            "", // Blank until scrubber implementation
-            "", // Blank until scrubber implementation
+            "",
+            "",
             "Filter index rule applied."))
 
         updatedPlan
@@ -162,7 +160,7 @@ object FilterIndexRule
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
     val indexManager = Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
+      .getContext(spark)
       .indexCollectionManager
     val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, project)
 

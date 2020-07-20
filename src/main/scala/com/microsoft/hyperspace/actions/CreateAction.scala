@@ -82,7 +82,7 @@ class CreateAction(
     // dataframe. So we use Try here. We still need an index object with empty values for event
     // logging.
     val index: IndexLogEntry = Try {
-      // if a logEntry exists, we can create a valid index object directly
+      // If a logEntry exists, we can create a valid index object directly.
       logEntry.asInstanceOf[IndexLogEntry]
     }.getOrElse {
       val sourcePlanProperties = SparkPlan.Properties(
