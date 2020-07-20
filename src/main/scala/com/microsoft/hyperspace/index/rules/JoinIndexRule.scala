@@ -24,7 +24,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
@@ -207,10 +207,6 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
   private def isPlanLinear(plan: LogicalPlan): Boolean =
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
 
-  private def find(attributes: Seq[Attribute], column: Expression): Option[Attribute] = {
-    attributes.find(_.semanticEquals(column))
-  }
-
   /**
    * Requirements to support join optimizations using join indexes are as follows:
    *
@@ -279,27 +275,21 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       condition: Expression): Boolean = {
     val conditions = extractConditions(condition)
     // Output attributes from base relations. Join condition attributes must belong to these
-    // attributes
-    val lBaseAttrs = l.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
-    val rBaseAttrs = r.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
-    val allBaseAttrs = lBaseAttrs ++ rBaseAttrs
-    val base = new mutable.HashMap[Expression, Expression]()
-
-    conditions.foreach {
-      case EqualTo(c1, c2) =>
-        (find(allBaseAttrs, c1), find(allBaseAttrs, c2)) match {
-          case (Some(b1), Some(b2)) =>
-            base.put(c1, b1)
-            base.put(c2, b2)
-          case _ =>
-            // Found a join column not present in any base relation.
-            return false
-        }
-    }
+    // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
+    val lBaseAttrs = l
+      .collectLeaves()
+      .filter(_.isInstanceOf[LogicalRelation])
+      .flatMap(_.output)
+      .map(_.canonicalized)
+    val rBaseAttrs = r
+      .collectLeaves()
+      .filter(_.isInstanceOf[LogicalRelation])
+      .flatMap(_.output)
+      .map(_.canonicalized)
 
     def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
-      (lBaseAttrs.contains(base(c1)) && rBaseAttrs.contains(base(c2))) ||
-      (lBaseAttrs.contains(base(c2)) && rBaseAttrs.contains(base(c1)))
+      (lBaseAttrs.contains(c1) && rBaseAttrs.contains(c2)) ||
+      (lBaseAttrs.contains(c2) && rBaseAttrs.contains(c1))
     }
 
     // Map to maintain and check one-to-one relation between join condition attributes. For join
@@ -308,18 +298,19 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
     // store just one copy of column 'A' when join condition contains column 'A' as well as 'a'.
     val attrMap = new mutable.HashMap[Expression, Expression]()
 
+    // TODO: Check 2: Exclusivity Checks.
     conditions.forall {
-      case EqualTo(c1, c2) =>
+      case EqualTo(ExtractCanonicalized(c1), ExtractCanonicalized(c2)) =>
         // c1 and c2 should belong to l and r respectively, or r and l respectively.
         if (!fromDifferentBaseRelations(c1, c2)) {
           return false
         }
         // The following validates that c1 is compared only against c2 and vice versa
-        if (attrMap.contains(base(c1)) && attrMap.contains(base(c2))) {
-          attrMap(base(c1)).equals(base(c2)) && attrMap(base(c2)).equals(base(c1))
-        } else if (!attrMap.contains(base(c1)) && !attrMap.contains(base(c2))) {
-          attrMap.put(base(c1), base(c2))
-          attrMap.put(base(c2), base(c1))
+        if (attrMap.contains(c1) && attrMap.contains(c2)) {
+          attrMap(c1).equals(c2) && attrMap(c2).equals(c1)
+        } else if (!attrMap.contains(c1) && !attrMap.contains(c2)) {
+          attrMap.put(c1, c2)
+          attrMap.put(c2, c1)
           true
         } else {
           false
@@ -599,4 +590,8 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
   private def spark: SparkSession = SparkSession.getActiveSession.getOrElse {
     throw HyperspaceException("Could not find active SparkSession")
   }
+}
+
+private[rules] object ExtractCanonicalized {
+  def unapply(expr: Expression): Option[Expression] = Some(expr.canonicalized)
 }
