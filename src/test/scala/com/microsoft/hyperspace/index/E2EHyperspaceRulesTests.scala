@@ -101,9 +101,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     def query(): DataFrame = spark.sql("SELECT * from t where c4 = 1")
 
     // Verify no Project node is present in the query plan, as a result of using SELECT *
-    assert(query().queryExecution.optimizedPlan.collect {
-      case p: Project => p
-    }.isEmpty, true)
+    assert(query().queryExecution.optimizedPlan.collect { case p: Project => p }.isEmpty, true)
 
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
   }
