@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Row}
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
@@ -87,6 +87,23 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     hyperspace.createIndex(df, indexConfig)
 
     def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c1")
+
+    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+  }
+
+  test("E2E test for filter query when all columns are selected.") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("filterIndex", Seq("c4", "c3"), Seq("c1", "c2", "c5"))
+
+    hyperspace.createIndex(df, indexConfig)
+    df.createOrReplaceTempView("t")
+
+    def query(): DataFrame = spark.sql("SELECT * from t where c4 = 1")
+
+    // Verify no Project node is present in the query plan, as a result of using SELECT *
+    assert(query().queryExecution.optimizedPlan.collect {
+      case p: Project => p
+    }.isEmpty, true)
 
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
   }

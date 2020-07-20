@@ -49,24 +49,22 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
-      case FilterRuleExtractor(
-          planHandle,
+      case ExtractFilterNode(
+          originalPlan,
           filter,
           outputColumns,
           filterColumns,
           logicalRelation,
-          fsRelation,
-          location) =>
+          fsRelation) =>
         try {
           val transformedPlan = replaceWithIndexIfPlanCovered(
             filter,
             outputColumns,
             filterColumns,
             logicalRelation,
-            fsRelation,
-            location)
+            fsRelation)
 
-          planHandle match {
+          originalPlan match {
             case p @ Project(_, _) =>
               p.copy(child = transformedPlan)
             case _ =>
@@ -75,7 +73,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
         } catch {
           case e: Exception =>
             logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
-            planHandle
+            originalPlan
         }
     }
   }
@@ -84,12 +82,11 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
    * For a given relation, check its available indexes and replace it with the top-ranked index
    * (according to cost model).
    *
-   * @param filter  Filter node in the subplan that is being optimized.
+   * @param filter Filter node in the subplan that is being optimized.
    * @param outputColumns List of output columns in subplan.
-   * @param filterColumns  List of columns in filter predicate.
-   * @param logicalRelation  child logical relation in the subplan.
+   * @param filterColumns List of columns in filter predicate.
+   * @param logicalRelation child logical relation in the subplan.
    * @param fsRelation Input relation in the subplan.
-   * @param location FileIndex associated with the locations of all files comprising fsRelation.
    * @return transformed logical plan in which original fsRelation is replaced by
    *         the top-ranked index.
    */
@@ -98,8 +95,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       logicalRelation: LogicalRelation,
-      fsRelation: HadoopFsRelation,
-      location: FileIndex): Filter = {
+      fsRelation: HadoopFsRelation): Filter = {
 
     val candidateIndexes =
       findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
@@ -132,7 +128,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
    *
    * TODO: This method is duplicated in FilterIndexRule and JoinIndexRule. Deduplicate.
    *
-   * @param filter  Filter node in the subplan that is being optimized.
+   * @param filter Filter node in the subplan that is being optimized.
    * @param outputColumns List of output columns in subplan.
    * @param filterColumns List of columns in filter predicate.
    * @param fsRelation Input relation in the subplan.
@@ -222,15 +218,14 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
   }
 }
 
-object FilterRuleExtractor extends Logging {
+object ExtractFilterNode {
   type returnType = (
-      LogicalPlan,
+      LogicalPlan, // original plan
       Filter,
       Seq[String], // output columns
       Seq[String], // filter columns
       LogicalRelation,
-      HadoopFsRelation,
-      FileIndex)
+      HadoopFsRelation)
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
     case project @ Project(
@@ -238,7 +233,7 @@ object FilterRuleExtractor extends Logging {
           filter @ Filter(
             condition: Expression,
             logicalRelation @ LogicalRelation(
-              fsRelation @ HadoopFsRelation(location, _, _, _, _, _),
+              fsRelation @ HadoopFsRelation(_, _, _, _, _, _),
               _,
               _,
               _))) =>
@@ -249,33 +244,19 @@ object FilterRuleExtractor extends Logging {
         .flatMap(_.toSeq)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(
-        project,
-        filter,
-        projectColumnNames,
-        filterColumnNames,
-        logicalRelation,
-        fsRelation,
-        location)
+      Some(project, filter, projectColumnNames, filterColumnNames, logicalRelation, fsRelation)
 
     case filter @ Filter(
           condition: Expression,
           logicalRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(location, _, _, _, _, _),
+            fsRelation @ HadoopFsRelation(_, _, _, _, _, _),
             _,
             _,
             _)) =>
       val relationColumnsName = logicalRelation.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(
-        filter,
-        filter,
-        relationColumnsName,
-        filterColumnNames,
-        logicalRelation,
-        fsRelation,
-        location)
+      Some(filter, filter, relationColumnsName, filterColumnNames, logicalRelation, fsRelation)
 
     case _ => None // plan does not match with any of filter index rule patterns
   }
