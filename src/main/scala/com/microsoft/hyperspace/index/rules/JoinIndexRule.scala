@@ -461,26 +461,26 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
    *
    * This mapping is used to find compatible indexes of T1 and T2.
    *
-   * @param lRequiredIndexedCols required indexed columns from left plan
-   * @param rRequiredIndexedCols required indexed columns from right plan
+   * @param leftBaseAttrs required indexed columns from left plan
+   * @param rightBaseAttrs required indexed columns from right plan
    * @param condition join condition which will be used to find the left-right column mapping
    * @return Mapping of corresponding columns from left and right, depending on the join
    *         condition. The keys represent columns from left subplan. The values are columns from
    *         right subplan.
    */
   private def getLRColumnMapping(
-      lRequiredIndexedCols: Seq[String],
-      rRequiredIndexedCols: Seq[String],
+      leftBaseAttrs: Seq[String],
+      rightBaseAttrs: Seq[String],
       condition: Expression): Map[String, String] = {
     extractConditions(condition).map {
       case EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
         Try {
-          (resolve(spark, attr1.name, lRequiredIndexedCols).get,
-            resolve(spark, attr2.name, rRequiredIndexedCols).get)
+          (resolve(spark, attr1.name, leftBaseAttrs).get,
+            resolve(spark, attr2.name, rightBaseAttrs).get)
         }.getOrElse {
           Try {
-            (resolve(spark, attr2.name, lRequiredIndexedCols).get,
-              resolve(spark, attr1.name, rRequiredIndexedCols).get)
+            (resolve(spark, attr2.name, leftBaseAttrs).get,
+              resolve(spark, attr1.name, rightBaseAttrs).get)
           }.getOrElse {
             throw new IllegalStateException("Unexpected exception while using join rule")
           }
