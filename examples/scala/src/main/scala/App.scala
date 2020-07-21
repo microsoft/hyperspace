@@ -94,8 +94,8 @@ object App {
 
     // Example of index usage for join.
     val eqJoin = empDF
-        .join(deptDF, empDF("deptId") === deptDF("deptId"))
-        .select(empDF("empName"), deptDF("deptName"))
+      .join(deptDF, empDF("deptId") === deptDF("deptId"))
+      .select(empDF("empName"), deptDF("deptName"))
     eqJoin.show()
     hyperspace.explain(eqJoin)
 
