@@ -41,6 +41,7 @@ trait HyperspaceIndexCRUDEvent extends HyperspaceEvent
  * Index creation event. Emitted on index creation.
  *
  * @param appInfo AppInfo for spark application.
+ * @param indexConfig Index config used in index creation.
  * @param index Optional index. It can be None if create index fails with invalid config.
  * @param originalPlan Original plan which is getting indexed.
  * @param message Message about event.
