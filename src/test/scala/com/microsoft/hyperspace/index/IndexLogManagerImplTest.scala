@@ -55,6 +55,10 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
             Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint()))))))),
     Map())
 
+  private def getEntry(state: String): LogEntry = {
+    TestUtils.copyWithState(sampleIndexLogEntry, state)
+  }
+
   override def beforeAll(): Unit = {
     super.beforeAll()
     FileUtils.delete(new Path(testRoot), true)
@@ -115,10 +119,6 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
 
-    def getEntry(state: String): LogEntry = {
-      TestUtils.copyWithState(sampleIndexLogEntry, state)
-    }
-
     FileUtils.createFile(
       fs,
       new Path(path, s"$HYPERSPACE_LOG/0"),
@@ -144,9 +144,30 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
-    FileUtils.createFile(fs, new Path(path, s"$HYPERSPACE_LOG/0"), "file contents")
-    new IndexLogManagerImpl(path).createLatestStableLog(0)
+    FileUtils.createFile(
+      fs, new Path(path, s"$HYPERSPACE_LOG/0"), JsonUtils.toJson(getEntry("ACTIVE")))
+    val result = new IndexLogManagerImpl(path).createLatestStableLog(0)
+    assert(result === true)
     assert(fs.exists(new Path(path, s"$HYPERSPACE_LOG/latestStable")))
+  }
+
+  test("testUpdateLatestStableLog fails if log state is not stable") {
+    val path = new Path(testRoot, UUID.randomUUID().toString)
+    val fs = path.getFileSystem(new Configuration)
+    FileUtils.createFile(
+      fs, new Path(path, s"$HYPERSPACE_LOG/0"), JsonUtils.toJson(getEntry("CANCELLING")))
+    val result = new IndexLogManagerImpl(path).createLatestStableLog(0)
+    assert(result === false)
+    assert(!fs.exists(new Path(path, s"$HYPERSPACE_LOG/latestStable")))
+  }
+
+  test("testUpdateLatestStableLog fails with exception if unable to find a valid log entry") {
+    val path = new Path(testRoot, UUID.randomUUID().toString)
+    val fs = path.getFileSystem(new Configuration)
+    FileUtils.createFile(
+      fs, new Path(path, s"$HYPERSPACE_LOG/0"), "Invalid Log Entry")
+    assertThrows[com.fasterxml.jackson.core.JsonParseException](
+      new IndexLogManagerImpl(path).createLatestStableLog(0))
   }
 
   // TODO: Test the case where the id does not exist.

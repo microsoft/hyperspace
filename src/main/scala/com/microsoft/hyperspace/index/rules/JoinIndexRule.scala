@@ -20,7 +20,6 @@ import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
@@ -30,9 +29,10 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -50,7 +50,11 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
  * These indexes are indexed by the join columns and can improve the query performance by
  * avoiding full shuffling of T1 and T2.
  */
-object JoinIndexRule extends Rule[LogicalPlan] with Logging {
+object JoinIndexRule
+    extends Rule[LogicalPlan]
+    with Logging
+    with HyperspaceEventLogging
+    with ActiveSparkSession {
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
     case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
       try {
@@ -59,6 +63,14 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
             case (lIndex, rIndex) =>
               val updatedPlan = join
                 .copy(left = getReplacementPlan(lIndex, l), right = getReplacementPlan(rIndex, r))
+
+              logEvent(HyperspaceIndexUsageEvent(
+                AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
+                Seq(lIndex, rIndex),
+                join.toString,
+                updatedPlan.toString,
+                "Join index rule applied."))
+
               updatedPlan
           }
           .getOrElse(join)
@@ -87,7 +99,7 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
     val indexManager = Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
+      .getContext(spark)
       .indexCollectionManager
 
     val lIndexes = RuleUtils.getCandidateIndexes(indexManager, left)
@@ -120,10 +132,6 @@ object JoinIndexRule extends Rule[LogicalPlan] with Logging {
       numBuckets = index.numBuckets,
       bucketColumnNames = index.indexedColumns,
       sortColumnNames = index.indexedColumns)
-
-    val spark = SparkSession.getActiveSession.getOrElse {
-      throw new IllegalArgumentException("Could not find active SparkSession")
-    }
 
     val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
     val relation = HadoopFsRelation(

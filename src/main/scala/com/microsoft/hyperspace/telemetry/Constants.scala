@@ -14,20 +14,8 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.actions
+package com.microsoft.hyperspace.telemetry
 
 object Constants {
-  object States {
-    val ACTIVE = "ACTIVE"
-    val CREATING = "CREATING"
-    val DELETING = "DELETING"
-    val DELETED = "DELETED"
-    val REFRESHING = "REFRESHING"
-    val VACUUMING = "VACUUMING"
-    val RESTORING = "RESTORING"
-    val DOESNOTEXIST = "DOESNOTEXIST"
-    val CANCELLING = "CANCELLING"
-  }
-
-  val STABLE_STATES: Set[String] = Set(States.ACTIVE, States.DELETED, States.DOESNOTEXIST)
+  val HYPERSPACE_EVENT_LOGGER_CLASS_KEY = "spark.hyperspace.eventLoggerClass"
 }

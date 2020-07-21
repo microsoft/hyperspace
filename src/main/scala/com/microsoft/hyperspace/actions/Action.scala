@@ -18,8 +18,9 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.internal.Logging
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, HyperspaceEventLogging}
 
 /**
  * This is a generic Index-Modifying Action interface. It provides APIs to begin and commit
@@ -30,7 +31,7 @@ import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
  *     1. Any metadata dependent logic should be passed in as functions instead.
  *     2. IndexLogEntry specific code should be removed.
  */
-trait Action extends Logging {
+trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession {
   protected val baseId: Int = logManager.getLatestId().getOrElse(-1)
 
   def logEntry: LogEntry
@@ -80,7 +81,10 @@ trait Action extends Logging {
   }
 
   def run(): Unit = {
+    val appInfo =
+      AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName)
     try {
+      logEvent(event(appInfo, "Operation Started."))
       validate()
 
       begin()
@@ -88,9 +92,13 @@ trait Action extends Logging {
       op()
 
       end()
+      logEvent(event(appInfo, message = "Operation Succeeded."))
     } catch {
       case e: Exception =>
+        logEvent(event(appInfo, message = s"Operation Failed: ${e.getMessage}."))
         throw e
     }
   }
+
+  protected def event(appInfo: AppInfo, message: String): HyperspaceEvent
 }
