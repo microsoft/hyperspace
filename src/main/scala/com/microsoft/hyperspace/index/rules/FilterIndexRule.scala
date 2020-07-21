@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
@@ -27,15 +26,20 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
  * a relation with an available covering index according to columns in
  * filter predicate.
  */
-object FilterIndexRule extends Rule[LogicalPlan] with Logging {
+object FilterIndexRule
+    extends Rule[LogicalPlan]
+    with Logging
+    with HyperspaceEventLogging
+    with ActiveSparkSession {
   override def apply(plan: LogicalPlan): LogicalPlan = {
     // FilterIndex rule looks for below patterns, in ordered manner, to trigger a transformation:
     //  Pattern-1: Scan -> Filter -> Project
@@ -113,7 +117,18 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
         val newOutput =
           logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
 
-        filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput))
+        val updatedPlan =
+          filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput))
+
+        logEvent(
+          HyperspaceIndexUsageEvent(
+            AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
+            Seq(index),
+            filter.toString,
+            updatedPlan.toString,
+            "Filter index rule applied."))
+
+        updatedPlan
 
       case None => filter // No candidate index found
     }
@@ -137,7 +152,7 @@ object FilterIndexRule extends Rule[LogicalPlan] with Logging {
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
     val indexManager = Hyperspace
-      .getContext(SparkSession.getActiveSession.get)
+      .getContext(spark)
       .indexCollectionManager
     val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, filter)
 
