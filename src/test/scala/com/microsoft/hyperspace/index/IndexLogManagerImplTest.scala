@@ -145,8 +145,7 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
     FileUtils.createFile(
-      fs, new Path(path, s"$HYPERSPACE_LOG/0"), JsonUtils.toJson(getEntry("ACTIVE"))
-    )
+      fs, new Path(path, s"$HYPERSPACE_LOG/0"), JsonUtils.toJson(getEntry("ACTIVE")))
     val result = new IndexLogManagerImpl(path).createLatestStableLog(0)
     assert(result === true)
     assert(fs.exists(new Path(path, s"$HYPERSPACE_LOG/latestStable")))
@@ -156,8 +155,7 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
     FileUtils.createFile(
-      fs, new Path(path, s"$HYPERSPACE_LOG/0"), JsonUtils.toJson(getEntry("CANCELLING"))
-    )
+      fs, new Path(path, s"$HYPERSPACE_LOG/0"), JsonUtils.toJson(getEntry("CANCELLING")))
     val result = new IndexLogManagerImpl(path).createLatestStableLog(0)
     assert(result === false)
     assert(!fs.exists(new Path(path, s"$HYPERSPACE_LOG/latestStable")))
@@ -167,11 +165,9 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
     FileUtils.createFile(
-      fs, new Path(path, s"$HYPERSPACE_LOG/0"), "Invalid Log Entry"
-    )
+      fs, new Path(path, s"$HYPERSPACE_LOG/0"), "Invalid Log Entry")
     assertThrows[com.fasterxml.jackson.core.JsonParseException](
-      new IndexLogManagerImpl(path).createLatestStableLog(0)
-    )
+      new IndexLogManagerImpl(path).createLatestStableLog(0))
   }
 
   // TODO: Test the case where the id does not exist.

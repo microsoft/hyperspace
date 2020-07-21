@@ -110,7 +110,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
     }
   }
 
-  override def createLatestStableLog(id: Int): Boolean =
+  override def createLatestStableLog(id: Int): Boolean = {
     getLog(id) match {
       case Some(logEntry) if Constants.STABLE_STATES.contains(logEntry.state) =>
         Try(FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration))
@@ -121,12 +121,13 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
             false
         }
       case Some(logEntry) =>
-        logError(s"Found LogEntry with non stable state = ${logEntry.state}")
+        logError(s"Found LogEntry with non stable state = ${logEntry.state} for id = '$id'")
         false
       case None =>
-        logError(s"Unable to get LogEntry for id = $id")
+        logError(s"Unable to get LogEntry for id = '$id'")
         false
     }
+  }
 
   override def deleteLatestStableLog(): Boolean = {
     try {
