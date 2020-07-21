@@ -22,21 +22,21 @@ import com.microsoft.hyperspace.index.IndexConfig
 
 object App {
   def main(args: Array[String]): Unit = {
-    // Create Spark session
+    // Create Spark session.
     val spark = SparkSession
       .builder()
       .appName("Hyperspace example")
       .config("spark.some.config.option", "some-value")
       .getOrCreate()
 
-    // Sample department records
+    // Sample department records.
     val departments = Seq(
       (10, "Accounting", "New York"),
       (20, "Research", "Dallas"),
       (30, "Sales", "Chicago"),
       (40, "Operations", "Boston"))
 
-    // Sample employee records
+    // Sample employee records.
     val employees = Seq(
       (7369, "SMITH", 20),
       (7499, "ALLEN", 30),
@@ -53,23 +53,24 @@ object App {
       (7902, "FORD", 20),
       (7654, "MARTIN", 30))
 
-    // Save example data records as Parquet
+    // Save example data records as Parquet.
     import spark.implicits._
+
     val deptLocation = "departments"
-    val empLocation = "employees"
     departments
       .toDF("deptId", "deptName", "location")
       .write
       .mode("overwrite")
       .parquet(deptLocation)
 
+    val empLocation = "employees"
     employees
       .toDF("empId", "empName", "deptId")
       .write
       .mode("overwrite")
       .parquet(empLocation)
 
-    // Create Hyperspace indexes
+    // Create Hyperspace indexes.
     val hyperspace = new Hyperspace(spark)
 
     val deptDF = spark.read.parquet(deptLocation)
@@ -80,18 +81,18 @@ object App {
     hyperspace.createIndex(deptDF, deptIndexConfig)
     hyperspace.createIndex(empDF, empIndexConfig)
 
-    // List all indexes
+    // List all indexes.
     hyperspace.indexes.show
 
-    // Enable Hyperspace to leverage indexes
+    // Enable Hyperspace to leverage indexes.
     spark.enableHyperspace()
 
-    // Example of index usage for filtered selection
+    // Example of index usage for filtered selection.
     val eqFilter = deptDF.filter("deptId = 20").select("deptName")
     eqFilter.show()
     hyperspace.explain(eqFilter)
 
-    // Example of index usage for join
+    // Example of index usage for join.
     val eqJoin = empDF
         .join(deptDF, empDF("deptId") === deptDF("deptId"))
         .select(empDF("empName"), deptDF("deptName"))
