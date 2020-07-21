@@ -132,8 +132,8 @@ object FilterIndexRule
           HyperspaceIndexUsageEvent(
             AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
             Seq(index),
-            "",
-            "",
+            project.toString,
+            updatedPlan.toString,
             "Filter index rule applied."))
 
         updatedPlan

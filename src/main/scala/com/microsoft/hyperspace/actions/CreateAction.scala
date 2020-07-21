@@ -77,7 +77,7 @@ class CreateAction(
   final override def op(): Unit = write(spark, df, indexConfig)
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    // logEntry may or may not exist the first time an index is being created.
+    // LogEntry may or may not exist the first time an index is being created.
     // This can happen, for example, if index config we receive is incompatible with the
     // dataframe. So we use Try here. We still need an index object with empty values for event
     // logging.

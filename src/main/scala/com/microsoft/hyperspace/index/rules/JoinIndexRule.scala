@@ -67,8 +67,8 @@ object JoinIndexRule
               logEvent(HyperspaceIndexUsageEvent(
                 AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
                 Seq(lIndex, rIndex),
-                "",
-                "",
+                join.toString,
+                updatedPlan.toString,
                 "Join index rule applied."))
 
               updatedPlan
