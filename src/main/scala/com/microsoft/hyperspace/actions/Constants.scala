@@ -29,5 +29,5 @@ object Constants {
     val CANCELLING = "CANCELLING"
   }
 
-  val STABLE_STATES: Seq[String] = Seq(States.ACTIVE, States.DELETED, States.DOESNOTEXIST)
+  val STABLE_STATES: Set[String] = Set(States.ACTIVE, States.DELETED, States.DOESNOTEXIST)
 }
