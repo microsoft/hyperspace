@@ -22,6 +22,7 @@ import scala.util.Try
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
+import org.apache.spark.internal.Logging
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
@@ -53,7 +54,7 @@ trait IndexLogManager {
   def writeLog(id: Int, log: LogEntry): Boolean
 }
 
-class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
+class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging {
   // Use FileContext instead of FileSystem for atomic renames?
   private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
 
@@ -115,8 +116,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
       FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration)
     } catch {
       case ex: Exception =>
-        // TODO: replace printStackTrace with Logging.
-        ex.printStackTrace()
+        logError(s"Failed to create the latest stable log with id = '$id'", ex)
         false
     }
   }
@@ -130,8 +130,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
       }
     } catch {
       case ex: Exception =>
-        // TODO: replace printStackTrace with Logging.
-        ex.printStackTrace()
+        logError("Failed to delete the latest stable log", ex)
         false
     }
   }
@@ -148,8 +147,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
         fs.rename(tempPath, pathFromId(id))
       } catch {
         case ex: Exception =>
-          // TODO: replace printStackTrace with Logging.
-          ex.printStackTrace()
+          logError(s"Failed to write log with id = '$id'", ex)
           false
       }
     }

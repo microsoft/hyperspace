@@ -62,9 +62,9 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   private def createSimplePlan(
-                                length: Long,
-                                modificationTime: Long,
-                                path: Path): LogicalRelation = {
+      length: Long,
+      modificationTime: Long,
+      path: Path): LogicalRelation = {
     val c1 = AttributeReference("c1", StringType)()
     val c2 = AttributeReference("c2", StringType)()
 

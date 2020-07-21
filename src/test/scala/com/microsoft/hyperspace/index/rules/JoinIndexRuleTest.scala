@@ -19,17 +19,16 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.FileUtils
 
-class JoinIndexRuleTest extends HyperspaceSuite {
-  val parentPath = new Path("src/test/resources/joinIndexTest")
-  val systemPath = new Path(parentPath, "idroot")
+class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
+  override val systemPath = new Path("src/test/resources/joinIndexRuleTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -66,18 +65,14 @@ class JoinIndexRuleTest extends HyperspaceSuite {
    */
   override def beforeAll(): Unit = {
     super.beforeAll()
-    FileUtils.delete(parentPath)
-
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
 
     val t1Location =
       new InMemoryFileIndex(spark, Seq(new Path("t1")), Map.empty, Some(t1Schema), NoopCache)
-
     val t2Location =
       new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t2Schema), NoopCache)
 
-    t1Relation = RuleTestHelper.baseRelation(t1Location, t1Schema, spark)
-    t2Relation = RuleTestHelper.baseRelation(t2Location, t2Schema, spark)
+    t1Relation = baseRelation(t1Location, t1Schema)
+    t2Relation = baseRelation(t2Location, t2Schema)
 
     t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
     t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, false)
@@ -102,13 +97,7 @@ class JoinIndexRuleTest extends HyperspaceSuite {
     createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
-  override def afterAll(): Unit = {
-    FileUtils.delete(parentPath)
-    super.afterAll()
-  }
-
   before {
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
   }
 
@@ -123,12 +112,13 @@ class JoinIndexRuleTest extends HyperspaceSuite {
   }
 
   test("Join rule does not update plan if index location is not set") {
-    spark.conf.unset(IndexConstants.INDEX_SYSTEM_PATH)
-
-    val joinCondition = EqualTo(t1c1, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
-    assert(updatedPlan.equals(originalPlan))
+    withSQLConf(IndexConstants.INDEX_SYSTEM_PATH -> "") {
+      val joinCondition = EqualTo(t1c1, t2c1)
+      val originalPlan =
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val updatedPlan = JoinIndexRule(originalPlan)
+      assert(updatedPlan.equals(originalPlan))
+    }
   }
 
   test("Join rule does not update plan if join condition does not exist") {
@@ -206,10 +196,8 @@ class JoinIndexRuleTest extends HyperspaceSuite {
 
     {
       // Test: should update plan if index exists to cover all implicit columns
-      val t1TestIndex =
-        createIndex("t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
-      val t2TestIndex =
-        createIndex("t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
+      val t1TestIndex = createIndex("t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
+      val t2TestIndex = createIndex("t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
 
       // clear cache so the new indexes gets added to it
       clearCache()
@@ -418,20 +406,4 @@ class JoinIndexRuleTest extends HyperspaceSuite {
       }
       .flatten
   }
-
-  private def createIndex(
-      name: String,
-      indexCols: Seq[AttributeReference],
-      includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry =
-    RuleTestHelper.createIndex(spark, systemPath, name, indexCols, includedCols, plan)
-
-  private def schemaFromAttributes(attributes: Attribute*): StructType =
-    RuleTestHelper.schemaFromAttributes(attributes: _*)
-
-  private def getIndexDataFilesPath(indexName: String): Path =
-    RuleTestHelper.getIndexDataFilesPath(indexName, systemPath)
-
-  private def getIndexRootPath(indexName: String): Path =
-    RuleTestHelper.getIndexRootPath(indexName, systemPath)
 }
