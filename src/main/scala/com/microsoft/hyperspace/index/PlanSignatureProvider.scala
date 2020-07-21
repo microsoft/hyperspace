@@ -39,7 +39,7 @@ class PlanSignatureProvider extends LogicalPlanSignatureProvider {
 
     signature match {
       case "" => None
-      case _ => Some(signature)
+      case _ => Some(HashingUtils.md5Hex(signature))
     }
   }
 }
