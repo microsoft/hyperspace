@@ -18,7 +18,8 @@ package com.microsoft.hyperspace.actions
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, DELETED, RESTORING}
-import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RestoreActionEvent}
 
 class RestoreAction(final override protected val logManager: IndexLogManager) extends Action {
   final override lazy val logEntry: LogEntry = {
@@ -40,4 +41,8 @@ class RestoreAction(final override protected val logManager: IndexLogManager) ex
   }
 
   final override def op(): Unit = { /* Do nothing */ }
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RestoreActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
+  }
 }
