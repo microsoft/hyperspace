@@ -19,7 +19,6 @@ package com.microsoft.hyperspace.index
 import java.util.UUID
 
 import scala.util.{Failure, Success, Try}
-import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
