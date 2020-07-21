@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.telemetry
 
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.{IndexConfig, IndexLogEntry}
 
 /**
  * Class for common app info.
@@ -41,13 +41,14 @@ trait HyperspaceIndexCRUDEvent extends HyperspaceEvent
  * Index creation event. Emitted on index creation.
  *
  * @param appInfo AppInfo for spark application.
- * @param index Related indexes.
+ * @param index Optional index. It can be None if create index fails with invalid config.
  * @param originalPlan Original plan which is getting indexed.
  * @param message Message about event.
  */
 case class CreateActionEvent(
     appInfo: AppInfo,
-    index: IndexLogEntry,
+    indexConfig: IndexConfig,
+    index: Option[IndexLogEntry],
     originalPlan: String,
     message: String)
     extends HyperspaceIndexCRUDEvent
@@ -56,7 +57,7 @@ case class CreateActionEvent(
  * Index deletion event. Emitted when delete is called on an index.
  *
  * @param appInfo AppInfo for spark application.
- * @param index Related indexes.
+ * @param index Related index.
  * @param message Message about event.
  */
 case class DeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
@@ -66,7 +67,7 @@ case class DeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
  * Index restore event. Emitted when restore is called on an index.
  *
  * @param appInfo AppInfo for spark application.
- * @param index Related indexes.
+ * @param index Related index.
  * @param message Message about event.
  */
 case class RestoreActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
@@ -76,7 +77,7 @@ case class RestoreActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: S
  * Index Vacuum Event. Emitted when vacuum is called on an index.
  *
  * @param appInfo AppInfo for spark application.
- * @param index Related indexes.
+ * @param index Related index.
  * @param message Message about event.
  */
 case class VacuumActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
@@ -86,7 +87,7 @@ case class VacuumActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
  * Index Refresh Event. Emitted when refresh is called on an index.
  *
  * @param appInfo AppInfo for spark application.
- * @param index Related indexes.
+ * @param index Related index.
  * @param message Message about event.
  */
 case class RefreshActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
@@ -97,7 +98,7 @@ case class RefreshActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: S
  * operation.
  *
  * @param appInfo AppInfo for spark application.
- * @param index Related indexes.
+ * @param index Related index.
  * @param message Message about event.
  */
 case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)

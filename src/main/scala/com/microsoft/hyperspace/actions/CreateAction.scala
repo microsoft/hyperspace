@@ -81,34 +81,10 @@ class CreateAction(
     // This can happen, for example, if index config we receive is incompatible with the
     // dataframe. So we use Try here. We still need an index object with empty values for event
     // logging.
-    val index: IndexLogEntry = Try {
+    val index: Option[IndexLogEntry] = Try {
       // If a logEntry exists, we can create a valid index object directly.
       logEntry.asInstanceOf[IndexLogEntry]
-    }.getOrElse {
-      val sourcePlanProperties = SparkPlan.Properties(
-        rawPlan = "",
-        LogicalPlanFingerprint(
-          LogicalPlanFingerprint.Properties(Seq(Signature(provider = "", value = "")))))
-      val sourceDataProperties =
-        Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
-
-      IndexLogEntry(
-        indexConfig.indexName,
-        CoveringIndex(
-          CoveringIndex.Properties(
-            CoveringIndex.Properties
-              .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
-            schemaString = "",
-            numBuckets = spark.conf
-              .get(
-                IndexConstants.INDEX_NUM_BUCKETS,
-                IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-              .toInt)),
-        Content(indexDataPath.toString, Seq()),
-        Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-        Map())
-    }
-
-    CreateActionEvent(appInfo, index, df.queryExecution.logical.toString, message)
+    }.toOption
+    CreateActionEvent(appInfo, indexConfig, index, df.queryExecution.logical.toString, message)
   }
 }

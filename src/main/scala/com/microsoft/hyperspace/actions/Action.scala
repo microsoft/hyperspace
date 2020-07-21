@@ -92,7 +92,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
       op()
 
       end()
-      logEvent(event(appInfo, message = "Operation Succeeded"))
+      logEvent(event(appInfo, message = "Operation Succeeded."))
     } catch {
       case e: Exception =>
         logEvent(event(appInfo, message = s"Operation Failed: ${e.getMessage}."))
