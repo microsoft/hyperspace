@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.actions
+package com.microsoft.hyperspace
 
-object Constants {
-  object States {
-    val ACTIVE = "ACTIVE"
-    val CREATING = "CREATING"
-    val DELETING = "DELETING"
-    val DELETED = "DELETED"
-    val REFRESHING = "REFRESHING"
-    val VACUUMING = "VACUUMING"
-    val RESTORING = "RESTORING"
-    val DOESNOTEXIST = "DOESNOTEXIST"
-    val CANCELLING = "CANCELLING"
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
+
+trait ActiveSparkSession {
+  def spark: SparkSession = {
+    SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No active spark session found")
+    }
   }
 
-  val STABLE_STATES: Set[String] = Set(States.ACTIVE, States.DELETED, States.DOESNOTEXIST)
+  def sparkContext: SparkContext = spark.sparkContext
 }
