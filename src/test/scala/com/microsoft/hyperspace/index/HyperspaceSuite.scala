@@ -73,6 +73,10 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
     }
   }
 
+  /**
+   * This method is not thread safe.
+   * Reverts spark config for variable after calling f
+   */
   protected def withSparkConf(confName: String, confValue: Any)(f: => Unit): Unit = {
     val original = spark.conf.get(confName)
     try {
