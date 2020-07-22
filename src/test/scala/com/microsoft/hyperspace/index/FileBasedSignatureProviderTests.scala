@@ -111,11 +111,11 @@ class FileBasedSignatureProviderTests extends SparkFunSuite with SparkInvolvedSu
   }
 
   private def createFileStatus(length: Long, modificationTime: Long, path: Path): FileStatus =
-    SignatureProviderTestHelper.createFileStatus(length, modificationTime, path)
+    SignatureProviderTestUtils.createFileStatus(length, modificationTime, path)
 
   private def createFileBasedSignature(files: Seq[FileStatus]): String =
     new FileBasedSignatureProvider()
-      .signature(SignatureProviderTestHelper.createLogicalRelation(spark, files)) match {
+      .signature(SignatureProviderTestUtils.createLogicalRelation(spark, files)) match {
       case Some(s) => s
       case None => throw HyperspaceException("Invalid plan for signature generation.")
     }

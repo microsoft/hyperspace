@@ -69,7 +69,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
     val c2 = AttributeReference("c2", StringType)()
 
     val tableSchema = schemaFromAttributes(c1, c2)
-    SignatureProviderTestHelper.createLogicalRelation(
+    SignatureProviderTestUtils.createLogicalRelation(
       spark,
       Seq(createFileStatus(length, modificationTime, path)),
       tableSchema)
@@ -81,7 +81,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
     val t1c3 = AttributeReference("t1c3", IntegerType)()
 
     val tableSchema = schemaFromAttributes(t1c1, t1c2, t1c3)
-    val scanNode = SignatureProviderTestHelper.createLogicalRelation(
+    val scanNode = SignatureProviderTestUtils.createLogicalRelation(
       spark,
       Seq(createFileStatus(length, modificationTime, path)),
       tableSchema)
@@ -98,7 +98,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
     val t1c3 = AttributeReference("t1c3", IntegerType)()
 
     val t1Schema = schemaFromAttributes(t1c1, t1c2, t1c3)
-    val r1 = SignatureProviderTestHelper.createLogicalRelation(
+    val r1 = SignatureProviderTestUtils.createLogicalRelation(
       spark,
       Seq(createFileStatus(fileLength1, fileModificationTime1, filePath1)),
       t1Schema)
@@ -107,7 +107,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
     val t2c2 = AttributeReference("t2c2", IntegerType)()
 
     val t2Schema = schemaFromAttributes(t2c1, t2c2)
-    val r2 = SignatureProviderTestHelper.createLogicalRelation(
+    val r2 = SignatureProviderTestUtils.createLogicalRelation(
       spark,
       Seq(createFileStatus(fileLength2, fileModificationTime2, filePath2)),
       t2Schema)
@@ -137,5 +137,5 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
 
   private def createFileStatus(length: Long, modificationTime: Long, path: Path): FileStatus =
-    SignatureProviderTestHelper.createFileStatus(length, modificationTime, path)
+    SignatureProviderTestUtils.createFileStatus(length, modificationTime, path)
 }

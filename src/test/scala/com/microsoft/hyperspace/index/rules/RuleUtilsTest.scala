@@ -96,11 +96,11 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
-    validateLogicalRelation(t1ScanNode)
+    validateLogicalRelation(t1ScanNode, t1ScanNode)
   }
 
   test("Verify get logical relation for multi-node linear plan.") {
-    validateLogicalRelation(t1ProjectNode)
+    validateLogicalRelation(t1ProjectNode, t1ScanNode)
   }
 
   test("Verify get logical relation for non-linear plan.") {
@@ -109,9 +109,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     assert(r.isEmpty)
   }
 
-  private def validateLogicalRelation(plan: LogicalPlan): Unit = {
+  private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
     val r = RuleUtils.getLogicalRelation(plan)
     assert(r.isDefined)
-    assert(r.get.equals(t1ScanNode))
+    assert(r.get.equals(expected))
   }
 }

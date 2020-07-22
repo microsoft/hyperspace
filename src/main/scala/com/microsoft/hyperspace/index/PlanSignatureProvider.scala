@@ -35,7 +35,7 @@ class PlanSignatureProvider extends LogicalPlanSignatureProvider {
    */
   def signature(logicalPlan: LogicalPlan): Option[String] = {
     var signature = ""
-    logicalPlan.foreachUp(o => signature += HashingUtils.md5Hex(o.nodeName))
+    logicalPlan.foreachUp(p => signature += HashingUtils.md5Hex(p.nodeName))
 
     signature match {
       case "" => None

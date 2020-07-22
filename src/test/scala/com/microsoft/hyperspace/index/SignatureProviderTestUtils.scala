@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-object SignatureProviderTestHelper {
+object SignatureProviderTestUtils {
   def createFileStatus(length: Long, modificationTime: Long, path: Path): FileStatus =
     new FileStatus(length, false, 0, 0, modificationTime, path)
 

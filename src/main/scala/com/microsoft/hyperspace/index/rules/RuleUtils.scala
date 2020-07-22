@@ -34,51 +34,45 @@ object RuleUtils {
    * @return indexes built for this plan
    */
   def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
-    getLogicalRelation(plan) match {
-      case Some(r) =>
-        // Map of a signature provider to a signature generated for the given plan.
-        val signatureMap = mutable.Map[String, String]()
+    // Map of a signature provider to a signature generated for the given plan.
+    val signatureMap = mutable.Map[String, String]()
 
-        def signatureValid(entry: IndexLogEntry): Boolean = {
-          val sourcePlanSignatures =
-            entry.source.plan.properties.fingerprint.properties.signatures
-          assert(sourcePlanSignatures.length == 1)
-          val sourcePlanSignature = sourcePlanSignatures.head
+    def signatureValid(entry: IndexLogEntry): Boolean = {
+      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
+      assert(sourcePlanSignatures.length == 1)
+      val sourcePlanSignature = sourcePlanSignatures.head
 
-          if (!signatureMap.contains(sourcePlanSignature.provider)) {
-            val signature = LogicalPlanSignatureProvider
-              .create(sourcePlanSignature.provider)
-              .signature(r)
-              .get // It is safe to call Option.get as signature() is
-            // called on a LogicalRelation node which is
-            // valid for signature computation
-            signatureMap.put(sourcePlanSignature.provider, signature)
-          }
-
-          signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
+      if (!signatureMap.contains(sourcePlanSignature.provider)) {
+        LogicalPlanSignatureProvider
+          .create(sourcePlanSignature.provider)
+          .signature(plan) match {
+          case Some(s) =>
+            signatureMap.put(sourcePlanSignature.provider, s)
+          case None => return false
         }
-
-        // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-        //  the code to support indexes in transitioning states as well.
-        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-        allIndexes.filter(index => index.created && signatureValid(index))
-
-      case None => Seq[IndexLogEntry]()
+      }
+      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
     }
+
+    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
+    //  the code to support indexes in transitioning states as well.
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+
+    allIndexes.filter(index => index.created && signatureValid(index))
   }
 
   /**
-   * Extract LogicalRelation node from a given linear logical plan.
+   * Extract the LogicalRelation node if the given logical plan is linear.
    *
    * @param logicalPlan given logical plan to extract LogicalRelation from.
    * @return if the plan is linear, the LogicalRelation node; Otherwise None.
    */
   def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
-    val lr = logicalPlan.collect { case r: LogicalRelation => r }
-    if (lr.length == 1) {
-      Some(lr.head)
+    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
+    if (lrs.length == 1) {
+      Some(lrs.head)
     } else {
-      None // plan is non-linear or it does not have any LogicalRelation
+      None // logicalPlan is non-linear or it has no LogicalRelation.
     }
   }
 }
