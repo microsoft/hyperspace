@@ -69,19 +69,17 @@ object RuleUtils {
 
   /**
    * Extract LogicalRelation node from a given logical plan.
-   * The assumption is the input plan is linear and has one scan node.
+   * The assumption is input plan is linear and has one scan node.
    *
-   * @param logicalPlan given logical plan to extract LogicalRelation
+   * @param logicalPlan given logical plan to extract LogicalRelation from.
    * @return if the plan is linear, the LogicalRelation node; Otherwise None.
    */
-  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] =
-    logicalPlan match {
-      case r: LogicalRelation => Some(r)
-      case p: LogicalPlan =>
-        if (p.children.size == 1) {
-          getLogicalRelation(p.children.head)
-        } else {
-          None // plan is non-linear or it does not have any LogicalRelation
-        }
+  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
+    val lr = logicalPlan.collect { case r: LogicalRelation => r }
+    if (lr.length == 1) {
+      Some(lr.head)
+    } else {
+      None // plan is non-linear or it does not have any LogicalRelation
     }
+  }
 }
