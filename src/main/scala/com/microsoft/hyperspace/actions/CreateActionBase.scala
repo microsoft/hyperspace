@@ -129,18 +129,19 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
     val spark = df.sparkSession
     val dfColumnNames = df.schema.fieldNames
-    val resolvedIndexedColumns =
-      ResolverUtils.resolve(spark, indexConfig.indexedColumns, dfColumnNames)
-    val resolvedIncludedColumns =
-      ResolverUtils.resolve(spark, indexConfig.includedColumns, dfColumnNames)
-
-    val allColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
+    val indexedColumns = indexConfig.indexedColumns
+    val includedColumns = indexConfig.includedColumns
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
+    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
 
     (resolvedIndexedColumns, resolvedIncludedColumns) match {
       case (Some(indexed), Some(included)) => (indexed, included)
       case _ =>
+        val unresolvedColumns = (indexedColumns ++ includedColumns)
+          .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
+          .collect { case c if c._2.isEmpty => c._1 }
         throw HyperspaceException(
-          s"Unexpected Exception: Some of the columns from $allColumns could not be resolved " +
+          s"Unexpected Exception: Columns $unresolvedColumns could not be resolved " +
             s"from available source columns $dfColumnNames")
     }
   }
