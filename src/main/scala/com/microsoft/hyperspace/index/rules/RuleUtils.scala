@@ -37,7 +37,7 @@ object RuleUtils {
     getLogicalRelation(plan) match {
       case Some(r) =>
         // Map of a signature provider to a signature generated for the given plan.
-        val signatureMap: mutable.Map[String, String] = mutable.Map()
+        val signatureMap = mutable.Map[String, String]()
 
         def signatureValid(entry: IndexLogEntry): Boolean = {
           val sourcePlanSignatures =
@@ -68,8 +68,7 @@ object RuleUtils {
   }
 
   /**
-   * Extract LogicalRelation node from a given logical plan.
-   * The assumption is input plan is linear and has one scan node.
+   * Extract LogicalRelation node from a given linear logical plan.
    *
    * @param logicalPlan given logical plan to extract LogicalRelation from.
    * @return if the plan is linear, the LogicalRelation node; Otherwise None.

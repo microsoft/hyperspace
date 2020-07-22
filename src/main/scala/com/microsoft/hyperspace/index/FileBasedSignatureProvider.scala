@@ -37,7 +37,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
   def signature(logicalPlan: LogicalPlan): Option[String] = {
-    fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex(_))
+    fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
   }
 
   /**

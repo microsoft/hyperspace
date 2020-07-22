@@ -84,7 +84,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
           Map())
 
-      case None => throw HyperspaceException("Invalid plan for index dataFrame.")
+      case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
   }
 
