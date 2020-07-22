@@ -51,16 +51,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
-    // Resolve the passed column names with existing column names from the dataframe if possible.
-    val (resolvedIndexedColumns, resolvedIncludedColumns) = {
-      try {
-        // Try creating log entry with resolved column names.
-        resolveConfig(df, indexConfig)
-      } catch {
-        // Creating index log entry with whatever the user passed.
-        case _: Exception => (indexConfig.indexedColumns, indexConfig.includedColumns)
-      }
-    }
+    // Resolve the passed column names with existing column names from the dataframe.
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val schema = {
       val allColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
       df.select(allColumns.head, allColumns.tail: _*).schema

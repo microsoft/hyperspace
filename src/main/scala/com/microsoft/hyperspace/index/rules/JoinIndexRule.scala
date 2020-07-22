@@ -305,19 +305,20 @@ object JoinIndexRule
     // store just one copy of column 'A' when join condition contains column 'A' as well as 'a'.
     val attrMap = new mutable.HashMap[Expression, Expression]()
 
-    // TODO: Check 2: Exclusivity Checks.
     conditions.forall {
-      case EqualTo(ExtractCanonicalized(c1), ExtractCanonicalized(c2)) =>
-        // c1 and c2 should belong to l and r respectively, or r and l respectively.
-        if (!fromDifferentBaseRelations(c1, c2)) {
+      case EqualTo(c1, c2) =>
+        val (c1Canonicalized, c2Canonicalized) = (c1.canonicalized, c2.canonicalized)
+        // Check 1: c1 and c2 should belong to l and r respectively, or r and l respectively.
+        if (!fromDifferentBaseRelations(c1Canonicalized, c2Canonicalized)) {
           return false
         }
-        // The following validates that c1 is compared only against c2 and vice versa
-        if (attrMap.contains(c1) && attrMap.contains(c2)) {
-          attrMap(c1).equals(c2) && attrMap(c2).equals(c1)
-        } else if (!attrMap.contains(c1) && !attrMap.contains(c2)) {
-          attrMap.put(c1, c2)
-          attrMap.put(c2, c1)
+        // Check 2: c1 is compared only against c2 and vice versa.
+        if (attrMap.contains(c1Canonicalized) && attrMap.contains(c2Canonicalized)) {
+          attrMap(c1Canonicalized).equals(c2Canonicalized) &&
+          attrMap(c2Canonicalized).equals(c1Canonicalized)
+        } else if (!attrMap.contains(c1Canonicalized) && !attrMap.contains(c2Canonicalized)) {
+          attrMap.put(c1Canonicalized, c2Canonicalized)
+          attrMap.put(c2Canonicalized, c1Canonicalized)
           true
         } else {
           false
@@ -557,8 +558,4 @@ object JoinIndexRule
     val requiredRightIndexedCols = lIndex.indexedColumns.map(columnMapping)
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
-}
-
-private[rules] object ExtractCanonicalized {
-  def unapply(expr: Expression): Option[Expression] = Some(expr.canonicalized)
 }
