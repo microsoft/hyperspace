@@ -44,11 +44,11 @@ class Hyperspace:
         java_import(self.jvm, "scala.collection.JavaConversions._")
         java_import(self.jvm, "scala.collection.Seq")
         java_import(self.jvm, 'java.util.*')
-        resultArrayList = self.jvm.ArrayList(len(list))
+        result_array_list = self.jvm.ArrayList(len(list))
         for element in list:
-            resultArrayList.add(self.jvm.String(element))
+            result_array_list.add(self.jvm.String(element))
         return self.jvm.scala.collection.JavaConverters.asScalaIteratorConverter(
-            resultArrayList.iterator()).asScala().toSeq()
+            result_array_list.iterator()).asScala().toSeq()
 
     def indexes(self):
         """
@@ -123,7 +123,7 @@ class Hyperspace:
         """
         self.hyperspace.cancel(indexName)
 
-    def explain(self, df, redirectFunc=lambda x: sys.stdout.write(x), verbose=False):
+    def explain(self, df, verbose=False, redirectFunc=lambda x: sys.stdout.write(x)):
         """
         Explains how indexes will be applied to the given dataframe.
         :param df: dataFrame

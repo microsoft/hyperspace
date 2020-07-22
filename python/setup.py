@@ -6,7 +6,5 @@ setuptools.setup(
     description="Python bindings for hyperspace.",
     url="https://github.com/microsoft/hyperspace",
     packages=setuptools.find_packages(),
-    classifiers=[
-    ],
     python_requires='>=2.7',
 )

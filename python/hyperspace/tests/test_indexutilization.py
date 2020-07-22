@@ -51,7 +51,7 @@ class HyperspaceIndexUtilizationTests(HyperspaceTestCase):
                                                           self.spark._jsparkSession,
                                                           self.hyperspace.indexes()._jdf, False)
             self.assertTrue(input == jvmExplainString)
-        self.hyperspace.explain(filter_query, verify_result)
+        self.hyperspace.explain(filter_query, False, verify_result)
 
 hyperspace_test = unittest.TestLoader().loadTestsFromTestCase(HyperspaceIndexUtilizationTests)
 unittest.TextTestRunner(verbosity=3).run(hyperspace_test)

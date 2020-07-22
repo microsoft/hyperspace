@@ -19,3 +19,5 @@ jobs:
         displayName: 'Running $sbt +compile'
       - script: sbt +test
         displayName: 'Running $sbt +test'
+      - script: run-tests.py
+        displayName: 'Running tests'
