@@ -64,12 +64,11 @@ class CreateAction(
     }
   }
 
-  private def isValidIndexSchema(indexConfig: IndexConfig, schema: StructType): Boolean = {
-    val validColumnNames = schema.fieldNames
-    val indexedColumns = indexConfig.indexedColumns
-    val includedColumns = indexConfig.includedColumns
-
-    ResolverUtils.resolve(spark, indexedColumns ++ includedColumns, validColumnNames).isDefined
+  private def isValidIndexSchema(config: IndexConfig, schema: StructType): Boolean = {
+    // Resolve index config columns from available column names present in the schema.
+    ResolverUtils
+      .resolve(spark, config.indexedColumns ++ config.includedColumns, schema.fieldNames)
+      .isDefined
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
