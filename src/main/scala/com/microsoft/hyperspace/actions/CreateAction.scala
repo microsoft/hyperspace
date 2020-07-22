@@ -16,12 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.util.Try
+
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
 import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 class CreateAction(
@@ -33,7 +36,7 @@ class CreateAction(
     extends CreateActionBase(dataManager)
     with Action {
   final override lazy val logEntry: LogEntry =
-  getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
 
   final override val transientState: String = CREATING
 
@@ -72,4 +75,10 @@ class CreateAction(
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
   final override def op(): Unit = write(spark, df, indexConfig)
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.
+    val index = Try(logEntry.asInstanceOf[IndexLogEntry]).toOption
+    CreateActionEvent(appInfo, indexConfig, index, df.queryExecution.logical.toString, message)
+  }
 }

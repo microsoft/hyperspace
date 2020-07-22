@@ -18,7 +18,8 @@ package com.microsoft.hyperspace.actions
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States._
-import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.telemetry.{AppInfo, CancelActionEvent, HyperspaceEvent}
 
 /**
  * Cancelling an action. This action is used if index maintenance operations fail and leave the
@@ -63,4 +64,13 @@ class CancelAction(final override protected val logManager: IndexLogManager) ext
    * TODO: Can be improved to clean up partially created files in previous incomplete operations
    */
   final override def op(): Unit = {}
+
+  final override protected def event(
+      appInfo: AppInfo,
+      message: String): HyperspaceEvent = {
+    CancelActionEvent(
+      appInfo,
+      logEntry.asInstanceOf[IndexLogEntry],
+      message)
+  }
 }
