@@ -264,7 +264,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
           Map())
         entry.state = state
         entry
-      case None => fail // Invalid plan for index dataFrame.
+      case None => fail("Invalid plan for index dataFrame.")
     }
   }
 
