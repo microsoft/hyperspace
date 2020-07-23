@@ -22,7 +22,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -236,15 +236,13 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
           serializedPlan,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(
-              Seq(Signature(
-                LogicalPlanSignatureProvider.create().name,
-                s)))))
+              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
         val sourceFiles = df.queryExecution.optimizedPlan.collect {
           case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              _,
+              _,
+              _) =>
             location.allFiles.map(_.getPath.toString)
         }.flatten
         val sourceDataProperties =
@@ -266,7 +264,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
           Map())
         entry.state = state
         entry
-      case None => throw HyperspaceException("Invalid plan for index dataFrame.")
+      case None => fail // Invalid plan for index dataFrame.
     }
   }
 

@@ -41,14 +41,11 @@ object RuleUtils {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
       val sourcePlanSignature = sourcePlanSignatures.head
-
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature = LogicalPlanSignatureProvider
+      signatureMap.getOrElseUpdate(
+        sourcePlanSignature.provider,
+        LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan)
-        signatureMap.put(sourcePlanSignature.provider, signature)
-      }
-      signatureMap(sourcePlanSignature.provider) match {
+          .signature(plan)) match {
         case Some(s) => s.equals(sourcePlanSignature.value)
         case None => false
       }

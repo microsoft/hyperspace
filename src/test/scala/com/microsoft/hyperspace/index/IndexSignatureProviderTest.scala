@@ -130,7 +130,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private def createIndexSignature(logicalPlan: LogicalPlan): String =
     new IndexSignatureProvider().signature(logicalPlan) match {
       case Some(s) => s
-      case None => throw HyperspaceException("Invalid plan for signature generation.")
+      case None => fail // Invalid plan for signature generation.
     }
 
   private def schemaFromAttributes(attributes: Attribute*): StructType =
