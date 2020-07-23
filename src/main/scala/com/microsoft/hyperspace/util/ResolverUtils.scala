@@ -29,7 +29,7 @@ object ResolverUtils {
    *
    * @param resolver Resolver.
    * @param requiredString The string that requires resolution.
-   * @param availableString Available list of strings to resolve from.
+   * @param availableString Available string to resolve from.
    * @return Optional available string if resolution is successful, else None
    */
   def resolve(
@@ -45,7 +45,7 @@ object ResolverUtils {
    *
    * @param spark Spark session.
    * @param requiredString The string that requires resolution.
-   * @param availableStrings All available strings to find a match from.
+   * @param availableStrings All available strings to resolve from.
    * @return First matching (i.e. resolved) string from availableStrings. If no match is found,
    *         return None.
    */
@@ -62,7 +62,7 @@ object ResolverUtils {
    *
    * @param spark Spark session.
    * @param requiredStrings List of strings to resolve.
-   * @param availableStrings List of available strings to resolve from.
+   * @param availableStrings All available strings to resolve from.
    * @return Sequence of optional values of resolved strings or None's.
    */
   def resolve(
