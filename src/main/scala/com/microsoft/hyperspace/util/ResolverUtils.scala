@@ -63,7 +63,7 @@ object ResolverUtils {
    * @param spark Spark session.
    * @param requiredStrings List of strings to resolve.
    * @param availableStrings All available strings to resolve from.
-   * @return Sequence of optional values of resolved strings or None's.
+   * @return Optional Seq of resolved strings if all required strings are resolved. Else, None.
    */
   def resolve(
       spark: SparkSession,
