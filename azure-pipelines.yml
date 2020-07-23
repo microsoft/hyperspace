@@ -19,3 +19,19 @@ jobs:
         displayName: 'Running $sbt +compile'
       - script: sbt +test
         displayName: 'Running $sbt +test'
+
+      # If not a pull request, publish artifacts.
+      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+        - script: sbt +package
+          displayName: 'Running $sbt +package'
+        - task: CopyFiles@2
+          displayName: 'Copy hyperspace-core JAR'
+          inputs:
+            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            contents: '**/*.jar'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish Hyperspace artifacts'
+          inputs:
+            artifactName: 'hyperspace-core'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
