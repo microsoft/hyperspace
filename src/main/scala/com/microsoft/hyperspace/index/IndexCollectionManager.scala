@@ -139,6 +139,7 @@ object IndexCollectionManager {
  * Case class representing index summary
  *
  * TODO: Finalize about adding these: data location, signatures, file lists etc.
+ *
  * @param name index name
  * @param indexedColumns indexed columns
  * @param includedColumns included columns

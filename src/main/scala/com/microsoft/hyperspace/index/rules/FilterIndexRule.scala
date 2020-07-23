@@ -98,7 +98,6 @@ object FilterIndexRule
       filterColumns: Seq[String],
       logicalRelation: LogicalRelation,
       fsRelation: HadoopFsRelation): Filter = {
-
     val candidateIndexes =
       findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
     rank(candidateIndexes) match {
@@ -150,18 +149,23 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
-    val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, filter)
+    RuleUtils.getLogicalRelation(filter) match {
+      case Some(r) =>
+        val indexManager = Hyperspace
+          .getContext(spark)
+          .indexCollectionManager
+        val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, r)
 
-    candidateIndexes.filter { index =>
-      indexCoversPlan(
-        outputColumns,
-        filterColumns,
-        index.indexedColumns,
-        index.includedColumns,
-        fsRelation.fileFormat)
+        candidateIndexes.filter { index =>
+          indexCoversPlan(
+            outputColumns,
+            filterColumns,
+            index.indexedColumns,
+            index.includedColumns,
+            fsRelation.fileFormat)
+        }
+
+      case None => Nil // There is zero or more than one LogicalRelation nodes in Filter's subplan
     }
   }
 

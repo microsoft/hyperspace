@@ -18,7 +18,8 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project}
+import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
@@ -92,5 +93,25 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     indexManager.delete("t1i1")
 
     assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode).length === 2)
+  }
+
+  test("Verify get logical relation for single logical relation node plan.") {
+    validateLogicalRelation(t1ScanNode, t1ScanNode)
+  }
+
+  test("Verify get logical relation for multi-node linear plan.") {
+    validateLogicalRelation(t1ProjectNode, t1ScanNode)
+  }
+
+  test("Verify get logical relation for non-linear plan.") {
+    val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
+    val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
+    assert(r.isEmpty)
+  }
+
+  private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
+    val r = RuleUtils.getLogicalRelation(plan)
+    assert(r.isDefined)
+    assert(r.get.equals(expected))
   }
 }
