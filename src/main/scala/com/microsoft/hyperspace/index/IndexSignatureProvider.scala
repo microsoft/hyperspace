@@ -41,10 +41,11 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
    * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
    *         can generate signature for the logical plan; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String] =
+  def signature(logicalPlan: LogicalPlan): Option[String] = {
     fileBasedSignatureProvider.signature(logicalPlan).flatMap { f =>
       planSignatureProvider.signature(logicalPlan).map { p =>
         HashingUtils.md5Hex(f + p)
       }
     }
+  }
 }

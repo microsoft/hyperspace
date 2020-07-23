@@ -35,7 +35,7 @@ object RuleUtils {
    */
   def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
-    val signatureMap = mutable.Map[String, String]()
+    val signatureMap = mutable.Map[String, Option[String]]()
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
@@ -43,15 +43,15 @@ object RuleUtils {
       val sourcePlanSignature = sourcePlanSignatures.head
 
       if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        LogicalPlanSignatureProvider
+        val signature = LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan) match {
-          case Some(s) =>
-            signatureMap.put(sourcePlanSignature.provider, s)
-          case None => return false
-        }
+          .signature(plan)
+        signatureMap.put(sourcePlanSignature.provider, signature)
       }
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
+      signatureMap(sourcePlanSignature.provider) match {
+        case Some(s) => s.equals(sourcePlanSignature.value)
+        case None => false
+      }
     }
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update

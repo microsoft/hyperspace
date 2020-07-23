@@ -166,9 +166,7 @@ object FilterIndexRule
             fsRelation.fileFormat)
         }
 
-      case None =>
-        // There is zero or more than one LogicalRelation nodes in Filter's subplan
-        Seq[IndexLogEntry]()
+      case None => Nil // There is zero or more than one LogicalRelation nodes in Filter's subplan
     }
   }
 
