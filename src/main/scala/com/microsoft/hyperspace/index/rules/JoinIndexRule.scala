@@ -64,12 +64,16 @@ object JoinIndexRule
               val updatedPlan = join
                 .copy(left = getReplacementPlan(lIndex, l), right = getReplacementPlan(rIndex, r))
 
-              logEvent(HyperspaceIndexUsageEvent(
-                AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
-                Seq(lIndex, rIndex),
-                join.toString,
-                updatedPlan.toString,
-                "Join index rule applied."))
+              logEvent(
+                HyperspaceIndexUsageEvent(
+                  AppInfo(
+                    sparkContext.sparkUser,
+                    sparkContext.applicationId,
+                    sparkContext.appName),
+                  Seq(lIndex, rIndex),
+                  join.toString,
+                  updatedPlan.toString,
+                  "Join index rule applied."))
 
               updatedPlan
           }
@@ -102,17 +106,19 @@ object JoinIndexRule
       .getContext(spark)
       .indexCollectionManager
 
-    val lIndexes = RuleUtils.getCandidateIndexes(indexManager, left)
-    if (lIndexes.isEmpty) {
+    val lIndexes =
+      RuleUtils.getLogicalRelation(left).map(RuleUtils.getCandidateIndexes(indexManager, _))
+    if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
 
-    val rIndexes = RuleUtils.getCandidateIndexes(indexManager, right)
-    if (rIndexes.isEmpty) {
+    val rIndexes =
+      RuleUtils.getLogicalRelation(right).map(RuleUtils.getCandidateIndexes(indexManager, _))
+    if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }
 
-    getBestIndexPair(left, right, condition, lIndexes, rIndexes)
+    getBestIndexPair(left, right, condition, lIndexes.get, rIndexes.get)
   }
 
   /**

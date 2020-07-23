@@ -114,7 +114,8 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
   test("Join rule does not update plan if index location is not set") {
     withSQLConf(IndexConstants.INDEX_SYSTEM_PATH -> "") {
       val joinCondition = EqualTo(t1c1, t2c1)
-      val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val originalPlan =
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
       val updatedPlan = JoinIndexRule(originalPlan)
       assert(updatedPlan.equals(originalPlan))
     }

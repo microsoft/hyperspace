@@ -20,6 +20,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -60,30 +61,31 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val serializedPlan =
       LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
 
-    val sourcePlanProperties = SparkPlan.Properties(
-      serializedPlan,
-      LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(
-          Seq(
-            Signature(
-              signatureProvider.name,
-              signatureProvider.signature(df.queryExecution.optimizedPlan))))))
+    signatureProvider.signature(df.queryExecution.optimizedPlan) match {
+      case Some(s) =>
+        val sourcePlanProperties = SparkPlan.Properties(
+          serializedPlan,
+          LogicalPlanFingerprint(
+            LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
-    // Note: Source files are fingerprinted as part of the serialized logical plan currently.
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
+        // Note: Source files are fingerprinted as part of the serialized logical plan currently.
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
 
-    IndexLogEntry(
-      indexConfig.indexName,
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
-          IndexLogEntry.schemaString(schema),
-          numBuckets)),
-      Content(path.toString, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-      Map())
+        IndexLogEntry(
+          indexConfig.indexName,
+          CoveringIndex(
+            CoveringIndex.Properties(
+              CoveringIndex.Properties
+                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+              IndexLogEntry.schemaString(schema),
+              numBuckets)),
+          Content(path.toString, Seq()),
+          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Map())
+
+      case None => throw HyperspaceException("Invalid plan for creating an index.")
+    }
   }
 
   protected def sourceFiles(df: DataFrame): Seq[String] =

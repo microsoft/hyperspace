@@ -23,6 +23,7 @@ import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StructField, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, HyperspaceSuite, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
 import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
@@ -34,45 +35,48 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
       includedCols: Seq[AttributeReference],
       plan: LogicalPlan): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
-    val sign: LogicalPlan => String = LogicalPlanSignatureProvider.create(signClass).signature
 
-    val sourcePlanProperties = SparkPlan.Properties(
-      LogicalPlanSerDeUtils.serialize(plan, spark),
-      LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature(signClass, sign(plan))))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
+    LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
+      case Some(s) =>
+        val sourcePlanProperties = SparkPlan.Properties(
+          LogicalPlanSerDeUtils.serialize(plan, spark),
+          LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
-    val indexLogEntry = IndexLogEntry(
-      name,
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(indexCols.map(_.name), includedCols.map(_.name)),
-          IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-          10)),
-      Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
-      Map())
+        val indexLogEntry = IndexLogEntry(
+          name,
+          CoveringIndex(
+            CoveringIndex.Properties(
+              CoveringIndex.Properties
+                .Columns(indexCols.map(_.name), includedCols.map(_.name)),
+              IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
+              10)),
+          Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
+          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Map())
 
-    val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
-    indexLogEntry.state = Constants.States.ACTIVE
-    logManager.writeLog(0, indexLogEntry)
-    indexLogEntry
+        val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
+        indexLogEntry.state = Constants.States.ACTIVE
+        logManager.writeLog(0, indexLogEntry)
+        indexLogEntry
+
+      case None => throw HyperspaceException("Invalid plan for index dataFrame.")
+    }
   }
 
   def getIndexDataFilesPath(indexName: String): Path =
-    new Path(new Path(systemPath, indexName), s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    new Path(
+      new Path(systemPath, indexName),
+      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
   def schemaFromAttributes(attributes: Attribute*): StructType =
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
 
-  def baseRelation(location: FileIndex, schema: StructType): HadoopFsRelation = {
+  def baseRelation(location: FileIndex, schema: StructType): HadoopFsRelation =
     HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
       spark)
-  }
 
   def getIndexRootPath(indexName: String): Path =
     new Path(systemPath, indexName)
 }
-
