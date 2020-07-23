@@ -23,13 +23,12 @@ import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
 object RuleTestHelper {
   class TestSignatureProvider extends LogicalPlanSignatureProvider {
-    def signature(plan: LogicalPlan): String =
+    def signature(plan: LogicalPlan): Option[String] =
       plan
         .collectFirst {
           case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
             location.hashCode()
         }
-        .get
-        .toString
+        .map(_.toString)
   }
 }

@@ -34,9 +34,9 @@ trait LogicalPlanSignatureProvider {
    * Interface that provides the signature of logical plan.
    *
    * @param logicalPlan logical plan.
-   * @return signature.
+   * @return signature if it can be computed w.r.t signature provider assumptions; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): String
+  def signature(logicalPlan: LogicalPlan): Option[String]
 }
 
 /**
@@ -44,7 +44,7 @@ trait LogicalPlanSignatureProvider {
  */
 object LogicalPlanSignatureProvider {
   // Creates a default signature provider.
-  def create(): LogicalPlanSignatureProvider = new FileBasedSignatureProvider
+  def create(): LogicalPlanSignatureProvider = new IndexSignatureProvider
 
   /**
    * Creates a parameterized signature provider.

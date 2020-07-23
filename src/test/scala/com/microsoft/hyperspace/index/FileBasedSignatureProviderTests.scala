@@ -16,17 +16,10 @@
 
 package com.microsoft.hyperspace.index
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.SparkInvolvedSuite
+import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 
 class FileBasedSignatureProviderTests extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength = 100
@@ -117,35 +110,13 @@ class FileBasedSignatureProviderTests extends SparkFunSuite with SparkInvolvedSu
     intercept[IllegalArgumentException](LogicalPlanSignatureProvider.create("randomProvider"))
   }
 
-  private def createFileStatus(length: Long, modificationTime: Long, path: Path): FileStatus = {
-    new FileStatus(length, false, 0, 0, modificationTime, path)
-  }
+  private def createFileStatus(length: Long, modificationTime: Long, path: Path): FileStatus =
+    SignatureProviderTestUtils.createFileStatus(length, modificationTime, path)
 
-  private def createFileBasedSignature(files: Seq[FileStatus]): String = {
-    new FileBasedSignatureProvider().signature(createLogicalRelation(files))
-  }
-
-  private def createLogicalRelation(fileStatuses: Seq[FileStatus]): LogicalRelation = {
-    val fileIndex = new MockPartitioningAwareFileIndex(spark, fileStatuses)
-    LogicalRelation(
-      HadoopFsRelation(
-        fileIndex,
-        partitionSchema = StructType(Seq()),
-        dataSchema = StructType(Seq()),
-        bucketSpec = None,
-        new ParquetFileFormat,
-        CaseInsensitiveMap(Map.empty))(spark))
-  }
-
-  private class MockPartitioningAwareFileIndex(sparkSession: SparkSession, files: Seq[FileStatus])
-      extends PartitioningAwareFileIndex(sparkSession, Map.empty, None) {
-    override def partitionSpec(): PartitionSpec = PartitionSpec(StructType(Seq()), Seq())
-    override protected def leafFiles: mutable.LinkedHashMap[Path, FileStatus] =
-      throw new NotImplementedError
-    override protected def leafDirToChildrenFiles: Map[Path, Array[FileStatus]] =
-      throw new NotImplementedError
-    override def rootPaths: Seq[Path] = throw new NotImplementedError
-    override def refresh(): Unit = throw new NotImplementedError
-    override def allFiles: Seq[FileStatus] = files
-  }
+  private def createFileBasedSignature(files: Seq[FileStatus]): String =
+    new FileBasedSignatureProvider()
+      .signature(SignatureProviderTestUtils.createLogicalRelation(spark, files)) match {
+      case Some(s) => s
+      case None => throw HyperspaceException("Invalid plan for signature generation.")
+    }
 }

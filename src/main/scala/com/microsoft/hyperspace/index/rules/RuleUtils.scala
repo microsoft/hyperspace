@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
@@ -34,20 +35,20 @@ object RuleUtils {
    */
   def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
-    val signatureMap = mutable.Map[String, String]()
+    val signatureMap = mutable.Map[String, Option[String]]()
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
       val sourcePlanSignature = sourcePlanSignatures.head
-
-      if (!signatureMap.contains(sourcePlanSignature.provider)) {
-        val signature = LogicalPlanSignatureProvider
+      signatureMap.getOrElseUpdate(
+        sourcePlanSignature.provider,
+        LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan)
-        signatureMap.put(sourcePlanSignature.provider, signature)
+          .signature(plan)) match {
+        case Some(s) => s.equals(sourcePlanSignature.value)
+        case None => false
       }
-      signatureMap(sourcePlanSignature.provider).equals(sourcePlanSignature.value)
     }
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
@@ -55,5 +56,20 @@ object RuleUtils {
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
     allIndexes.filter(index => index.created && signatureValid(index))
+  }
+
+  /**
+   * Extract the LogicalRelation node if the given logical plan is linear.
+   *
+   * @param logicalPlan given logical plan to extract LogicalRelation from.
+   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
+   */
+  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
+    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
+    if (lrs.length == 1) {
+      Some(lrs.head)
+    } else {
+      None // logicalPlan is non-linear or it has no LogicalRelation.
+    }
   }
 }
