@@ -2,10 +2,12 @@ import unittest
 import tempfile
 import shutil
 import os
+import sys
 
 from pyspark.sql import SparkSession
+
 from hyperspace import *
-from testing.utils import HyperspaceTestCase
+from hyperspace.testing.utils import HyperspaceTestCase
 
 
 class HyperspaceIndexManagementTests(HyperspaceTestCase):
@@ -68,4 +70,5 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         self.assertEqual(self.hyperspace.indexes().filter("""name = "idx4" """).count(), 0)
 
 hyperspace_test = unittest.TestLoader().loadTestsFromTestCase(HyperspaceIndexManagementTests)
-unittest.TextTestRunner(verbosity=3).run(hyperspace_test)
+result = unittest.TextTestRunner(verbosity=3).run(hyperspace_test)
+sys.exit(not result.wasSuccessful())

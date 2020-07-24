@@ -1,8 +1,8 @@
 import unittest
+import sys
 
 from pyspark import SparkContext, SparkConf
 from pyspark.sql import SparkSession
-import sys
 
 
 class HyperspaceTestCase(unittest.TestCase):

@@ -9,9 +9,9 @@ from hyperspace import *
 class Hyperspace:
     def __init__(self, spark):
         """
-        Initializes hyperspace object.
+        Initializes Hyperspace object.
         :param spark: sparkSession object
-        :return: hyperspace object
+        :return: Hyperspace object
 
         >>> hyperspace = Hyperspace(spark)
         """
@@ -28,9 +28,11 @@ class Hyperspace:
         >>> _getJavaIndexConfig(idx_config)
         """
         indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
+        print(indexed_columns)
         included_columns = self._getScalaSeqFromList(index_config.includedColumns)
+        print(included_columns)
         _jindexConfig = self.jvm.com.microsoft.hyperspace.index.IndexConfig(
-                     self.jvm.String(index_config.indexName), indexed_columns, included_columns)
+                     self.jvm.java.lang.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig
 
     def _getScalaSeqFromList(self, list):
@@ -141,7 +143,7 @@ class Hyperspace:
     @staticmethod
     def enable(spark):
         """
-        Enables hyperspace index usage on given spark session.
+        Enables Hyperspace index usage on given spark session.
         :param spark: sparkSession
 
         >>> Hyperspace.enable(spark)
@@ -152,7 +154,7 @@ class Hyperspace:
     @staticmethod
     def disable(spark):
         """
-        Disables hyperspace index usage on given spark session.
+        Disables Hyperspace index usage on given spark session.
         :param spark: sparkSession
 
         >>> Hyperspace.disable(spark)
@@ -163,7 +165,7 @@ class Hyperspace:
     @staticmethod
     def isEnabled(spark):
         """
-        Checks if hyperspace is enabled or not.
+        Checks if Hyperspace is enabled or not.
         :param spark: sparkSession
 
         >>> Hyperspace.isEnabled(spark)

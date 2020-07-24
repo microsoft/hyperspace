@@ -1,5 +1,5 @@
-from hyperspace.hyperspace import Hyperspace
-from hyperspace.indexconfig import IndexConfig
+from hyperspace import Hyperspace
+from indexconfig import IndexConfig
 
 __all__ = [
     'Hyperspace', 'IndexConfig'

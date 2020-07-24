@@ -14,30 +14,45 @@
  * limitations under the License.
  */
 
+/***************************
+* Spark Packages settings *
+***************************/
+ 
+sparkVersion := "2.4.2"
+
 name := "hyperspace-core"
+
+spName := "hyperspace-core"
+
+spAppendScalaVersion := true
+
+spIncludeMaven := true
+
+spIgnoreProvided := true
+
+packageBin in Compile := spPackage.value
 
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
 lazy val supportedScalaVersions = List(scala212, scala211)
-
-lazy val sparkVersion = "2.4.2"
+lazy val spkVer = "2.4.2"
 
 scalaVersion := scala212
 
 crossScalaVersions := supportedScalaVersions
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided" withSources(),
-  "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion % "provided" withSources(),
+  "org.apache.spark" %% "spark-sql" % spkVer % "provided" withSources(),
+  "org.apache.spark" %% "spark-core" % spkVer % "provided" withSources(),
+  "org.apache.spark" %% "spark-catalyst" % spkVer % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion % "test" classifier "tests",
-  "org.apache.spark" %% "spark-core" % sparkVersion % "test" classifier "tests",
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "test" classifier "tests",
-  "org.apache.spark" %% "spark-hive" % sparkVersion % "test" classifier "tests"
+  "org.apache.spark" %% "spark-catalyst" % spkVer % "test" classifier "tests",
+  "org.apache.spark" %% "spark-core" % spkVer % "test" classifier "tests",
+  "org.apache.spark" %% "spark-sql" % spkVer % "test" classifier "tests",
+  "org.apache.spark" %% "spark-hive" % spkVer % "test" classifier "tests"
 )
 
 scalacOptions ++= Seq(

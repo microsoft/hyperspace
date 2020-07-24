@@ -54,15 +54,17 @@ def test(root_dir, package):
                   if os.path.isfile(os.path.join(test_dir, f)) and
                   f.endswith(".py") and not f.startswith("_")]
     extra_class_path = path.join(python_root_dir, path.join("hyperspace", "testing"))
-
     for test_file in test_files:
         try:
-            cmd = ["spark-submit",
+            my_env = os.environ.copy()
+            my_env["SPARK_HOME"] = os.path.join(root_dir, "spark-2.4.2-bin-hadoop2.7")
+            my_env["PATH"] = os.path.join(root_dir, os.path.join("spark-2.4.2-bin-hadoop2.7","bin")) + ":" + my_env["PATH"]
+            cmd = ["spark-2.4.2-bin-hadoop2.7/bin/spark-submit",
                    "--driver-class-path=%s" % extra_class_path,
+                   "--jars=%s" % extra_class_path,
                    "--packages", package, test_file]
             print("Running tests in %s\n=============" % test_file)
-            print("Command: %s" % str(cmd))
-            run_cmd(cmd, stream_output=True)
+            run_cmd(cmd, stream_output=True, env=my_env)
         except:
             print("Failed tests in %s" % (test_file))
             raise
@@ -76,15 +78,11 @@ def delete_if_exists(path):
 
 
 def prepare(root_dir):
-    # Build package with python files in it
-    sbt_path = path.join(root_dir, path.join("build", "sbt"))
+    sbt_path = "sbt"
     delete_if_exists(os.path.expanduser("~/.ivy2/cache/com/microsoft/hyperspace"))
     delete_if_exists(os.path.expanduser("~/.m2/repository/com/microsoft/hyperspace"))
     run_cmd([sbt_path, "clean", "publishM2"], stream_output=True)
-
-    # Get current release which is required to be loaded
-    version = '0.1.0'
-    package = "com.microsoft:hyperspace-core_2.12:" + version
+    package = "com.microsoft.hyperspace:hyperspace-core_2.12:0.2.0-SNAPSHOT"
     return package
 
 
@@ -122,5 +120,4 @@ def run_python_style_checks(root_dir):
 if __name__ == "__main__":
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     package = prepare(root_dir)
-    run_python_style_checks(root_dir)
     test(root_dir, package)

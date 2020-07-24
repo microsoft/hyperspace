@@ -2,10 +2,12 @@ import unittest
 import tempfile
 import shutil
 import os
+import sys
+
+from pyspark.sql import SQLContext
 
 from hyperspace import *
-from testing.utils import HyperspaceTestCase
-from pyspark.sql import SQLContext
+from hyperspace.testing.utils import HyperspaceTestCase
 
 
 class HyperspaceIndexUtilizationTests(HyperspaceTestCase):
@@ -54,4 +56,5 @@ class HyperspaceIndexUtilizationTests(HyperspaceTestCase):
         self.hyperspace.explain(filter_query, False, verify_result)
 
 hyperspace_test = unittest.TestLoader().loadTestsFromTestCase(HyperspaceIndexUtilizationTests)
-unittest.TextTestRunner(verbosity=3).run(hyperspace_test)
+result = unittest.TextTestRunner(verbosity=3).run(hyperspace_test)
+sys.exit(not result.wasSuccessful())
