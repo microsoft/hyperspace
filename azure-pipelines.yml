@@ -23,8 +23,8 @@ jobs:
         inputs:
           filePath: 'download_spark.sh'
         displayName: 'Downloading spark'
-      - script: run-tests.py
-        displayName: 'Running tests'
+      - script: python run-tests.py
+        displayName: 'Running python tests'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
         - script: sbt +package
