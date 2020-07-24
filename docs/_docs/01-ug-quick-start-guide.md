@@ -55,7 +55,7 @@ To use Hyperspace with a Spark's interactive shell, you need to download/install
 Start the Spark Scala shell as follows:
 
 ```
-./bin/spark-shell --packages com.microsoft:hyperspace-core_2.11:0.1.0
+./bin/spark-shell --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.1.0
 ```
 
 #### PySpark
@@ -92,6 +92,8 @@ val hs = new Hyperspace(spark)
 To create a Hyperspace Index, specify a `DataFrame` along with index configurations. `indexedColumns` are the column names used for join or filter operations, and `includedColumns` are the ones used for project operations. In this example, we will have a query that filters on the `id` column and projects the `name` column.
 
 ```scala
+import com.microsoft.hyperspace.index._
+
 hs.createIndex(df, IndexConfig("index", indexedColumns = Seq("id"), includedColumns = Seq("name")))
 ```
 
@@ -146,5 +148,5 @@ Now that you have created an index that your query can utilize, you can enable H
 
 ```scala
 spark.enableHyperspace
-query.show 
+query.show
 ```

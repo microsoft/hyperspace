@@ -26,6 +26,7 @@ import com.microsoft.hyperspace.util.HashingUtils
  * [[FileBasedSignatureProvider]] provides the logical plan signature based on files in the
  * logical relation. File metadata, eg. size, modification time and path, of each file in the
  * FileIndex will be used to generate the signature.
+ * If the logical plan does not have any LogicalRelation operator, no signature is provided.
  */
 class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
 
@@ -33,19 +34,19 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Generate the signature of logical plan.
    *
    * @param logicalPlan logical plan of data frame.
-   * @return signature.
+   * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): String = {
-    HashingUtils.md5Hex(fingerprintVisitor(logicalPlan))
+  def signature(logicalPlan: LogicalPlan): Option[String] = {
+    fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
   }
 
   /**
    * Visit logical plan and collect info needed for fingerprint.
    *
    * @param logicalPlan logical plan of data frame.
-   * @return fingerprint.
+   * @return fingerprint, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
-  private def fingerprintVisitor(logicalPlan: LogicalPlan): String = {
+  private def fingerprintVisitor(logicalPlan: LogicalPlan): Option[String] = {
     var fingerprint = ""
     logicalPlan.foreachUp {
       // Currently we are only collecting plan fingerprint from hdfs file based scan nodes.
@@ -59,7 +60,11 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
             HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus)))
       case _ =>
     }
-    fingerprint
+
+    fingerprint match {
+      case "" => None
+      case _ => Some(fingerprint)
+    }
   }
 
   /**

@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace
 
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
-
-object RuleTestHelper {
-  class TestSignatureProvider extends LogicalPlanSignatureProvider {
-    def signature(plan: LogicalPlan): Option[String] =
-      plan
-        .collectFirst {
-          case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
-            location.hashCode()
-        }
-        .map(_.toString)
+trait ActiveSparkSession {
+  def spark: SparkSession = {
+    SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No active spark session found")
+    }
   }
+
+  def sparkContext: SparkContext = spark.sparkContext
 }
