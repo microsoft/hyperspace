@@ -84,7 +84,7 @@ class IndexCollectionManager(
       .toDF()
   }
 
-  def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
+  override def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
     indexLogManagers
       .map(_.getLatestLog())
       .filter(_.isDefined)
@@ -139,6 +139,7 @@ object IndexCollectionManager {
  * Case class representing index summary
  *
  * TODO: Finalize about adding these: data location, signatures, file lists etc.
+ *
  * @param name index name
  * @param indexedColumns indexed columns
  * @param includedColumns included columns

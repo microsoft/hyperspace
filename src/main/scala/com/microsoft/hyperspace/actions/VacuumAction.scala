@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.actions
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{DELETED, DOESNOTEXIST, VACUUMING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, VacuumActionEvent}
 
 class VacuumAction(
     final override protected val logManager: IndexLogManager,
@@ -48,5 +49,9 @@ class VacuumAction(
         dataManager.delete(id)
       }
     }
+  }
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    VacuumActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }
