@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
@@ -44,10 +45,16 @@ class RefreshAction(
 
   // Deserialize the plan and create a df.
   private lazy val df = {
-    val serializedPlan = previousIndexLogEntry.source.plan.properties.rawPlan
-    val plan = LogicalPlanSerDeUtils.deserialize(serializedPlan, spark)
-    val qe = spark.sessionState.executePlan(plan)
-    new Dataset[Row](spark, plan, RowEncoder(qe.analyzed.schema))
+    if (previousIndexLogEntry.relation.isDefined) {
+      val relation = previousIndexLogEntry.relation.get
+      val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
+      spark.read.schema(dataSchema).load(relation.files: _*)
+    } else {
+      val serializedPlan = previousIndexLogEntry.source.plan.properties.rawPlan
+      val plan = LogicalPlanSerDeUtils.deserialize(serializedPlan, spark)
+      val qe = spark.sessionState.executePlan(plan)
+      new Dataset[Row](spark, plan, RowEncoder(qe.analyzed.schema))
+    }
   }
 
   private lazy val indexConfig: IndexConfig = {
@@ -56,7 +63,7 @@ class RefreshAction(
   }
 
   final override lazy val logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override val transientState: String = REFRESHING
 

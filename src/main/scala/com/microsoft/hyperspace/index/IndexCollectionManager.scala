@@ -168,7 +168,7 @@ private[hyperspace] object IndexSummary {
       entry.numBuckets,
       entry.derivedDataset.properties.schemaString,
       entry.content.root,
-      entry.plan(spark).toString,
+      entry.derivedDataset.properties.schemaString, // TODO
       entry.state)
   }
 }

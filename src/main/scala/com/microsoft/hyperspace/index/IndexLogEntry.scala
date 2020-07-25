@@ -16,12 +16,10 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.index.Content.Directory
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -29,10 +27,16 @@ case class NoOpFingerprint() {
   val properties: Map[String, String] = Map()
 }
 
+case class RelationMetadataEntry(files: Seq[String], dataSchemaJson: String, fileFormat: String)
+
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: String, directories: Seq[Content.Directory])
 object Content {
-  case class Directory(path: String, files: Seq[String], fingerprint: NoOpFingerprint)
+  case class Directory(
+      path: String,
+      files: Seq[String],
+      relations: Seq[RelationMetadataEntry],
+      fingerprint: NoOpFingerprint)
 }
 
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.
@@ -94,11 +98,17 @@ case class IndexLogEntry(
 
   def includedColumns: Seq[String] = derivedDataset.properties.columns.included
 
-  def numBuckets: Int = derivedDataset.properties.numBuckets
-
-  def plan(spark: SparkSession): LogicalPlan = {
-    LogicalPlanSerDeUtils.deserialize(source.plan.properties.rawPlan, spark)
+  def relation: Option[RelationMetadataEntry] = {
+    source.data(0).properties.content.directories(0) match {
+      case dir: Directory =>
+        // Currently we only support to create an index on LogicalRelation
+        assert(dir.relations.size == 1)
+        Some(dir.relations(0))
+      case null => None
+    }
   }
+
+  def numBuckets: Int = derivedDataset.properties.numBuckets
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 

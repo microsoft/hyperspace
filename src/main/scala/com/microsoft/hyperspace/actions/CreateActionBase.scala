@@ -40,8 +40,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
-      path: Path,
-      sourceFiles: Seq[String]): IndexLogEntry = {
+      path: Path): IndexLogEntry = {
     val numBuckets = spark.sessionState.conf
       .getConfString(
         IndexConstants.INDEX_NUM_BUCKETS,
@@ -58,8 +57,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     // Here we use the unanalyzed logical plan returned by the parser, before analysis and
     // optimization. Analyzed and optimized plans have additional ser/de issues that are not
     // fully covered by the current ser/de framework.
-    val serializedPlan =
-      LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
+    val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
@@ -70,7 +68,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
         // Note: Source files are fingerprinted as part of the serialized logical plan currently.
         val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
+          Hdfs.Properties(
+            Content(
+              "",
+              Seq(
+                Content.Directory("", sourceFiles(df), sourceRelations(df), NoOpFingerprint()))))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -91,12 +93,25 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def sourceFiles(df: DataFrame): Seq[String] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        location.allFiles.map(_.getPath.toString)
+      HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+      _,
+      _,
+      _) =>
+      location.allFiles.map(_.getPath.toString)
     }.flatten
+
+  protected def sourceRelations(df: DataFrame): Seq[RelationMetadataEntry] =
+    df.queryExecution.optimizedPlan.collect {
+      case LogicalRelation(
+      HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
+      _,
+      _,
+      _) =>
+        RelationMetadataEntry(
+          location.allFiles.map(_.getPath.toString),
+          dataSchema.json,
+          fileFormat.toString())
+    }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = spark.sessionState.conf
