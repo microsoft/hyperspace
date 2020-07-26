@@ -45,12 +45,6 @@ import string
 import tempfile
 
 
-def run_sbt_tests(root_dir):
-    print("##### Running SBT tests #####")
-    sbt_path = path.join(root_dir, path.join("build", "sbt"))
-    run_cmd([sbt_path, "clean", "test"], stream_output=True)
-
-
 def run_python_tests(root_dir):
     print("##### Running Python tests #####")
     python_test_script = path.join(root_dir, path.join("python", "run-tests.py"))

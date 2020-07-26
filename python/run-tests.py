@@ -58,7 +58,7 @@ def test(root_dir, package):
         try:
             my_env = os.environ.copy()
             my_env["SPARK_HOME"] = os.path.join(root_dir, "spark-2.4.2-bin-hadoop2.7")
-            my_env["PATH"] = os.path.join(root_dir, os.path.join("spark-2.4.2-bin-hadoop2.7","bin")) + ":" + my_env["PATH"]
+            my_env["PATH"] = os.path.join(root_dir, os.path.join("spark-2.4.2-bin-hadoop2.7", "bin")) + ":" + my_env["PATH"]
             cmd = ["spark-2.4.2-bin-hadoop2.7/bin/spark-submit",
                    "--driver-class-path=%s" % extra_class_path,
                    "--jars=%s" % extra_class_path,
