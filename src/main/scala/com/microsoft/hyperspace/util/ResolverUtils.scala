@@ -57,8 +57,8 @@ object ResolverUtils {
   }
 
   /**
-   * Finds all resolved strings for requiredStrings, from the list of availableStrings. Returns a
-   * sequence of Optional values for matches, None for unmatched strings.
+   * Finds all resolved strings for requiredStrings, from the list of availableStrings. Returns
+   * optional seq of resolved strings if all required strings are resolved, otherwise None.
    *
    * @param spark Spark session.
    * @param requiredStrings List of strings to resolve.
@@ -69,7 +69,6 @@ object ResolverUtils {
       spark: SparkSession,
       requiredStrings: Seq[String],
       availableStrings: Seq[String]): Option[Seq[String]] = {
-    val resolved = requiredStrings.map(resolve(spark, _, availableStrings))
-    if (resolved.forall(_.nonEmpty)) Some(resolved.map(_.get)) else None
+    Some(requiredStrings.map(resolve(spark, _, availableStrings).getOrElse { return None }))
   }
 }

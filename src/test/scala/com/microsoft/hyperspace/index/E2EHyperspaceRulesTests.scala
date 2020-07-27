@@ -99,7 +99,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
 
     def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
 
-    // verify if case-insensitive index works with case-insensitive query
+    // Verify if case-insensitive index works with case-insensitive query.
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
   }
 

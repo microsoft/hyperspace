@@ -20,11 +20,12 @@ import scala.collection.mutable.WrappedArray
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
-class CreateIndexTests extends HyperspaceSuite {
+class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -58,7 +59,7 @@ class CreateIndexTests extends HyperspaceSuite {
 
   test("Creating one index.") {
     hyperspace.createIndex(df, indexConfig1)
-    val count = hyperspace.indexes.where(s"""name = "${indexConfig1.indexName}" """).count
+    val count = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ").count
     assert(count == 1)
   }
 
@@ -87,18 +88,18 @@ class CreateIndexTests extends HyperspaceSuite {
 
   test("Index creation passes with columns of different case if case-sensitivity is false.") {
     hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
-    val indexes = hyperspace.indexes.where(s"""name = "${indexConfig1.indexName}" """)
+    val indexes = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ")
     assert(indexes.count == 1)
     assert(
-      indexes.head.getAs[WrappedArray[String]]("indexedColumns").head.equals("Query"),
+      indexes.head.getAs[WrappedArray[String]]("indexedColumns").head == "Query",
       "Indexed columns with wrong case are stored in metadata")
     assert(
-      indexes.head.getAs[WrappedArray[String]]("includedColumns").head.equals("imprs"),
+      indexes.head.getAs[WrappedArray[String]]("includedColumns").head == "imprs",
       "Included columns with wrong case are stored in metadata")
   }
 
   test("Index creation fails with columns of different case if case-sensitivity is true.") {
-    withSparkConf("spark.sql.caseSensitive", true) {
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
       val exception = intercept[HyperspaceException] {
         hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
       }
