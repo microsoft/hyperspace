@@ -93,20 +93,20 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def sourceFiles(df: DataFrame): Seq[String] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-      HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-      _,
-      _,
-      _) =>
-      location.allFiles.map(_.getPath.toString)
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
+        location.allFiles.map(_.getPath.toString)
     }.flatten
 
   protected def sourceRelations(df: DataFrame): Seq[RelationMetadataEntry] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-      HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
-      _,
-      _,
-      _) =>
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
+          _,
+          _,
+          _) =>
         RelationMetadataEntry(
           location.allFiles.map(_.getPath.toString),
           dataSchema.json,

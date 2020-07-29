@@ -66,8 +66,7 @@ object LogicalPlanSerDeUtils {
 
     // Read binary data objects back and covert to logical plan.
     val bytes = Base64.getDecoder.decode(serializedPlan)
-    val deserializedPlan = KryoSerDeUtils.deserialize[LogicalRelationWrapper](
-      kryoSerializer, bytes)
+    val deserializedPlan = KryoSerDeUtils.deserialize[LogicalPlan](kryoSerializer, bytes)
 
     // Restore non-serializable operators/expressions from their corresponding wrappers.
     restore(deserializedPlan, spark)

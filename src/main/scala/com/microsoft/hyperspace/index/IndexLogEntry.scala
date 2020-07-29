@@ -101,7 +101,7 @@ case class IndexLogEntry(
   def relation: Option[RelationMetadataEntry] = {
     source.data(0).properties.content.directories(0) match {
       case dir: Directory =>
-        // Currently we only support to create an index on LogicalRelation
+        // Currently we only support to create an index on a LogicalRelation
         assert(dir.relations.size == 1)
         Some(dir.relations(0))
       case null => None
