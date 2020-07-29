@@ -32,6 +32,13 @@ into [Hyperspace's roadmap](../ROADMAP.md).]
 
 > Note: If you want to use any images, please upload the .svg AND .png/.jpg file them to `/docs/design/img/` and link to them here.
 
+Here's a sample image:
+
+<img src="./img/sample.png"
+     alt="Sample image"
+     style="float: center; margin-right: 10px;"
+     width= "100px" />
+
 ## Implementation
 
 [A description of the steps in the implementation, who will do them, and when.]
