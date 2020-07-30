@@ -7,11 +7,9 @@ If you are here, it means you are interested in helping us out. A hearty welcome
 * Give us feedback and bug reports regarding the software or the documentation
 * Improve our design docs, examples, tutorials, and documentation
 
-Please start by browsing the [issues](https://github.com/microsoft/hyperspace/issues) and leave a comment to engage us if any of them interests you.
+Please start by browsing the [issues](https://github.com/microsoft/hyperspace/issues) and leave a comment to engage us if any of them interests you. And don't forget to take a look at the project [roadmap](ROADMAP.md).
 
-Please make sure to take a look at the project [roadmap](ROADMAP.md).
-
-# Contributing Code
+Here are a few things to consider:
 
 * Before starting working on a major feature or bug fix, please open a GitHub issue describing the work you are proposing. We will make sure no one else is already working on it and the work aligns with the project [roadmap](ROADMAP.md).
 * A "major" feature or bug fix is defined as any change that is > 100 lines of code (not including tests) or changes user-facing behavior (e.g., breaking API changes). Please read [Proposing Major Changes to Hyperspace](#proposing-major-changes-to-hyperspace) before you begin any major work.
@@ -19,9 +17,7 @@ Please make sure to take a look at the project [roadmap](ROADMAP.md).
 
 **Coding Style:** Please review our [coding guidelines](/docs/coding-guidelines/scala-coding-style.md).
 
-# Proposing Major Changes to Hyperspace
-
-## Introduction
+## Proposing Major Changes to Hyperspace
 
 The development process in Hyperspace is design-driven. If you intend of making any significant changes, please consider discussing with the Hyperspace community first (and sometimes formally documented), before you open a PR.
 
@@ -29,7 +25,7 @@ The rest of this document describes the process for proposing, documenting and i
 
 To learn about the motivation behind Hyperspace, see the talk [Hyperspace: An Indexing Subsystem for Apache Spark](https://www.youtube.com/watch?v=ofn53mT7H6c) from Spark+AI Summit 2020.	
 
-## The Proposal Process
+### The Proposal Process
 
 The process outlined below is for reviewing a proposal and reaching a decision about whether to accept/decline a proposal.	
 
@@ -49,7 +45,7 @@ After the proposal is accepted or declined (e.g., after Step 2 or Step 4), imple
 
 > **Tip:** If you are an experienced committer and are certain that a design doc will be required for a particular proposal, you can skip Step 2 and just include the doc PR with the initial issue.
 
-## Writing a Design Document
+### Writing a Design Document
 
 As noted [above](#the-proposal-process), some (but not all) proposals need to be elaborated in a design document.	
 
@@ -59,17 +55,17 @@ As noted [above](#the-proposal-process), some (but not all) proposals need to be
   - Address any additional feedback/questions and update your PR as needed. New design doc authors may be paired with a design doc *shepherd* to help work on the doc.
   - Once all the comments are address, you can check-in the design doc. It is expected that the design doc may go through multiple checked-in revisions so please feel free to open subsequent PRs to update/add more information. 
 
-## Proposal Review
+### Proposal Review
 
 A group of Hyperspace team members will review your proposal and CC the relevant developers, raising important questions, pinging lapsed discussions, and generally trying to guide the discussion toward agreement about the outcome. The discussion itself is expected to happen on the issue, so that anyone can take part.	
 
-## Consensus and Disagreement
+### Consensus and Disagreement
 
 The goal of the proposal process is to reach general consensus about the outcome in a timely manner.	
 
 If general consensus cannot be reached, the proposal review group decides the next step by reviewing and discussing the issue and reaching a consensus among themselves. 
 
-# Becoming a Hyperspace Committer
+## Becoming a Hyperspace Committer
 
 The Hyperspace team will add new committers from the active contributors, based on their contributions to Hyperspace. The qualifications for new committers are derived from [Apache Spark Contributor Guide](https://spark.apache.org/contributing.html):
 
