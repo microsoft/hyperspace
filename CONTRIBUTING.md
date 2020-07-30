@@ -53,7 +53,7 @@ After the proposal is accepted or declined (e.g., after Step 2 or Step 4), imple
 
 As noted [above](#the-proposal-process), some (but not all) proposals need to be elaborated in a design document.	
 
-  - The design document should follow the template outlined [here]() and must be named as `docs/design/GITHUB-ISSUE-NUMBER-shortname.md`.
+  - The design document should follow the template outlined [here](./docs/design/TEMPLATE.md) and must be named as `docs/design/GITHUB-ISSUE-NUMBER-shortname.md`.
     > Note: To obtain the `GITHUB-ISSUE-NUMBER`, you need to first open a GitHub issue and since you are in this section reading how to write a design document, it is assumed that you have already gone through a round of initial discussion in the issue and were asked to explicitly write a design document. 
   - Once you have the document ready and have addressed any specific concerns raised during the initial discussion, please open a PR. 
   - Address any additional feedback/questions and update your PR as needed. New design doc authors may be paired with a design doc *shepherd* to help work on the doc.
