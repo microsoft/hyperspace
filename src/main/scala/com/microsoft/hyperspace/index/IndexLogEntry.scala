@@ -102,6 +102,8 @@ case class IndexLogEntry(
 
   def includedColumns: Seq[String] = derivedDataset.properties.columns.included
 
+  def numBuckets: Int = derivedDataset.properties.numBuckets
+
   def relation: RelationMetadataEntry = {
     source.data(0).properties.content.directories(0) match {
       case dir: Directory =>
@@ -111,8 +113,6 @@ case class IndexLogEntry(
       case _ => throw HyperspaceException("Index relation info not found")
     }
   }
-
-  def numBuckets: Int = derivedDataset.properties.numBuckets
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 
