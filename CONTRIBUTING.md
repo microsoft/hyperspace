@@ -17,7 +17,7 @@ Please make sure to take a look at the project [roadmap](ROADMAP.md).
 * A "major" feature or bug fix is defined as any change that is > 100 lines of code (not including tests) or changes user-facing behavior (e.g., breaking API changes). Please read [Proposing Major Changes to Hyperspace](#proposing-major-changes-to-hyperspace) before you begin any major work.
 * Once you are ready, you can create a [PR](https://github.com/microsoft/hyperspace/pulls) and the committers will help reviewing your PR.
 
-**Coding Style: ** Please review our [coding guidelines](/docs/coding-guidelines/scala-coding-style.md).
+**Coding Style:** Please review our [coding guidelines](/docs/coding-guidelines/scala-coding-style.md).
 
 # Proposing Major Changes to Hyperspace
 
@@ -47,7 +47,7 @@ The process outlined below is for reviewing a proposal and reaching a decision a
 
 After the proposal is accepted or declined (e.g., after Step 2 or Step 4), implementation work proceeds in the same way as any other contribution. 	
 
-> **Tip:** If you are an experienced committer and are certain that a design doc will be required for a particular proposal, you can skip Step 1 and 2 and just include the doc PR with the initial issue.
+> **Tip:** If you are an experienced committer and are certain that a design doc will be required for a particular proposal, you can skip Step 2 and just include the doc PR with the initial issue.
 
 ## Writing a Design Document
 
