@@ -53,7 +53,6 @@ class IndexLogEntryTest extends SparkFunSuite {
         |    "plan" : {
         |      "kind" : "Spark",
         |      "properties" : {
-        |        "rawPlan" : "planString",
         |        "fingerprint" : {
         |          "kind" : "LogicalPlan",
         |          "properties" : {
@@ -72,7 +71,12 @@ class IndexLogEntryTest extends SparkFunSuite {
         |          "root" : "",
         |          "directories" : [ {
         |            "path" : "",
-        |            "files" : [ "f1", "f2" ],
+        |            "relations" : [ {
+        |              "rootPaths" : [ "rootpath" ],
+        |              "files": [ "f1", "f2" ],
+        |              "dataSchemaJson" : "schema",
+        |              "fileFormat" : "type"
+        |             } ],
         |            "fingerprint" : {
         |              "kind" : "NoOp",
         |              "properties" : { }
@@ -96,11 +100,18 @@ class IndexLogEntryTest extends SparkFunSuite {
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
-      "planString",
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))))
     val expectedSourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))
+      Hdfs.Properties(
+        Content(
+          "",
+          Seq(
+            Content.Directory(
+              "",
+              Seq(RelationMetadataEntry(Seq("rootpath"), Seq("f1", "f2"), "schema", "type")),
+              NoOpFingerprint()))))
+
     val expected = IndexLogEntry(
       "indexName",
       CoveringIndex(

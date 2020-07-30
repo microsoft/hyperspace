@@ -31,7 +31,6 @@ class JsonUtilsTests extends SparkFunSuite {
         StructField("school", StringType)))
 
     val sourcePlanProperties = SparkPlan.Properties(
-      "plan",
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
     val sourceDataProperties =

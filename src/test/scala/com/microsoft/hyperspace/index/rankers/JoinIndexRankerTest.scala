@@ -61,7 +61,6 @@ class JoinIndexRankerTest extends SparkFunSuite {
       includedCols: Seq[AttributeReference],
       numBuckets: Int): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      "serializedPlan",
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signClass", "sign(plan)")))))
     val sourceDataProperties =

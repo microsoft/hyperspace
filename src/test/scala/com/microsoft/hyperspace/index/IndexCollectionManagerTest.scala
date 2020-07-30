@@ -39,10 +39,10 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
         private val testLogEntry: IndexLogEntry = {
           val sourcePlanProperties = SparkPlan.Properties(
-            "",
             LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
           val sourceDataProperties =
-            Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
+            Hdfs.Properties(
+              Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
           val entry = IndexLogEntry(
             indexPath.toString,
@@ -91,7 +91,6 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
     def toIndex(str: String): IndexLogEntry = {
       val sourcePlanProperties = SparkPlan.Properties(
-        "",
         LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
       val sourceDataProperties =
         Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))

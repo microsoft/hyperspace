@@ -26,7 +26,6 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, HyperspaceSuite, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def createIndex(
@@ -39,7 +38,6 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
       case Some(s) =>
         val sourcePlanProperties = SparkPlan.Properties(
-          LogicalPlanSerDeUtils.serialize(plan, spark),
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
         val sourceDataProperties =
           Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))

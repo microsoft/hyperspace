@@ -48,7 +48,6 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
       schema: StructType,
       indexDir: String): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      "plan",
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
     val sourceDataProperties =

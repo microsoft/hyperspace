@@ -25,7 +25,6 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
@@ -72,7 +71,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       200,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
       s"$indexStorageLocation/index1/v__=0",
-      df.queryExecution.optimizedPlan.toString(),
+      StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
       Constants.States.ACTIVE)
     assert(actual.equals(expected))
   }
@@ -231,22 +230,26 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
 
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
         val sourcePlanProperties = SparkPlan.Properties(
-          serializedPlan,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(
               Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
-        val sourceFiles = df.queryExecution.optimizedPlan.collect {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+        val relations = df.queryExecution.optimizedPlan.collect {
+            case LogicalRelation(
+              HadoopFsRelation(
+                location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
               _,
               _,
               _) =>
-            location.allFiles.map(_.getPath.toString)
-        }.flatten
+                RelationMetadataEntry(
+                  location.rootPaths.map(_.toString),
+                  location.allFiles.map(_.getPath.toString),
+                  dataSchema.json,
+                  fileFormat.toString())
+        }
         val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
+          Hdfs.Properties(
+            Content("", Seq(Content.Directory("", relations, NoOpFingerprint()))))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,

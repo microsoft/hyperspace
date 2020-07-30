@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.Content.Directory
 
@@ -27,14 +28,17 @@ case class NoOpFingerprint() {
   val properties: Map[String, String] = Map()
 }
 
-case class RelationMetadataEntry(files: Seq[String], dataSchemaJson: String, fileFormat: String)
+case class RelationMetadataEntry(
+    rootPaths: Seq[String],
+    files: Seq[String],
+    dataSchemaJson: String,
+    fileFormat: String)
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: String, directories: Seq[Content.Directory])
 object Content {
   case class Directory(
       path: String,
-      files: Seq[String],
       relations: Seq[RelationMetadataEntry],
       fingerprint: NoOpFingerprint)
 }
@@ -66,7 +70,7 @@ case class SparkPlan(properties: SparkPlan.Properties) {
   val kind = "Spark"
 }
 object SparkPlan {
-  case class Properties(rawPlan: String, fingerprint: LogicalPlanFingerprint)
+  case class Properties(fingerprint: LogicalPlanFingerprint)
 }
 
 // IndexLogEntry-specific Hdfs that represents the source data.
@@ -98,13 +102,13 @@ case class IndexLogEntry(
 
   def includedColumns: Seq[String] = derivedDataset.properties.columns.included
 
-  def relation: Option[RelationMetadataEntry] = {
+  def relation: RelationMetadataEntry = {
     source.data(0).properties.content.directories(0) match {
       case dir: Directory =>
         // Currently we only support to create an index on a LogicalRelation
         assert(dir.relations.size == 1)
-        Some(dir.relations(0))
-      case null => None
+        dir.relations(0)
+      case _ => throw HyperspaceException("Index relation info not found")
     }
   }
 

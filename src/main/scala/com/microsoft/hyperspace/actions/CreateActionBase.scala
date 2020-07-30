@@ -23,7 +23,6 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -54,25 +53,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df.select(allColumns.head, allColumns.tail: _*).schema
     }
 
-    // Here we use the unanalyzed logical plan returned by the parser, before analysis and
-    // optimization. Analyzed and optimized plans have additional ser/de issues that are not
-    // fully covered by the current ser/de framework.
-    val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
-
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val sourcePlanProperties = SparkPlan.Properties(
-          serializedPlan,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
         // Note: Source files are fingerprinted as part of the serialized logical plan currently.
         val sourceDataProperties =
           Hdfs.Properties(
-            Content(
-              "",
-              Seq(
-                Content.Directory("", sourceFiles(df), sourceRelations(df), NoOpFingerprint()))))
+            Content("", Seq(Content.Directory("", sourceRelations(df), NoOpFingerprint()))))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -90,16 +80,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  protected def sourceFiles(df: DataFrame): Seq[String] =
-    df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        location.allFiles.map(_.getPath.toString)
-    }.flatten
-
   protected def sourceRelations(df: DataFrame): Seq[RelationMetadataEntry] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
@@ -108,9 +88,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           _,
           _) =>
         RelationMetadataEntry(
+          location.rootPaths.map(_.toString),
           location.allFiles.map(_.getPath.toString),
           dataSchema.json,
-          fileFormat.toString())
+          fileFormat.toString)
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

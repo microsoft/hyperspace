@@ -31,7 +31,6 @@ class IndexTests extends SparkFunSuite {
       schema: StructType,
       numBuckets: Int): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      "plan",
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
     val sourceDataProperties =
