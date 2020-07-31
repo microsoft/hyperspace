@@ -288,8 +288,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
         }
         val files = relations.map (_.files).flatten
         val sourceDataProperties =
-          Hdfs.Properties(
-            Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,

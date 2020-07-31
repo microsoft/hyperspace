@@ -104,8 +104,7 @@ class IndexLogEntryTest extends SparkFunSuite {
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))))
     val expectedSourceDataProperties =
-      Hdfs.Properties(
-        Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))
+      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))
 
     val expected = IndexLogEntry(
       "indexName",
