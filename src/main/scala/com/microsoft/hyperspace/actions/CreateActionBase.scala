@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
+import java.util.Locale
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
@@ -91,7 +93,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           location.rootPaths.map(_.toString),
           location.allFiles.map(_.getPath.toString),
           dataSchema.json,
-          fileFormat.toString)
+          fileFormat.toString.toLowerCase(Locale.ROOT))
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

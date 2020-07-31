@@ -46,7 +46,7 @@ class RefreshAction(
   private lazy val df = {
     val rel = previousIndexLogEntry.relation
     val dataSchema = DataType.fromJson(rel.dataSchemaJson).asInstanceOf[StructType]
-    spark.read.schema(dataSchema).load(rel.rootPaths: _*)
+    spark.read.schema(dataSchema).format(rel.fileFormat).load(rel.rootPaths: _*)
   }
 
   private lazy val indexConfig: IndexConfig = {

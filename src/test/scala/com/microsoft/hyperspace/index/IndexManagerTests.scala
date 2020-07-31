@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import java.util.Locale
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
@@ -184,7 +186,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
     verifyIndexes(Seq(expectedVacuumedIndex1, expectedVacuumedIndex2))
   }
 
-  test("Verify refresh-full rebuild of index.") {
+  test("Verify refresh-full rebuild of index in Parquet format.") {
     val refreshTestLocation = sampleParquetDataLocation + "refresh"
     FileUtils.delete(new Path(refreshTestLocation))
     import spark.implicits._
@@ -221,6 +223,44 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
     FileUtils.delete(new Path(refreshTestLocation))
   }
 
+  test("Verify refresh-full rebuild of index in CSV format.") {
+    val refreshTestLocation = sampleParquetDataLocation + "refresh2"
+    FileUtils.delete(new Path(refreshTestLocation))
+    import spark.implicits._
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .limit(10)
+      .write
+      .option("header", "true")
+      .csv(refreshTestLocation)
+    val df = spark.read.option("header", "true").csv(refreshTestLocation)
+    hyperspace.createIndex(df, indexConfig1)
+    var indexCount =
+      spark.read
+        .parquet(s"$indexStorageLocation/index1" +
+          s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+        .count()
+    assert(indexCount == 10)
+
+    // Change Original Data
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .limit(3)
+      .write
+      .mode("overwrite")
+      .csv(refreshTestLocation)
+    hyperspace.refreshIndex(indexConfig1.indexName)
+    indexCount = spark.read
+      .parquet(s"$indexStorageLocation/index1" +
+        s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+      .count()
+
+    // Check if index got updated
+    assert(indexCount == 3)
+
+    FileUtils.delete(new Path(refreshTestLocation))
+  }
+
   private def expectedIndex(
       indexConfig: IndexConfig,
       schema: StructType,
@@ -244,7 +284,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
                   location.rootPaths.map(_.toString),
                   location.allFiles.map(_.getPath.toString),
                   dataSchema.json,
-                  fileFormat.toString())
+                  fileFormat.toString.toLowerCase(Locale.ROOT))
         }
         val sourceDataProperties =
           Hdfs.Properties(
