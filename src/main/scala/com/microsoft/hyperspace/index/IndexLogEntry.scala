@@ -20,7 +20,6 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.Directory
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -37,10 +36,7 @@ case class RelationMetadataEntry(
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: String, directories: Seq[Content.Directory])
 object Content {
-  case class Directory(
-      path: String,
-      files: Seq[String],
-      fingerprint: NoOpFingerprint)
+  case class Directory(path: String, files: Seq[String], fingerprint: NoOpFingerprint)
 }
 
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.

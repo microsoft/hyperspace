@@ -28,7 +28,6 @@ import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
 class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with BeforeAndAfterAll {
-
   val testRoot = "src/test/resources/indexLogManagerTests"
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",

@@ -71,7 +71,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         |          "root" : "",
         |          "directories" : [ {
         |            "path" : "",
-        |            "files": [ "f1", "f2" ],
+        |            "files" : [ "f1", "f2" ],
         |            "fingerprint" : {
         |              "kind" : "NoOp",
         |              "properties" : { }
@@ -82,7 +82,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         |    } ],
         |    "relations" : [ {
         |      "rootPaths" : [ "rootpath" ],
-        |      "files": [ "f1", "f2" ],
+        |      "files" : [ "f1", "f2" ],
         |      "dataSchemaJson" : "schema",
         |      "fileFormat" : "type"
         |      } ]
@@ -105,13 +105,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))))
     val expectedSourceDataProperties =
       Hdfs.Properties(
-        Content(
-          "",
-          Seq(
-            Content.Directory(
-              "",
-              Seq("f1", "f2"),
-              NoOpFingerprint()))))
+        Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))
 
     val expected = IndexLogEntry(
       "indexName",
