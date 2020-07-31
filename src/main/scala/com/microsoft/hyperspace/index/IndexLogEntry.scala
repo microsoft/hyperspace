@@ -39,7 +39,7 @@ case class Content(root: String, directories: Seq[Content.Directory])
 object Content {
   case class Directory(
       path: String,
-      relations: Seq[RelationMetadataEntry],
+      files: Seq[String],
       fingerprint: NoOpFingerprint)
 }
 
@@ -82,7 +82,7 @@ object Hdfs {
 }
 
 // IndexLogEntry-specific Source that uses SparkPlan as a plan and Hdfs as data.
-case class Source(plan: SparkPlan, data: Seq[Hdfs])
+case class Source(plan: SparkPlan, data: Seq[Hdfs], relations: Seq[RelationMetadataEntry])
 
 // IndexLogEntry that captures index-related information.
 case class IndexLogEntry(
@@ -104,14 +104,12 @@ case class IndexLogEntry(
 
   def numBuckets: Int = derivedDataset.properties.numBuckets
 
-  def relation: RelationMetadataEntry = {
-    source.data(0).properties.content.directories(0) match {
-      case dir: Directory =>
-        // Currently we only support to create an index on a LogicalRelation
-        assert(dir.relations.size == 1)
-        dir.relations(0)
-      case _ => throw HyperspaceException("Index relation info not found")
-    }
+  def relation: RelationMetadataEntry = source.relations match {
+    case rels: Seq[RelationMetadataEntry] =>
+      assert(rels.size == 1)
+      // Currently we only support to create an index on a LogicalRelation
+      rels(0)
+    case _ => throw HyperspaceException("Index relation info not found")
   }
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)

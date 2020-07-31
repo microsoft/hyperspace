@@ -29,10 +29,6 @@ import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
 class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with BeforeAndAfterAll {
 
-  def getRelMetaEntry(files: Seq[String]): RelationMetadataEntry = {
-    RelationMetadataEntry(Seq("rootpath"), files, "schema", "type")
-  }
-
   val testRoot = "src/test/resources/indexLogManagerTests"
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",
@@ -44,10 +40,8 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     Content(
       "/root/log",
       Seq(
-        Content.Directory(
-          "dir1", Seq(getRelMetaEntry(Seq("1.json", "2.json"))), NoOpFingerprint()),
-        Content.Directory(
-          "dir2", Seq(getRelMetaEntry(Seq("1.json", "2.json"))), NoOpFingerprint()))),
+        Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
+        Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint()))),
     Source(
       SparkPlan(
         SparkPlan.Properties(
@@ -57,10 +51,10 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
         Hdfs(properties = Hdfs.Properties(content = Content(
           "/root/data",
           Seq(
-            Content.Directory(
-              "dir1", Seq(getRelMetaEntry(Seq("1.json", "2.json"))), NoOpFingerprint()),
-            Content.Directory(
-              "dir2", Seq(getRelMetaEntry(Seq("1.json", "2.json"))), NoOpFingerprint()))))))),
+            Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
+            Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint())))))),
+      Seq(RelationMetadataEntry(Seq("rootpath"), Seq("1.json", "2.json"), "schema", "type"))
+    ),
     Map())
 
   private def getEntry(state: String): LogEntry = {

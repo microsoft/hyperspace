@@ -71,12 +71,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         |          "root" : "",
         |          "directories" : [ {
         |            "path" : "",
-        |            "relations" : [ {
-        |              "rootPaths" : [ "rootpath" ],
-        |              "files": [ "f1", "f2" ],
-        |              "dataSchemaJson" : "schema",
-        |              "fileFormat" : "type"
-        |             } ],
+        |            "files": [ "f1", "f2" ],
         |            "fingerprint" : {
         |              "kind" : "NoOp",
         |              "properties" : { }
@@ -84,7 +79,13 @@ class IndexLogEntryTest extends SparkFunSuite {
         |          } ]
         |        }
         |      }
-        |    } ]
+        |    } ],
+        |    "relations" : [ {
+        |      "rootPaths" : [ "rootpath" ],
+        |      "files": [ "f1", "f2" ],
+        |      "dataSchemaJson" : "schema",
+        |      "fileFormat" : "type"
+        |      } ]
         |  },
         |  "extra" : { },
         |  "version" : "0.1",
@@ -109,7 +110,7 @@ class IndexLogEntryTest extends SparkFunSuite {
           Seq(
             Content.Directory(
               "",
-              Seq(RelationMetadataEntry(Seq("rootpath"), Seq("f1", "f2"), "schema", "type")),
+              Seq("f1", "f2"),
               NoOpFingerprint()))))
 
     val expected = IndexLogEntry(
@@ -121,7 +122,10 @@ class IndexLogEntryTest extends SparkFunSuite {
           schema.json,
           200)),
       Content("rootContentPath", Seq()),
-      Source(SparkPlan(expectedSourcePlanProperties), Seq(Hdfs(expectedSourceDataProperties))),
+      Source(
+        SparkPlan(expectedSourcePlanProperties),
+        Seq(Hdfs(expectedSourceDataProperties)),
+        Seq(RelationMetadataEntry(Seq("rootpath"), Seq("f1", "f2"), "schema", "type"))),
       Map())
     expected.state = "ACTIVE"
     expected.timestamp = 1578818514080L

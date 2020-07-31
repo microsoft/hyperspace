@@ -69,7 +69,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
           "schema",
           10)),
       Content("dirPath", Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
       Map())
     entry.state = Constants.States.ACTIVE
     entry

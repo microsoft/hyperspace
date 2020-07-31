@@ -286,9 +286,10 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
                   dataSchema.json,
                   fileFormat.toString.toLowerCase(Locale.ROOT))
         }
+        val files = relations.map (_.files).flatten
         val sourceDataProperties =
           Hdfs.Properties(
-            Content("", Seq(Content.Directory("", relations, NoOpFingerprint()))))
+            Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,
@@ -302,7 +303,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
             s"$indexStorageLocation/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), relations),
           Map())
         entry.state = state
         entry

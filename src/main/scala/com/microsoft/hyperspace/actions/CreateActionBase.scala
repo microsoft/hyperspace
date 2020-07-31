@@ -61,10 +61,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
+        val relations = sourceRelations(df)
+        val allFiles = relations.map(_.files).flatten
+
         // Note: Source files are fingerprinted as part of the serialized logical plan currently.
         val sourceDataProperties =
           Hdfs.Properties(
-            Content("", Seq(Content.Directory("", sourceRelations(df), NoOpFingerprint()))))
+            Content("", Seq(Content.Directory("", allFiles, NoOpFingerprint()))))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -75,7 +78,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               IndexLogEntry.schemaString(schema),
               numBuckets)),
           Content(path.toString, Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Source(
+            SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), relations),
           Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")

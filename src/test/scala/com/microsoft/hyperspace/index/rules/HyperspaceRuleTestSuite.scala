@@ -51,7 +51,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
           Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
           Map())
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))

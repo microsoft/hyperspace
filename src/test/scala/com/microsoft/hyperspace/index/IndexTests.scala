@@ -45,7 +45,7 @@ class IndexTests extends SparkFunSuite {
           IndexLogEntry.schemaString(schema),
           10)),
       Content(path, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
       Map())
     entry.state = Constants.States.ACTIVE
     entry
