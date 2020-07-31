@@ -3,7 +3,7 @@ import sys
 from pyspark.sql import SparkSession, DataFrame
 from py4j.java_gateway import java_import
 
-from hyperspace import *
+from .indexconfig import *
 
 
 class Hyperspace:
