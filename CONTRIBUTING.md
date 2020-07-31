@@ -1,4 +1,6 @@
-# Welcome!
+# Contributing to Hyperspace
+
+## Welcome!
 
 If you are here, it means you are interested in helping us out. A hearty welcome and thank you! There are many ways you can contribute to the Hyperspace project:
 
