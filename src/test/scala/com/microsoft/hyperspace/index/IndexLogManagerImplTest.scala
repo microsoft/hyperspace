@@ -44,16 +44,17 @@ class IndexLogManagerImplTest extends SparkFunSuite with SparkInvolvedSuite with
     Source(
       SparkPlan(
         SparkPlan.Properties(
+          Seq(Relation(Seq("rootpath"), Hdfs(properties = Hdfs.Properties(content = Content(
+            "/root/data",
+            Seq(
+              Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
+              Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint()))))),
+            "schema",
+            "type")),
+          null,
+          null,
           LogicalPlanFingerprint(
-            LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature")))))),
-      Seq(
-        Hdfs(properties = Hdfs.Properties(content = Content(
-          "/root/data",
-          Seq(
-            Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
-            Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint())))))),
-      Seq(RelationMetadataEntry(Seq("rootpath"), Seq("1.json", "2.json"), "schema", "type"))
-    ),
+            LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature"))))))),
     Map())
 
   private def getEntry(state: String): LogEntry = {

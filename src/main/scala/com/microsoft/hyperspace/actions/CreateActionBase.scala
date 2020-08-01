@@ -16,11 +16,10 @@
 
 package com.microsoft.hyperspace.actions
 
-import java.util.Locale
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
@@ -57,17 +56,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
+        val relations = sourceRelations(df)
+        // Currently we only support to create an index on a LogicalRelation
+        assert(relations.size == 1)
+
         val sourcePlanProperties = SparkPlan.Properties(
+          relations,
+          null,
+          null,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
-
-        val relations = sourceRelations(df)
-        val allFiles = relations.map(_.files).flatten
-
-        // Note: Source files are fingerprinted as part of the serialized logical plan currently.
-        val sourceDataProperties =
-          Hdfs.Properties(
-            Content("", Seq(Content.Directory("", allFiles, NoOpFingerprint()))))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -79,25 +77,33 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               numBuckets)),
           Content(path.toString, Seq()),
           Source(
-            SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), relations),
+            SparkPlan(sourcePlanProperties)),
           Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
   }
 
-  protected def sourceRelations(df: DataFrame): Seq[RelationMetadataEntry] =
+  protected def sourceRelations(df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
-          _,
-          _,
-          _) =>
-        RelationMetadataEntry(
+      HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
+      _,
+      _,
+      _) =>
+        val files = location.allFiles.map(_.getPath.toString)
+        // Note: Source files are fingerprinted as part of the serialized logical plan currently.
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val fileFormatName = fileFormat match {
+          case d: DataSourceRegister => d.shortName
+          case f: Any => throw HyperspaceException(s"Unsupported file format $f")
+        }
+        Relation(
           location.rootPaths.map(_.toString),
-          location.allFiles.map(_.getPath.toString),
+          Hdfs(sourceDataProperties),
           dataSchema.json,
-          fileFormat.toString.toLowerCase(Locale.ROOT))
+          fileFormatName)
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

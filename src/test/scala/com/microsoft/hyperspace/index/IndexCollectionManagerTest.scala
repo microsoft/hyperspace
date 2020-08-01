@@ -39,9 +39,10 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
         private val testLogEntry: IndexLogEntry = {
           val sourcePlanProperties = SparkPlan.Properties(
+            Seq(),
+            null,
+            null,
             LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
-          val sourceDataProperties =
-            Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
           val entry = IndexLogEntry(
             indexPath.toString,
@@ -52,7 +53,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
                 "",
                 10)),
             Content(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0", Seq()),
-            Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
+            Source(SparkPlan(sourcePlanProperties)),
             Map())
           entry.state = Constants.States.ACTIVE
           entry
@@ -90,9 +91,10 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
     def toIndex(str: String): IndexLogEntry = {
       val sourcePlanProperties = SparkPlan.Properties(
+        Seq(),
+        null,
+        null,
         LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
-      val sourceDataProperties =
-        Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
       val entry = IndexLogEntry(
         str,
@@ -103,7 +105,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
             "",
             10)),
         Content(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0", Seq()),
-        Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
+        Source(SparkPlan(sourcePlanProperties)),
         Map())
       entry.state = Constants.States.ACTIVE
       entry

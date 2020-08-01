@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
@@ -26,12 +25,6 @@ case class NoOpFingerprint() {
   val kind: String = "NoOp"
   val properties: Map[String, String] = Map()
 }
-
-case class RelationMetadataEntry(
-    rootPaths: Seq[String],
-    files: Seq[String],
-    dataSchemaJson: String,
-    fileFormat: String)
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: String, directories: Seq[Content.Directory])
@@ -61,14 +54,6 @@ object LogicalPlanFingerprint {
   case class Properties(signatures: Seq[Signature])
 }
 
-// IndexLogEntry-specific SparkPlan that represents the source plan.
-case class SparkPlan(properties: SparkPlan.Properties) {
-  val kind = "Spark"
-}
-object SparkPlan {
-  case class Properties(fingerprint: LogicalPlanFingerprint)
-}
-
 // IndexLogEntry-specific Hdfs that represents the source data.
 case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
@@ -77,8 +62,28 @@ object Hdfs {
   case class Properties(content: Content)
 }
 
-// IndexLogEntry-specific Source that uses SparkPlan as a plan and Hdfs as data.
-case class Source(plan: SparkPlan, data: Seq[Hdfs], relations: Seq[RelationMetadataEntry])
+// IndexLogEntry-specific Relation that represents the source relation.
+case class Relation(
+    rootPaths: Seq[String],
+    data: Hdfs,
+    dataSchemaJson: String,
+    fileFormat: String)
+
+// IndexLogEntry-specific SparkPlan that represents the source plan.
+case class SparkPlan(properties: SparkPlan.Properties) {
+  val kind = "Spark"
+}
+
+object SparkPlan {
+  case class Properties(
+      relations: Seq[Relation],
+      rawPlan: String, // null for now
+      sql: String, // null for now
+      fingerprint: LogicalPlanFingerprint)
+}
+
+// IndexLogEntry-specific Source that uses SparkPlan as a plan.
+case class Source(plan: SparkPlan)
 
 // IndexLogEntry that captures index-related information.
 case class IndexLogEntry(
@@ -100,13 +105,7 @@ case class IndexLogEntry(
 
   def numBuckets: Int = derivedDataset.properties.numBuckets
 
-  def relation: RelationMetadataEntry = source.relations match {
-    case rels: Seq[RelationMetadataEntry] =>
-      assert(rels.size == 1)
-      // Currently we only support to create an index on a LogicalRelation
-      rels(0)
-    case _ => throw HyperspaceException("Index relation info not found")
-  }
+  def relations: Seq[Relation] = source.plan.properties.relations
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 

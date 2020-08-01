@@ -53,6 +53,29 @@ class IndexLogEntryTest extends SparkFunSuite {
         |    "plan" : {
         |      "kind" : "Spark",
         |      "properties" : {
+        |        "relations" : [ {
+        |          "rootPaths" : [ "rootpath" ],
+        |          "data" : {
+        |            "kind" : "HDFS",
+        |            "properties" : {
+        |              "content" : {
+        |                "root" : "",
+        |                "directories" : [ {
+        |                  "path" : "",
+        |                  "files" : [ "f1", "f2" ],
+        |                  "fingerprint" : {
+        |                    "kind" : "NoOp",
+        |                    "properties" : { }
+        |                  }
+        |                } ]
+        |              }
+        |            }
+        |          },
+        |          "dataSchemaJson" : "schema",
+        |          "fileFormat" : "type"
+        |          } ],
+        |        "rawPlan" : null,
+        |        "sql" : null,
         |        "fingerprint" : {
         |          "kind" : "LogicalPlan",
         |          "properties" : {
@@ -63,29 +86,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         |          }
         |        }
         |      }
-        |    },
-        |    "data" : [ {
-        |      "kind" : "HDFS",
-        |      "properties" : {
-        |        "content" : {
-        |          "root" : "",
-        |          "directories" : [ {
-        |            "path" : "",
-        |            "files" : [ "f1", "f2" ],
-        |            "fingerprint" : {
-        |              "kind" : "NoOp",
-        |              "properties" : { }
-        |            }
-        |          } ]
-        |        }
-        |      }
-        |    } ],
-        |    "relations" : [ {
-        |      "rootPaths" : [ "rootpath" ],
-        |      "files" : [ "f1", "f2" ],
-        |      "dataSchemaJson" : "schema",
-        |      "fileFormat" : "type"
-        |      } ]
+        |    }
         |  },
         |  "extra" : { },
         |  "version" : "0.1",
@@ -101,10 +102,17 @@ class IndexLogEntryTest extends SparkFunSuite {
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
+      Seq(Relation(
+        Seq("rootpath"),
+        Hdfs(
+          Hdfs.Properties(
+            Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))),
+        "schema",
+        "type")),
+      null,
+      null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))))
-    val expectedSourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))
 
     val expected = IndexLogEntry(
       "indexName",
@@ -116,9 +124,7 @@ class IndexLogEntryTest extends SparkFunSuite {
           200)),
       Content("rootContentPath", Seq()),
       Source(
-        SparkPlan(expectedSourcePlanProperties),
-        Seq(Hdfs(expectedSourceDataProperties)),
-        Seq(RelationMetadataEntry(Seq("rootpath"), Seq("f1", "f2"), "schema", "type"))),
+        SparkPlan(expectedSourcePlanProperties)),
       Map())
     expected.state = "ACTIVE"
     expected.timestamp = 1578818514080L

@@ -38,9 +38,10 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
       case Some(s) =>
         val sourcePlanProperties = SparkPlan.Properties(
+          Seq(),
+          null,
+          null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
-        val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
         val indexLogEntry = IndexLogEntry(
           name,
@@ -51,7 +52,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
           Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
+          Source(SparkPlan(sourcePlanProperties)),
           Map())
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))

@@ -55,10 +55,11 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   def testEntry(df: DataFrame): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
+      Seq(),
+      null,
+      null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
     val entry = IndexLogEntry(
       "index1",
@@ -69,7 +70,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
           "schema",
           10)),
       Content("dirPath", Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), Seq()),
+      Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE
     entry

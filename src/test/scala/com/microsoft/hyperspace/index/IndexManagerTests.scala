@@ -22,9 +22,10 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.FileUtils
@@ -269,10 +270,6 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
 
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val sourcePlanProperties = SparkPlan.Properties(
-          LogicalPlanFingerprint(
-            LogicalPlanFingerprint.Properties(
-              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
         val relations = df.queryExecution.optimizedPlan.collect {
             case LogicalRelation(
               HadoopFsRelation(
@@ -280,15 +277,26 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               _,
               _,
               _) =>
-                RelationMetadataEntry(
+                val files = location.allFiles.map(_.getPath.toString)
+                val sourceDataProperties =
+                  Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+                val fileFormatName = fileFormat match {
+                  case d: DataSourceRegister => d.shortName
+                  case f: Any => throw HyperspaceException(s"Unsupported file format $f")
+                }
+                Relation(
                   location.rootPaths.map(_.toString),
-                  location.allFiles.map(_.getPath.toString),
+                  Hdfs(sourceDataProperties),
                   dataSchema.json,
-                  fileFormat.toString.toLowerCase(Locale.ROOT))
+                  fileFormatName)
         }
-        val files = relations.map (_.files).flatten
-        val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val sourcePlanProperties = SparkPlan.Properties(
+          relations,
+          null,
+          null,
+          LogicalPlanFingerprint(
+            LogicalPlanFingerprint.Properties(
+              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,
@@ -302,7 +310,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
             s"$indexStorageLocation/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties)), relations),
+          Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state
         entry
