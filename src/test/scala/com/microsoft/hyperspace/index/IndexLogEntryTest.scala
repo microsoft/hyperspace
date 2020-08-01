@@ -102,13 +102,13 @@ class IndexLogEntryTest extends SparkFunSuite {
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
-      Seq(Relation(
-        Seq("rootpath"),
-        Hdfs(
-          Hdfs.Properties(
+      Seq(
+        Relation(
+          Seq("rootpath"),
+          Hdfs(Hdfs.Properties(
             Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))),
-        "schema",
-        "type")),
+          "schema",
+          "type")),
       null,
       null,
       LogicalPlanFingerprint(
@@ -123,8 +123,7 @@ class IndexLogEntryTest extends SparkFunSuite {
           schema.json,
           200)),
       Content("rootContentPath", Seq()),
-      Source(
-        SparkPlan(expectedSourcePlanProperties)),
+      Source(SparkPlan(expectedSourcePlanProperties)),
       Map())
     expected.state = "ACTIVE"
     expected.timestamp = 1578818514080L

@@ -76,8 +76,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               IndexLogEntry.schemaString(schema),
               numBuckets)),
           Content(path.toString, Seq()),
-          Source(
-            SparkPlan(sourcePlanProperties)),
+          Source(SparkPlan(sourcePlanProperties)),
           Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
@@ -87,17 +86,18 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def sourceRelations(df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-      HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
-      _,
-      _,
-      _) =>
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
+          _,
+          _,
+          _) =>
         val files = location.allFiles.map(_.getPath.toString)
-        // Note: Source files are fingerprinted as part of the serialized logical plan currently.
+        // Note that source files are currently fingerprinted when the optimized plan is
+        // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
-          case f: Any => throw HyperspaceException(s"Unsupported file format $f")
+          case other => throw HyperspaceException(s"Unsupported file format: $other")
         }
         Relation(
           location.rootPaths.map(_.toString),
