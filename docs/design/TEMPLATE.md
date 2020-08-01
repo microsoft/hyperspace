@@ -45,6 +45,11 @@ Here's a sample image:
 
 > Note: If you want to use any images, please upload the .svg AND .png/.jpg file them to `/docs/design/img/` and link to them here.
 
+## Impact on Performance (if applicable)
+
+[A discussion of impact on performance and any corner cases that the author is aware of. If there is a negative impact on performance, please make sure 
+to capture an issue in the next section. This section may be omitted if there are none.]
+
 ## Open issues (if applicable)
 
 [A discussion of issues relating to this proposal for which the author does not
