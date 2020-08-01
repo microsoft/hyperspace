@@ -55,6 +55,7 @@ class IndexLogEntryTest extends SparkFunSuite {
         |      "properties" : {
         |        "relations" : [ {
         |          "rootPaths" : [ "rootpath" ],
+        |          "options" : { },
         |          "data" : {
         |            "kind" : "HDFS",
         |            "properties" : {
@@ -108,7 +109,8 @@ class IndexLogEntryTest extends SparkFunSuite {
           Hdfs(Hdfs.Properties(
             Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))),
           "schema",
-          "type")),
+          "type",
+          Map())),
       null,
       null,
       LogicalPlanFingerprint(

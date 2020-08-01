@@ -249,7 +249,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
                 dataSchema,
                 _,
                 fileFormat,
-                _),
+                options),
               _,
               _,
               _) =>
@@ -264,7 +264,8 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               location.rootPaths.map(_.toString),
               Hdfs(sourceDataProperties),
               dataSchema.json,
-              fileFormatName)
+              fileFormatName,
+              options)
         }
         val sourcePlanProperties = SparkPlan.Properties(
           relations,

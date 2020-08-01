@@ -67,7 +67,8 @@ case class Relation(
     rootPaths: Seq[String],
     data: Hdfs,
     dataSchemaJson: String,
-    fileFormat: String)
+    fileFormat: String,
+    options: Map[String, String])
 
 // IndexLogEntry-specific SparkPlan that represents the source plan.
 case class SparkPlan(properties: SparkPlan.Properties) {

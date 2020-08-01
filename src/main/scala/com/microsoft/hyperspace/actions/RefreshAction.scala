@@ -48,7 +48,13 @@ class RefreshAction(
     // Currently we only support to create an index on a LogicalRelation
     assert(rels.size == 1)
     val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
-    spark.read.schema(dataSchema).format(rels.head.fileFormat).load(rels.head.rootPaths: _*)
+    // "path" key in options incurs to read data twice unexpectedly
+    val opts = rels.head.options - "path"
+    spark.read
+      .schema(dataSchema)
+      .format(rels.head.fileFormat)
+      .options(opts)
+      .load(rels.head.rootPaths: _*)
   }
 
   private lazy val indexConfig: IndexConfig = {

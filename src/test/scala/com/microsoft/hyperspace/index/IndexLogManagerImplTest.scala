@@ -54,7 +54,8 @@ class IndexLogManagerImplTest
               Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
               Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint()))))),
           "schema",
-          "type")),
+          "type",
+          Map())),
         null,
         null,
         LogicalPlanFingerprint(

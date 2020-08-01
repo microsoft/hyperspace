@@ -86,7 +86,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def sourceRelations(df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, fileFormat, _),
+          HadoopFsRelation(
+            location: PartitioningAwareFileIndex,
+            _,
+            dataSchema,
+            _,
+            fileFormat,
+            options),
           _,
           _,
           _) =>
@@ -103,7 +109,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           location.rootPaths.map(_.toString),
           Hdfs(sourceDataProperties),
           dataSchema.json,
-          fileFormatName)
+          fileFormatName,
+          options)
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
