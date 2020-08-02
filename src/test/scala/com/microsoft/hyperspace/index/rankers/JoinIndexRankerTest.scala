@@ -61,11 +61,11 @@ class JoinIndexRankerTest extends SparkFunSuite {
       includedCols: Seq[AttributeReference],
       numBuckets: Int): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      "serializedPlan",
+      Seq(),
+      null,
+      null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signClass", "sign(plan)")))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
     val entry = IndexLogEntry(
       name,
@@ -76,7 +76,7 @@ class JoinIndexRankerTest extends SparkFunSuite {
           IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
           numBuckets)),
       Content(name, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE
     entry

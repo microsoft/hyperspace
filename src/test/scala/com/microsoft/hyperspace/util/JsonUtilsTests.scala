@@ -31,11 +31,11 @@ class JsonUtilsTests extends SparkFunSuite {
         StructField("school", StringType)))
 
     val sourcePlanProperties = SparkPlan.Properties(
-      "plan",
+      Seq(),
+      null,
+      null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
     val index = IndexLogEntry(
       "myIndex",
@@ -45,7 +45,7 @@ class JsonUtilsTests extends SparkFunSuite {
           IndexLogEntry.schemaString(schema),
           10)),
       Content("path", Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Source(SparkPlan(sourcePlanProperties)),
       Map())
     index.state = Constants.States.ACTIVE
 

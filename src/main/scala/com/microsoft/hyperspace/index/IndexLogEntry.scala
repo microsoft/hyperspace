@@ -16,12 +16,9 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -57,14 +54,6 @@ object LogicalPlanFingerprint {
   case class Properties(signatures: Seq[Signature])
 }
 
-// IndexLogEntry-specific SparkPlan that represents the source plan.
-case class SparkPlan(properties: SparkPlan.Properties) {
-  val kind = "Spark"
-}
-object SparkPlan {
-  case class Properties(rawPlan: String, fingerprint: LogicalPlanFingerprint)
-}
-
 // IndexLogEntry-specific Hdfs that represents the source data.
 case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
@@ -73,8 +62,29 @@ object Hdfs {
   case class Properties(content: Content)
 }
 
-// IndexLogEntry-specific Source that uses SparkPlan as a plan and Hdfs as data.
-case class Source(plan: SparkPlan, data: Seq[Hdfs])
+// IndexLogEntry-specific Relation that represents the source relation.
+case class Relation(
+    rootPaths: Seq[String],
+    data: Hdfs,
+    dataSchemaJson: String,
+    fileFormat: String,
+    options: Map[String, String])
+
+// IndexLogEntry-specific SparkPlan that represents the source plan.
+case class SparkPlan(properties: SparkPlan.Properties) {
+  val kind = "Spark"
+}
+
+object SparkPlan {
+  case class Properties(
+      relations: Seq[Relation],
+      rawPlan: String, // null for now
+      sql: String, // null for now
+      fingerprint: LogicalPlanFingerprint)
+}
+
+// IndexLogEntry-specific Source that uses SparkPlan as a plan.
+case class Source(plan: SparkPlan)
 
 // IndexLogEntry that captures index-related information.
 case class IndexLogEntry(
@@ -96,9 +106,7 @@ case class IndexLogEntry(
 
   def numBuckets: Int = derivedDataset.properties.numBuckets
 
-  def plan(spark: SparkSession): LogicalPlan = {
-    LogicalPlanSerDeUtils.deserialize(source.plan.properties.rawPlan, spark)
-  }
+  def relations: Seq[Relation] = source.plan.properties.relations
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 
