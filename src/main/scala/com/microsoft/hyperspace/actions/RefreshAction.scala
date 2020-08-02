@@ -45,10 +45,10 @@ class RefreshAction(
   // Reconstruct a df from schema
   private lazy val df = {
     val rels = previousIndexLogEntry.relations
-    // Currently we only support to create an index on a LogicalRelation
+    // Currently we only support to create an index on a LogicalRelation.
     assert(rels.size == 1)
     val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
-    // "path" key in options incurs to read data twice unexpectedly
+    // "path" key in options incurs to read data twice unexpectedly.
     val opts = rels.head.options - "path"
     spark.read
       .schema(dataSchema)

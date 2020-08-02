@@ -57,7 +57,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = sourceRelations(df)
-        // Currently we only support to create an index on a LogicalRelation
+        // Currently we only support to create an index on a LogicalRelation.
         assert(relations.size == 1)
 
         val sourcePlanProperties = SparkPlan.Properties(

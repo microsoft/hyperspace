@@ -188,7 +188,6 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Verify refresh-full rebuild of index.") {
-
     Seq(("csv", Map("header" -> "true")), ("parquet", Map()), ("json", Map())).foreach {
       case (format, option: Map[String, String]) =>
         val refreshTestLocation = sampleParquetDataLocation + "refresh_" + format
