@@ -36,7 +36,7 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
 
-  object CreateActionBaseMock extends CreateActionBase(mockDataManager) {
+  object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
     def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
   }
 
@@ -147,14 +147,14 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite {
       (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
       .foreach {
         case (df, expectedRootPaths, expectedCount) =>
-          val relation = CreateActionBaseMock.getSourceRelations(df)(0)
+          val relation = CreateActionBaseWrapper.getSourceRelations(df)(0)
           val rootPaths = relation.rootPaths.map {
             case path if path.startsWith(workDir) => path.drop(workDir.size + 1) // slash
             case path => path
           }
           assert(rootPaths == expectedRootPaths)
           assert(df.count == expectedCount)
-          assert(relation.options.isDefinedAt("path") == false)
+          assert(!relation.options.isDefinedAt("path"))
         case _ => fail("invalid test")
       }
 
