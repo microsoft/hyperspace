@@ -22,6 +22,7 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
+
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
