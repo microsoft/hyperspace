@@ -97,7 +97,6 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Verify reconstruct df with path key in options") {
-
     val path1 = sampleParquetDataLocation + "table1"
     val path2 = sampleParquetDataLocation + "table2"
     FileUtils.delete(new Path(path1))

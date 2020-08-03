@@ -51,7 +51,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       .write
       .parquet(sampleParquetDataLocation)
 
-    df = spark.read.parquet(sampleParquetDataLocation)
+    df = spark.read.option("path", sampleParquetDataLocation).parquet(sampleParquetDataLocation)
   }
 
   after {
@@ -265,7 +265,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               Hdfs(sourceDataProperties),
               dataSchema.json,
               fileFormatName,
-              options)
+              options - "path")
         }
         val sourcePlanProperties = SparkPlan.Properties(
           relations,
