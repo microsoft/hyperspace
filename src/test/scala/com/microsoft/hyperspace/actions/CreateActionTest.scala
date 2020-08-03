@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileContext, Path}
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.mockito.Mockito._
@@ -35,6 +35,10 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
+
+  object CreateActionBaseMock extends CreateActionBase(mockDataManager) {
+    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+  }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -103,5 +107,58 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite {
     val ex = intercept[HyperspaceException](action.validate())
     assert(
       ex.getMessage.contains(s"Another Index with name ${indexConfig.indexName} already exists"))
+  }
+
+  test("Verify rootPaths for given LogicalRelations") {
+    val path1 = sampleParquetDataLocation + "table1"
+    val path2 = sampleParquetDataLocation + "table2"
+    FileUtils.delete(new Path(path1))
+    FileUtils.delete(new Path(path2))
+
+    import spark.implicits._
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .limit(2)
+      .write
+      .parquet(path1)
+
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .limit(3)
+      .write
+      .parquet(path2)
+
+    val workDir = FileContext.getFileContext.getWorkingDirectory.toString
+
+    Seq(
+      (spark.read.format("parquet").load(path1), Seq(path1), 2),
+      (spark.read.format("parquet").load(path1, path2), Seq(path1, path2), 5),
+      (spark.read.parquet(path1), Seq(path1), 2),
+      (spark.read.parquet(path1, path2), Seq(path1, path2), 5),
+      (spark.read.parquet(path1, path1, path1), Seq(path1, path1, path1), 6),
+      (spark.read.format("parquet").option("path", path1).load(path1), Seq(path1), 2),
+      (spark.read.format("parquet").option("path", path1).load(path2), Seq(path2), 3),
+      (spark.read.option("path", path1).parquet(path1), Seq(path1, path1), 4),
+      (spark.read.option("path", path1).parquet(path2), Seq(path1, path2), 5),
+      (
+        spark.read.format("parquet").option("path", path1).load(path1, path2),
+        Seq(path1, path1, path2),
+        7),
+      (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
+      .foreach {
+        case (df, expectedRootPaths, expectedCount) =>
+          val relation = CreateActionBaseMock.getSourceRelations(df)(0)
+          val rootPaths = relation.rootPaths.map {
+            case path if path.startsWith(workDir) => path.drop(workDir.size + 1) // slash
+            case path => path
+          }
+          assert(rootPaths == expectedRootPaths)
+          assert(df.count == expectedCount)
+          assert(relation.options.isDefinedAt("path") == false)
+        case _ => fail("invalid test")
+      }
+
+    FileUtils.delete(new Path(path1))
+    FileUtils.delete(new Path(path2))
   }
 }

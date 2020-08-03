@@ -96,43 +96,4 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
     val ex = intercept[HyperspaceException](action.validate())
     assert(ex.getMessage.contains("Refresh is only supported in ACTIVE state"))
   }
-
-  test("Verify reconstruct df with path key in options") {
-    val path1 = sampleParquetDataLocation + "table1"
-    val path2 = sampleParquetDataLocation + "table2"
-    FileUtils.delete(new Path(path1))
-    FileUtils.delete(new Path(path2))
-
-    import spark.implicits._
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .limit(2)
-      .write
-      .parquet(path1)
-
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .limit(3)
-      .write
-      .parquet(path2)
-
-    assert(spark.read.format("parquet").load(path1).count == 2)
-    assert(spark.read.format("parquet").load(path1, path2).count == 5)
-    assert(spark.read.parquet(path1).count == 2)
-    assert(spark.read.parquet(path1, path2).count == 5)
-
-    // path option ignored
-    assert(spark.read.format("parquet").option("path", path1).load(path1).count == 2)
-    assert(spark.read.format("parquet").option("path", path1).load(path2).count == 3)
-
-    // path option is not ignored
-    assert(spark.read.option("path", path1).parquet(path1).count == 4)
-    assert(spark.read.option("path", path1).parquet(path2).count == 5)
-
-    assert(spark.read.format("parquet").option("path", path1).load(path1, path2).count == 7)
-    assert(spark.read.option("path", path1).parquet(path1, path2).count == 7)
-
-    FileUtils.delete(new Path(path1))
-    FileUtils.delete(new Path(path2))
-  }
 }

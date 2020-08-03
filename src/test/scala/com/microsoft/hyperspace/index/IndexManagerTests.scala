@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import java.util.Locale
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
@@ -51,7 +49,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       .write
       .parquet(sampleParquetDataLocation)
 
-    df = spark.read.option("path", sampleParquetDataLocation).parquet(sampleParquetDataLocation)
+    df = spark.read.parquet(sampleParquetDataLocation)
   }
 
   after {
@@ -229,7 +227,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
         assert(indexCount == 3)
 
         FileUtils.delete(new Path(refreshTestLocation))
-      case _ => assert(false, "invalid test")
+      case _ => fail("invalid test")
     }
   }
 
