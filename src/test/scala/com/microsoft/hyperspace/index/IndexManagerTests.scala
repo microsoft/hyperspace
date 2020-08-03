@@ -229,6 +229,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
         assert(indexCount == 3)
 
         FileUtils.delete(new Path(refreshTestLocation))
+      case _ => assert(false, "invalid test")
     }
   }
 
