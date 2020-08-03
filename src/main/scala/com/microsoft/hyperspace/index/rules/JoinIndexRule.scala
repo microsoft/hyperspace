@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference, AttributeSet, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
@@ -291,16 +291,8 @@ object JoinIndexRule
       condition: Expression): Boolean = {
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
-    val lBaseAttrs = l
-      .collectLeaves()
-      .filter(_.isInstanceOf[LogicalRelation])
-      .flatMap(_.output)
-      .map(_.canonicalized)
-    val rBaseAttrs = r
-      .collectLeaves()
-      .filter(_.isInstanceOf[LogicalRelation])
-      .flatMap(_.output)
-      .map(_.canonicalized)
+    val lBaseAttrs = relationOutputs(l).map(_.canonicalized)
+    val rBaseAttrs = relationOutputs(r).map(_.canonicalized)
 
     def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
       (lBaseAttrs.contains(c1) && rBaseAttrs.contains(c2)) ||
@@ -351,10 +343,8 @@ object JoinIndexRule
       joinCondition: Expression,
       lIndexes: Seq[IndexLogEntry],
       rIndexes: Seq[IndexLogEntry]): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val lBaseAttrs =
-      left.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output).map(_.name)
-    val rBaseAttrs =
-      right.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output).map(_.name)
+    val lBaseAttrs = relationOutputs(left).map(_.name)
+    val rBaseAttrs = relationOutputs(right).map(_.name)
 
     // Map of left resolved columns with their corresponding right resolved
     // columns from condition.
@@ -375,6 +365,10 @@ object JoinIndexRule
     val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
 
     compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
+  }
+
+  private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {
+    l.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
   }
 
   /**
