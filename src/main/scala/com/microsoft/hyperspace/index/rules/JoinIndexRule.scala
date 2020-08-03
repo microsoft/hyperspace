@@ -557,6 +557,9 @@ object JoinIndexRule
       lIndex: IndexLogEntry,
       rIndex: IndexLogEntry,
       columnMapping: Map[String, String]): Boolean = {
+    require(columnMapping.keys.toSet.equals(lIndex.indexedColumns.toSet))
+    require(columnMapping.values.toSet.equals(rIndex.indexedColumns.toSet))
+
     val requiredRightIndexedCols = lIndex.indexedColumns.map(columnMapping)
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
