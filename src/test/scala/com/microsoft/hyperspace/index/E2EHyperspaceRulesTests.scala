@@ -157,6 +157,41 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
       Seq(
         getIndexFilesPath(leftDfIndexConfig.indexName),
         getIndexFilesPath(rightDfIndexConfig.indexName)))
+
+  }
+
+  test("E2E test for join query with alias columns is not supported.") {
+    def verifyNoChange(f: () => DataFrame): Unit = {
+      spark.disableHyperspace()
+      val originalPlan = f().queryExecution.optimizedPlan
+      val updatedPlan = JoinIndexRule(originalPlan)
+      assert(originalPlan.equals(updatedPlan))
+    }
+
+    withView("t1", "t2") {
+      val leftDf = spark.read.parquet(sampleParquetDataLocation)
+      val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
+      hyperspace.createIndex(leftDf, leftDfIndexConfig)
+
+      val rightDf = spark.read.parquet(sampleParquetDataLocation)
+      val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
+      hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+      leftDf.createOrReplaceTempView("t1")
+      rightDf.createOrReplaceTempView("t2")
+
+      // Test: join query with alias columns in join condition is not optimized.
+      def query1(): DataFrame = spark.sql("""SELECT alias, c4
+          |from t2, (select c3 as alias, c1 from t1)
+          |where t2.c3 = alias""".stripMargin)
+      verifyNoChange(query1)
+
+      // Test: join query with alias columns in project columns is not optimized.
+      def query2(): DataFrame = spark.sql("""SELECT alias, c4
+          |from t2, (select c3, c1 as alias from t1) as newt
+          |where t2.c3 = newt.c3""".stripMargin)
+      verifyNoChange(query2)
+    }
   }
 
   test("E2E test for join query on catalog temp tables/views") {
