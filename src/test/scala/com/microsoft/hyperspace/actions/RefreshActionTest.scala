@@ -26,7 +26,6 @@ import org.mockito.Mockito.{mock, when}
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 
 class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -55,13 +54,12 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   def testEntry(df: DataFrame): IndexLogEntry = {
-    val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
     val sourcePlanProperties = SparkPlan.Properties(
-      serializedPlan,
+      Seq(),
+      null,
+      null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
     val entry = IndexLogEntry(
       "index1",
@@ -72,7 +70,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
           "schema",
           10)),
       Content("dirPath", Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE
     entry
