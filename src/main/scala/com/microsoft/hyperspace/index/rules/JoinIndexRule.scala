@@ -236,6 +236,9 @@ object JoinIndexRule
    *    WHERE newT1.aliasCol = T2.b
    * Here, aliasCol is not directly from the base relation T1
    *
+   * TODO: add alias resolver for supporting aliases in join condition. Until then,
+   *   make sure this scenario isn't supported
+   *
    * 2. For each equality condition in the join predicate, one attribute must belong to the left
    * subplan, and another from right subplan.
    * E.g. A = B => A should come from left and B should come from right or vice versa.
@@ -286,7 +289,6 @@ object JoinIndexRule
       l: LogicalPlan,
       r: LogicalPlan,
       condition: Expression): Boolean = {
-    val conditions = extractConditions(condition)
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
     val lBaseAttrs = l
@@ -311,20 +313,20 @@ object JoinIndexRule
     // store just one copy of column 'A' when join condition contains column 'A' as well as 'a'.
     val attrMap = new mutable.HashMap[Expression, Expression]()
 
-    conditions.forall {
-      case EqualTo(c1, c2) =>
-        val (c1Canonicalized, c2Canonicalized) = (c1.canonicalized, c2.canonicalized)
+    extractConditions(condition).forall {
+      case EqualTo(e1, e2) =>
+        val (c1, c2) = (e1.canonicalized, e2.canonicalized)
         // Check 1: c1 and c2 should belong to l and r respectively, or r and l respectively.
-        if (!fromDifferentBaseRelations(c1Canonicalized, c2Canonicalized)) {
+        if (!fromDifferentBaseRelations(c1, c2)) {
           return false
         }
         // Check 2: c1 is compared only against c2 and vice versa.
-        if (attrMap.contains(c1Canonicalized) && attrMap.contains(c2Canonicalized)) {
-          attrMap(c1Canonicalized).equals(c2Canonicalized) &&
-          attrMap(c2Canonicalized).equals(c1Canonicalized)
-        } else if (!attrMap.contains(c1Canonicalized) && !attrMap.contains(c2Canonicalized)) {
-          attrMap.put(c1Canonicalized, c2Canonicalized)
-          attrMap.put(c2Canonicalized, c1Canonicalized)
+        if (attrMap.contains(c1) && attrMap.contains(c2)) {
+          attrMap(c1).equals(c2) &&
+          attrMap(c2).equals(c1)
+        } else if (!attrMap.contains(c1) && !attrMap.contains(c2)) {
+          attrMap.put(c1, c2)
+          attrMap.put(c2, c1)
           true
         } else {
           false
@@ -361,8 +363,8 @@ object JoinIndexRule
     val rRequiredIndexedCols = lRMap.values.toSeq
 
     // All required columns resolved with base relation.
-    val lRequiredAllCols: Seq[String] = resolve(spark, allRequiredCols(left), lBaseAttrs).get
-    val rRequiredAllCols: Seq[String] = resolve(spark, allRequiredCols(right), rBaseAttrs).get
+    val lRequiredAllCols = resolve(spark, allRequiredCols(left), lBaseAttrs).get
+    val rRequiredAllCols = resolve(spark, allRequiredCols(right), rBaseAttrs).get
 
     // Make sure required indexed columns are subset of all required columns for a subplan
     require(resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined)
