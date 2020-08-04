@@ -28,9 +28,7 @@ class Hyperspace:
         >>> _getJavaIndexConfig(idx_config)
         """
         indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
-        print(indexed_columns)
         included_columns = self._getScalaSeqFromList(index_config.includedColumns)
-        print(included_columns)
         _jindexConfig = self.jvm.com.microsoft.hyperspace.index.IndexConfig(
                      self.jvm.java.lang.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig

@@ -41,7 +41,7 @@ import fnmatch
 import subprocess
 import sys
 import shutil
-from os import path
+from os import path, environ
 
 
 def test(root_dir, package):
@@ -56,10 +56,10 @@ def test(root_dir, package):
     extra_class_path = path.join(python_root_dir, path.join("hyperspace", "testing"))
     for test_file in test_files:
         try:
-            my_env = os.environ.copy()
-            my_env["SPARK_HOME"] = os.path.join(root_dir, "spark-2.4.2-bin-hadoop2.7")
-            my_env["PATH"] = os.path.join(root_dir, os.path.join("spark-2.4.2-bin-hadoop2.7", "bin")) + ":" + my_env["PATH"]
-            cmd = ["spark-2.4.2-bin-hadoop2.7/bin/spark-submit",
+            if environ.get('SPARK_HOME') is None:
+                sys.exit(1)
+            spark_submit = path.join(environ.get('SPARK_HOME'), path.join("bin", "spark-submit"))
+            cmd = [spark-submit,
                    "--driver-class-path=%s" % extra_class_path,
                    "--jars=%s" % extra_class_path,
                    "--packages", package, test_file]
@@ -111,10 +111,6 @@ def run_cmd(cmd, throw_on_error=True, env=None, stream_output=False, **kwargs):
                 "Non-zero exitcode: %s\n\nSTDOUT:\n%s\n\nSTDERR:%s" %
                 (exit_code, stdout, stderr))
         return (exit_code, stdout, stderr)
-
-
-def run_python_style_checks(root_dir):
-    run_cmd([os.path.join(root_dir, "dev", "lint-python")], stream_output=True)
 
 
 if __name__ == "__main__":

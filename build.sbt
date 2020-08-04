@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+name := "hyperspace-core"
+
 sparkVersion := "2.4.2"
 
 lazy val scala212 = "2.12.8"
@@ -62,10 +64,8 @@ testScalastyle := scalastyle.in(Test).toTask("").value
 /***************************
 * Spark Packages settings *
 ***************************/
- 
-name := "hyperspace-core"
 
-spName := "hyperspace-core"
+spName := "microsoft/hyperspace-core"
 
 spAppendScalaVersion := true
 

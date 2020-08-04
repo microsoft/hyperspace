@@ -25,7 +25,6 @@ class HyperspaceIndexUtilizationTests(HyperspaceTestCase):
         self.hyperspace = Hyperspace(self.spark)
 
     def tearDown(self):
-        self.spark.stop()
         shutil.rmtree(self.temp_path)
         shutil.rmtree(self.temp_index_path)
         super(HyperspaceIndexUtilizationTests, self).tearDown()

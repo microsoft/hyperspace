@@ -24,9 +24,3 @@ HADOOP_VERSION="2.7"
 SPARK_DIR="spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}"
 
 curl -k -L -o "spark-${SPARK_VERSION}.tgz" "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIR}.tgz" && tar xzvf "spark-${SPARK_VERSION}.tgz"
-cd spark-2.4.2-bin-hadoop2.7
-pwd=$(pwd)
-SPARK_HOME=$(pwd)
-
-export PATH=$PATH:$SPARK_HOME/bin
-echo "Spark Home: ${SPARK_HOME}"

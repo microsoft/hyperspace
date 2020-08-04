@@ -6,7 +6,6 @@ from pyspark.sql import SparkSession
 
 
 class HyperspaceTestCase(unittest.TestCase):
-
     def setUp(self):
         self._old_sys_path = list(sys.path)
         class_name = self.__class__.__name__
