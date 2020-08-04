@@ -16,9 +16,10 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.{FileContext, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.mockito.Mockito._
 
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
@@ -26,7 +27,7 @@ import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.FileUtils
 
-class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite {
+class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHelper {
   private val indexSystemPath = "src/test/resources/indexLocation"
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -110,55 +111,53 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Verify rootPaths for given LogicalRelations") {
-    val path1 = sampleParquetDataLocation + "table1"
-    val path2 = sampleParquetDataLocation + "table2"
-    FileUtils.delete(new Path(path1))
-    FileUtils.delete(new Path(path2))
+    withTempPath { p =>
+      val path1 = p + "table1"
+      val path2 = p + "table2"
 
-    import spark.implicits._
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .limit(2)
-      .write
-      .parquet(path1)
+      FileUtils.delete(new Path(path1))
+      FileUtils.delete(new Path(path2))
 
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .limit(3)
-      .write
-      .parquet(path2)
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(2)
+        .write
+        .parquet(path1)
 
-    val workDir = FileContext.getFileContext.getWorkingDirectory.toString
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .parquet(path2)
 
-    Seq(
-      (spark.read.format("parquet").load(path1), Seq(path1), 2),
-      (spark.read.format("parquet").load(path1, path2), Seq(path1, path2), 5),
-      (spark.read.parquet(path1), Seq(path1), 2),
-      (spark.read.parquet(path1, path2), Seq(path1, path2), 5),
-      (spark.read.parquet(path1, path1, path1), Seq(path1, path1, path1), 6),
-      (spark.read.format("parquet").option("path", path1).load(path1), Seq(path1), 2),
-      (spark.read.format("parquet").option("path", path1).load(path2), Seq(path2), 3),
-      (spark.read.option("path", path1).parquet(path1), Seq(path1, path1), 4),
-      (spark.read.option("path", path1).parquet(path2), Seq(path1, path2), 5),
-      (
-        spark.read.format("parquet").option("path", path1).load(path1, path2),
-        Seq(path1, path1, path2),
-        7),
-      (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
-      .foreach {
-        case (df, expectedRootPaths, expectedCount) =>
-          val relation = CreateActionBaseWrapper.getSourceRelations(df)(0)
-          val rootPaths = relation.rootPaths.map {
-            case path if path.startsWith(workDir) => path.drop(workDir.size + 1) // slash
-            case path => path
-          }
-          assert(rootPaths == expectedRootPaths)
-          assert(df.count == expectedCount)
-          assert(!relation.options.isDefinedAt("path"))
-        case _ => fail("invalid test")
-      }
+      Seq(
+        (spark.read.format("parquet").load(path1), Seq(path1), 2),
+        (spark.read.format("parquet").load(path1, path2), Seq(path1, path2), 5),
+        (spark.read.parquet(path1), Seq(path1), 2),
+        (spark.read.parquet(path1, path2), Seq(path1, path2), 5),
+        (spark.read.parquet(path1, path1, path1), Seq(path1, path1, path1), 6),
+        (spark.read.format("parquet").option("path", path1).load(path1), Seq(path1), 2),
+        (spark.read.format("parquet").option("path", path1).load(path2), Seq(path2), 3),
+        (spark.read.option("path", path1).parquet(path1), Seq(path1, path1), 4),
+        (spark.read.option("path", path1).parquet(path2), Seq(path1, path2), 5),
+        (
+          spark.read.format("parquet").option("path", path1).load(path1, path2),
+          Seq(path1, path1, path2),
+          7),
+        (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
+        .foreach {
+          case (df, expectedPaths, expectedCount) =>
+            val relation = CreateActionBaseWrapper.getSourceRelations(df).head
+            val expectedRootPaths = expectedPaths.map("file:" + _)
 
-    FileUtils.delete(new Path(path1))
-    FileUtils.delete(new Path(path2))
+            assert(relation.rootPaths == expectedRootPaths)
+            assert(df.count == expectedCount)
+            assert(!relation.options.isDefinedAt("path"))
+        }
+
+      FileUtils.delete(new Path(path1))
+      FileUtils.delete(new Path(path2))
+    }
   }
 }

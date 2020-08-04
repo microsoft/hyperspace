@@ -26,7 +26,6 @@ import org.mockito.Mockito.{mock, when}
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.FileUtils
 
 class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
