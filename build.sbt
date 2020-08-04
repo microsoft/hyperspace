@@ -14,45 +14,28 @@
  * limitations under the License.
  */
 
-/***************************
-* Spark Packages settings *
-***************************/
- 
 sparkVersion := "2.4.2"
-
-name := "hyperspace-core"
-
-spName := "hyperspace-core"
-
-spAppendScalaVersion := true
-
-spIncludeMaven := true
-
-spIgnoreProvided := true
-
-packageBin in Compile := spPackage.value
 
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
 lazy val supportedScalaVersions = List(scala212, scala211)
-lazy val spkVer = "2.4.2"
 
 scalaVersion := scala212
 
 crossScalaVersions := supportedScalaVersions
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-sql" % spkVer % "provided" withSources(),
-  "org.apache.spark" %% "spark-core" % spkVer % "provided" withSources(),
-  "org.apache.spark" %% "spark-catalyst" % spkVer % "provided" withSources(),
+  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources(),
+  "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources(),
+  "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
-  "org.apache.spark" %% "spark-catalyst" % spkVer % "test" classifier "tests",
-  "org.apache.spark" %% "spark-core" % spkVer % "test" classifier "tests",
-  "org.apache.spark" %% "spark-sql" % spkVer % "test" classifier "tests",
-  "org.apache.spark" %% "spark-hive" % spkVer % "test" classifier "tests"
+  "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "test" classifier "tests",
+  "org.apache.spark" %% "spark-core" % sparkVersion.value % "test" classifier "tests",
+  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
+  "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
 )
 
 scalacOptions ++= Seq(
@@ -75,6 +58,22 @@ compileScalastyle := scalastyle.in(Compile).toTask("").value
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
 testScalastyle := scalastyle.in(Test).toTask("").value
 (test in Test) := ((test in Test) dependsOn testScalastyle).value
+
+/***************************
+* Spark Packages settings *
+***************************/
+ 
+name := "hyperspace-core"
+
+spName := "hyperspace-core"
+
+spAppendScalaVersion := true
+
+spIncludeMaven := true
+
+spIgnoreProvided := true
+
+packageBin in Compile := spPackage.value
 
 /***********************
  * Test configurations *

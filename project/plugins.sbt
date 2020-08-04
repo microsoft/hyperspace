@@ -22,4 +22,4 @@ addSbtPlugin("com.jsuereth" % "sbt-pgp" % "2.0.1")
 
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
-addSbtPlugin("org.spark-packages" % "sbt-spark-package" % "0.2.6") 
+addSbtPlugin("org.spark-packages" % "sbt-spark-package" % "0.2.6")

@@ -21,7 +21,7 @@ jobs:
         displayName: 'Running $sbt +test'
       - task: Bash@3
         inputs:
-          filePath: 'download_spark.sh'
+          filePath: 'script/download_spark.sh'
         displayName: 'Downloading spark'
       - script: python run-tests.py
         displayName: 'Running python tests'

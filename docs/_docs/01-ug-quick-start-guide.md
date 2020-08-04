@@ -67,7 +67,7 @@ pip install pyspark==2.4.2
 
 Then, run PySpark with the Hyperspace package:
 ```
-pyspark --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.1.0
+pyspark --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.2.0
 ```
 
 ## Hyperspace APIs
