@@ -18,14 +18,15 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
-class E2EHyperspaceRulesTests extends HyperspaceSuite {
+class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private val sampleData = SampleData.testData
   private val testDir = "src/test/resources/e2eTests/"
   private val sampleParquetDataLocation = testDir + "sampleparquet"
@@ -91,6 +92,36 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
   }
 
+  test("E2E test for case insensitive filter query utilizing indexes.") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("filterIndex", Seq("C3"), Seq("C1"))
+
+    hyperspace.createIndex(df, indexConfig)
+
+    def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
+
+    // Verify if case-insensitive index works with case-insensitive query.
+    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+  }
+
+  test("E2E test for case sensitive filter query where changing conf changes behavior.") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+
+    hyperspace.createIndex(df, indexConfig)
+    def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
+
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
+      intercept[AnalysisException] {
+        query().show
+      }
+    }
+
+    withSQLConf("spark.sql.caseSensitive" -> "false") {
+      verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+    }
+  }
+
   test("E2E test for filter query when all columns are selected.") {
     val df = spark.read.parquet(sampleParquetDataLocation)
     val indexConfig = IndexConfig("filterIndex", Seq("c4", "c3"), Seq("c1", "c2", "c5"))
@@ -118,6 +149,26 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
 
     def query(): DataFrame = {
       leftDf.join(rightDf, leftDf("c3") === rightDf("c3")).select(leftDf("c1"), rightDf("c4"))
+    }
+
+    verifyIndexUsage(
+      query,
+      Seq(
+        getIndexFilesPath(leftDfIndexConfig.indexName),
+        getIndexFilesPath(rightDfIndexConfig.indexName)))
+  }
+
+  test("E2E test for join query with case-insensitive column names.") {
+    val leftDf = spark.read.parquet(sampleParquetDataLocation)
+    val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
+    hyperspace.createIndex(leftDf, leftDfIndexConfig)
+
+    val rightDf = spark.read.parquet(sampleParquetDataLocation)
+    val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
+    hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+    def query(): DataFrame = {
+      leftDf.join(rightDf, leftDf("c3") === rightDf("C3")).select(leftDf("C1"), rightDf("c4"))
     }
 
     verifyIndexUsage(

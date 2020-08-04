@@ -24,6 +24,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -49,8 +50,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
+    // Resolve the passed column names with existing column names from the dataframe.
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val schema = {
-      val allColumns = indexConfig.indexedColumns ++ indexConfig.includedColumns
+      val allColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
       df.select(allColumns.head, allColumns.tail: _*).schema
     }
 
@@ -72,7 +75,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           CoveringIndex(
             CoveringIndex.Properties(
               CoveringIndex.Properties
-                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+                .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(schema),
               numBuckets)),
           Content(path.toString, Seq()),
@@ -121,13 +124,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS,
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
-    val selectedColumns = indexConfig.indexedColumns ++ indexConfig.includedColumns
+
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
+    val selectedColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
     val indexDataFrame = df.select(selectedColumns.head, selectedColumns.tail: _*)
-    val indexColNames = indexConfig.indexedColumns
 
     // run job
     val repartitionedIndexDataFrame =
-      indexDataFrame.repartition(numBuckets, indexColNames.map(df(_)): _*)
+      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(df(_)): _*)
 
     // Save the index with the number of buckets specified.
     repartitionedIndexDataFrame.write
@@ -135,6 +139,28 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         repartitionedIndexDataFrame,
         indexDataPath.toString,
         numBuckets,
-        indexColNames)
+        resolvedIndexedColumns)
+  }
+
+  private def resolveConfig(
+      df: DataFrame,
+      indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
+    val spark = df.sparkSession
+    val dfColumnNames = df.schema.fieldNames
+    val indexedColumns = indexConfig.indexedColumns
+    val includedColumns = indexConfig.includedColumns
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
+    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
+
+    (resolvedIndexedColumns, resolvedIncludedColumns) match {
+      case (Some(indexed), Some(included)) => (indexed, included)
+      case _ =>
+        val unresolvedColumns = (indexedColumns ++ includedColumns)
+          .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
+          .collect { case c if c._2.isEmpty => c._1 }
+        throw HyperspaceException(
+          s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
+            s"from available source columns '${dfColumnNames.mkString(",")}'")
+    }
   }
 }

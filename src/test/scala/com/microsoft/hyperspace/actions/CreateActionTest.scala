@@ -104,10 +104,21 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
   test("validate() fails if old index logs found with non-DOESNOTEXIST state") {
     when(mockLogManager.getLatestLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
     val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
-    // No exception thrown is considered a pass
     val ex = intercept[HyperspaceException](action.validate())
     assert(
       ex.getMessage.contains(s"Another Index with name ${indexConfig.indexName} already exists"))
+  }
+
+  test("op() fails if index config is of wrong case and spark is case-sensitive") {
+    when(mockLogManager.getLatestLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
+    val indexConfig = IndexConfig("index1", Seq("rgUID"), Seq("dATE"))
+    val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
+      val ex = intercept[HyperspaceException](action.op())
+      assert(
+        ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
+          "source columns 'Date,RGUID,Query,imprs,clicks'"))
+    }
   }
 
   test("Verify rootPaths for given LogicalRelations") {
