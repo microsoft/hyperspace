@@ -18,14 +18,15 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
-class E2EHyperspaceRulesTests extends HyperspaceSuite {
+class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private val sampleData = SampleData.testData
   private val testDir = "src/test/resources/e2eTests/"
   private val sampleParquetDataLocation = testDir + "sampleparquet"
@@ -101,6 +102,24 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite {
 
     // Verify if case-insensitive index works with case-insensitive query.
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+  }
+
+  test("E2E test for case sensitive filter query where changing conf changes behavior.") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+
+    hyperspace.createIndex(df, indexConfig)
+    def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
+
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
+      intercept[AnalysisException] {
+        query().show
+      }
+    }
+
+    withSQLConf("spark.sql.caseSensitive" -> "false") {
+      verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+    }
   }
 
   test("E2E test for filter query when all columns are selected.") {

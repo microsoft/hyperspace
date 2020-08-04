@@ -314,8 +314,7 @@ object JoinIndexRule
         }
         // Check 2: c1 is compared only against c2 and vice versa.
         if (attrMap.contains(c1) && attrMap.contains(c2)) {
-          attrMap(c1).equals(c2) &&
-          attrMap(c2).equals(c1)
+          attrMap(c1).equals(c2) && attrMap(c2).equals(c1)
         } else if (!attrMap.contains(c1) && !attrMap.contains(c2)) {
           attrMap.put(c1, c2)
           attrMap.put(c2, c1)
