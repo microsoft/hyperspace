@@ -108,12 +108,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")
         }
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts = options - "path"
         Relation(
           location.rootPaths.map(_.toString),
           Hdfs(sourceDataProperties),
           dataSchema.json,
           fileFormatName,
-          options)
+          opts)
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

@@ -37,6 +37,10 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
 
+  object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+  }
+
   override def beforeAll(): Unit = {
     super.beforeAll()
 
@@ -111,8 +115,54 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
     val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
     withSQLConf("spark.sql.caseSensitive" -> "true") {
       val ex = intercept[HyperspaceException](action.op())
-      assert(ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
-        "source columns 'Date,RGUID,Query,imprs,clicks'"))
+      assert(
+        ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
+          "source columns 'Date,RGUID,Query,imprs,clicks'"))
+    }
+  }
+
+  test("Verify rootPaths for given LogicalRelations") {
+    withTempPath { p =>
+      val path1 = p + "table1"
+      val path2 = p + "table2"
+
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(2)
+        .write
+        .parquet(path1)
+
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .parquet(path2)
+
+      Seq(
+        (spark.read.format("parquet").load(path1), Seq(path1), 2),
+        (spark.read.format("parquet").load(path1, path2), Seq(path1, path2), 5),
+        (spark.read.parquet(path1), Seq(path1), 2),
+        (spark.read.parquet(path1, path2), Seq(path1, path2), 5),
+        (spark.read.parquet(path1, path1, path1), Seq(path1, path1, path1), 6),
+        (spark.read.format("parquet").option("path", path1).load(path1), Seq(path1), 2),
+        (spark.read.format("parquet").option("path", path1).load(path2), Seq(path2), 3),
+        (spark.read.option("path", path1).parquet(path1), Seq(path1, path1), 4),
+        (spark.read.option("path", path1).parquet(path2), Seq(path1, path2), 5),
+        (
+          spark.read.format("parquet").option("path", path1).load(path1, path2),
+          Seq(path1, path1, path2),
+          7),
+        (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
+        .foreach {
+          case (df, expectedPaths, expectedCount) =>
+            val relation = CreateActionBaseWrapper.getSourceRelations(df).head
+            val expectedRootPaths = expectedPaths.map("file:" + _)
+
+            assert(relation.rootPaths == expectedRootPaths)
+            assert(df.count == expectedCount)
+            assert(!relation.options.isDefinedAt("path"))
+        }
     }
   }
 }
