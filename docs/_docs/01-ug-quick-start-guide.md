@@ -59,10 +59,10 @@ Start the Spark Scala shell as follows:
 ```
 
 #### PySpark
-Install or upgrade Pyspark by running the following:
+Install Pyspark by running the following:
 
 ```
-pip install --upgrade pyspark
+pip install pyspark==2.4.2
 ```
 
 Then, run PySpark with the Hyperspace package:
