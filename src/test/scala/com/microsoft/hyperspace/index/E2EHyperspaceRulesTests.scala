@@ -176,7 +176,6 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       Seq(
         getIndexFilesPath(leftDfIndexConfig.indexName),
         getIndexFilesPath(rightDfIndexConfig.indexName)))
-
   }
 
   test("E2E test for join query with alias columns is not supported.") {
