@@ -157,8 +157,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
           .collect { case c if c._2.isEmpty => c._1 }
         throw HyperspaceException(
-          s"Columns $unresolvedColumns could not be resolved " +
-            s"from available source columns $dfColumnNames")
+          s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
+            s"from available source columns '${dfColumnNames.mkString(",")}'")
     }
   }
 }
