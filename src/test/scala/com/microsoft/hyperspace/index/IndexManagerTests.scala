@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import java.util.Locale
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
@@ -229,6 +227,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
         assert(indexCount == 3)
 
         FileUtils.delete(new Path(refreshTestLocation))
+      case _ => fail("invalid test")
     }
   }
 
@@ -264,7 +263,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               Hdfs(sourceDataProperties),
               dataSchema.json,
               fileFormatName,
-              options)
+              options - "path")
         }
         val sourcePlanProperties = SparkPlan.Properties(
           relations,

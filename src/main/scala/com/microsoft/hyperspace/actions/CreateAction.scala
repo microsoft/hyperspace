@@ -25,7 +25,7 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
-import com.microsoft.hyperspace.util.LogicalPlanUtils
+import com.microsoft.hyperspace.util.{LogicalPlanUtils, ResolverUtils}
 
 class CreateAction(
     spark: SparkSession,
@@ -64,12 +64,11 @@ class CreateAction(
     }
   }
 
-  private def isValidIndexSchema(indexConfig: IndexConfig, schema: StructType): Boolean = {
-    val validColumnNames = schema.fieldNames
-    val indexedColumns = indexConfig.indexedColumns
-    val includedColumns = indexConfig.includedColumns
-    indexedColumns.forall(validColumnNames.contains) && includedColumns.forall(
-      validColumnNames.contains)
+  private def isValidIndexSchema(config: IndexConfig, schema: StructType): Boolean = {
+    // Resolve index config columns from available column names present in the schema.
+    ResolverUtils
+      .resolve(spark, config.indexedColumns ++ config.includedColumns, schema.fieldNames)
+      .isDefined
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().

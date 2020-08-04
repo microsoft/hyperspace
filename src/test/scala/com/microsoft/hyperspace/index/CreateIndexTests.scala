@@ -16,18 +16,19 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.DataFrame
+import scala.collection.mutable.WrappedArray
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.SQLHelper
+
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
-class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
-
+class CreateIndexTests extends HyperspaceSuite with SQLHelper {
+  override val systemPath = new Path("src/test/resources/indexLocation")
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexSystemPath = "src/test/resources/indexLocation"
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private var df: DataFrame = _
@@ -39,14 +40,12 @@ class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
     val sparkSession = spark
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
-    FileUtils.delete(new Path(indexSystemPath))
     FileUtils.delete(new Path(sampleParquetDataLocation))
 
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     dfFromSample.write.parquet(sampleParquetDataLocation)
 
     df = spark.read.parquet(sampleParquetDataLocation)
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
   }
 
   override def afterAll(): Unit = {
@@ -55,12 +54,12 @@ class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   after {
-    FileUtils.delete(new Path(indexSystemPath))
+    FileUtils.delete(systemPath)
   }
 
   test("Creating one index.") {
     hyperspace.createIndex(df, indexConfig1)
-    val count = hyperspace.indexes.where(s"""name = "${indexConfig1.indexName}" """).count
+    val count = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ").count
     assert(count == 1)
   }
 
@@ -85,6 +84,27 @@ class CreateIndexTests extends SparkFunSuite with SparkInvolvedSuite {
       hyperspace.createIndex(df, IndexConfig("index1", Seq("IllegalColA"), Seq("IllegalColB")))
     }
     assert(exception.getMessage.contains("Index config is not applicable to dataframe schema"))
+  }
+
+  test("Index creation passes with columns of different case if case-sensitivity is false.") {
+    hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
+    val indexes = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ")
+    assert(indexes.count == 1)
+    assert(
+      indexes.head.getAs[WrappedArray[String]]("indexedColumns").head == "Query",
+      "Indexed columns with wrong case are stored in metadata")
+    assert(
+      indexes.head.getAs[WrappedArray[String]]("includedColumns").head == "imprs",
+      "Included columns with wrong case are stored in metadata")
+  }
+
+  test("Index creation fails with columns of different case if case-sensitivity is true.") {
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
+      val exception = intercept[HyperspaceException] {
+        hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
+      }
+      assert(exception.getMessage.contains("Index config is not applicable to dataframe schema."))
+    }
   }
 
   test("Index creation fails since the dataframe has a filter node.") {

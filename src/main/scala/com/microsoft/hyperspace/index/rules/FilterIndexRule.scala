@@ -29,6 +29,7 @@ import org.apache.spark.sql.types.StructType
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -137,8 +138,6 @@ object FilterIndexRule
    * For a given relation, find all available indexes on it which fully cover given output and
    * filter columns.
    *
-   * TODO: This method is duplicated in FilterIndexRule and JoinIndexRule. Deduplicate.
-   *
    * @param filter Filter node in the subplan that is being optimized.
    * @param outputColumns List of output columns in subplan.
    * @param filterColumns List of columns in filter predicate.
@@ -193,8 +192,8 @@ object FilterIndexRule
     val allColumnsInIndex = indexedColumns ++ includedColumns
 
     // TODO: Normalize predicates into CNF and incorporate more conditions.
-    filterColumns.contains(indexedColumns.head) &&
-    allColumnsInPlan.forall(allColumnsInIndex.contains)
+    ResolverUtils.resolve(spark, indexedColumns.head, filterColumns).isDefined &&
+    ResolverUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex).isDefined
   }
 
   /**
