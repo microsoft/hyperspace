@@ -19,11 +19,12 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -40,8 +41,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
-      path: Path,
-      sourceFiles: Seq[String]): IndexLogEntry = {
+      path: Path): IndexLogEntry = {
     val numBuckets = spark.sessionState.conf
       .getConfString(
         IndexConstants.INDEX_NUM_BUCKETS,
@@ -50,53 +50,73 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
+    // Resolve the passed column names with existing column names from the dataframe.
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val schema = {
-      val allColumns = indexConfig.indexedColumns ++ indexConfig.includedColumns
+      val allColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
       df.select(allColumns.head, allColumns.tail: _*).schema
     }
 
-    // Here we use the unanalyzed logical plan returned by the parser, before analysis and
-    // optimization. Analyzed and optimized plans have additional ser/de issues that are not
-    // fully covered by the current ser/de framework.
-    val serializedPlan =
-      LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
-
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
+        val relations = sourceRelations(df)
+        // Currently we only support to create an index on a LogicalRelation.
+        assert(relations.size == 1)
+
         val sourcePlanProperties = SparkPlan.Properties(
-          serializedPlan,
+          relations,
+          null,
+          null,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
-
-        // Note: Source files are fingerprinted as part of the serialized logical plan currently.
-        val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
 
         IndexLogEntry(
           indexConfig.indexName,
           CoveringIndex(
             CoveringIndex.Properties(
               CoveringIndex.Properties
-                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+                .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(schema),
               numBuckets)),
           Content(path.toString, Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Source(SparkPlan(sourcePlanProperties)),
           Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
   }
 
-  protected def sourceFiles(df: DataFrame): Seq[String] =
+  protected def sourceRelations(df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          HadoopFsRelation(
+            location: PartitioningAwareFileIndex,
+            _,
+            dataSchema,
+            _,
+            fileFormat,
+            options),
           _,
           _,
           _) =>
-        location.allFiles.map(_.getPath.toString)
-    }.flatten
+        val files = location.allFiles.map(_.getPath.toString)
+        // Note that source files are currently fingerprinted when the optimized plan is
+        // fingerprinted by LogicalPlanFingerprint.
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val fileFormatName = fileFormat match {
+          case d: DataSourceRegister => d.shortName
+          case other => throw HyperspaceException(s"Unsupported file format: $other")
+        }
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts = options - "path"
+        Relation(
+          location.rootPaths.map(_.toString),
+          Hdfs(sourceDataProperties),
+          dataSchema.json,
+          fileFormatName,
+          opts)
+    }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = spark.sessionState.conf
@@ -104,13 +124,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS,
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
-    val selectedColumns = indexConfig.indexedColumns ++ indexConfig.includedColumns
+
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
+    val selectedColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
     val indexDataFrame = df.select(selectedColumns.head, selectedColumns.tail: _*)
-    val indexColNames = indexConfig.indexedColumns
 
     // run job
     val repartitionedIndexDataFrame =
-      indexDataFrame.repartition(numBuckets, indexColNames.map(df(_)): _*)
+      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(df(_)): _*)
 
     // Save the index with the number of buckets specified.
     repartitionedIndexDataFrame.write
@@ -118,6 +139,28 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         repartitionedIndexDataFrame,
         indexDataPath.toString,
         numBuckets,
-        indexColNames)
+        resolvedIndexedColumns)
+  }
+
+  private def resolveConfig(
+      df: DataFrame,
+      indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
+    val spark = df.sparkSession
+    val dfColumnNames = df.schema.fieldNames
+    val indexedColumns = indexConfig.indexedColumns
+    val includedColumns = indexConfig.includedColumns
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
+    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
+
+    (resolvedIndexedColumns, resolvedIncludedColumns) match {
+      case (Some(indexed), Some(included)) => (indexed, included)
+      case _ =>
+        val unresolvedColumns = (indexedColumns ++ includedColumns)
+          .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
+          .collect { case c if c._2.isEmpty => c._1 }
+        throw HyperspaceException(
+          s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
+            s"from available source columns '${dfColumnNames.mkString(",")}'")
+    }
   }
 }

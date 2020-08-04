@@ -20,12 +20,12 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
 import com.microsoft.hyperspace.util.FileUtils
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
@@ -72,7 +72,6 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       200,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
       s"$indexStorageLocation/index1/v__=0",
-      df.queryExecution.optimizedPlan.toString(),
       Constants.States.ACTIVE)
     assert(actual.equals(expected))
   }
@@ -187,40 +186,49 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Verify refresh-full rebuild of index.") {
-    val refreshTestLocation = sampleParquetDataLocation + "refresh"
-    FileUtils.delete(new Path(refreshTestLocation))
-    import spark.implicits._
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .limit(10)
-      .write
-      .parquet(refreshTestLocation)
-    val df = spark.read.parquet(refreshTestLocation)
-    hyperspace.createIndex(df, indexConfig1)
-    var indexCount =
-      spark.read
-        .parquet(s"$indexStorageLocation/index1" +
-          s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-        .count()
-    assert(indexCount == 10)
+    Seq(("csv", Map("header" -> "true")), ("parquet", Map()), ("json", Map())).foreach {
+      case (format, option: Map[String, String]) =>
+        val refreshTestLocation = sampleParquetDataLocation + "refresh_" + format
+        FileUtils.delete(new Path(refreshTestLocation))
+        val indexConfig = IndexConfig(s"index_$format", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .options(option)
+          .format(format)
+          .save(refreshTestLocation)
+        val df = spark.read.format(format).options(option).load(refreshTestLocation)
+        hyperspace.createIndex(df, indexConfig)
+        var indexCount =
+          spark.read
+            .parquet(s"$indexStorageLocation/index_$format" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+            .count()
+        assert(indexCount == 10)
 
-    // Change Original Data
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .limit(3)
-      .write
-      .mode("overwrite")
-      .parquet(refreshTestLocation)
-    hyperspace.refreshIndex(indexConfig1.indexName)
-    indexCount = spark.read
-      .parquet(s"$indexStorageLocation/index1" +
-        s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
-      .count()
+        // Change Original Data
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(3)
+          .write
+          .mode("overwrite")
+          .options(option)
+          .format(format)
+          .save(refreshTestLocation)
+        hyperspace.refreshIndex(indexConfig.indexName)
+        indexCount = spark.read
+          .parquet(s"$indexStorageLocation/index_$format" +
+            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+          .count()
 
-    // Check if index got updated
-    assert(indexCount == 3)
+        // Check if index got updated
+        assert(indexCount == 3)
 
-    FileUtils.delete(new Path(refreshTestLocation))
+        FileUtils.delete(new Path(refreshTestLocation))
+      case _ => fail("invalid test")
+    }
   }
 
   private def expectedIndex(
@@ -231,22 +239,39 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
 
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val serializedPlan = LogicalPlanSerDeUtils.serialize(df.queryExecution.logical, spark)
-        val sourcePlanProperties = SparkPlan.Properties(
-          serializedPlan,
-          LogicalPlanFingerprint(
-            LogicalPlanFingerprint.Properties(
-              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
-        val sourceFiles = df.queryExecution.optimizedPlan.collect {
+        val relations = df.queryExecution.optimizedPlan.collect {
           case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              HadoopFsRelation(
+                location: PartitioningAwareFileIndex,
+                _,
+                dataSchema,
+                _,
+                fileFormat,
+                options),
               _,
               _,
               _) =>
-            location.allFiles.map(_.getPath.toString)
-        }.flatten
-        val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", sourceFiles, NoOpFingerprint()))))
+            val files = location.allFiles.map(_.getPath.toString)
+            val sourceDataProperties =
+              Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+            val fileFormatName = fileFormat match {
+              case d: DataSourceRegister => d.shortName
+              case other => throw HyperspaceException(s"Unsupported file format $other")
+            }
+            Relation(
+              location.rootPaths.map(_.toString),
+              Hdfs(sourceDataProperties),
+              dataSchema.json,
+              fileFormatName,
+              options - "path")
+        }
+        val sourcePlanProperties = SparkPlan.Properties(
+          relations,
+          null,
+          null,
+          LogicalPlanFingerprint(
+            LogicalPlanFingerprint.Properties(
+              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,
@@ -260,7 +285,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
             s"$indexStorageLocation/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
-          Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+          Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state
         entry

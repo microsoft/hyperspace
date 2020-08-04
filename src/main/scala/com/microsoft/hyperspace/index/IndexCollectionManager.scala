@@ -146,7 +146,6 @@ object IndexCollectionManager {
  * @param numBuckets number of buckets
  * @param schema index schema json
  * @param indexLocation index location
- * @param queryPlan original dataframe query plan on which this index is built
  * @param state index state
  */
 private[hyperspace] case class IndexSummary(
@@ -156,7 +155,6 @@ private[hyperspace] case class IndexSummary(
     numBuckets: Int,
     schema: String,
     indexLocation: String,
-    queryPlan: String,
     state: String)
 
 private[hyperspace] object IndexSummary {
@@ -168,7 +166,6 @@ private[hyperspace] object IndexSummary {
       entry.numBuckets,
       entry.derivedDataset.properties.schemaString,
       entry.content.root,
-      entry.plan(spark).toString,
       entry.state)
   }
 }
