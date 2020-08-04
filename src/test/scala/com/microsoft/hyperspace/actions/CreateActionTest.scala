@@ -115,9 +115,6 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
       val path1 = p + "table1"
       val path2 = p + "table2"
 
-      FileUtils.delete(new Path(path1))
-      FileUtils.delete(new Path(path2))
-
       import spark.implicits._
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -155,9 +152,6 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
             assert(df.count == expectedCount)
             assert(!relation.options.isDefinedAt("path"))
         }
-
-      FileUtils.delete(new Path(path1))
-      FileUtils.delete(new Path(path2))
     }
   }
 }
