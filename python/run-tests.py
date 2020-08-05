@@ -57,6 +57,7 @@ def test(root_dir, package):
     for test_file in test_files:
         try:
             if environ.get('SPARK_HOME') is None:
+                print("SPARK_HOME is not set in the environment variables.")
                 sys.exit(1)
             my_env = os.environ.copy()
             cmd = [os.path.join(my_env["SPARK_HOME"], os.path.join("bin", "spark-submit")),
