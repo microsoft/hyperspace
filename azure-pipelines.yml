@@ -25,9 +25,14 @@ jobs:
       - task: Bash@3
         inputs:
           filePath: 'script/download_spark.sh'
+          arguments: '2.4.2 2.7'
         displayName: 'Downloading spark'
-      - script: python run-tests.py
+      - task: Bash@3
+        inputs:
+          filePath: 'python run-tests.py'
         displayName: 'Running python tests'
+        env:
+          SPARK_HOME: $(Build.BinariesDirectory)\spark-2.4.2-bin-hadoop2.7
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
         - script: sbt +package
