@@ -59,7 +59,16 @@ Start the Spark Scala shell as follows:
 ```
 
 #### PySpark
-Support for Pyspark is [on the way](https://github.com/microsoft/hyperspace/pull/36).
+Install Pyspark by running the following:
+
+```
+pip install pyspark==2.4.2
+```
+
+Then, run PySpark with the Hyperspace package:
+```
+pyspark --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.2.0
+```
 
 ## Hyperspace APIs
 
