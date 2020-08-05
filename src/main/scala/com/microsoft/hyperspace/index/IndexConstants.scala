@@ -47,4 +47,6 @@ object IndexConstants {
     val PLAIN_TEXT = "plaintext"
     val HTML = "html"
   }
+
+  val DATA_FILE_NAME_COLUMN = "_data_file_name"
 }

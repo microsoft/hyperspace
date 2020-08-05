@@ -16,9 +16,11 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.functions.{input_file_name, udf}
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -53,8 +55,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     // Resolve the passed column names with existing column names from the dataframe.
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val schema = {
-      val allColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
-      df.select(allColumns.head, allColumns.tail: _*).schema
+      val indexConfigColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
+      val allColumns = indexConfigColumns ++ internalColumns(df, indexConfigColumns)
+      df.select(allColumns.head, allColumns.tail: _*)
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, fileName(input_file_name()))
+        .schema
     }
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
@@ -126,8 +131,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .toInt
 
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val selectedColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val indexDataFrame = df.select(selectedColumns.head, selectedColumns.tail: _*)
+    val indexConfigColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
+    val selectedColumns = indexConfigColumns ++ internalColumns(df, indexConfigColumns)
+    val indexDataFrame = df
+      .select(selectedColumns.head, selectedColumns.tail: _*)
+      .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, fileName(input_file_name()))
 
     // run job
     val repartitionedIndexDataFrame =
@@ -163,4 +171,17 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
             s"from available source columns '${dfColumnNames.mkString(",")}'")
     }
   }
+
+  private def internalColumns(df: DataFrame, indexConfigColumns: Seq[String]): Seq[String] = {
+    val partitionSchema = df.queryExecution.optimizedPlan.collect {
+      case LogicalRelation(HadoopFsRelation(_, pSchema, _, _, _, _), _, _, _) => pSchema
+    }
+
+    val spark = df.sparkSession
+    partitionSchema.head
+      .map(_.name)
+      .filter(ResolverUtils.resolve(spark, _, indexConfigColumns).isEmpty)
+  }
+
+  private val fileName = udf((fullFilePath: String) => FilenameUtils.getBaseName(fullFilePath))
 }
