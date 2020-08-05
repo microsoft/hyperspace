@@ -22,7 +22,6 @@ jobs:
       - task: Bash@3
         inputs:
           filePath: 'script/download_spark.sh'
-          arguments: '2.4.2 2.7'
         displayName: 'Downloading spark'
       - task: PythonScript@0
         inputs:
