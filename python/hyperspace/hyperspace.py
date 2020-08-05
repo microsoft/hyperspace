@@ -136,7 +136,7 @@ class Hyperspace:
         analyzer = self.jvm.com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
         result_string = analyzer.explainString(df._jdf, self.spark._jsparkSession,
                                                self.hyperspace.indexes(), verbose)
-        redirectFunc(self.jvm.java.lang.String(result_string))
+        redirectFunc(result_string)
 
     @staticmethod
     def enable(spark):
