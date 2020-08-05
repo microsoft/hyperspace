@@ -48,7 +48,7 @@ object BenchmarkRunner {
     val spark = SparkSession
       .builder()
       .getOrCreate()
-    
+
     // Change log level to clean up output
     spark.sparkContext.setLogLevel("ERROR")
 
