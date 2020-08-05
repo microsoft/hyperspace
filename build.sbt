@@ -147,6 +147,12 @@ developers := List(
     name  = "Jiying Li",
     email = "",
     url   = url("https://github.com/laserljy")
+  ),
+  Developer(
+    id    = "sezruby",
+    name  = "Enujin Song",
+    email = "",
+    url   = url("https://github.com/sezruby")
   )
 )
 
