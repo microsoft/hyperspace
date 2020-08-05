@@ -58,6 +58,7 @@ def test(root_dir, package):
         try:
             if environ.get('SPARK_HOME') is None:
                 sys.exit(1)
+            my_env = os.env.copy()
             cmd = [os.path.join(my_env["SPARK_HOME"], os.path.join("bin", "spark-submit")),
                    "--driver-class-path=%s" % extra_class_path,
                    "--jars=%s" % extra_class_path,
