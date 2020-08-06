@@ -48,6 +48,10 @@ object BenchmarkRunner {
     val spark = SparkSession
       .builder()
       .getOrCreate()
+    // ------------------
+//    val sparkConf = new SparkConf().setMaster("local[*]")
+//    val spark = SparkSession.builder.config(sparkConf).getOrCreate()
+    // ------------------
 
     // Change log level to clean up output
     spark.sparkContext.setLogLevel("ERROR")
@@ -79,7 +83,8 @@ object BenchmarkRunner {
       // Get Index Sizes
       println("Collecting index sizes and printing sample records from each.")
       val indexNames =
-        if (benchmarkName.equals("tpch")) TPCHBenchmark.recommendedIndexes.map(x => parseIndexConf(x).config.indexName)
+        if (benchmarkName.equals("tpch"))
+          TPCHBenchmark.recommendedIndexes.map(x => parseIndexConf(x).config.indexName)
         else TPCDSBenchmark.recommendedIndexes.map(x => parseIndexConf(x).config.indexName)
 
       var indexesSizeStats = Seq[Tuple2[String, Long]]()
@@ -209,6 +214,11 @@ object BenchmarkRunner {
     require(!spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH).isEmpty)
     spark.conf.set(IndexConstants.INDEX_NUM_BUCKETS, buckets)
 
+    // ---------- pouriap delete me ---------------
+    println(s"Printing indexes ")
+    hyperspace.indexes.show(100)
+    // ------------------------------------
+
     val indexes =
       if (benchmark.equals("tpch")) TPCHBenchmark.recommendedIndexes
       else TPCDSBenchmark.recommendedIndexes
@@ -271,6 +281,11 @@ object BenchmarkRunner {
     val df = readBaseTableData(spark, baseTableData, format)
     println(
       s"\tCreating index ${indexInfo.config.indexName} on data files under $baseTableData ...")
+
+    // ----- pouriap delete me -----
+    println(s"Sample records from base table ")
+    df.show(2, false)
+    //------------------------------
 
     val startTime = System.currentTimeMillis()
     hyperspace.createIndex(df, indexInfo.config)
