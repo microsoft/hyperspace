@@ -81,7 +81,7 @@ object BenchmarkRunner {
         totalCreateIXStats._1)
 
       // Get Index Sizes
-      println("Collecting index sizes and printing sample records from each.")
+      println("Collecting index sizes.")
       val indexNames =
         if (benchmarkName.equals("tpch"))
           TPCHBenchmark.recommendedIndexes.map(x => parseIndexConf(x).config.indexName)
@@ -92,13 +92,14 @@ object BenchmarkRunner {
         val indexDirPath = s"$systemDir/$x/v__=0"
         val size = FileUtils.getDirectorySize(new Path(indexDirPath))
         indexesSizeStats :+= (x, size)
-
-        println(s" Sample record from index $x (total index size is $size):")
-        spark.read.parquet(indexDirPath).show(2, false)
+//        println(s" Sample record from index $x (total index size is $size):")
+//        spark.read.parquet(indexDirPath).show(2, false)
       }
 
       println("Index Size Summary:\n")
-      indexesSizeStats.sortBy(_._1).foreach(xs => println(s"${xs._1}, ${xs._2}"))
+      indexesSizeStats.sortBy(_._1).foreach{xs =>
+        val readableSize = getReadableSize(xs._2)
+        println(s"${xs._1}, ${xs._2}, ${readableSize._1}${readableSize._2}")}
     }
 
     if (runWorkload) {
@@ -212,12 +213,11 @@ object BenchmarkRunner {
       format: String): Tuple2[Long, Int] = {
     val hyperspace = Hyperspace()
     require(!spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH).isEmpty)
+    val systemPath = spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH)
     spark.conf.set(IndexConstants.INDEX_NUM_BUCKETS, buckets)
 
-    // ---------- pouriap delete me ---------------
-    println(s"Printing indexes ")
-    hyperspace.indexes.show(100)
-    // ------------------------------------
+    println(s"Printing existing indexes (if any) before index creation (under systemPath: $systemPath ).")
+    hyperspace.indexes.show(100, false)
 
     val indexes =
       if (benchmark.equals("tpch")) TPCHBenchmark.recommendedIndexes
@@ -242,9 +242,13 @@ object BenchmarkRunner {
     indexInfo.foreach { x =>
       val baseTableData = s"$dataDir/${x.tableName}"
       totalTime += createIndex(spark, hyperspace, baseTableData, x, format)
+
+      println(s"Print sample records from index ${x.config.indexName}")
+      val indexFilesPath = s"$systemPath/${x.config.indexName}/v__=0"
+      spark.read.parquet(indexFilesPath).show(2, false)
     }
 
-    hyperspace.indexes.show(100)
+    hyperspace.indexes.show(100, false)
     (totalTime, indexCount)
   }
 
@@ -281,11 +285,6 @@ object BenchmarkRunner {
     val df = readBaseTableData(spark, baseTableData, format)
     println(
       s"\tCreating index ${indexInfo.config.indexName} on data files under $baseTableData ...")
-
-    // ----- pouriap delete me -----
-    println(s"Sample records from base table ")
-    df.show(2, false)
-    //------------------------------
 
     val startTime = System.currentTimeMillis()
     hyperspace.createIndex(df, indexInfo.config)
@@ -434,6 +433,18 @@ object BenchmarkRunner {
       .select(date_format(current_timestamp, dateFormat))
       .first()
       .mkString
+  }
+
+  private def getReadableSize(size: Long): Tuple2[Long, String] = {
+    if (size < 1024) {
+      return (size, "Bytes")
+    } else if (size < 1024 * 1024) {
+      return (size / 1024, "KB")
+    } else if (size < 1024 * 1024 * 1024) {
+      return (size / (1024 * 1024), "MB")
+    }
+
+    (size / (1024 * 1024 * 1024), "GB")
   }
 
   // scalastyle:on
