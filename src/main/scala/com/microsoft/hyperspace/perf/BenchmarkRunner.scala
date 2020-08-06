@@ -89,7 +89,7 @@ object BenchmarkRunner {
         indexesSizeStats :+= (x, size)
 
         println(s" Sample record from index $x (total index size is $size):")
-        spark.read.parquet(indexDirPath).show(2)
+        spark.read.parquet(indexDirPath).show(2, false)
       }
 
       println("Index Size Summary:\n")
