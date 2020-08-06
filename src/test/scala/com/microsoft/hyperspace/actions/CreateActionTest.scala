@@ -123,8 +123,8 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
 
   test("Verify rootPaths for given LogicalRelations") {
     withTempPath { p =>
-      val path1 = p + "table1"
-      val path2 = p + "table2"
+      val path1 = new Path(p.getCanonicalPath, "t1").toString
+      val path2 = new Path(p.getCanonicalPath, "t2").toString
 
       import spark.implicits._
       SampleData.testData
@@ -157,9 +157,10 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
         .foreach {
           case (df, expectedPaths, expectedCount) =>
             val relation = CreateActionBaseWrapper.getSourceRelations(df).head
-            val expectedRootPaths = expectedPaths.map("file:" + _)
-
-            assert(relation.rootPaths == expectedRootPaths)
+            def normalize(path: String): String = {
+              new Path(path).toUri.getPath
+            }
+            assert(relation.rootPaths.map(normalize) == expectedPaths.map(normalize))
             assert(df.count == expectedCount)
             assert(!relation.options.isDefinedAt("path"))
         }
