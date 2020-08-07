@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import scala.collection.mutable.WrappedArray
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
@@ -29,8 +29,11 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
+  private val samplePartitionedParquetDataLocation = "src/test/resources/samplepartitionedparquet"
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
+  private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
+  private val indexConfig4 = IndexConfig("index3", Seq("Date", "Query"), Seq("clicks"))
   private var df: DataFrame = _
   private var hyperspace: Hyperspace = _
 
@@ -41,15 +44,34 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
     FileUtils.delete(new Path(sampleParquetDataLocation))
+    FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
 
+    // save test non-partitioned.
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     dfFromSample.write.parquet(sampleParquetDataLocation)
+
+    // save test data partitioned.
+    // `Date` is the first partition key and `Query` is the second partition key.
+    dfFromSample.select("Date").distinct().collectAsList().forEach { d =>
+      val date = d.get(0)
+      dfFromSample.filter($"date" === date).select("Query").distinct().collectAsList().forEach {
+        q =>
+          val query = q.get(0)
+          val partitionPath = s"$samplePartitionedParquetDataLocation/Date=$date/Query=$query"
+          dfFromSample
+            .filter($"date" === date && $"Query" === query)
+            .select("RGUID", "imprs", "clicks")
+            .write
+            .parquet(partitionPath)
+      }
+    }
 
     df = spark.read.parquet(sampleParquetDataLocation)
   }
 
   override def afterAll(): Unit = {
     FileUtils.delete(new Path(sampleParquetDataLocation))
+    FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
     super.afterAll()
   }
 
@@ -137,5 +159,22 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     assert(
       exception.getMessage.contains(
         "Only creating index over HDFS file based scan nodes is supported."))
+  }
+
+  test("Check lineage in index records for non-partitioned data") {}
+
+  test(
+    "Check lineage in index records for partitioned data when partition key is not in config") {
+
+  }
+
+  test(
+    "Check lineage in index records for partitioned data when partition key is in config") {
+
+  }
+
+  test(
+    "Check lineage in index records for partitioned data when partition key is load path") {
+
   }
 }
