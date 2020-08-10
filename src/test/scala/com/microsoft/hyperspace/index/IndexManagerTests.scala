@@ -70,7 +70,11 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       indexConfig1.indexedColumns,
       indexConfig1.includedColumns,
       200,
-      StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
+      StructType(
+        Seq(
+          StructField("RGUID", StringType),
+          StructField("Date", StringType),
+          StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))).json,
       s"$indexStorageLocation/index1/v__=0",
       Constants.States.ACTIVE)
     assert(actual.equals(expected))

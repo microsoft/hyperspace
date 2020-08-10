@@ -27,7 +27,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
 
@@ -109,7 +109,7 @@ object FilterIndexRule
         val newRelation = HadoopFsRelation(
           newLocation,
           new StructType(),
-          index.schema,
+          StructType(index.schema.filter(!_.name.equals(IndexConstants.DATA_FILE_NAME_COLUMN))),
           None, // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
           new ParquetFileFormat,
           Map())(spark)

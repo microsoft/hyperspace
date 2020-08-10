@@ -145,7 +145,7 @@ object JoinIndexRule
     val relation = HadoopFsRelation(
       location,
       new StructType(),
-      index.schema,
+      StructType(index.schema.filter(!_.name.equals(IndexConstants.DATA_FILE_NAME_COLUMN))),
       Some(bucketSpec),
       new ParquetFileFormat,
       Map())(spark)
