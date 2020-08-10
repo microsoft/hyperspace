@@ -80,6 +80,8 @@ You can run the code snippets in the following sections to explore the main feat
 
 To begin with, create a `DataFrame` from the data files (required to detect source data changes and to perform index refresh across sessions):
 
+Scala:
+
 ```scala
 import org.apache.spark.sql._
 import spark.implicits._
@@ -88,7 +90,17 @@ Seq((1, "name1"), (2, "name2")).toDF("id", "name").write.mode("overwrite").parqu
 val df = spark.read.parquet("table")
 ```
 
+Python:
+
+```python
+sample_data = [(1, "name1"), (2, "name2")]
+spark.createDataFrame(sample_data, ['id', 'name']).write.mode("overwrite").parquet("table")
+df = spark.read.parquet("table")
+```
+
 Also, create a `Hyperspace` object, which provides index management APIs:
+
+Scala:
 
 ```scala
 import com.microsoft.hyperspace._
@@ -96,9 +108,19 @@ import com.microsoft.hyperspace._
 val hs = new Hyperspace(spark)
 ```
 
+Python:
+
+```python
+from hyperspace import Hyperspace
+
+hs = Hyperspace(spark)
+```
+
 #### Create an index
 
 To create a Hyperspace Index, specify a `DataFrame` along with index configurations. `indexedColumns` are the column names used for join or filter operations, and `includedColumns` are the ones used for project operations. In this example, we will have a query that filters on the `id` column and projects the `name` column.
+
+Scala:
 
 ```scala
 import com.microsoft.hyperspace.index._
@@ -106,20 +128,57 @@ import com.microsoft.hyperspace.index._
 hs.createIndex(df, IndexConfig("index", indexedColumns = Seq("id"), includedColumns = Seq("name")))
 ```
 
+Python:
+
+```python
+from hyperspace import IndexConfig
+
+hs.createIndex(df, IndexConfig("index", ["id"], ["name"]))
+```
+
 #### Getting information on the available indexes
 
 `Hyperspace.indexes` returns a `DataFrame` that captures the metadata of the available indexes, thus you can perform any `DataFrame` operations to display, filter, etc.:
+
+Scala:
 
 ```scala
 val indexes: DataFrame = hs.indexes
 indexes.show
 ```
 
+Python:
+
+```python
+indexes = hs.indexes()
+indexes.show()
+```
+
 #### Other management APIs
 
 These are the additional APIs for managing (delete, refresh, etc.) indexes:
 
+Scala:
+
 ```scala
+// Refreshes the given index if the source data changes.
+hs.refreshIndex("index")
+
+// Soft-deletes the given index and does not physically remove it from filesystem.
+hs.deleteIndex("index")
+
+// Restores the soft-deleted index.
+hs.restoreIndex("index")
+
+// Soft-delete the given index for vacuum.
+hs.deleteIndex("index")
+// Hard-delete the given index and physically remove it from filesystem.
+hs.vacuumIndex("index")
+```
+
+Python:
+
+```python
 // Refreshes the given index if the source data changes.
 hs.refreshIndex("index")
 
@@ -141,21 +200,40 @@ hs.vacuumIndex("index")
 
 The following is a query that filters on the `id` column and projects the `name` column:
 
+Scala:
 ```scala
 val query = df.filter(df("id") === 1).select("name")
 ```
 
+Python:
+```python
+query = df.filter("""id = 1""").select("""name""")
+```
+
 To check whether any index will be used, you can use the `explain` API, which will print out the information on the indexes used, physical plan/operator differences, etc.:
 
+Scala:
 ```scala
 hs.explain(query, verbose = true)
+```
+
+Python:
+```python
+hs.explain(query, verbose = True)
 ```
 
 #### Enable Hyperspace
 
 Now that you have created an index that your query can utilize, you can enable Hyperspace and execute your query:
 
+Scala:
 ```scala
 spark.enableHyperspace
 query.show
+```
+
+Python:
+```python
+Hyperspace.enable(spark)
+query.show()
 ```
