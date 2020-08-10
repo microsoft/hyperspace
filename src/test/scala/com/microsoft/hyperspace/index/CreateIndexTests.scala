@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import scala.collection.mutable.WrappedArray
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
@@ -28,13 +28,16 @@ import com.microsoft.hyperspace.util.FileUtils
 class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val sampleData = SampleData.testData
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
+  private val sampleNonPartitionedParquetDataLocation = "src/test/resources/sampleparquet"
   private val samplePartitionedParquetDataLocation = "src/test/resources/samplepartitionedparquet"
+  private val partitionKey1 = "Date"
+  private val partitionKey2 = "Query"
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
-  private val indexConfig4 = IndexConfig("index3", Seq("Date", "Query"), Seq("clicks"))
-  private var df: DataFrame = _
+  private val indexConfig4 = IndexConfig("index4", Seq("Date", "Query"), Seq("clicks"))
+  private var nonPartitionedDataDF: DataFrame = _
+  private var partitionedDataDF: DataFrame = _
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
@@ -43,34 +46,39 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     val sparkSession = spark
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
-    FileUtils.delete(new Path(sampleParquetDataLocation))
+    FileUtils.delete(new Path(sampleNonPartitionedParquetDataLocation))
     FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
 
     // save test non-partitioned.
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-    dfFromSample.write.parquet(sampleParquetDataLocation)
+    dfFromSample.write.parquet(sampleNonPartitionedParquetDataLocation)
+    nonPartitionedDataDF = spark.read.parquet(sampleNonPartitionedParquetDataLocation)
 
     // save test data partitioned.
     // `Date` is the first partition key and `Query` is the second partition key.
-    dfFromSample.select("Date").distinct().collectAsList().forEach { d =>
+    dfFromSample.select(partitionKey1).distinct().collectAsList().forEach { d =>
       val date = d.get(0)
-      dfFromSample.filter($"date" === date).select("Query").distinct().collectAsList().forEach {
-        q =>
+      dfFromSample
+        .filter($"date" === date)
+        .select(partitionKey2)
+        .distinct()
+        .collectAsList()
+        .forEach { q =>
           val query = q.get(0)
-          val partitionPath = s"$samplePartitionedParquetDataLocation/Date=$date/Query=$query"
+          val partitionPath =
+            s"$samplePartitionedParquetDataLocation/$partitionKey1=$date/$partitionKey2=$query"
           dfFromSample
             .filter($"date" === date && $"Query" === query)
             .select("RGUID", "imprs", "clicks")
             .write
             .parquet(partitionPath)
-      }
+        }
     }
-
-    df = spark.read.parquet(sampleParquetDataLocation)
+    partitionedDataDF = spark.read.parquet(samplePartitionedParquetDataLocation)
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(new Path(sampleParquetDataLocation))
+    FileUtils.delete(new Path(sampleNonPartitionedParquetDataLocation))
     FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
     super.afterAll()
   }
@@ -80,36 +88,40 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Creating one index.") {
-    hyperspace.createIndex(df, indexConfig1)
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     val count = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ").count
     assert(count == 1)
   }
 
   test("Creating index with existing index name fails.") {
-    hyperspace.createIndex(df, indexConfig1)
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     val exception = intercept[HyperspaceException] {
-      hyperspace.createIndex(df, indexConfig2.copy(indexName = "index1"))
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig2.copy(indexName = "index1"))
     }
     assert(exception.getMessage.contains("Another Index with name index1 already exists"))
   }
 
   test("Creating index with existing index name (case-insensitive) fails.") {
-    hyperspace.createIndex(df, indexConfig1)
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     val exception = intercept[HyperspaceException] {
-      hyperspace.createIndex(df, indexConfig1.copy(indexName = "INDEX1"))
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig1.copy(indexName = "INDEX1"))
     }
     assert(exception.getMessage.contains("Another Index with name INDEX1 already exists"))
   }
 
   test("Index creation fails since indexConfig does not satisfy the table schema.") {
     val exception = intercept[HyperspaceException] {
-      hyperspace.createIndex(df, IndexConfig("index1", Seq("IllegalColA"), Seq("IllegalColB")))
+      hyperspace.createIndex(
+        nonPartitionedDataDF,
+        IndexConfig("index1", Seq("IllegalColA"), Seq("IllegalColB")))
     }
     assert(exception.getMessage.contains("Index config is not applicable to dataframe schema"))
   }
 
   test("Index creation passes with columns of different case if case-sensitivity is false.") {
-    hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
+    hyperspace.createIndex(
+      nonPartitionedDataDF,
+      IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
     val indexes = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ")
     assert(indexes.count == 1)
     assert(
@@ -123,14 +135,16 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   test("Index creation fails with columns of different case if case-sensitivity is true.") {
     withSQLConf("spark.sql.caseSensitive" -> "true") {
       val exception = intercept[HyperspaceException] {
-        hyperspace.createIndex(df, IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
+        hyperspace.createIndex(
+          nonPartitionedDataDF,
+          IndexConfig("index1", Seq("qUeRy"), Seq("ImpRS")))
       }
       assert(exception.getMessage.contains("Index config is not applicable to dataframe schema."))
     }
   }
 
   test("Index creation fails since the dataframe has a filter node.") {
-    val dfWithFilter = df.filter("Query='facebook'")
+    val dfWithFilter = nonPartitionedDataDF.filter("Query='facebook'")
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfWithFilter, indexConfig1)
     }
@@ -140,7 +154,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Index creation fails since the dataframe has a projection node.") {
-    val dfWithSelect = df.select("Query")
+    val dfWithSelect = nonPartitionedDataDF.select("Query")
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfWithSelect, indexConfig1)
     }
@@ -150,9 +164,12 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Index creation fails since the dataframe has a join node.") {
-    val dfJoin = df
-      .join(df, df("Query") === df("Query"))
-      .select(df("RGUID"), df("Query"), df("imprs"))
+    val dfJoin = nonPartitionedDataDF
+      .join(nonPartitionedDataDF, nonPartitionedDataDF("Query") === nonPartitionedDataDF("Query"))
+      .select(
+        nonPartitionedDataDF("RGUID"),
+        nonPartitionedDataDF("Query"),
+        nonPartitionedDataDF("imprs"))
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfJoin, indexConfig1)
     }
@@ -161,20 +178,53 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
         "Only creating index over HDFS file based scan nodes is supported."))
   }
 
-  test("Check lineage in index records for non-partitioned data") {}
+  test("Check lineage in index records for non-partitioned data.") {
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+    val indexRecordsDF = spark.read.parquet(
+      s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
-  test(
-    "Check lineage in index records for partitioned data when partition key is not in config") {
-
+    // For non-partitioned data, only file name lineage column should be added to index schema.
+    indexRecordsDF.schema.fields.corresponds(
+      indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
+        Seq(IndexConstants.DATA_FILE_NAME_COLUMN))(_.name.equals(_))
   }
 
-  test(
-    "Check lineage in index records for partitioned data when partition key is in config") {
+  test("Check lineage in index records for partitioned data when partition key is not in config.") {
+    hyperspace.createIndex(partitionedDataDF, indexConfig3)
+    val indexRecordsDF = spark.read.parquet(
+      s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
+    // For partitioned data, beside file name lineage column all partition keys columns
+    // should be added to index schema if they are not already among index config columns.
+    indexRecordsDF.schema.fields.corresponds(
+      indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+        Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey1, partitionKey2))(_.name.equals(_))
   }
 
-  test(
-    "Check lineage in index records for partitioned data when partition key is load path") {
+  test("Check lineage in index records for partitioned data when partition key is in config.") {
+    hyperspace.createIndex(partitionedDataDF, indexConfig4)
+    val indexRecordsDF = spark.read.parquet(
+      s"$systemPath/${indexConfig4.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+
+    // For partitioned data, if partition keys are already in index config columns,
+    // there should be no duplicates due to adding lineage.
+    indexRecordsDF.schema.fields.corresponds(
+      indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+        Seq(IndexConstants.DATA_FILE_NAME_COLUMN))(_.name.equals(_))
+  }
+
+  test("Check lineage in index records for partitioned data when partition key is in load path.") {
+    val dataDF =
+      spark.read.parquet(s"$samplePartitionedParquetDataLocation/$partitionKey1=2017-09-03")
+    hyperspace.createIndex(dataDF, indexConfig3)
+    val indexRecordsDF = spark.read.parquet(
+      s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+
+    // As data load path includes first partition key, index schema should only contain
+    // file name column and second partition key column as lineage columns.
+    indexRecordsDF.schema.fields.corresponds(
+      indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+        Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey2))(_.name.equals(_))
 
   }
 }
