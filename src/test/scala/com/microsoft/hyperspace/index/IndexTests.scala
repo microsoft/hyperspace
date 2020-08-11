@@ -32,11 +32,11 @@ class IndexTests extends SparkFunSuite with SparkInvolvedSuite {
       schema: StructType,
       numBuckets: Int): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      "",
+      Seq(),
+      null,
+      null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
-    val sourceDataProperties =
-      Hdfs.Properties(Content("", Seq(Content.Directory("", Seq(), NoOpFingerprint()))))
 
     val entry = IndexLogEntry(
       config.indexName,
@@ -47,7 +47,7 @@ class IndexTests extends SparkFunSuite with SparkInvolvedSuite {
           IndexLogEntry.schemaString(schema),
           10)),
       Content(path, Seq()),
-      Source(SparkPlan(sourcePlanProperties), Seq(Hdfs(sourceDataProperties))),
+      Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE
     entry

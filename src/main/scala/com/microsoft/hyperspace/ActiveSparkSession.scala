@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.util
+package com.microsoft.hyperspace
 
-import org.apache.spark.SparkFunSuite
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 
-class IndexNameUtilsTests extends SparkFunSuite {
-  test("Test normalizeIndexName() function.") {
-    val indexName = "  my index   1     "
-    val expectedIndexNameAfterNorm = "my_index_1"
-    assert(IndexNameUtils.normalizeIndexName(indexName).equals(expectedIndexNameAfterNorm))
+trait ActiveSparkSession {
+  def spark: SparkSession = {
+    SparkSession.getActiveSession.getOrElse {
+      throw HyperspaceException("No active spark session found")
+    }
   }
+
+  def sparkContext: SparkContext = spark.sparkContext
 }

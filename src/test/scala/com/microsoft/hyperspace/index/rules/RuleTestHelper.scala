@@ -22,15 +22,13 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
 object RuleTestHelper {
-  // TODO: Refactor common test code for Rules
   class TestSignatureProvider extends LogicalPlanSignatureProvider {
-    def signature(plan: LogicalPlan): String =
+    def signature(plan: LogicalPlan): Option[String] =
       plan
         .collectFirst {
           case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
             location.hashCode()
         }
-        .get
-        .toString
+        .map(_.toString)
   }
 }

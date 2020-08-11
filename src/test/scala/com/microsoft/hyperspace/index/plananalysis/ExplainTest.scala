@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConsta
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexStorageLocation = "src/test/resources/indexLocation"
+  override val systemPath = new Path("src/test/resources/indexLocation")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private var sampleParquetDataFullPath: String = ""
   private var hyperspace: Hyperspace = _
@@ -36,13 +36,11 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     val sparkSession = spark
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexStorageLocation)
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
     spark.sessionState.conf.setConf(SQLConf.LEGACY_BUCKETED_TABLE_SCAN_OUTPUT_ORDERING, true)
 
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
-    fileSystem.delete(new Path(indexStorageLocation), true)
     fileSystem.delete(new Path(sampleParquetDataLocation), true)
     val sampleData = Seq(("data1", 1), ("data2", 2), ("data3", 3))
     val dfFromSample = sampleData.toDF("Col1", "Col2")
@@ -59,7 +57,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
 
   after {
     clearCache()
-    fileSystem.delete(new Path(indexStorageLocation), true)
+    fileSystem.delete(systemPath, true)
     spark.conf.unset(IndexConstants.DISPLAY_MODE)
     spark.conf.unset(IndexConstants.HIGHLIGHT_BEGIN_TAG)
     spark.conf.unset(IndexConstants.HIGHLIGHT_END_TAG)
@@ -543,7 +541,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   }
 
   private def getIndexFilesPath(indexName: String): Path = {
-    new Path(indexStorageLocation, s"$indexName/v__=0")
+    new Path(systemPath, s"$indexName/v__=0")
   }
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(

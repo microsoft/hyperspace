@@ -18,10 +18,11 @@ package com.microsoft.hyperspace.index
 
 import java.util.UUID
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
+import org.apache.spark.internal.Logging
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
@@ -53,7 +54,7 @@ trait IndexLogManager {
   def writeLog(id: Int, log: LogEntry): Boolean
 }
 
-class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
+class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging {
   // Use FileContext instead of FileSystem for atomic renames?
   private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
 
@@ -110,13 +111,20 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
   }
 
   override def createLatestStableLog(id: Int): Boolean = {
-    // TODO: make sure log with the id has a stable state.
-    try {
-      FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration)
-    } catch {
-      case ex: Exception =>
-        // TODO: replace printStackTrace with Logging.
-        ex.printStackTrace()
+    getLog(id) match {
+      case Some(logEntry) if Constants.STABLE_STATES.contains(logEntry.state) =>
+        Try(FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration))
+        match {
+          case Success(v) => v
+          case Failure(e) =>
+            logError(s"Failed to create the latest stable log with id = '$id'", e)
+            false
+        }
+      case Some(logEntry) =>
+        logError(s"Found LogEntry with non stable state = ${logEntry.state} for id = '$id'")
+        false
+      case None =>
+        logError(s"Unable to get LogEntry for id = '$id'")
         false
     }
   }
@@ -130,8 +138,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
       }
     } catch {
       case ex: Exception =>
-        // TODO: replace printStackTrace with Logging.
-        ex.printStackTrace()
+        logError("Failed to delete the latest stable log", ex)
         false
     }
   }
@@ -148,8 +155,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager {
         fs.rename(tempPath, pathFromId(id))
       } catch {
         case ex: Exception =>
-          // TODO: replace printStackTrace with Logging.
-          ex.printStackTrace()
+          logError(s"Failed to write log with id = '$id'", ex)
           false
       }
     }

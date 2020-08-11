@@ -16,22 +16,22 @@
 
 name := "hyperspace-core"
 
-lazy val sparkVersion = "3.0.0"
+sparkVersion := "3.0.0"
 
 scalaVersion := "2.12.10"
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided" withSources(),
-  "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion % "provided" withSources(),
+  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources(),
+  "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources(),
+  "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion % "test" classifier "tests",
-  "org.apache.spark" %% "spark-core" % sparkVersion % "test" classifier "tests",
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "test" classifier "tests",
-  "org.apache.spark" %% "spark-hive" % sparkVersion % "test" classifier "tests"
+  "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "test" classifier "tests",
+  "org.apache.spark" %% "spark-core" % sparkVersion.value % "test" classifier "tests",
+  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
+  "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
 )
 
 scalacOptions ++= Seq(
@@ -54,6 +54,20 @@ compileScalastyle := scalastyle.in(Compile).toTask("").value
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
 testScalastyle := scalastyle.in(Test).toTask("").value
 (test in Test) := ((test in Test) dependsOn testScalastyle).value
+
+/***************************
+ * Spark Packages settings *
+ ***************************/
+
+spName := "microsoft/hyperspace-core"
+
+spAppendScalaVersion := true
+
+spIncludeMaven := true
+
+spIgnoreProvided := true
+
+packageBin in Compile := spPackage.value
 
 /***********************
  * Test configurations *
@@ -127,6 +141,12 @@ developers := List(
     name  = "Jiying Li",
     email = "",
     url   = url("https://github.com/laserljy")
+  ),
+  Developer(
+    id    = "sezruby",
+    name  = "Eunjin Song",
+    email = "",
+    url   = url("https://github.com/sezruby")
   )
 )
 

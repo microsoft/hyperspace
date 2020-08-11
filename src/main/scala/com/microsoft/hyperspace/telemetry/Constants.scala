@@ -14,21 +14,8 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.util
+package com.microsoft.hyperspace.telemetry
 
-/**
- * [[IndexNameUtils]] provides utility functions to format the index name as need.
- */
-object IndexNameUtils {
-
-  /**
-   * Normalize the index name by trimming space(s) at both ends, and replacing internal space(s)
-   * with an underscore.
-   *
-   * @param indexName the name of index passed in by user.
-   * @return a normalized index name.
-   */
-  def normalizeIndexName(indexName: String): String = {
-    indexName.trim.replaceAll("\\s+", "_")
-  }
+object Constants {
+  val HYPERSPACE_EVENT_LOGGER_CLASS_KEY = "spark.hyperspace.eventLoggerClass"
 }

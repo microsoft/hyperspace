@@ -1,7 +1,7 @@
 ---
 name: Issue template
 about: Describe an issue that the user is facing.
-title: ""
+title: ''
 labels: untriaged
 assignees: ''
 
@@ -35,4 +35,3 @@ Please complete the following information if applicable:
  - Apache Spark Version [e.g., Apache Spark 2.4.2]
  - Platform [e.g. Local execution, Azure Synapse Analytics, Azure/AWS Databricks, HDInsight Spark]
 -->
-

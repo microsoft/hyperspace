@@ -18,11 +18,12 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActionEvent}
 
 // TODO: This class depends directly on LogEntry. This should be updated such that
 //   it works with IndexLogEntry only. (for example, this class can take in
@@ -41,12 +42,17 @@ class RefreshAction(
 
   private lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
 
-  // Deserialize the plan and create a df.
+  // Reconstruct a df from schema
   private lazy val df = {
-    val serializedPlan = previousIndexLogEntry.source.plan.properties.rawPlan
-    val plan = LogicalPlanSerDeUtils.deserialize(serializedPlan, spark)
-    val qe = spark.sessionState.executePlan(plan)
-    new Dataset[Row](spark, plan, RowEncoder(qe.analyzed.schema))
+    val rels = previousIndexLogEntry.relations
+    // Currently we only support to create an index on a LogicalRelation.
+    assert(rels.size == 1)
+    val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
+    spark.read
+      .schema(dataSchema)
+      .format(rels.head.fileFormat)
+      .options(rels.head.options)
+      .load(rels.head.rootPaths: _*)
   }
 
   private lazy val indexConfig: IndexConfig = {
@@ -55,7 +61,7 @@ class RefreshAction(
   }
 
   final override lazy val logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, sourceFiles(df))
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override val transientState: String = REFRESHING
 
@@ -74,5 +80,9 @@ class RefreshAction(
     //   This should be user-configurable to allow maintain the existing bucket numbers
     //   in the index log entry.
     write(spark, df, indexConfig)
+  }
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }
