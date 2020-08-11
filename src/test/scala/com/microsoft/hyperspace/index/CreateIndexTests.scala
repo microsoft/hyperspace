@@ -56,14 +56,14 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
 
     // save test data partitioned.
     // `Date` is the first partition key and `Query` is the second partition key.
-    dfFromSample.select(partitionKey1).distinct().collectAsList().forEach { d =>
+    dfFromSample.select(partitionKey1).distinct().collect().foreach { d =>
       val date = d.get(0)
       dfFromSample
         .filter($"date" === date)
         .select(partitionKey2)
         .distinct()
-        .collectAsList()
-        .forEach { q =>
+        .collect()
+        .foreach { q =>
           val query = q.get(0)
           val partitionPath =
             s"$samplePartitionedParquetDataLocation/$partitionKey1=$date/$partitionKey2=$query"
