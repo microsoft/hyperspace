@@ -19,7 +19,7 @@
 # A utility script for build pipeline to download and install spark binaries for 
 # python tests to run.
 
-SPARK_VERSION="2.4.2"
+SPARK_VERSION="3.0.0"
 HADOOP_VERSION="2.7"
 SPARK_DIR="spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}"
 

@@ -29,7 +29,7 @@ jobs:
           scriptPath: 'run-tests.py'
         displayName: 'Running python tests'
         env:
-          SPARK_HOME: $(Build.SourcesDirectory)/spark-2.4.2-bin-hadoop2.7
+          SPARK_HOME: $(Build.SourcesDirectory)/spark-3.0.0-bin-hadoop2.7
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
         - script: sbt +package
