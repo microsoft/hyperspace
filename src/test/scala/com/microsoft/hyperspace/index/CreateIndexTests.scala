@@ -225,6 +225,5 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     indexRecordsDF.schema.fields.corresponds(
       indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
         Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey2))(_.name.equals(_))
-
   }
 }
