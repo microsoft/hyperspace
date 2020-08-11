@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index._
@@ -115,14 +116,9 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
   test("Join rule works if indexes exist for case insensitive index and query") {
     val t1c1Caps = t1c1.withName("T1C1")
 
-<<<<<<< HEAD
-    val joinCondition = EqualTo(t1c1, t2c1)
+    val joinCondition = EqualTo(t1c1Caps, t2c1)
     val originalPlan =
       Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
-=======
-    val joinCondition = EqualTo(t1c1Caps, t2c1)
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
->>>>>>> master
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
@@ -134,7 +130,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     withSQLConf(IndexConstants.INDEX_SYSTEM_PATH -> "") {
       val joinCondition = EqualTo(t1c1, t2c1)
       val originalPlan =
-        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
       val updatedPlan = JoinIndexRule(originalPlan)
       assert(updatedPlan.equals(originalPlan))
     }
@@ -349,8 +345,9 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     }
   }
 
-  test("Join rule updates plan if columns have one-to-one mapping with repeated " +
-    "case-insensitive predicates") {
+  test(
+    "Join rule updates plan if columns have one-to-one mapping with repeated " +
+      "case-insensitive predicates") {
     val t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c3), t2FilterNode)
 
@@ -358,7 +355,8 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val t2c1Caps = t2c1.withName("T2C1")
 
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1Caps, t2c1Caps))
-    val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val originalPlan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 

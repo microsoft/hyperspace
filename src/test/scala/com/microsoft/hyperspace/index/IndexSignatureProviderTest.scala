@@ -113,7 +113,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
       t2Schema)
 
     val joinCondition = EqualTo(t1c3, t2c2)
-    val joinNode = Join(r1, r2, JoinType("inner"), Some(joinCondition))
+    val joinNode = Join(r1, r2, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
 
     val filterCondition = And(EqualTo(t1c1, Literal("ABC")), IsNotNull(t1c1))
     val filterNode = Filter(filterCondition, joinNode)

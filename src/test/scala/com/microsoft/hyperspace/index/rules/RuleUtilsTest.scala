@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.JoinType
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, JoinHint, LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
@@ -104,7 +104,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify get logical relation for non-linear plan.") {
-    val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
+    val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None, JoinHint.NONE)
     val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
   }
