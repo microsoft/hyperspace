@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
