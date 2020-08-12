@@ -26,6 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.FileUtils
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
@@ -251,7 +252,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               _,
               _,
               _) =>
-            val files = location.allFiles.map(_.getPath.toString)
+            val files = location.allFiles.map(FileInfo(_))
             val sourceDataProperties =
               Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
             val fileFormatName = fileFormat match {

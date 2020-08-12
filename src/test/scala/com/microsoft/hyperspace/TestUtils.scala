@@ -16,6 +16,9 @@
 
 package com.microsoft.hyperspace
 
+import org.apache.hadoop.fs.{FileStatus, Path}
+
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.IndexLogEntry
 
 object TestUtils {
@@ -23,5 +26,19 @@ object TestUtils {
     val result = index.copy()
     result.state = state
     result
+  }
+
+  def toFileStatus(path: String): FileStatus = {
+    toFileStatus(new Path(path))
+  }
+
+  def toFileStatus(path: Path): FileStatus = {
+    val status = new FileStatus()
+    status.setPath(path)
+    status
+  }
+
+  def toFileInfo(path: String): FileInfo = {
+    FileInfo(toFileStatus(path))
   }
 }

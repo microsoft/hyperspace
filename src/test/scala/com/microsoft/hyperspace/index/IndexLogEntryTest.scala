@@ -15,10 +15,11 @@
  */
 
 package com.microsoft.hyperspace.index
-
+// scalastyle:off
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
+import com.microsoft.hyperspace.TestUtils.toFileInfo
 import com.microsoft.hyperspace.util.JsonUtils
 
 class IndexLogEntryTest extends SparkFunSuite {
@@ -63,7 +64,15 @@ class IndexLogEntryTest extends SparkFunSuite {
         |                "root" : "",
         |                "directories" : [ {
         |                  "path" : "",
-        |                  "files" : [ "f1", "f2" ],
+        |                  "files" : [ {
+        |                    "name" : "f1",
+        |                    "size" : 0,
+        |                    "modifiedTime" : 0
+        |                  }, {
+        |                    "name" : "f2",
+        |                    "size" : 0,
+        |                    "modifiedTime" : 0
+        |                  } ],
         |                  "fingerprint" : {
         |                    "kind" : "NoOp",
         |                    "properties" : { }
@@ -100,14 +109,15 @@ class IndexLogEntryTest extends SparkFunSuite {
     val schema =
       StructType(Array(StructField("RGUID", StringType), StructField("Date", StringType)))
 
-    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
       Seq(
         Relation(
           Seq("rootpath"),
-          Hdfs(Hdfs.Properties(
-            Content("", Seq(Content.Directory("", Seq("f1", "f2"), NoOpFingerprint()))))),
+          Hdfs(
+            Hdfs.Properties(Content(
+              "",
+              Seq(Content.Directory("", Seq("f1", "f2").map(toFileInfo), NoOpFingerprint()))))),
           "schema",
           "type",
           Map())),
@@ -129,6 +139,10 @@ class IndexLogEntryTest extends SparkFunSuite {
       Map())
     expected.state = "ACTIVE"
     expected.timestamp = 1578818514080L
+
+    println(JsonUtils.toJson(expected))
+
+    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     assert(actual.equals(expected))
   }
