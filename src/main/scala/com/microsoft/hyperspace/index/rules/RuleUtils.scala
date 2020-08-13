@@ -45,7 +45,7 @@ object RuleUtils {
         sourcePlanSignature.provider,
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan)) match {
+          .signature(plan, entry.allSourceFileSet)) match {
         case Some(s) => s.equals(sourcePlanSignature.value)
         case None => false
       }

@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
@@ -107,6 +109,19 @@ case class IndexLogEntry(
   def numBuckets: Int = derivedDataset.properties.numBuckets
 
   def relations: Seq[Relation] = source.plan.properties.relations
+
+  def allSourceFileSet: Set[Path] = {
+    relations
+      .flatMap(
+        _.data.properties.content.directories.flatMap(_.files.map(new Path(_))))
+      .toSet
+  }
+
+  def bucketSpec: BucketSpec =
+    BucketSpec(
+      numBuckets = numBuckets,
+      bucketColumnNames = indexedColumns,
+      sortColumnNames = indexedColumns)
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 

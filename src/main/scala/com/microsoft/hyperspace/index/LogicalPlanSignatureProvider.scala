@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index
 
 import scala.util.{Success, Try}
 
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.util.hyperspace.Utils
 
@@ -37,6 +38,8 @@ trait LogicalPlanSignatureProvider {
    * @return signature if it can be computed w.r.t signature provider assumptions; Otherwise None.
    */
   def signature(logicalPlan: LogicalPlan): Option[String]
+
+  def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = None
 }
 
 /**

@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.util.HashingUtils
@@ -48,4 +49,13 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
       }
     }
   }
+
+  override def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = {
+    fileBasedSignatureProvider.signature(logicalPlan, whiteListFiles).flatMap { f =>
+      planSignatureProvider.signature(logicalPlan).map { p =>
+        HashingUtils.md5Hex(f + p)
+      }
+    }
+  }
+
 }

@@ -18,6 +18,7 @@ package com.microsoft
 
 import org.apache.spark.sql.SparkSession
 
+import com.microsoft.hyperspace.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
 package object hyperspace {
@@ -47,6 +48,8 @@ package object hyperspace {
       disableHyperspace
       sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
         hyperspaceOptimizationRuleBatch
+      sparkSession.sessionState.experimentalMethods.extraStrategies ++=
+        BucketUnionStrategy :: Nil
       sparkSession
     }
 

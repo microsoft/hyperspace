@@ -20,13 +20,13 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.{ActiveSparkSession, BucketUnionLogicalPlan, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
@@ -66,12 +66,13 @@ object FilterIndexRule
             logicalRelation,
             fsRelation)
 
-          originalPlan match {
+          val replaced = originalPlan match {
             case p @ Project(_, _) =>
               p.copy(child = transformedPlan)
             case _ =>
               transformedPlan
           }
+          replaced
         } catch {
           case e: Exception =>
             logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
@@ -97,7 +98,7 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       logicalRelation: LogicalRelation,
-      fsRelation: HadoopFsRelation): Filter = {
+      fsRelation: HadoopFsRelation): LogicalPlan = {
     val candidateIndexes =
       findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
     rank(candidateIndexes) match {
@@ -106,29 +107,56 @@ object FilterIndexRule
         val newLocation =
           new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
 
-        val newRelation = HadoopFsRelation(
+        val newFsRelation = HadoopFsRelation(
           newLocation,
           new StructType(),
           index.schema,
-          None, // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
+          Some(index.bucketSpec),
           new ParquetFileFormat,
           Map())(spark)
 
         val newOutput =
           logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
 
-        val updatedPlan =
-          filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput))
+        val newIndexRelation = logicalRelation.copy(relation = newFsRelation, output = newOutput)
+        val updatedPlan = filter.copy(child = newIndexRelation)
+
+        // for appended source files
+        val appendedSourceFiles =
+          fsRelation.location.inputFiles.map(new Path(_))
+            .filter(p => !index.allSourceFileSet.contains(p))
+
+        val replacedPlan = if (!appendedSourceFiles.isEmpty) {
+          val appendedLocation =
+            new InMemoryFileIndex(spark, appendedSourceFiles, Map(), None)
+          val appendedRelation = logicalRelation.copy(
+            relation =
+              fsRelation.copy(location = appendedLocation, dataSchema = index.schema)(spark),
+            output = newOutput)
+
+          val attrs = appendedRelation.attributeMap.baseMap
+            .filter { key =>
+              index.indexedColumns contains key._2._2.name
+            }
+            .map { case (_, ref) => ref._1 }
+
+          val filtered = filter.copy(child = appendedRelation)
+          val shuffled =
+            RepartitionByExpression(attrs.toSeq, filtered, index.numBuckets)
+          // val filtered2 = filter.copy(child = shuffled)
+          BucketUnionLogicalPlan(Seq(updatedPlan, shuffled), index.bucketSpec)
+        } else {
+          updatedPlan
+        }
 
         logEvent(
           HyperspaceIndexUsageEvent(
             AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
             Seq(index),
             filter.toString,
-            updatedPlan.toString,
+            replacedPlan.toString,
             "Filter index rule applied."))
-
-        updatedPlan
+        replacedPlan
 
       case None => filter // No candidate index found
     }

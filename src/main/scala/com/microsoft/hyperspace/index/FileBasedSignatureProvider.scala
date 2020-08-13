@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
@@ -40,13 +40,19 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
     fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
   }
 
+  override def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = {
+    fingerprintVisitor(logicalPlan, whiteListFiles).map(HashingUtils.md5Hex)
+  }
+
   /**
    * Visit logical plan and collect info needed for fingerprint.
    *
    * @param logicalPlan logical plan of data frame.
    * @return fingerprint, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
-  private def fingerprintVisitor(logicalPlan: LogicalPlan): Option[String] = {
+  private def fingerprintVisitor(
+      logicalPlan: LogicalPlan,
+      whiteListFiles: Set[Path] = Set()): Option[String] = {
     var fingerprint = ""
     logicalPlan.foreachUp {
       // Currently we are only collecting plan fingerprint from hdfs file based scan nodes.
@@ -57,7 +63,9 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
           _) =>
         fingerprint ++= location.allFiles.foldLeft("")(
           (accumulate: String, fileStatus: FileStatus) =>
-            HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus)))
+            if (whiteListFiles.isEmpty || whiteListFiles.contains(fileStatus.getPath)) {
+              HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus))
+            } else "")
       case _ =>
     }
 
