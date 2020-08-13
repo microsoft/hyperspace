@@ -15,7 +15,7 @@
  */
 
 package com.microsoft.hyperspace.index
-// scalastyle:off
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
@@ -139,10 +139,6 @@ class IndexLogEntryTest extends SparkFunSuite {
       Map())
     expected.state = "ACTIVE"
     expected.timestamp = 1578818514080L
-
-    println(JsonUtils.toJson(expected))
-
-    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     assert(actual.equals(expected))
   }

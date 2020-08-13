@@ -56,7 +56,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
   // TODO: Revisit if access modifier can be changed to protected.
   def op(): Unit
 
-  protected def end(): Unit = {
+  private def end(): Unit = {
     val newId = baseId + 2
     val entry = logEntry
     entry.state = finalState
@@ -73,7 +73,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
     }
   }
 
-  final protected def saveEntry(id: Int, entry: LogEntry): Unit = {
+  private def saveEntry(id: Int, entry: LogEntry): Unit = {
     entry.timestamp = System.currentTimeMillis()
     if (!logManager.writeLog(id, entry)) {
       throw HyperspaceException("Could not acquire proper state")
