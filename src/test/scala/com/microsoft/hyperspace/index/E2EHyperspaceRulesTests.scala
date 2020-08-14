@@ -18,13 +18,13 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule, JoinIndexRuleV2}
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private val sampleData = SampleData.testData
@@ -81,6 +81,26 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
         .containsSlice(expectedOptimizationRuleBatch))
   }
 
+  test("verify join rule v2 enabled when flighting flag is set.") {
+    val expectedOptimizationRuleBatch = Seq(JoinIndexRuleV2, JoinIndexRule, FilterIndexRule)
+
+    withSQLConf("spark.hyperspace.enableJoinRuleV2" -> "true") {
+      assert(
+        !spark.sessionState.experimentalMethods.extraOptimizations
+          .containsSlice(expectedOptimizationRuleBatch))
+
+      spark.enableHyperspace()
+      assert(
+        spark.sessionState.experimentalMethods.extraOptimizations
+          .containsSlice(expectedOptimizationRuleBatch))
+
+      spark.disableHyperspace()
+      assert(
+        !spark.sessionState.experimentalMethods.extraOptimizations
+          .containsSlice(expectedOptimizationRuleBatch))
+    }
+  }
+
   test("E2E test for filter query.") {
     val df = spark.read.parquet(sampleParquetDataLocation)
     val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
@@ -90,36 +110,6 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c1")
 
     verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
-  }
-
-  test("E2E test for case insensitive filter query utilizing indexes.") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
-    val indexConfig = IndexConfig("filterIndex", Seq("C3"), Seq("C1"))
-
-    hyperspace.createIndex(df, indexConfig)
-
-    def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
-
-    // Verify if case-insensitive index works with case-insensitive query.
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
-  }
-
-  test("E2E test for case sensitive filter query where changing conf changes behavior.") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
-    val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
-
-    hyperspace.createIndex(df, indexConfig)
-    def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
-
-    withSQLConf("spark.sql.caseSensitive" -> "true") {
-      intercept[AnalysisException] {
-        query().show
-      }
-    }
-
-    withSQLConf("spark.sql.caseSensitive" -> "false") {
-      verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
-    }
   }
 
   test("E2E test for filter query when all columns are selected.") {
@@ -140,7 +130,6 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   test("E2E test for join query.") {
     val leftDf = spark.read.parquet(sampleParquetDataLocation)
     val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
-
     hyperspace.createIndex(leftDf, leftDfIndexConfig)
 
     val rightDf = spark.read.parquet(sampleParquetDataLocation)
@@ -158,57 +147,51 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
         getIndexFilesPath(rightDfIndexConfig.indexName)))
   }
 
-  test("E2E test for join query with case-insensitive column names.") {
-    val leftDf = spark.read.parquet(sampleParquetDataLocation)
-    val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
-    hyperspace.createIndex(leftDf, leftDfIndexConfig)
+  test("E2E test for join rule V2: optimizes SortMergeJoin, ignores BroadcastHashJoin.") {
+    // Choose a threshold based on the data, which makes some tables small and eligible for BHJ.
+    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "6000") {
+      val df1 = spark.read.parquet(sampleParquetDataLocation)
+      val df2 = spark.read.parquet(sampleParquetDataLocation)
+      df1.union(df1).union(df1).write.mode("overwrite").parquet(testDir + "bigdata")
+      val bigDataPath = testDir + "bigdata"
+      val bigDf = spark.read.parquet(bigDataPath)
 
-    val rightDf = spark.read.parquet(sampleParquetDataLocation)
-    val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
-    hyperspace.createIndex(rightDf, rightDfIndexConfig)
+      val df1IndexConfig = IndexConfig("df1ic", Seq("c1"), Seq("c2", "c4"))
+      val df2IndexConfig1 = IndexConfig("df2ic1", Seq("c1"), Seq("c2", "c3"))
+      val df2IndexConfig2 = IndexConfig("df2ic2", Seq("c2"), Seq("c1", "c3"))
+      val bigDfIndexConfig = IndexConfig("bigdfic", Seq("c2"), Seq("c1", "c3"))
 
-    def query(): DataFrame = {
-      leftDf.join(rightDf, leftDf("c3") === rightDf("C3")).select(leftDf("C1"), rightDf("c4"))
-    }
+      hyperspace.createIndex(df1, df1IndexConfig)
+      hyperspace.createIndex(df2, df2IndexConfig1)
+      hyperspace.createIndex(df2, df2IndexConfig2)
+      hyperspace.createIndex(bigDf, bigDfIndexConfig)
 
-    verifyIndexUsage(
-      query,
-      Seq(
-        getIndexFilesPath(leftDfIndexConfig.indexName),
-        getIndexFilesPath(rightDfIndexConfig.indexName)))
-  }
+      def query(): DataFrame = {
+        val join1 = df1.join(df2, df1("c1") === df2("c1")).select(df1("c4"), df2("c2"), df2("c3"))
+        bigDf.join(join1, bigDf("c2") === df2("c2")).select(bigDf("c2"), df2("c3"))
+      }
 
-  test("E2E test for join query with alias columns is not supported.") {
-    def verifyNoChange(f: () => DataFrame): Unit = {
+      // If the rule works correctly, only bigDf and df2 will be replaced by indexes.
       spark.disableHyperspace()
-      val originalPlan = f().queryExecution.optimizedPlan
-      val updatedPlan = JoinIndexRule(originalPlan)
-      assert(originalPlan.equals(updatedPlan))
-    }
+      val dfWithHyperspaceDisabled = query()
+      val schemaWithHyperspaceDisabled = dfWithHyperspaceDisabled.schema
+      val sortedRowsWithHyperspaceDisabled = getSortedRows(dfWithHyperspaceDisabled)
 
-    withView("t1", "t2") {
-      val leftDf = spark.read.parquet(sampleParquetDataLocation)
-      val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
-      hyperspace.createIndex(leftDf, leftDfIndexConfig)
+      // Setting up only JoinIndexRuleV2 so that other rules don't interfere with test.
+      spark.sessionState.experimentalMethods.extraOptimizations ++= JoinIndexRuleV2 :: Nil
+      val dfWithHyperspaceEnabled = query()
 
-      val rightDf = spark.read.parquet(sampleParquetDataLocation)
-      val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
-      hyperspace.createIndex(rightDf, rightDfIndexConfig)
+      assert(
+        queryPlanHasExpectedRootPaths(
+          dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
+          Seq(
+            getIndexFilesPath(bigDfIndexConfig.indexName),
+            new Path(sampleParquetDataLocation).makeQualified(fileSystem),
+            getIndexFilesPath(df2IndexConfig2.indexName))))
 
-      leftDf.createOrReplaceTempView("t1")
-      rightDf.createOrReplaceTempView("t2")
-
-      // Test: join query with alias columns in join condition is not optimized.
-      def query1(): DataFrame = spark.sql("""SELECT alias, c4
-          |from t2, (select c3 as alias, c1 from t1)
-          |where t2.c3 = alias""".stripMargin)
-      verifyNoChange(query1)
-
-      // Test: join query with alias columns in project columns is not optimized.
-      def query2(): DataFrame = spark.sql("""SELECT alias, c4
-          |from t2, (select c3, c1 as alias from t1) as newt
-          |where t2.c3 = newt.c3""".stripMargin)
-      verifyNoChange(query2)
+      assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
+      assert(
+        sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))
     }
   }
 
