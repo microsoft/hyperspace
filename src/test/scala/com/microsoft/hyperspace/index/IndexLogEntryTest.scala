@@ -110,7 +110,7 @@ class IndexLogEntryTest extends SparkFunSuite {
       StructType(Array(StructField("RGUID", StringType), StructField("Date", StringType)))
 
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
-    
+
     val expectedSourcePlanProperties = SparkPlan.Properties(
       Seq(
         Relation(
