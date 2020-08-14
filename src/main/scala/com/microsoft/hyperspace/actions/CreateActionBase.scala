@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -147,12 +147,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         resolvedIndexedColumns)
   }
 
-  final def leafFileInfo(path: Path): Seq[FileInfo] = {
+  private def leafFileInfo(path: Path): Seq[FileInfo] = {
+    // Assuming index directories don't contain nested directories. Only Leaf files.
     val fs = path.getFileSystem(new Configuration)
-    Try(fs.listStatus(path).map(FileInfo(_))) match {
-      case Success(value) => value
-      case _ => Seq()
-    }
+    Try { fs.listStatus(path).map(FileInfo(_)).toSeq }.getOrElse(Seq())
   }
 
   private def resolveConfig(

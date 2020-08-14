@@ -28,17 +28,9 @@ object TestUtils {
     result
   }
 
-  def toFileStatus(path: String): FileStatus = {
-    toFileStatus(new Path(path))
-  }
-
-  def toFileStatus(path: Path): FileStatus = {
-    val status = new FileStatus()
-    status.setPath(path)
-    status
-  }
-
   def toFileInfo(path: String): FileInfo = {
-    FileInfo(toFileStatus(path))
+    val status = new FileStatus
+    status.setPath(new Path(path))
+    FileInfo(status)
   }
 }
