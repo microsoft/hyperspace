@@ -18,11 +18,12 @@ package com.microsoft.hyperspace.index.rules
 
 import scala.collection.mutable
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 
 object RuleUtils {
 
@@ -33,7 +34,10 @@ object RuleUtils {
    * @param plan logical plan
    * @return indexes built for this plan
    */
-  def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
+  def getCandidateIndexes(
+      indexManager: IndexManager,
+      plan: LogicalPlan,
+      spark: SparkSession): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
 
@@ -41,11 +45,17 @@ object RuleUtils {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
       val sourcePlanSignature = sourcePlanSignatures.head
+      val hybridScanEnabled = spark.sessionState.conf
+        .getConfString(
+          IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+          IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+        .toBoolean
+
       signatureMap.getOrElseUpdate(
         sourcePlanSignature.provider,
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan, entry.allSourceFileSet)) match {
+          .signature(plan, if (hybridScanEnabled) entry.allSourceFileSet else Set())) match {
         case Some(s) => s.equals(sourcePlanSignature.value)
         case None => false
       }

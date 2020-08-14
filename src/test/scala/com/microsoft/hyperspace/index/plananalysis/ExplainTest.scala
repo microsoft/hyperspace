@@ -307,7 +307,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(" Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
-      .append("ReadSchema: struct<Col2:int,Col1:string>---->")
+      .append("ReadSchema: struct<Col2:int,Col1:string>, SelectedBucketsCount: 1 out of 200---->")
       .append(displayMode.newLine)
       .append("   +- FileScan parquet [Col1#135] Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
@@ -323,7 +323,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
         "Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
-      .append("ReadSchema: struct<Col2:int,Col1:string>---->")
+      .append("ReadSchema: struct<Col2:int,Col1:string>, SelectedBucketsCount: 1 out of 200---->")
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append("=============================================================")
@@ -479,7 +479,8 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append("Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]"))
       .append(", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
-      .append("ReadSchema: struct<Col2:int,Col1:string>" + displayMode.highlightTag.close)
+      .append("ReadSchema: struct<Col2:int,Col1:string>, ")
+      .append("SelectedBucketsCount: 1 out of 200" + displayMode.highlightTag.close)
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append("=============================================================")

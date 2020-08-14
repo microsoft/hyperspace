@@ -123,7 +123,8 @@ object FilterIndexRule
 
         // for appended source files
         val appendedSourceFiles =
-          fsRelation.location.inputFiles.map(new Path(_))
+          fsRelation.location.inputFiles
+            .map(new Path(_))
             .filter(p => !index.allSourceFileSet.contains(p))
 
         val replacedPlan = if (!appendedSourceFiles.isEmpty) {
@@ -143,8 +144,9 @@ object FilterIndexRule
           val filtered = filter.copy(child = appendedRelation)
           val shuffled =
             RepartitionByExpression(attrs.toSeq, filtered, index.numBuckets)
-          // val filtered2 = filter.copy(child = shuffled)
-          BucketUnionLogicalPlan(Seq(updatedPlan, shuffled), index.bucketSpec)
+          BucketUnionLogicalPlan(
+            Seq(updatedPlan, shuffled),
+            index.bucketSpec.copy(sortColumnNames = Seq()))
         } else {
           updatedPlan
         }
@@ -182,7 +184,7 @@ object FilterIndexRule
         val indexManager = Hyperspace
           .getContext(spark)
           .indexCollectionManager
-        val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, r)
+        val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, r, spark)
 
         candidateIndexes.filter { index =>
           indexCoversPlan(

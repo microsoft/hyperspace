@@ -39,7 +39,8 @@ trait LogicalPlanSignatureProvider {
    */
   def signature(logicalPlan: LogicalPlan): Option[String]
 
-  def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = None
+  def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] =
+    signature(logicalPlan)
 }
 
 /**

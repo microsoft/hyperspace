@@ -160,6 +160,6 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
     assert(location.rootPaths.head.equals(expectedLocation))
     assert(partitionSchema.equals(new StructType()))
     assert(dataSchema.equals(allIndexes.filter(_.name.equals(indexName)).head.schema))
-    assert(bucketSpec.isEmpty)
+    assert(bucketSpec.nonEmpty)
   }
 }

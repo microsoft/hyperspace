@@ -22,9 +22,8 @@ import scala.util.Try
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, Coalesce, EqualTo, Expression, SortOrder}
-import org.apache.spark.sql.catalyst.plans.logical.{Distinct, Join, LogicalPlan, Project, RepartitionByExpression, Union}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, RepartitionByExpression}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
@@ -109,13 +108,17 @@ object JoinIndexRule
       .indexCollectionManager
 
     val lIndexes =
-      RuleUtils.getLogicalRelation(left).map(RuleUtils.getCandidateIndexes(indexManager, _))
+      RuleUtils
+        .getLogicalRelation(left)
+        .map(RuleUtils.getCandidateIndexes(indexManager, _, spark))
     if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
 
     val rIndexes =
-      RuleUtils.getLogicalRelation(right).map(RuleUtils.getCandidateIndexes(indexManager, _))
+      RuleUtils
+        .getLogicalRelation(right)
+        .map(RuleUtils.getCandidateIndexes(indexManager, _, spark))
     if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }
@@ -136,14 +139,12 @@ object JoinIndexRule
    * @return replacement plan
    */
   private def getReplacementPlan(index: IndexLogEntry, plan: LogicalPlan): LogicalPlan = {
-    val bucketSpec = index.bucketSpec
-
     val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
     val relation = HadoopFsRelation(
       location,
       new StructType(),
       index.schema,
-      Some(bucketSpec),
+      Some(index.bucketSpec),
       new ParquetFileFormat,
       Map())(spark)
 
@@ -153,39 +154,61 @@ object JoinIndexRule
     // lead to wrong results. So we only replace the base relation.
 
     val replacedPlan = plan transformUp {
-      case baseRelation @ LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
+      case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
     }
 
-    val complementIndexPlan = plan transformUp {
+    val hybridScanEnabled = spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+      .toBoolean
+
+    if (hybridScanEnabled) {
+      getComplementIndexPlan(index, plan, replacedPlan)
+    } else {
+      replacedPlan
+    }
+  }
+
+  private def getComplementIndexPlan(
+      index: IndexLogEntry,
+      originalPlan: LogicalPlan,
+      indexPlan: LogicalPlan): LogicalPlan = {
+    val complementIndexPlan = originalPlan transformUp {
       case baseRelation @ LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
         val updatedOutput =
-          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
+          baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
 
         val files =
-          fsRelation.location.inputFiles.map(new Path(_))
+          fsRelation.location.inputFiles
+            .map(new Path(_))
             .filter(!index.allSourceFileSet.contains(_))
-        val newLocation =
-          new InMemoryFileIndex(spark, files, Map(), None)
-        val newRelation =
-          fsRelation.copy(location = newLocation, dataSchema = index.schema)(spark)
 
-        val newLogicalRelation = baseRelation.copy(relation = newRelation, output = updatedOutput)
-
-        val attrs = newLogicalRelation.attributeMap.baseMap
-          .filter { key =>
-            index.indexedColumns contains key._2._2.name
-          }
-          .map { case (_, ref) => ref._1 }
-        // TODO fix
-        //  cur: project => filter => exchange => relation
-        //  desired: exchange => project => filter => relation
-        RepartitionByExpression(attrs.toSeq, newLogicalRelation, index.numBuckets)
+        if (files.nonEmpty) {
+          val newLocation =
+            new InMemoryFileIndex(spark, files, Map(), None)
+          val newRelation =
+            fsRelation.copy(location = newLocation, dataSchema = index.schema)(spark)
+          baseRelation.copy(relation = newRelation, output = updatedOutput)
+        } else {
+          baseRelation
+        }
     }
 
-    BucketUnionLogicalPlan(Seq(replacedPlan, complementIndexPlan), bucketSpec)
+    if (!originalPlan.equals(complementIndexPlan)) {
+      val attrs = complementIndexPlan.output.attrs.filter { attr =>
+        index.indexedColumns contains attr.name
+      }
+      val shuffled = RepartitionByExpression(attrs, complementIndexPlan, index.numBuckets)
+      BucketUnionLogicalPlan(
+        Seq(indexPlan, shuffled),
+        index.bucketSpec.copy(sortColumnNames = Seq()))
+    } else {
+      indexPlan
+    }
   }
 
   /**

@@ -22,7 +22,7 @@ import org.apache.spark.{OneToOneDependency, Partition, SparkContext, TaskContex
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Attribute}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{SparkPlan, SparkStrategy}
@@ -81,8 +81,8 @@ class BucketAwareUnionRDD[T: ClassTag](
 private[hyperspace]
 case class BucketUnionLogicalPlan(children: Seq[LogicalPlan], bucketSpec: BucketSpec)
     extends LogicalPlan {
+  require(children.forall(_.output.equals(children.head.output)))
   override def output: Seq[Attribute] = children.head.output
-  override def outputOrdering: Seq[SortOrder] = children.head.outputOrdering
 
   // from Spark code
   override def maxRows: Option[Long] = {
