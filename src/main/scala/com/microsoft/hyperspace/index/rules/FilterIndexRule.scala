@@ -16,17 +16,14 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.{ActiveSparkSession, BucketUnionLogicalPlan, Hyperspace}
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
@@ -59,108 +56,29 @@ object FilterIndexRule
           logicalRelation,
           fsRelation) =>
         try {
-          val transformedPlan = replaceWithIndexIfPlanCovered(
-            filter,
-            outputColumns,
-            filterColumns,
-            logicalRelation,
-            fsRelation)
-
-          val replaced = originalPlan match {
-            case p @ Project(_, _) =>
-              p.copy(child = transformedPlan)
-            case _ =>
-              transformedPlan
+          val candidateIndexes =
+            findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
+          rank(candidateIndexes) match {
+            case Some(index) =>
+              val replacedPlan = RuleUtils.getReplacementPlan(spark, index, originalPlan)
+              logEvent(
+                HyperspaceIndexUsageEvent(
+                  AppInfo(
+                    sparkContext.sparkUser,
+                    sparkContext.applicationId,
+                    sparkContext.appName),
+                  Seq(index),
+                  filter.toString,
+                  replacedPlan.toString,
+                  "Filter index rule applied."))
+              replacedPlan
+            case None => originalPlan
           }
-          replaced
         } catch {
           case e: Exception =>
             logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
             originalPlan
         }
-    }
-  }
-
-  /**
-   * For a given relation, check its available indexes and replace it with the top-ranked index
-   * (according to cost model).
-   *
-   * @param filter Filter node in the subplan that is being optimized.
-   * @param outputColumns List of output columns in subplan.
-   * @param filterColumns List of columns in filter predicate.
-   * @param logicalRelation child logical relation in the subplan.
-   * @param fsRelation Input relation in the subplan.
-   * @return transformed logical plan in which original fsRelation is replaced by
-   *         the top-ranked index.
-   */
-  private def replaceWithIndexIfPlanCovered(
-      filter: Filter,
-      outputColumns: Seq[String],
-      filterColumns: Seq[String],
-      logicalRelation: LogicalRelation,
-      fsRelation: HadoopFsRelation): LogicalPlan = {
-    val candidateIndexes =
-      findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
-    rank(candidateIndexes) match {
-      case Some(index) =>
-        val spark = fsRelation.sparkSession
-        val newLocation =
-          new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
-
-        val newFsRelation = HadoopFsRelation(
-          newLocation,
-          new StructType(),
-          index.schema,
-          Some(index.bucketSpec),
-          new ParquetFileFormat,
-          Map())(spark)
-
-        val newOutput =
-          logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
-
-        val newIndexRelation = logicalRelation.copy(relation = newFsRelation, output = newOutput)
-        val updatedPlan = filter.copy(child = newIndexRelation)
-
-        // for appended source files
-        val appendedSourceFiles =
-          fsRelation.location.inputFiles
-            .map(new Path(_))
-            .filter(p => !index.allSourceFileSet.contains(p))
-
-        val replacedPlan = if (!appendedSourceFiles.isEmpty) {
-          val appendedLocation =
-            new InMemoryFileIndex(spark, appendedSourceFiles, Map(), None)
-          val appendedRelation = logicalRelation.copy(
-            relation =
-              fsRelation.copy(location = appendedLocation, dataSchema = index.schema)(spark),
-            output = newOutput)
-
-          val attrs = appendedRelation.attributeMap.baseMap
-            .filter { key =>
-              index.indexedColumns contains key._2._2.name
-            }
-            .map { case (_, ref) => ref._1 }
-
-          val filtered = filter.copy(child = appendedRelation)
-          val shuffled =
-            RepartitionByExpression(attrs.toSeq, filtered, index.numBuckets)
-          BucketUnionLogicalPlan(
-            Seq(updatedPlan, shuffled),
-            index.bucketSpec.copy(sortColumnNames = Seq()))
-        } else {
-          updatedPlan
-        }
-
-        logEvent(
-          HyperspaceIndexUsageEvent(
-            AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
-            Seq(index),
-            filter.toString,
-            replacedPlan.toString,
-            "Filter index rule applied."))
-        replacedPlan
-
-      case None => filter // No candidate index found
     }
   }
 
