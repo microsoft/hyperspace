@@ -16,7 +16,9 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.util.Try
+import java.io.FileNotFoundException
+
+import scala.util.{Failure, Try}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -148,9 +150,19 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   }
 
   private def leafFileInfo(path: Path): Seq[FileInfo] = {
-    // Assuming index directories don't contain nested directories. Only Leaf files.
-    val fs = path.getFileSystem(new Configuration)
-    Try { fs.listStatus(path).map(FileInfo(_)).toSeq }.getOrElse(Seq())
+    try {
+      val fs = path.getFileSystem(new Configuration)
+      val statuses = fs.listStatus(path)
+
+      // Assuming index directories don't contain nested directories. Only Leaf files.
+      assert(statuses.forall(!_.isDirectory))
+
+      statuses.map(FileInfo(_)).toSeq
+    } catch {
+      // FileNotFoundException is an expected exception before index gets created.
+      case _: FileNotFoundException => Seq()
+      case e => throw e
+    }
   }
 
   private def resolveConfig(

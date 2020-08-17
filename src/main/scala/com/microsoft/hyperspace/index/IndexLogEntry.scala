@@ -33,6 +33,7 @@ case class Content(root: String, directories: Seq[Content.Directory])
 object Content {
   case class Directory(path: String, files: Seq[FileInfo], fingerprint: NoOpFingerprint)
   object Directory {
+    // modifiedTime is an Epoch time in milliseconds. (ms `since 1970-01-01T00:00:00.000 UTC).
     case class FileInfo(name: String, size: Long, modifiedTime: Long)
     object FileInfo {
       def apply(s: FileStatus): FileInfo =

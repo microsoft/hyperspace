@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.TestUtils.toFileInfo
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.JsonUtils
 
 class IndexLogEntryTest extends SparkFunSuite {
@@ -116,9 +116,13 @@ class IndexLogEntryTest extends SparkFunSuite {
         Relation(
           Seq("rootpath"),
           Hdfs(
-            Hdfs.Properties(Content(
-              "",
-              Seq(Content.Directory("", Seq("f1", "f2").map(toFileInfo), NoOpFingerprint()))))),
+            Hdfs.Properties(
+              Content(
+                "",
+                Seq(Content.Directory(
+                  "",
+                  Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)),
+                  NoOpFingerprint()))))),
           "schema",
           "type",
           Map())),
