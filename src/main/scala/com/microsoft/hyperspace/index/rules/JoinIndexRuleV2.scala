@@ -77,6 +77,7 @@ object JoinIndexRuleV2
       relation.outputSet
         .filter(c => contains(tempVar, c.asInstanceOf[AttributeReference]))
         .map(_.name)
+        .toSeq
     val reqdIdxCols = relation.outputSet
       .filter(
         c =>
@@ -84,17 +85,9 @@ object JoinIndexRuleV2
             joinCols.toSet.map((col: Attribute) => col.asInstanceOf[AttributeReference]),
             c.asInstanceOf[AttributeReference]))
       .map(_.name)
+      .toSeq
 
-    val usableIndexes = availableIndexes
-      .filter { index =>
-        index.config.indexedColumns.toSet.equals(reqdIdxCols.toSet) &&
-        allReqdCols.forall(
-          c =>
-            (index.config.indexedColumns ++ index.config.includedColumns)
-              .contains(c))
-      }
-
-    usableIndexes.headOption match {
+    filterUsableIndexes(availableIndexes, reqdIdxCols, allReqdCols).headOption match {
       case None => relation
       case Some(index) => updateLogicalRelationWithIndex(spark, relation, index)
     }
@@ -116,8 +109,7 @@ object JoinIndexRuleV2
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
 
-    val joinCols =
-      condition.references.map(_.asInstanceOf[AttributeReference]).toSet
+    val joinCols = condition.references.map(_.asInstanceOf[AttributeReference]).toSet
     val eligibleBaseRelations = plan.collectLeaves().filter {
       case relation: LogicalRelation =>
         relation.output.toSet.exists(col => contains(joinCols, col))

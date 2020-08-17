@@ -321,8 +321,8 @@ object JoinIndexRule
     require(resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined)
     require(resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined)
 
-    val lUsable = getUsableIndexes(lIndexes, lRequiredIndexedCols, lRequiredAllCols)
-    val rUsable = getUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
+    val lUsable = filterUsableIndexes(lIndexes, lRequiredIndexedCols, lRequiredAllCols)
+    val rUsable = filterUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
     val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
 
     compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
@@ -427,32 +427,6 @@ object JoinIndexRule
     case And(left, right) =>
       extractConditions(left) ++ extractConditions(right)
     case _ => throw new IllegalStateException("Unsupported condition found")
-  }
-
-  /**
-   * Get usable indexes which satisfy indexed and included column requirements.
-   *
-   * Pre-requisite: the indexed and included columns required must be already resolved with their
-   * corresponding base relation columns at this point.
-   *
-   * @param indexes All available indexes for the logical plan
-   * @param requiredIndexCols required indexed columns resolved with their base relation column.
-   * @param allRequiredCols required included columns resolved with their base relation column.
-   * @return Indexes which satisfy the indexed and covering column requirements from the logical
-   *         plan and join condition
-   */
-  private def getUsableIndexes(
-      indexes: Seq[IndexLogEntry],
-      requiredIndexCols: Seq[String],
-      allRequiredCols: Seq[String]): Seq[IndexLogEntry] = {
-    indexes.filter { idx =>
-      val allCols = idx.indexedColumns ++ idx.includedColumns
-
-      // All required index columns should match one-to-one with all indexed columns and
-      // vice-versa. All required columns must be present in the available index columns.
-      requiredIndexCols.toSet.equals(idx.indexedColumns.toSet) &&
-      allRequiredCols.forall(allCols.contains)
-    }
   }
 
   /**
