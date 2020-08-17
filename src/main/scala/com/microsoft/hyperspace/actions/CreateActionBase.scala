@@ -161,7 +161,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     } catch {
       // FileNotFoundException is an expected exception before index gets created.
       case _: FileNotFoundException => Seq()
-      case e => throw e
+      case e : Throwable => throw e
     }
   }
 
