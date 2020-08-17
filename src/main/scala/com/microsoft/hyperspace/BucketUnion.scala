@@ -36,17 +36,7 @@ class BucketAwareUnionRDDPartition(@transient val rdds: Seq[RDD[_]], override va
   var parents: Array[Partition] = rdds.map(_.partitions(index)).toArray
 
   override def hashCode(): Int = index
-
   override def equals(other: Any): Boolean = super.equals(other)
-
-  /*
-  @throws(classOf[IOException])
-  private def writeObject(oos: ObjectOutputStream): Unit = Utils.tryOrIOException {
-    // Update the reference to parent partition at the time of task serialization
-    parents = rdds.map(_.partitions(index)).toArray
-    oos.defaultWriteObject()
-  }
-   */
 }
 
 private[hyperspace]
@@ -84,7 +74,6 @@ case class BucketUnionLogicalPlan(children: Seq[LogicalPlan], bucketSpec: Bucket
   require(children.forall(_.output.equals(children.head.output)))
   override def output: Seq[Attribute] = children.head.output
 
-  // from Spark code
   override def maxRows: Option[Long] = {
     if (children.exists(_.maxRows.isEmpty)) {
       None
@@ -93,7 +82,6 @@ case class BucketUnionLogicalPlan(children: Seq[LogicalPlan], bucketSpec: Bucket
     }
   }
 
-  // from Spark code
   override def maxRowsPerPartition: Option[Long] = {
     if (children.exists(_.maxRowsPerPartition.isEmpty)) {
       None
@@ -102,7 +90,6 @@ case class BucketUnionLogicalPlan(children: Seq[LogicalPlan], bucketSpec: Bucket
     }
   }
 
-  // from Spark code
   override lazy val resolved: Boolean = {
     // allChildrenCompatible needs to be evaluated after childrenResolved
     def allChildrenCompatible: Boolean =
@@ -138,5 +125,4 @@ case class BucketUnionExecutorExec(children: Seq[SparkPlan], bucketSpec: BucketS
 
   override def output: Seq[Attribute] = children.head.output
   override def outputPartitioning: Partitioning = children.head.outputPartitioning
-  // override def outputOrdering: Seq[SortOrder] = children.head.outputOrdering
 }

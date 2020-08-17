@@ -50,6 +50,14 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
     }
   }
 
+  /**
+   * Generate the signature of logical plan.
+   *
+   * @param logicalPlan logical plan of data frame.
+   * @param whiteListFiles while list of file paths used to calculate signature
+   * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
+   *         can generate signature for the logical plan; Otherwise None.
+   */
   override def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = {
     fileBasedSignatureProvider.signature(logicalPlan, whiteListFiles).flatMap { f =>
       planSignatureProvider.signature(logicalPlan).map { p =>

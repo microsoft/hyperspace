@@ -40,6 +40,13 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
     fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
   }
 
+  /**
+   * Generate the signature of logical plan.
+   *
+   * @param logicalPlan logical plan of data frame.
+   * @param whiteListFiles while list of file paths used to calculate signature
+   * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
+   */
   override def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = {
     fingerprintVisitor(logicalPlan, whiteListFiles).map(HashingUtils.md5Hex)
   }
@@ -48,6 +55,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Visit logical plan and collect info needed for fingerprint.
    *
    * @param logicalPlan logical plan of data frame.
+   * @param whiteListFiles while list of file paths used to calculate signature
    * @return fingerprint, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
   private def fingerprintVisitor(

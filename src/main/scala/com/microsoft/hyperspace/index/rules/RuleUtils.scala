@@ -36,6 +36,7 @@ object RuleUtils {
    *
    * @param indexManager indexManager
    * @param plan logical plan
+   * @param spark Spark session
    * @return indexes built for this plan
    */
   def getCandidateIndexes(
@@ -95,6 +96,7 @@ object RuleUtils {
    *
    * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
    *
+   * @param spark Spark session
    * @param index index used in replacement plan
    * @param plan current plan
    * @return replacement plan
@@ -147,14 +149,14 @@ object RuleUtils {
         val updatedOutput =
           baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
 
-        val files =
+        val filesNotCovered =
           fsRelation.location.inputFiles
             .map(new Path(_))
             .filter(!index.allSourceFileSet.contains(_))
 
-        if (files.nonEmpty) {
+        if (filesNotCovered.nonEmpty) {
           val newLocation =
-            new InMemoryFileIndex(spark, files, Map(), None)
+            new InMemoryFileIndex(spark, filesNotCovered, Map(), None)
           val newRelation =
             fsRelation.copy(location = newLocation, dataSchema = index.schema)(spark)
           baseRelation.copy(relation = newRelation, output = updatedOutput)
@@ -167,10 +169,16 @@ object RuleUtils {
       val attrs = complementIndexPlan.output.attrs.filter { attr =>
         index.indexedColumns contains attr.name
       }
+      // Perform on-the-fly shuffle with the same partition structure of index
+      // so that we could avoid incurring shuffle whole index data at merge stage
       val shuffled = RepartitionByExpression(attrs, complementIndexPlan, index.numBuckets)
-      BucketUnionLogicalPlan(
-        Seq(indexPlan, shuffled),
-        index.bucketSpec.copy(sortColumnNames = Seq()))
+
+      // removing sort order because original data isn't sorted by the same columns as the index
+      val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
+
+      // Merge index data & newly shuffled data by using bucket-aware union.
+      // Currently, BucketUnion does not keep the sort order within a bucket.
+      BucketUnionLogicalPlan(Seq(indexPlan, shuffled), bucketSpec)
     } else {
       indexPlan
     }
