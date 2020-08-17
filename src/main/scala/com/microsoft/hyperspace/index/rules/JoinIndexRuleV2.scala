@@ -16,20 +16,15 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, AttributeSet, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 
-import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.JoinIndexRule.spark
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.index.rules.JoinRuleUtils._
+import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
 
 /**
  * Join Index Rule V2. This rule tries to optimizes both sides of a shuffle based join
@@ -46,7 +41,11 @@ import com.microsoft.hyperspace.index.rules.JoinIndexRule.spark
  * 2. Independently check left and right sides of the join for available indexes. If an index
  *    is picked, the shuffle on that side will be eliminated.
  */
-object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging {
+object JoinIndexRuleV2
+    extends Rule[LogicalPlan]
+    with Logging
+    with HyperspaceEventLogging
+    with ActiveSparkSession {
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
     case join @ Join(l, r, _, Some(condition)) if eligible(l, r, condition) =>
       updatePlan(join)
@@ -97,7 +96,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging {
 
     usableIndexes.headOption match {
       case None => relation
-      case Some(index) => replaceRelationWithIndex(relation, index)
+      case Some(index) => updateLogicalRelationWithIndex(spark, relation, index)
     }
   }
 
@@ -156,55 +155,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging {
   }
 
   private def isBroadcastJoin(l: LogicalPlan, r: LogicalPlan): Boolean = {
-    val broadcastThreshold: Long =
-      SparkSession.getActiveSession.get.conf
-        .get("spark.sql.autoBroadcastJoinThreshold")
-        .toLong
+    val broadcastThreshold: Long = spark.conf.get("spark.sql.autoBroadcastJoinThreshold").toLong
     l.stats.sizeInBytes <= broadcastThreshold || r.stats.sizeInBytes <= broadcastThreshold
-  }
-
-  /**
-   * Check for supported Join Conditions. Equi-Joins in simple CNF form are supported.
-   *
-   * Predicates should be of the form (A = B and C = D and E = F and...). OR based conditions
-   * are not supported. E.g. (A = B OR C = D) is not supported
-   *
-   * TODO (500053): Investigate whether OR condition can use bucketing info for optimization
-   *
-   * @param condition the join condition
-   * @return true if the condition is supported. False otherwise.
-   */
-  private def isJoinConditionSupported(condition: Expression): Boolean = {
-    condition match {
-      case EqualTo(_: AttributeReference, _: AttributeReference) => true
-      case And(left, right) => isJoinConditionSupported(left) && isJoinConditionSupported(right)
-      case _ => false
-    }
-  }
-
-  private def replaceRelationWithIndex(
-    relation: LogicalRelation,
-    index: IndexLogEntry): LogicalRelation = {
-    val bucketSpec = BucketSpec(
-      numBuckets = index.numBuckets,
-      bucketColumnNames = index.config.indexedColumns,
-      sortColumnNames = index.config.indexedColumns)
-
-    val spark = SparkSession.getActiveSession.getOrElse {
-      throw new IllegalArgumentException("Could not find active SparkSession")
-    }
-
-    val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
-    val newRelation = HadoopFsRelation(
-      location,
-      new StructType(),
-      index.schema,
-      Some(bucketSpec),
-      new ParquetFileFormat,
-      Map())(spark)
-
-    val newOutput =
-      relation.output.filter(attr => newRelation.schema.fieldNames.contains(attr.name))
-    relation.copy(relation = newRelation, output = newOutput)
   }
 }

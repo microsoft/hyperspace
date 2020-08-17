@@ -19,20 +19,17 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 import scala.util.Try
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.index.rules.JoinRuleUtils._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils._
 
@@ -136,29 +133,13 @@ object JoinIndexRule
    * @return replacement plan
    */
   private def getReplacementPlan(index: IndexLogEntry, plan: LogicalPlan): LogicalPlan = {
-    val bucketSpec = BucketSpec(
-      numBuckets = index.numBuckets,
-      bucketColumnNames = index.indexedColumns,
-      sortColumnNames = index.indexedColumns)
-
-    val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
-    val relation = HadoopFsRelation(
-      location,
-      new StructType(),
-      index.schema,
-      Some(bucketSpec),
-      new ParquetFileFormat,
-      Map())(spark)
-
     // Here we can't replace the plan completely with the index. This will create problems.
     // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
     // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
     // lead to wrong results. So we only replace the base relation.
     plan transform {
-      case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
-        val updatedOutput =
-          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-        baseRelation.copy(relation = relation, output = updatedOutput)
+      case baseRelation @ LogicalRelation(_: HadoopFsRelation, _, _, _) =>
+        updateLogicalRelationWithIndex(spark, baseRelation, index)
     }
   }
 
@@ -173,25 +154,6 @@ object JoinIndexRule
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
     isJoinConditionSupported(condition) && isPlanLinear(l) &&
     isPlanLinear(r) && ensureAttributeRequirements(l, r, condition)
-  }
-
-  /**
-   * Check for supported Join Conditions. Equi-Joins in simple CNF form are supported.
-   *
-   * Predicates should be of the form (A = B and C = D and E = F and...). OR based conditions
-   * are not supported. E.g. (A = B OR C = D) is not supported
-   *
-   * TODO: Investigate whether OR condition can use bucketing info for optimization
-   *
-   * @param condition the join condition
-   * @return true if the condition is supported. False otherwise.
-   */
-  private def isJoinConditionSupported(condition: Expression): Boolean = {
-    condition match {
-      case EqualTo(_: AttributeReference, _: AttributeReference) => true
-      case And(left, right) => isJoinConditionSupported(left) && isJoinConditionSupported(right)
-      case _ => false
-    }
   }
 
   /**

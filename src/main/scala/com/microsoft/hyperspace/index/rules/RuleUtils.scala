@@ -18,8 +18,14 @@ package com.microsoft.hyperspace.index.rules
 
 import scala.collection.mutable
 
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
@@ -71,5 +77,57 @@ object RuleUtils {
     } else {
       None // logicalPlan is non-linear or it has no LogicalRelation.
     }
+  }
+}
+
+object JoinRuleUtils {
+
+  /**
+   * Check for supported Join Conditions. Equi-Joins in simple CNF form are supported.
+   *
+   * Predicates should be of the form (A = B and C = D and E = F and...). OR based conditions
+   * are not supported. E.g. (A = B OR C = D) is not supported
+   *
+   * TODO (500053): Investigate whether OR condition can use bucketing info for optimization
+   *
+   * @param condition the join condition
+   * @return true if the condition is supported. False otherwise.
+   */
+  def isJoinConditionSupported(condition: Expression): Boolean = {
+    condition match {
+      case EqualTo(_: AttributeReference, _: AttributeReference) => true
+      case And(left, right) => isJoinConditionSupported(left) && isJoinConditionSupported(right)
+      case _ => false
+    }
+  }
+
+  /**
+   * Return an updated scan node (LogicalRelation) containing index information.
+   * @param spark SparkSession.
+   * @param relation Original source relation to update.
+   * @param index Index Log Entry to use in place of original relation.
+   * @return
+   */
+  def updateLogicalRelationWithIndex(
+      spark: SparkSession,
+      relation: LogicalRelation,
+      index: IndexLogEntry): LogicalRelation = {
+    val bucketSpec = BucketSpec(
+      numBuckets = index.numBuckets,
+      bucketColumnNames = index.config.indexedColumns,
+      sortColumnNames = index.config.indexedColumns)
+
+    val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
+    val newRelation = HadoopFsRelation(
+      location,
+      new StructType(),
+      index.schema,
+      Some(bucketSpec),
+      new ParquetFileFormat,
+      Map())(spark)
+
+    val newOutput =
+      relation.output.filter(attr => newRelation.schema.fieldNames.contains(attr.name))
+    relation.copy(relation = newRelation, output = newOutput)
   }
 }
