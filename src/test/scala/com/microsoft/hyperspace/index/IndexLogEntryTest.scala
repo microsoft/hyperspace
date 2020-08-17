@@ -66,12 +66,12 @@ class IndexLogEntryTest extends SparkFunSuite {
         |                  "path" : "",
         |                  "files" : [ {
         |                    "name" : "f1",
-        |                    "size" : 0,
-        |                    "modifiedTime" : 0
+        |                    "size" : 100,
+        |                    "modifiedTime" : 100
         |                  }, {
         |                    "name" : "f2",
-        |                    "size" : 0,
-        |                    "modifiedTime" : 0
+        |                    "size" : 200,
+        |                    "modifiedTime" : 200
         |                  } ],
         |                  "fingerprint" : {
         |                    "kind" : "NoOp",
