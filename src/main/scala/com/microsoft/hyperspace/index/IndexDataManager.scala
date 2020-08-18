@@ -47,17 +47,19 @@ class IndexDataManagerImpl(indexPath: Path) extends IndexDataManager {
   // TODO: Investigate whether FileContext should be used instead of FileSystem for atomic renames.
   private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
 
+  private lazy val absoluteIndexPath: Path = fs.makeQualified(indexPath)
+
   /**
    * This method relies on the naming convention that directory name will be similar to hive
    * partitioning scheme, i.e. "root/v__=value/f1.parquet" etc. Here the value represents the
    * version id of the data.
    */
   override def getLatestVersionId(): Option[Int] = {
-    if (!fs.exists(indexPath)) {
+    if (!fs.exists(absoluteIndexPath)) {
       return None
     }
     val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
-    val ids = fs.listStatus(indexPath).collect {
+    val ids = fs.listStatus(absoluteIndexPath).collect {
       case status
           if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
         status.getPath.getName.drop(prefixLength).toInt
@@ -66,7 +68,9 @@ class IndexDataManagerImpl(indexPath: Path) extends IndexDataManager {
   }
 
   override def getPath(id: Int): Path = {
-    new Path(indexPath, s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=${id.toString}")
+    new Path(
+      absoluteIndexPath,
+      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=${id.toString}")
   }
 
   override def delete(id: Int): Unit = FileUtils.delete(getPath(id))

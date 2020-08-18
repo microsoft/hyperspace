@@ -57,8 +57,10 @@ trait IndexLogManager {
 class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging {
   // Use FileContext instead of FileSystem for atomic renames?
   private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
+  private lazy val absoluteIndexPath: Path = fs.makeQualified(indexPath)
 
-  private lazy val hyperspaceLogPath: Path = new Path(indexPath, IndexConstants.HYPERSPACE_LOG)
+  private lazy val hyperspaceLogPath: Path =
+    new Path(absoluteIndexPath, IndexConstants.HYPERSPACE_LOG)
 
   private val pathFromId: Int => Path = id => new Path(hyperspaceLogPath, id.toString)
 
@@ -113,8 +115,9 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
   override def createLatestStableLog(id: Int): Boolean = {
     getLog(id) match {
       case Some(logEntry) if Constants.STABLE_STATES.contains(logEntry.state) =>
-        Try(FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration))
-        match {
+        Try {
+          FileUtil.copy(fs, pathFromId(id), fs, latestStablePath, false, new Configuration)
+        } match {
           case Success(v) => v
           case Failure(e) =>
             logError(s"Failed to create the latest stable log with id = '$id'", e)
