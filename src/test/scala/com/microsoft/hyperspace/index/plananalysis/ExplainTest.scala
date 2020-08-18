@@ -44,7 +44,8 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val dfFromSample = sampleData.toDF("Col1", "Col2")
     dfFromSample.write.parquet(sampleParquetDataLocation)
     sampleParquetDataFullPath =
-      fileSystem.getFileStatus(new Path(sampleParquetDataLocation)).getPath.toString
+      fileSystem.makeQualified(new Path(sampleParquetDataLocation)).toString
+    // fileSystem.getFileStatus(new Path(sampleParquetDataLocation)).getPath.toString
   }
 
   override def afterAll(): Unit = {
@@ -519,7 +520,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   }
 
   private def getIndexFilesPath(indexName: String): Path = {
-    new Path(systemPath, s"$indexName/v__=0")
+    new Path(fileSystem.makeQualified(systemPath), s"$indexName/v__=0")
   }
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(

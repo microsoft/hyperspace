@@ -407,7 +407,9 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   private def getIndexFilesPath(indexName: String): Path = {
-    new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    val fs = systemPath.getFileSystem(new Configuration)
+    fs.makeQualified(
+      new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))
   }
 
   /**

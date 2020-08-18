@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
@@ -32,6 +33,12 @@ import com.microsoft.hyperspace.util.FileUtils
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val indexStorageLocation = "src/test/resources/indexLocation"
+  private val absoluteIndexLocation = {
+    val indexStoratePath = new Path(indexStorageLocation)
+    val fs = indexStoratePath.getFileSystem(new Configuration)
+    fs.makeQualified(indexStoratePath).toString
+  }
+
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -72,7 +79,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       indexConfig1.includedColumns,
       200,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
-      s"$indexStorageLocation/index1/v__=0",
+      s"$absoluteIndexLocation/index1/v__=0",
       Constants.States.ACTIVE)
     assert(actual.equals(expected))
   }
@@ -237,7 +244,6 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       schema: StructType,
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
-
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = df.queryExecution.optimizedPlan.collect {
@@ -283,7 +289,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content(
-            s"$indexStorageLocation/${indexConfig.indexName}" +
+            s"$absoluteIndexLocation/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
           Source(SparkPlan(sourcePlanProperties)),
