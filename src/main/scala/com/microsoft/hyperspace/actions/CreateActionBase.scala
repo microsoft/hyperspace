@@ -85,7 +85,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(schema),
               numBuckets)),
-          Content(path.toString, Seq(Directory("", leafFileInfo(path), NoOpFingerprint()))),
+          Content(path.toString, Seq(Directory("", indexFilesInfo(path), NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -149,7 +149,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         resolvedIndexedColumns)
   }
 
-  private def leafFileInfo(path: Path): Seq[FileInfo] = {
+  private def indexFilesInfo(path: Path): Seq[FileInfo] = {
     try {
       val fs = path.getFileSystem(new Configuration)
       val statuses = fs.listStatus(path)
