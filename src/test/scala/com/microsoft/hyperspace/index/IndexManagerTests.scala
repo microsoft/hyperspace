@@ -61,23 +61,12 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
     super.afterAll()
   }
 
-  test("Verify that indexes() returns the correct dataframe.") {
-    import spark.implicits._
-    hyperspace.createIndex(df, indexConfig1)
-    val actual = hyperspace.indexes.as[IndexSummary].collect()(0)
-    val expected = new IndexSummary(
-      indexConfig1.indexName,
-      indexConfig1.indexedColumns,
-      indexConfig1.includedColumns,
-      200,
-      StructType(
-        Seq(
-          StructField("RGUID", StringType),
-          StructField("Date", StringType),
-          StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))).json,
-      s"$indexStorageLocation/index1/v__=0",
-      Constants.States.ACTIVE)
-    assert(actual.equals(expected))
+  test("Verify that indexes() returns the correct dataframe without lineage.") {
+    verifyIndexesOutput(false)
+  }
+
+  test("Verify that indexes() returns the correct dataframe with lineage.") {
+    verifyIndexesOutput(true)
   }
 
   test("Verify getIndexes()") {
@@ -300,5 +289,29 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   // Verify if the indexes currently stored in Hyperspace matches the given indexes.
   private def verifyIndexes(expectedIndexes: Seq[IndexLogEntry]): Unit = {
     assert(IndexCollectionManager(spark).getIndexes().toSet == expectedIndexes.toSet)
+  }
+
+  private def verifyIndexesOutput(enableLineage: Boolean): Unit = {
+    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, if (enableLineage) "true" else "false")
+    import spark.implicits._
+    hyperspace.createIndex(df, indexConfig1)
+    val actual = hyperspace.indexes.as[IndexSummary].collect()(0)
+    var expectedSchema = StructType(
+      Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
+    if (enableLineage) {
+      expectedSchema =
+        expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
+    }
+    val expected = new IndexSummary(
+      indexConfig1.indexName,
+      indexConfig1.indexedColumns,
+      indexConfig1.includedColumns,
+      200,
+      expectedSchema.json,
+      s"$indexStorageLocation/index1/v__=0",
+      Constants.States.ACTIVE)
+    assert(actual.equals(expected))
+    spark.conf
+      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
   }
 }

@@ -27,11 +27,8 @@ import com.microsoft.hyperspace.util.FileUtils
 
 class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
-  private val sampleData = SampleData.testData
   private val sampleNonPartitionedParquetDataLocation = "src/test/resources/sampleparquet"
   private val samplePartitionedParquetDataLocation = "src/test/resources/samplepartitionedparquet"
-  private val partitionKey1 = "Date"
-  private val partitionKey2 = "Query"
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
@@ -44,36 +41,23 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     super.beforeAll()
 
     val sparkSession = spark
-    import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
     FileUtils.delete(new Path(sampleNonPartitionedParquetDataLocation))
     FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
 
     // save test non-partitioned.
-    val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-    dfFromSample.write.parquet(sampleNonPartitionedParquetDataLocation)
+    SampleData.saveTestDataNonPartitioned(
+      spark,
+      sampleNonPartitionedParquetDataLocation,
+      "Date",
+      "RGUID",
+      "Query",
+      "imprs",
+      "clicks")
     nonPartitionedDataDF = spark.read.parquet(sampleNonPartitionedParquetDataLocation)
 
     // save test data partitioned.
-    // `Date` is the first partition key and `Query` is the second partition key.
-    dfFromSample.select(partitionKey1).distinct().collect().foreach { d =>
-      val date = d.get(0)
-      dfFromSample
-        .filter($"date" === date)
-        .select(partitionKey2)
-        .distinct()
-        .collect()
-        .foreach { q =>
-          val query = q.get(0)
-          val partitionPath =
-            s"$samplePartitionedParquetDataLocation/$partitionKey1=$date/$partitionKey2=$query"
-          dfFromSample
-            .filter($"date" === date && $"Query" === query)
-            .select("RGUID", "imprs", "clicks")
-            .write
-            .parquet(partitionPath)
-        }
-    }
+    SampleData.saveTestDataPartitioned(spark, samplePartitionedParquetDataLocation)
     partitionedDataDF = spark.read.parquet(samplePartitionedParquetDataLocation)
   }
 
@@ -179,51 +163,70 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Check lineage in index records for non-partitioned data.") {
+    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
     hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     val indexRecordsDF = spark.read.parquet(
       s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
     // For non-partitioned data, only file name lineage column should be added to index schema.
-    indexRecordsDF.schema.fields.corresponds(
-      indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
-        Seq(IndexConstants.DATA_FILE_NAME_COLUMN))(_.name.equals(_))
+    assert(
+      indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
+          Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
+    spark.conf
+      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
   }
 
   test("Check lineage in index records for partitioned data when partition key is not in config.") {
+    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
     hyperspace.createIndex(partitionedDataDF, indexConfig3)
     val indexRecordsDF = spark.read.parquet(
       s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
     // For partitioned data, beside file name lineage column all partition keys columns
     // should be added to index schema if they are not already among index config columns.
-    indexRecordsDF.schema.fields.corresponds(
-      indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-        Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey1, partitionKey2))(_.name.equals(_))
+    assert(
+      indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+          Seq(
+            IndexConstants.DATA_FILE_NAME_COLUMN,
+            SampleData.partitionKey1,
+            SampleData.partitionKey2)).sorted)(_.equals(_)))
+    spark.conf
+      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
   }
 
   test("Check lineage in index records for partitioned data when partition key is in config.") {
+    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
     hyperspace.createIndex(partitionedDataDF, indexConfig4)
     val indexRecordsDF = spark.read.parquet(
       s"$systemPath/${indexConfig4.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
     // For partitioned data, if partition keys are already in index config columns,
     // there should be no duplicates due to adding lineage.
-    indexRecordsDF.schema.fields.corresponds(
-      indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-        Seq(IndexConstants.DATA_FILE_NAME_COLUMN))(_.name.equals(_))
+    assert(
+      indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
+          Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
+    spark.conf
+      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
   }
 
   test("Check lineage in index records for partitioned data when partition key is in load path.") {
+    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
     val dataDF =
-      spark.read.parquet(s"$samplePartitionedParquetDataLocation/$partitionKey1=2017-09-03")
+      spark.read.parquet(
+        s"$samplePartitionedParquetDataLocation/${SampleData.partitionKey1}=2017-09-03")
     hyperspace.createIndex(dataDF, indexConfig3)
     val indexRecordsDF = spark.read.parquet(
       s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
     // As data load path includes first partition key, index schema should only contain
     // file name column and second partition key column as lineage columns.
-    indexRecordsDF.schema.fields.corresponds(
-      indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-        Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey2))(_.name.equals(_))
+    assert(indexRecordsDF.schema.fieldNames.sorted.corresponds(
+      (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+        Seq(IndexConstants.DATA_FILE_NAME_COLUMN, SampleData.partitionKey2)).sorted)(_.equals(_)))
+    spark.conf
+      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
   }
 }

@@ -20,6 +20,7 @@ import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{input_file_name, udf}
 import org.apache.spark.sql.sources.DataSourceRegister
 
@@ -53,14 +54,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
     // Resolve the passed column names with existing column names from the dataframe.
-    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val schema = {
-      val indexConfigColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
-      val allColumns = indexConfigColumns ++ internalColumns(df, indexConfigColumns)
-      df.select(allColumns.head, allColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, fileName(input_file_name()))
-        .schema
-    }
+    val (indexDataFrame, resolvedIndexedColumns, resolvedIncludedColumns) =
+      getIndexDataFrame(spark, df, indexConfig)
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
@@ -81,7 +76,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
             CoveringIndex.Properties(
               CoveringIndex.Properties
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
-              IndexLogEntry.schemaString(schema),
+              IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets)),
           Content(path.toString, Seq()),
           Source(SparkPlan(sourcePlanProperties)),
@@ -130,12 +125,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
 
-    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val indexConfigColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val selectedColumns = indexConfigColumns ++ internalColumns(df, indexConfigColumns)
-    val indexDataFrame = df
-      .select(selectedColumns.head, selectedColumns.tail: _*)
-      .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, fileName(input_file_name()))
+    val (indexDataFrame, resolvedIndexedColumns, _) = getIndexDataFrame(spark, df, indexConfig)
 
     // run job
     val repartitionedIndexDataFrame =
@@ -172,16 +162,43 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  private def internalColumns(df: DataFrame, indexConfigColumns: Seq[String]): Seq[String] = {
+  private def getIndexDataFrame(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
+    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
+    val indexConfigColumns = resolvedIndexedColumns ++ resolvedIncludedColumns
+    val addLineage = spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_LINEAGE_ENABLED,
+        IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      .toBoolean
+
+    val indexDF = if (addLineage) {
+      // Lineage is captured using two sets of columns:
+      // 1. DATA_FILE_NAME_COLUMN column contains source data filename for each index record.
+      // 2. If source data is partitioned, all partitioning key(s) are added to index schema.
+      val additionalPartitioningColumns = getPartitioningColumns(df).filter(
+        ResolverUtils.resolve(spark, _, indexConfigColumns).isEmpty)
+      val dataFrameColumns = indexConfigColumns ++ additionalPartitioningColumns
+      df.select(dataFrameColumns.head, dataFrameColumns.tail: _*)
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, getFileName(input_file_name()))
+    } else {
+      df.select(indexConfigColumns.head, indexConfigColumns.tail: _*)
+    }
+
+    (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
+  }
+
+  private def getPartitioningColumns(df: DataFrame): Seq[String] = {
+    // Extract partitioning keys, if original data is partitioned.
     val partitionSchema = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(HadoopFsRelation(_, pSchema, _, _, _, _), _, _, _) => pSchema
     }
 
-    val spark = df.sparkSession
-    partitionSchema.head
-      .map(_.name)
-      .filter(ResolverUtils.resolve(spark, _, indexConfigColumns).isEmpty)
+    partitionSchema.head.map(_.name)
   }
 
-  private val fileName = udf((fullFilePath: String) => FilenameUtils.getBaseName(fullFilePath))
+  private val getFileName: UserDefinedFunction = udf(
+    (fullFilePath: String) => FilenameUtils.getBaseName(fullFilePath))
 }

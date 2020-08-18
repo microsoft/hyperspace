@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace
 
+import org.apache.spark.sql.SparkSession
+
 /**
  * Sample data for testing.
  */
@@ -31,4 +33,37 @@ object SampleData {
     ("2019-10-03", "380786e6495d4cd8a5dd4cc8d3d12917", "facebook", 2, 3000),
     ("2019-10-03", "ff60e4838b92421eafc3e6ee59a9e9f1", "mi perro", 2, 2000),
     ("2019-10-03", "187696fe0a6a40cc9516bc6e47c70bc1", "facebook", 4, 3000))
+
+  // column names and partition keys for partitioned case
+  val colnames = Seq("Date", "RGUID", "Query", "imprs", "clicks")
+  val partitionKey1 = "Date"
+  val partitionKey2 = "Query"
+
+  def saveTestDataNonPartitioned(spark: SparkSession, path: String, colNames: String*): Unit = {
+    import spark.implicits._
+    assert(colNames.length == 5)
+    testData.toDF(colNames: _*).write.parquet(path)
+  }
+
+  def saveTestDataPartitioned(spark: SparkSession, path: String): Unit = {
+    // `Date` is the first partition key and `Query` is the second partition key.
+    import spark.implicits._
+    val df = testData.toDF(colnames: _*)
+    df.select(partitionKey1).distinct().collect().foreach { d =>
+      val date = d.get(0)
+      df.filter($"Date" === date)
+        .select(partitionKey2)
+        .distinct()
+        .collect()
+        .foreach { q =>
+          val query = q.get(0)
+          val partitionPath =
+            s"$path/$partitionKey1=$date/$partitionKey2=$query"
+          df.filter($"Date" === date && $"Query" === query)
+            .select("RGUID", "imprs", "clicks")
+            .write
+            .parquet(partitionPath)
+        }
+    }
+  }
 }
