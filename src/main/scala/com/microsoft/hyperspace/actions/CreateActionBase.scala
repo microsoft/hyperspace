@@ -18,8 +18,6 @@ package com.microsoft.hyperspace.actions
 
 import java.io.FileNotFoundException
 
-import scala.util.{Failure, Try}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
