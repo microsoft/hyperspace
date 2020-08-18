@@ -73,7 +73,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
           (accumulate: String, fileStatus: FileStatus) =>
             if (whiteListFiles.isEmpty || whiteListFiles.contains(fileStatus.getPath)) {
               HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus))
-            } else "")
+            } else accumulate)
       case _ =>
     }
 

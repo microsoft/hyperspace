@@ -44,7 +44,7 @@ object RuleUtils {
       plan: LogicalPlan,
       spark: SparkSession): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
-    val signatureMap = mutable.Map[String, Option[String]]()
+    val signatureMap = mutable.Map[(String, Set[Path]), Option[String]]()
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
@@ -55,12 +55,13 @@ object RuleUtils {
           IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
           IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
         .toBoolean
+      val indexSourceFileSet: Set[Path] = if (hybridScanEnabled) entry.allSourceFileSet else Set()
 
       signatureMap.getOrElseUpdate(
-        sourcePlanSignature.provider,
+        (sourcePlanSignature.provider, indexSourceFileSet),
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan, if (hybridScanEnabled) entry.allSourceFileSet else Set())) match {
+          .signature(plan, indexSourceFileSet)) match {
         case Some(s) => s.equals(sourcePlanSignature.value)
         case None => false
       }
