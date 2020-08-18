@@ -83,7 +83,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(schema),
               numBuckets)),
-          Content(path.toString, Seq(Directory("", indexFilesInfo(path), NoOpFingerprint()))),
+          Content(root = path.getParent.toString,
+            directories = Seq(Directory(path.getName, indexFilesInfo(path), NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

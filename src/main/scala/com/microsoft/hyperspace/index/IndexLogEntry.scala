@@ -37,7 +37,7 @@ object Content {
     case class FileInfo(name: String, size: Long, modifiedTime: Long)
     object FileInfo {
       def apply(s: FileStatus): FileInfo =
-        FileInfo(s.getPath.toString, s.getLen, s.getModificationTime)
+        FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
     }
   }
 }
