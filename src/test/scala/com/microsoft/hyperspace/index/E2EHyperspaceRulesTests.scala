@@ -25,12 +25,13 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private val sampleData = SampleData.testData
   private val testDir = "src/test/resources/e2eTests/"
   private val sampleParquetDataLocation = testDir + "sampleparquet"
-  override val systemPath = new Path(testDir + "indexLocation")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private var hyperspace: Hyperspace = _
 
