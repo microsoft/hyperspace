@@ -80,6 +80,9 @@ class IndexLogManagerImplTest
     TestUtils.copyWithState(sampleIndexLogEntry, state)
   }
 
+  private def logManager(path: Path): IndexLogManager =
+    new IndexLogManagerImpl(TestUtils.makeAbsolute(path))
+
   override def beforeAll(): Unit = {
     super.beforeAll()
     FileUtils.delete(new Path(testRoot), true)
@@ -92,7 +95,7 @@ class IndexLogManagerImplTest
 
   test("testGetLog returns None if log not found") {
     val path = new Path(testRoot, "testPath")
-    assert(new IndexLogManagerImpl(path).getLog(0).isEmpty)
+    assert(logManager(path).getLog(0).isEmpty)
   }
 
   test("testGetLog returns IndexLogEntry if id found") {
@@ -101,7 +104,7 @@ class IndexLogManagerImplTest
       path.getFileSystem(new Configuration),
       new Path(path, s"$HYPERSPACE_LOG/0"),
       JsonUtils.toJson(sampleIndexLogEntry))
-    val actual = new IndexLogManagerImpl(path).getLog(0).get
+    val actual = logManager(path).getLog(0).get
     val expected = sampleIndexLogEntry
     assert(actual.equals(expected))
   }
@@ -117,10 +120,10 @@ class IndexLogManagerImplTest
   test("testDeleteLatestStableLog") {}
 
   test("testWriteLog pass if no other file exists with same name") {
-    val path = new Path(testRoot, UUID.randomUUID().toString)
+    val path = TestUtils.makeAbsolute(new Path(testRoot, UUID.randomUUID().toString))
     val entry = sampleIndexLogEntry
-    assert(new IndexLogManagerImpl(path).writeLog(0, entry))
-    assert(!new IndexLogManagerImpl(path).writeLog(0, entry))
+    assert(logManager(path).writeLog(0, entry))
+    assert(!logManager(path).writeLog(0, entry))
   }
 
   test("testGetLatestId") {
@@ -132,7 +135,7 @@ class IndexLogManagerImplTest
     FileUtils.createFile(fs, new Path(path, s"$HYPERSPACE_LOG/20"), "file contents")
 
     val expected = Some(20)
-    val actual = new IndexLogManagerImpl(path).getLatestId()
+    val actual = logManager(path).getLatestId()
     assert(actual.equals(expected))
   }
 
@@ -158,7 +161,7 @@ class IndexLogManagerImplTest
       JsonUtils.toJson(getEntry("CANCELLING")))
 
     val expected = Some(getEntry("ACTIVE"))
-    val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+    val actual = logManager(path).getLatestStableLog()
     assert(actual.equals(expected))
   }
 
@@ -169,7 +172,7 @@ class IndexLogManagerImplTest
       fs,
       new Path(path, s"$HYPERSPACE_LOG/0"),
       JsonUtils.toJson(getEntry("ACTIVE")))
-    val result = new IndexLogManagerImpl(path).createLatestStableLog(0)
+    val result = logManager(path).createLatestStableLog(0)
     assert(result === true)
     assert(fs.exists(new Path(path, s"$HYPERSPACE_LOG/latestStable")))
   }
@@ -181,7 +184,7 @@ class IndexLogManagerImplTest
       fs,
       new Path(path, s"$HYPERSPACE_LOG/0"),
       JsonUtils.toJson(getEntry("CANCELLING")))
-    val result = new IndexLogManagerImpl(path).createLatestStableLog(0)
+    val result = logManager(path).createLatestStableLog(0)
     assert(result === false)
     assert(!fs.exists(new Path(path, s"$HYPERSPACE_LOG/latestStable")))
   }
@@ -191,7 +194,7 @@ class IndexLogManagerImplTest
     val fs = path.getFileSystem(new Configuration)
     FileUtils.createFile(fs, new Path(path, s"$HYPERSPACE_LOG/0"), "Invalid Log Entry")
     assertThrows[com.fasterxml.jackson.core.JsonParseException](
-      new IndexLogManagerImpl(path).createLatestStableLog(0))
+      logManager(path).createLatestStableLog(0))
   }
 
   // TODO: Test the case where the id does not exist.
