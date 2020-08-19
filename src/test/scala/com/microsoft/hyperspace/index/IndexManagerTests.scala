@@ -27,11 +27,12 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, Sp
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexStorageLocation = "src/test/resources/indexLocation"
+  private val indexStorageLocation =
+    PathUtils.makeAbsolute("src/test/resources/indexLocation").toString
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
