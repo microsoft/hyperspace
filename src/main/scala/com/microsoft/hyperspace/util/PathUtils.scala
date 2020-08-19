@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace
+package com.microsoft.hyperspace.util
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.Path
 
-import com.microsoft.hyperspace.index.IndexLogEntry
+object PathUtils {
 
-object TestUtils {
-  def copyWithState(index: IndexLogEntry, state: String): IndexLogEntry = {
-    val result = index.copy()
-    result.state = state
-    result
+  def makeAbsolute(location: String): Path = makeAbsolute(new Path(location))
+
+  def makeAbsolute(path: Path): Path = {
+    val fs = path.getFileSystem(new Configuration)
+    fs.makeQualified(path)
   }
 }

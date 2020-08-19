@@ -19,14 +19,15 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
+import com.microsoft.hyperspace.util.PathUtils
+
 trait IndexLogManagerFactory {
   def create(indexPath: Path): IndexLogManager
 }
 
 object IndexLogManagerFactoryImpl extends IndexLogManagerFactory {
   override def create(indexPath: Path): IndexLogManager = {
-    val fs: FileSystem = indexPath.getFileSystem(new Configuration)
-    new IndexLogManagerImpl(fs.makeQualified(indexPath))
+    new IndexLogManagerImpl(PathUtils.makeAbsolute(indexPath))
   }
 }
 
@@ -36,8 +37,7 @@ trait IndexDataManagerFactory {
 
 object IndexDataManagerFactoryImpl extends IndexDataManagerFactory {
   override def create(indexPath: Path): IndexDataManager = {
-    val fs: FileSystem = indexPath.getFileSystem(new Configuration)
-    new IndexDataManagerImpl(fs.makeQualified(indexPath))
+    new IndexDataManagerImpl(PathUtils.makeAbsolute(indexPath))
   }
 }
 

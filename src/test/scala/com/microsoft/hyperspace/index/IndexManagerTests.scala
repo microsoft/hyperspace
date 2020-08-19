@@ -23,16 +23,16 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite, TestUtils}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val indexStorageLocation = "src/test/resources/indexLocation"
-  private val absoluteIndexLocation = TestUtils.makeAbsolute(indexStorageLocation)
+  private val absoluteIndexLocation = PathUtils.makeAbsolute(indexStorageLocation)
 
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))

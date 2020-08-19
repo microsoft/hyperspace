@@ -59,6 +59,7 @@ class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging 
 
   // Use FileContext instead of FileSystem for atomic renames?
   private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
+
   private lazy val hyperspaceLogPath: Path = new Path(indexPath, IndexConstants.HYPERSPACE_LOG)
 
   private val pathFromId: Int => Path = id => new Path(hyperspaceLogPath, id.toString)

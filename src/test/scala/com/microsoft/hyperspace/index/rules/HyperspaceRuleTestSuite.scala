@@ -23,9 +23,10 @@ import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StructField, StructType}
 
-import com.microsoft.hyperspace.{HyperspaceException, TestUtils}
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, HyperspaceSuite, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
+import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.PathUtils
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def createIndex(
@@ -55,7 +56,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
-        val logManager = new IndexLogManagerImpl(TestUtils.makeAbsolute(getIndexRootPath(name)))
+        val logManager = new IndexLogManagerImpl(PathUtils.makeAbsolute(getIndexRootPath(name)))
         indexLogEntry.state = Constants.States.ACTIVE
         logManager.writeLog(0, indexLogEntry)
         indexLogEntry
