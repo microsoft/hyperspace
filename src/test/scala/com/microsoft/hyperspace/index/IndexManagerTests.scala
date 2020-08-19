@@ -31,8 +31,8 @@ import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexStorageLocation = "src/test/resources/indexLocation"
-  private val absoluteIndexLocation = PathUtils.makeAbsolute(indexStorageLocation)
+  private val indexStorageLocation =
+    PathUtils.makeAbsolute("src/test/resources/indexLocation").toString
 
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
@@ -74,7 +74,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       indexConfig1.includedColumns,
       200,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
-      s"$absoluteIndexLocation/index1/v__=0",
+      s"$indexStorageLocation/index1/v__=0",
       Constants.States.ACTIVE)
     assert(actual.equals(expected))
   }
@@ -284,7 +284,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content(
-            s"$absoluteIndexLocation/${indexConfig.indexName}" +
+            s"$indexStorageLocation/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
           Source(SparkPlan(sourcePlanProperties)),
