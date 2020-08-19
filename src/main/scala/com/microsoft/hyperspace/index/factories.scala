@@ -25,7 +25,8 @@ trait IndexLogManagerFactory {
 
 object IndexLogManagerFactoryImpl extends IndexLogManagerFactory {
   override def create(indexPath: Path): IndexLogManager = {
-    new IndexLogManagerImpl(indexPath)
+    val fs: FileSystem = indexPath.getFileSystem(new Configuration)
+    new IndexLogManagerImpl(fs.makeQualified(indexPath))
   }
 }
 
@@ -35,7 +36,8 @@ trait IndexDataManagerFactory {
 
 object IndexDataManagerFactoryImpl extends IndexDataManagerFactory {
   override def create(indexPath: Path): IndexDataManager = {
-    new IndexDataManagerImpl(indexPath)
+    val fs: FileSystem = indexPath.getFileSystem(new Configuration)
+    new IndexDataManagerImpl(fs.makeQualified(indexPath))
   }
 }
 

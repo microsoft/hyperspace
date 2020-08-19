@@ -55,12 +55,11 @@ trait IndexLogManager {
 }
 
 class IndexLogManagerImpl(indexPath: Path) extends IndexLogManager with Logging {
+  assert(indexPath.isAbsolute)
+
   // Use FileContext instead of FileSystem for atomic renames?
   private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
-  private lazy val absoluteIndexPath: Path = fs.makeQualified(indexPath)
-
-  private lazy val hyperspaceLogPath: Path =
-    new Path(absoluteIndexPath, IndexConstants.HYPERSPACE_LOG)
+  private lazy val hyperspaceLogPath: Path = new Path(indexPath, IndexConstants.HYPERSPACE_LOG)
 
   private val pathFromId: Int => Path = id => new Path(hyperspaceLogPath, id.toString)
 

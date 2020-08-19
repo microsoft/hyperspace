@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, TestUtils}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
@@ -43,9 +43,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val sampleData = Seq(("data1", 1), ("data2", 2), ("data3", 3))
     val dfFromSample = sampleData.toDF("Col1", "Col2")
     dfFromSample.write.parquet(sampleParquetDataLocation)
-    sampleParquetDataFullPath =
-      fileSystem.makeQualified(new Path(sampleParquetDataLocation)).toString
-    // fileSystem.getFileStatus(new Path(sampleParquetDataLocation)).getPath.toString
+    sampleParquetDataFullPath = TestUtils.makeAbsolute(sampleParquetDataLocation).toString
   }
 
   override def afterAll(): Unit = {
@@ -520,7 +518,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   }
 
   private def getIndexFilesPath(indexName: String): Path = {
-    new Path(fileSystem.makeQualified(systemPath), s"$indexName/v__=0")
+    new Path(TestUtils.makeAbsolute(systemPath), s"$indexName/v__=0")
   }
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(

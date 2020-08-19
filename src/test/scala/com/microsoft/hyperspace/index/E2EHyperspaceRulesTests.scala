@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
@@ -407,8 +407,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   private def getIndexFilesPath(indexName: String): Path = {
-    val fs = systemPath.getFileSystem(new Configuration)
-    fs.makeQualified(
+    TestUtils.makeAbsolute(
       new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))
   }
 
