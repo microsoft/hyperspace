@@ -16,9 +16,6 @@
 
 package com.microsoft.hyperspace
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-
 import com.microsoft.hyperspace.index.IndexLogEntry
 
 object TestUtils {

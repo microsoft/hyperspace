@@ -20,7 +20,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 object PathUtils {
-
   def makeAbsolute(location: String): Path = makeAbsolute(new Path(location))
 
   def makeAbsolute(path: Path): Path = {

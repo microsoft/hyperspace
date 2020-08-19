@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, TestUtils}
+import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.PathUtils
 
