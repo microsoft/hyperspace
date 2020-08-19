@@ -163,7 +163,7 @@ class IndexLogManagerImplTest
   }
 
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {
-    val path = new Path(testRoot, UUID.randomUUID().toString)
+    val path = PathUtils.makeAbsolute(new Path(testRoot, UUID.randomUUID().toString))
     val fs = path.getFileSystem(new Configuration)
     FileUtils.createFile(
       fs,
