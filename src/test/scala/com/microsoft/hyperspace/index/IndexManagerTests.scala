@@ -73,7 +73,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
       indexConfig1.includedColumns,
       200,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
-      s"$indexStorageLocation/index1/v__=0",
+      s"$indexStorageLocation/index1",
       Constants.States.ACTIVE)
     assert(actual.equals(expected))
   }
@@ -284,9 +284,12 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content(
-            s"$indexStorageLocation/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Seq()),
+            s"$indexStorageLocation/${indexConfig.indexName}",
+            Seq(
+              Content.Directory(
+                s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
+                Seq(),
+                NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state

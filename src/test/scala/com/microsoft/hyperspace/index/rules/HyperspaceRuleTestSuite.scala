@@ -25,7 +25,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, HyperspaceSuite, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
+import com.microsoft.hyperspace.index._
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def createIndex(
@@ -51,7 +51,9 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
+          Content(
+            getIndexDataFilesPath(name).toUri.toString,
+            Seq(Content.Directory("", Seq(), NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

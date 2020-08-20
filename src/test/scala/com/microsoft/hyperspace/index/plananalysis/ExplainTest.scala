@@ -518,9 +518,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     verifyExplainOutput(df, expectedOutput.toString, verbose = false) { filterQuery }
   }
 
-  private def getIndexFilesPath(indexName: String): Path = {
-    new Path(systemPath, s"$indexName/v__=0")
-  }
+  private def getIndexFilesPath(indexName: String): Path = new Path(systemPath, indexName)
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(
       query: DataFrame => DataFrame) {
