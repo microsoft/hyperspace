@@ -30,7 +30,14 @@ case class NoOpFingerprint() {
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: String, directories: Seq[Content.Directory]) {
-  def rootDirs: Seq[Path] = directories.map(d => new Path(root + Path.SEPARATOR + d.path))
+  def files: Seq[Path] =
+    directories.flatMap { d =>
+      if (d.path.equals("")) {
+        d.files.map(f => new Path(root + Path.SEPARATOR + d.path + Path.SEPARATOR + f.name))
+      } else {
+        Seq(new Path(root + Path.SEPARATOR + d.path))
+      }
+    }
 }
 
 object Content {
@@ -39,8 +46,11 @@ object Content {
     // modifiedTime is an Epoch time in milliseconds. (ms since 1970-01-01T00:00:00.000 UTC).
     case class FileInfo(name: String, size: Long, modifiedTime: Long)
     object FileInfo {
-      def apply(s: FileStatus): FileInfo =
-        FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
+      def apply(s: FileStatus): FileInfo = {
+        val path = s.getPath
+        val name = Path.SEPARATOR + path.getParent.getName + Path.SEPARATOR + path.getName
+        FileInfo(name, s.getLen, s.getModificationTime)
+      }
     }
   }
 }

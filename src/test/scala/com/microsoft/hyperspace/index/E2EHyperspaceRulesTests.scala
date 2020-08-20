@@ -387,7 +387,9 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private def queryPlanHasExpectedRootPaths(
       optimizedPlan: LogicalPlan,
       expectedPaths: Seq[Path]): Boolean = {
-    getAllRootPaths(optimizedPlan).equals(expectedPaths)
+    getAllRootPaths(optimizedPlan).zip(expectedPaths).forall {
+      case (a, b) => a.toString.startsWith(b.toString)
+    }
   }
 
   /**

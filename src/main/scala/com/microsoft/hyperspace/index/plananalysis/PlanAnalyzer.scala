@@ -142,7 +142,7 @@ object PlanAnalyzer {
           _,
           _,
           _) =>
-        usedPaths += location.rootPaths.map(_.getParent).head.toString
+        usedPaths += location.rootPaths.map(_.getParent.getParent).head.toString
       case other =>
         other.subqueries.foreach { subQuery =>
           getPaths(subQuery).flatMap(path => usedPaths += path)

@@ -26,6 +26,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def createIndex(
@@ -53,7 +54,9 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
               10)),
           Content(
             getIndexDataFilesPath(name).toUri.toString,
-            Seq(Content.Directory("", Seq(), NoOpFingerprint()))),
+            Seq(
+              Content
+                .Directory("", Seq(FileInfo("v__=0/f1.parquet", 10, 10)), NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -78,6 +81,5 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
       spark)
 
-  def getIndexRootPath(indexName: String): Path =
-    new Path(systemPath, indexName)
+  def getIndexRootPath(indexName: String): Path = new Path(systemPath, indexName)
 }

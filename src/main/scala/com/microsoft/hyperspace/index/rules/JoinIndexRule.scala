@@ -141,7 +141,7 @@ object JoinIndexRule
       bucketColumnNames = index.indexedColumns,
       sortColumnNames = index.indexedColumns)
 
-    val location = new InMemoryFileIndex(spark, index.content.rootDirs, Map(), None)
+    val location = new InMemoryFileIndex(spark, index.content.files, Map(), None)
     val relation = HadoopFsRelation(
       location,
       new StructType(),

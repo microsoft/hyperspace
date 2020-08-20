@@ -332,8 +332,9 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     }
   }
 
-  test("Join rule updates plan if columns have one-to-one mapping with repeated " +
-    "case-insensitive predicates") {
+  test(
+    "Join rule updates plan if columns have one-to-one mapping with repeated " +
+      "case-insensitive predicates") {
     val t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c3), t2FilterNode)
 
@@ -401,7 +402,12 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
       updatedPlan: LogicalPlan,
       indexPaths: Seq[Path]): Unit = {
     assert(treeStructureEquality(originalPlan, updatedPlan))
-    assert(basePaths(updatedPlan) == indexPaths)
+    val bP = basePaths(updatedPlan)
+    assert(bP.length == indexPaths.length)
+    assert(bP.zip(indexPaths).forall {
+      case (a, b) =>
+        a.toString.startsWith(b.toString)
+    })
   }
 
   /** method to check if tree structures of two logical plans are the same. */

@@ -87,7 +87,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Content(
             root = absolutePath.getParent.toString,
             directories = Seq(
-              Directory(absolutePath.getName, indexFilesInfo(absolutePath), NoOpFingerprint()))),
+              Directory("", indexFilesInfo(absolutePath), NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
