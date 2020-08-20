@@ -409,9 +409,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  private def getIndexFilesPath(indexName: String): Path = {
-    new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-  }
+  private def getIndexFilesPath(indexName: String): Path = new Path(systemPath, s"$indexName")
 
   /**
    * Gets the sorted rows from the given dataframe to make it easy to compare with

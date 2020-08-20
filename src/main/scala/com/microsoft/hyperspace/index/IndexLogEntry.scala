@@ -32,11 +32,7 @@ case class NoOpFingerprint() {
 case class Content(root: String, directories: Seq[Content.Directory]) {
   def files: Seq[Path] =
     directories.flatMap { d =>
-      if (d.path.equals("")) {
-        d.files.map(f => new Path(root + Path.SEPARATOR + d.path + Path.SEPARATOR + f.name))
-      } else {
-        Seq(new Path(root + Path.SEPARATOR + d.path))
-      }
+      d.files.map(f => new Path(root + Path.SEPARATOR + d.path + Path.SEPARATOR + f.name))
     }
 }
 
@@ -47,9 +43,7 @@ object Content {
     case class FileInfo(name: String, size: Long, modifiedTime: Long)
     object FileInfo {
       def apply(s: FileStatus): FileInfo = {
-        val path = s.getPath
-        val name = Path.SEPARATOR + path.getParent.getName + Path.SEPARATOR + path.getName
-        FileInfo(name, s.getLen, s.getModificationTime)
+        FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
       }
     }
   }

@@ -103,8 +103,7 @@ object FilterIndexRule
     rank(candidateIndexes) match {
       case Some(index) =>
         val spark = fsRelation.sparkSession
-        val newLocation =
-          new InMemoryFileIndex(spark, index.content.files, Map(), None)
+        val newLocation = new InMemoryFileIndex(spark, index.content.files, Map(), None)
 
         val newRelation = HadoopFsRelation(
           newLocation,
