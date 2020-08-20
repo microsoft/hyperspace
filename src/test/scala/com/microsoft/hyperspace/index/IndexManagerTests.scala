@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
@@ -29,7 +30,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
+class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   private val indexStorageLocation =
     PathUtils.makeAbsolute("src/test/resources/indexLocation").toString
@@ -63,12 +64,30 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
     super.afterAll()
   }
 
-  test("Verify that indexes() returns the correct dataframe without lineage.") {
-    verifyIndexesOutput(false)
-  }
-
-  test("Verify that indexes() returns the correct dataframe with lineage.") {
-    verifyIndexesOutput(true)
+  test("Verify that indexes() returns the correct dataframe with and without lineage.") {
+    Seq(true, false).foreach { enableLineage =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+        import spark.implicits._
+        hyperspace.createIndex(df, indexConfig1)
+        val actual = hyperspace.indexes.as[IndexSummary].collect()(0)
+        var expectedSchema =
+          StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
+        if (enableLineage) {
+          expectedSchema =
+            expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
+        }
+        val expected = new IndexSummary(
+          indexConfig1.indexName,
+          indexConfig1.indexedColumns,
+          indexConfig1.includedColumns,
+          200,
+          expectedSchema.json,
+          s"$indexStorageLocation/index1/v__=0",
+          Constants.States.ACTIVE)
+        assert(actual.equals(expected))
+      }
+      FileUtils.delete(new Path(indexStorageLocation))
+    }
   }
 
   test("Verify getIndexes()") {
@@ -291,29 +310,5 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
   // Verify if the indexes currently stored in Hyperspace matches the given indexes.
   private def verifyIndexes(expectedIndexes: Seq[IndexLogEntry]): Unit = {
     assert(IndexCollectionManager(spark).getIndexes().toSet == expectedIndexes.toSet)
-  }
-
-  private def verifyIndexesOutput(enableLineage: Boolean): Unit = {
-    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, if (enableLineage) "true" else "false")
-    import spark.implicits._
-    hyperspace.createIndex(df, indexConfig1)
-    val actual = hyperspace.indexes.as[IndexSummary].collect()(0)
-    var expectedSchema = StructType(
-      Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
-    if (enableLineage) {
-      expectedSchema =
-        expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
-    }
-    val expected = new IndexSummary(
-      indexConfig1.indexName,
-      indexConfig1.indexedColumns,
-      indexConfig1.includedColumns,
-      200,
-      expectedSchema.json,
-      s"$indexStorageLocation/index1/v__=0",
-      Constants.States.ACTIVE)
-    assert(actual.equals(expected))
-    spark.conf
-      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
   }
 }

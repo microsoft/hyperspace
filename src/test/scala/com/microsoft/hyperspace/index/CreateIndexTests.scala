@@ -29,6 +29,8 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val sampleNonPartitionedParquetDataLocation = "src/test/resources/sampleparquet"
   private val samplePartitionedParquetDataLocation = "src/test/resources/samplepartitionedparquet"
+  private val partitionKey1 = "Date"
+  private val partitionKey2 = "Query"
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
@@ -45,19 +47,21 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(new Path(sampleNonPartitionedParquetDataLocation))
     FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
 
+    val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
     // save test non-partitioned.
     SampleData.saveTestDataNonPartitioned(
       spark,
       sampleNonPartitionedParquetDataLocation,
-      "Date",
-      "RGUID",
-      "Query",
-      "imprs",
-      "clicks")
+      dataColumns: _*)
     nonPartitionedDataDF = spark.read.parquet(sampleNonPartitionedParquetDataLocation)
 
     // save test data partitioned.
-    SampleData.saveTestDataPartitioned(spark, samplePartitionedParquetDataLocation)
+    SampleData.saveTestDataPartitioned(
+      spark,
+      samplePartitionedParquetDataLocation,
+      partitionKey1,
+      partitionKey2,
+      dataColumns: _*)
     partitionedDataDF = spark.read.parquet(samplePartitionedParquetDataLocation)
   }
 
@@ -163,70 +167,68 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Check lineage in index records for non-partitioned data.") {
-    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
-    hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
-    val indexRecordsDF = spark.read.parquet(
-      s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+      val indexRecordsDF = spark.read.parquet(
+        s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
-    // For non-partitioned data, only file name lineage column should be added to index schema.
-    assert(
-      indexRecordsDF.schema.fieldNames.sorted.corresponds(
-        (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
-          Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
-    spark.conf
-      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      // For non-partitioned data, only file name lineage column should be added to index schema.
+      assert(
+        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+          (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
+    }
   }
 
   test("Check lineage in index records for partitioned data when partition key is not in config.") {
-    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
-    hyperspace.createIndex(partitionedDataDF, indexConfig3)
-    val indexRecordsDF = spark.read.parquet(
-      s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      hyperspace.createIndex(partitionedDataDF, indexConfig3)
+      val indexRecordsDF = spark.read.parquet(
+        s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
-    // For partitioned data, beside file name lineage column all partition keys columns
-    // should be added to index schema if they are not already among index config columns.
-    assert(
-      indexRecordsDF.schema.fieldNames.sorted.corresponds(
-        (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-          Seq(
-            IndexConstants.DATA_FILE_NAME_COLUMN,
-            SampleData.partitionKey1,
-            SampleData.partitionKey2)).sorted)(_.equals(_)))
-    spark.conf
-      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      // For partitioned data, beside file name lineage column all partition keys columns
+      // should be added to index schema if they are not already among index config columns.
+      assert(
+        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+            Seq(
+              IndexConstants.DATA_FILE_NAME_COLUMN,
+              partitionKey1,
+              partitionKey2)).sorted)(_.equals(_)))
+    }
   }
 
   test("Check lineage in index records for partitioned data when partition key is in config.") {
-    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
-    hyperspace.createIndex(partitionedDataDF, indexConfig4)
-    val indexRecordsDF = spark.read.parquet(
-      s"$systemPath/${indexConfig4.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      hyperspace.createIndex(partitionedDataDF, indexConfig4)
+      val indexRecordsDF = spark.read.parquet(
+        s"$systemPath/${indexConfig4.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
-    // For partitioned data, if partition keys are already in index config columns,
-    // there should be no duplicates due to adding lineage.
-    assert(
-      indexRecordsDF.schema.fieldNames.sorted.corresponds(
-        (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
-          Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
-    spark.conf
-      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      // For partitioned data, if partition keys are already in index config columns,
+      // there should be no duplicates due to adding lineage.
+      assert(
+        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+          (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
+    }
   }
 
   test("Check lineage in index records for partitioned data when partition key is in load path.") {
-    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
-    val dataDF =
-      spark.read.parquet(
-        s"$samplePartitionedParquetDataLocation/${SampleData.partitionKey1}=2017-09-03")
-    hyperspace.createIndex(dataDF, indexConfig3)
-    val indexRecordsDF = spark.read.parquet(
-      s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      val dataDF =
+        spark.read.parquet(
+          s"$samplePartitionedParquetDataLocation/$partitionKey1=2017-09-03")
+      hyperspace.createIndex(dataDF, indexConfig3)
+      val indexRecordsDF = spark.read.parquet(
+        s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
-    // As data load path includes first partition key, index schema should only contain
-    // file name column and second partition key column as lineage columns.
-    assert(indexRecordsDF.schema.fieldNames.sorted.corresponds(
-      (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-        Seq(IndexConstants.DATA_FILE_NAME_COLUMN, SampleData.partitionKey2)).sorted)(_.equals(_)))
-    spark.conf
-      .set(IndexConstants.INDEX_LINEAGE_ENABLED, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      // As data load path includes first partition key, index schema should only contain
+      // file name column and second partition key column as lineage columns.
+      assert(
+        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey2)).sorted)(
+          _.equals(_)))
+    }
   }
 }
