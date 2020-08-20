@@ -24,10 +24,11 @@ import org.apache.spark.sql.DataFrame
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
+import com.microsoft.hyperspace.util.PathUtils
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  override val systemPath = new Path("src/test/resources/indexLocation")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private var sampleParquetDataFullPath: String = ""
   private var hyperspace: Hyperspace = _
@@ -43,8 +44,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val sampleData = Seq(("data1", 1), ("data2", 2), ("data3", 3))
     val dfFromSample = sampleData.toDF("Col1", "Col2")
     dfFromSample.write.parquet(sampleParquetDataLocation)
-    sampleParquetDataFullPath =
-      fileSystem.getFileStatus(new Path(sampleParquetDataLocation)).getPath.toString
+    sampleParquetDataFullPath = PathUtils.makeAbsolute(sampleParquetDataLocation).toString
   }
 
   override def afterAll(): Unit = {
