@@ -27,10 +27,10 @@ import com.microsoft.hyperspace.util.FileUtils
 
 class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
-  private val sampleNonPartitionedParquetDataLocation = "src/test/resources/sampleparquet"
-  private val samplePartitionedParquetDataLocation = "src/test/resources/samplepartitionedparquet"
-  private val partitionKey1 = "Date"
-  private val partitionKey2 = "Query"
+  private val testDir = "src/test/resources/createIndexTests/"
+  private val sampleNonPartitionedParquetDataLocation = testDir + "sampleparquet"
+  private val samplePartitionedParquetDataLocation = testDir + "samplepartitionedparquet"
+  private val partitionKeys = Seq("Date", "Query")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
@@ -44,30 +44,27 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
 
     val sparkSession = spark
     hyperspace = new Hyperspace(sparkSession)
-    FileUtils.delete(new Path(sampleNonPartitionedParquetDataLocation))
-    FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
+    FileUtils.delete(new Path(testDir), true)
 
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
     // save test non-partitioned.
-    SampleData.saveTestDataNonPartitioned(
+    SampleData.save(
       spark,
       sampleNonPartitionedParquetDataLocation,
-      dataColumns: _*)
+      dataColumns)
     nonPartitionedDataDF = spark.read.parquet(sampleNonPartitionedParquetDataLocation)
 
     // save test data partitioned.
-    SampleData.saveTestDataPartitioned(
+    SampleData.save(
       spark,
       samplePartitionedParquetDataLocation,
-      partitionKey1,
-      partitionKey2,
-      dataColumns: _*)
+      dataColumns,
+      Some(partitionKeys))
     partitionedDataDF = spark.read.parquet(samplePartitionedParquetDataLocation)
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(new Path(sampleNonPartitionedParquetDataLocation))
-    FileUtils.delete(new Path(samplePartitionedParquetDataLocation))
+    FileUtils.delete(new Path(testDir), true)
     super.afterAll()
   }
 
@@ -191,10 +188,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         indexRecordsDF.schema.fieldNames.sorted.corresponds(
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-            Seq(
-              IndexConstants.DATA_FILE_NAME_COLUMN,
-              partitionKey1,
-              partitionKey2)).sorted)(_.equals(_)))
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN) ++ partitionKeys).sorted)(_.equals(_)))
     }
   }
 
@@ -217,7 +211,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       val dataDF =
         spark.read.parquet(
-          s"$samplePartitionedParquetDataLocation/$partitionKey1=2017-09-03")
+          s"$samplePartitionedParquetDataLocation/${partitionKeys.head}=2017-09-03")
       hyperspace.createIndex(dataDF, indexConfig3)
       val indexRecordsDF = spark.read.parquet(
         s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
@@ -227,7 +221,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         indexRecordsDF.schema.fieldNames.sorted.corresponds(
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKey2)).sorted)(
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKeys(1))).sorted)(
           _.equals(_)))
     }
   }

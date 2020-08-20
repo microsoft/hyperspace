@@ -227,5 +227,5 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   }
 
   private val getFileName: UserDefinedFunction = udf(
-    (fullFilePath: String) => FilenameUtils.getBaseName(fullFilePath))
+    (fullFilePath: String) => FilenameUtils.getName(fullFilePath))
 }

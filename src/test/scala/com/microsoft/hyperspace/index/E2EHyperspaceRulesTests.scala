@@ -41,23 +41,21 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
     hyperspace = new Hyperspace(spark)
-    fileSystem.delete(new Path(sampleNonPartitionedParquetDataLocation), true)
-    fileSystem.delete(new Path(samplePartitionedParquetDataLocation), true)
+    fileSystem.delete(new Path(testDir), true)
 
     val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
     // save test non-partitioned.
-    SampleData.saveTestDataNonPartitioned(
+    SampleData.save(
       spark,
       sampleNonPartitionedParquetDataLocation,
-      dataColumns: _*)
+      dataColumns)
 
     // save test partitioned.
-    SampleData.saveTestDataPartitioned(
+    SampleData.save(
       spark,
       samplePartitionedParquetDataLocation,
-      "c1",
-      "c3",
-      dataColumns: _*)
+      dataColumns,
+      Some(Seq("c1", "c3")))
   }
 
   before {

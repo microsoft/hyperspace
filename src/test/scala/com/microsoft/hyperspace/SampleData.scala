@@ -34,19 +34,18 @@ object SampleData {
     ("2019-10-03", "ff60e4838b92421eafc3e6ee59a9e9f1", "mi perro", 2, 2000),
     ("2019-10-03", "187696fe0a6a40cc9516bc6e47c70bc1", "facebook", 4, 3000))
 
-  def saveTestDataNonPartitioned(spark: SparkSession, path: String, colNames: String*): Unit = {
-    import spark.implicits._
-    testData.toDF(colNames: _*).write.parquet(path)
-  }
-
-  def saveTestDataPartitioned(
+  def save(
       spark: SparkSession,
       path: String,
-      partitionKey1: String,
-      partitionKey2: String,
-      colNames: String*): Unit = {
+      columns: Seq[String],
+      partitionColumns: Option[Seq[String]] = None): Unit = {
     import spark.implicits._
-    val df = testData.toDF(colNames: _*)
-    df.write.partitionBy(partitionKey1, partitionKey2).parquet(path)
+    val df = testData.toDF(columns: _*)
+    partitionColumns match {
+      case Some(pcs) =>
+        df.write.partitionBy(pcs: _*).parquet(path)
+      case None =>
+        df.write.parquet(path)
+    }
   }
 }
