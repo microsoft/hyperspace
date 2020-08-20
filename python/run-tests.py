@@ -83,7 +83,12 @@ def prepare(root_dir):
     delete_if_exists(os.path.expanduser("~/.ivy2/cache/com/microsoft/hyperspace"))
     delete_if_exists(os.path.expanduser("~/.m2/repository/com/microsoft/hyperspace"))
     run_cmd([sbt_path, "clean", "publishM2"], stream_output=True)
-    package = "com.microsoft.hyperspace:hyperspace-core_2.12:0.2.0-SNAPSHOT"
+    
+    # Get current release which is required to be loaded
+    version = '0.0.0'
+    with open(os.path.join(root_dir, "version.sbt")) as fd:
+        version = fd.readline().split('"')[1]
+    package = "com.microsoft.hyperspace:hyperspace-core_2.12:" + version
     return package
 
 
