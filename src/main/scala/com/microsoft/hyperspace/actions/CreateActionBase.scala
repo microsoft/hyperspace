@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Content.Directory
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -47,6 +47,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df: DataFrame,
       indexConfig: IndexConfig,
       path: Path): IndexLogEntry = {
+    val absolutePath = PathUtils.makeAbsolute(path)
     val numBuckets = spark.sessionState.conf
       .getConfString(
         IndexConstants.INDEX_NUM_BUCKETS,
@@ -83,8 +84,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(schema),
               numBuckets)),
-          Content(root = path.getParent.toString,
-            directories = Seq(Directory(path.getName, indexFilesInfo(path), NoOpFingerprint()))),
+          Content(
+            root = absolutePath.getParent.toString,
+            directories = Seq(
+              Directory(absolutePath.getName, indexFilesInfo(absolutePath), NoOpFingerprint()))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -160,7 +163,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     } catch {
       // FileNotFoundException is an expected exception before index gets created.
       case _: FileNotFoundException => Seq()
-      case e : Throwable => throw e
+      case e: Throwable => throw e
     }
   }
 
