@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
@@ -29,7 +29,10 @@ case class NoOpFingerprint() {
 }
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
-case class Content(root: String, directories: Seq[Content.Directory])
+case class Content(root: String, directories: Seq[Content.Directory]) {
+  def rootDirs: Seq[Path] = directories.map(d => new Path(root + Path.SEPARATOR + d.path))
+}
+
 object Content {
   case class Directory(path: String, files: Seq[FileInfo], fingerprint: NoOpFingerprint)
   object Directory {
