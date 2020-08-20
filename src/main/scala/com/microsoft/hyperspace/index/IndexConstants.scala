@@ -48,7 +48,7 @@ object IndexConstants {
     val HTML = "html"
   }
 
-  val DATA_FILE_NAME_COLUMN = "_data_file_name"
+  private[hyperspace] val DATA_FILE_NAME_COLUMN = "_data_file_name"
   val INDEX_LINEAGE_ENABLED = "spark.hyperspace.index.lineage.enabled"
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
 }
