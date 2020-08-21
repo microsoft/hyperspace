@@ -20,7 +20,9 @@ import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.analysis.CleanupAliases
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
@@ -167,16 +169,29 @@ object RuleUtils {
     }
 
     if (!originalPlan.equals(complementIndexPlan)) {
+      // Remove sort order because original data isn't sorted by the same columns as the index.
+      val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
       val attrs = complementIndexPlan.output.attrs.filter { attr =>
         index.indexedColumns contains attr.name
       }
+
       // Perform on-the-fly shuffle with the same partition structure of index
-      // so that we could avoid incurring shuffle whole index data at merge stage
-      val shuffled = RepartitionByExpression(attrs, complementIndexPlan, index.numBuckets)
-
-      // removing sort order because original data isn't sorted by the same columns as the index
-      val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
-
+      // so that we could avoid incurring shuffle whole index data at merge stage.
+      val shuffled = if (attrs.size != index.indexedColumns.size) {
+        // There should be a project node.
+        complementIndexPlan transformUp {
+          case project@Project(
+          _,
+          child) =>
+            val childAttrs = child.output.attrs.filter { attr =>
+              index.indexedColumns contains attr.name
+            }
+            assert(childAttrs.size == index.indexedColumns.size)
+            project.copy(child = RepartitionByExpression(childAttrs, child, index.numBuckets))
+        }
+      } else {
+        RepartitionByExpression(attrs, complementIndexPlan, index.numBuckets)
+      }
       // Merge index data & newly shuffled data by using bucket-aware union.
       // Currently, BucketUnion does not keep the sort order within a bucket.
       BucketUnionLogicalPlan(Seq(indexPlan, shuffled), bucketSpec)

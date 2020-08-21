@@ -122,7 +122,7 @@ case class IndexLogEntry(
   def allSourceFileSet: Set[Path] = {
     relations
       .flatMap(
-        _.data.properties.content.directories.flatMap(_.files.map(new Path(_))))
+        _.data.properties.content.directories.flatMap(_.files.map(f => new Path(f.name))))
       .toSet
   }
 
