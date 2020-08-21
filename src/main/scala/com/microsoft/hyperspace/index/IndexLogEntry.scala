@@ -16,9 +16,11 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -29,7 +31,15 @@ case class NoOpFingerprint() {
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: String, directories: Seq[Content.Directory])
 object Content {
-  case class Directory(path: String, files: Seq[String], fingerprint: NoOpFingerprint)
+  case class Directory(path: String, files: Seq[FileInfo], fingerprint: NoOpFingerprint)
+  object Directory {
+    // modifiedTime is an Epoch time in milliseconds. (ms since 1970-01-01T00:00:00.000 UTC).
+    case class FileInfo(name: String, size: Long, modifiedTime: Long)
+    object FileInfo {
+      def apply(s: FileStatus): FileInfo =
+        FileInfo(s.getPath.toString, s.getLen, s.getModificationTime)
+    }
+  }
 }
 
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.
