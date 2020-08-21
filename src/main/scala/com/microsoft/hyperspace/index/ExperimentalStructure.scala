@@ -8,12 +8,12 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import com.microsoft.hyperspace.index.Content1.Directory
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 // scalastyle:off
-case class Content1(directory: Content1.Directory) {
-  def files: Seq[Path] = rec(new Path(directory.name), directory)
+case class Content1(root: Content1.Directory) {
+  def files: Seq[Path] = rec(new Path(root.name), root)
 
   private def rec(prefixPath: Path, directory: Directory): Seq[Path] = {
     val files = directory.files.map(f => new Path(prefixPath, f.name))
-    files ++ directory.dirs.flatMap {
+    files ++ directory.subDirs.flatMap {
       dir => rec(new Path(prefixPath, dir.name), dir)
     }
   }
@@ -23,7 +23,7 @@ object Content1 {
   case class Directory(
     name: String,
     files: Seq[Directory.FileInfo] = Seq(),
-    dirs: Seq[Directory] = Seq())
+    subDirs: Seq[Directory] = Seq())
 
   object Directory {
 
