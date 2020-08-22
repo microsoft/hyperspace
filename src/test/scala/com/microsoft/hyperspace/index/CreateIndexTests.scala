@@ -28,8 +28,8 @@ import com.microsoft.hyperspace.util.FileUtils
 class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val testDir = "src/test/resources/createIndexTests/"
-  private val sampleNonPartitionedParquetDataLocation = testDir + "sampleparquet"
-  private val samplePartitionedParquetDataLocation = testDir + "samplepartitionedparquet"
+  private val nonPartitionedDataPath = testDir + "sampleparquet"
+  private val partitionedDataPath = testDir + "samplepartitionedparquet"
   private val partitionKeys = Seq("Date", "Query")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
@@ -47,20 +47,20 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(new Path(testDir), true)
 
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
-    // save test non-partitioned.
+    // save test data non-partitioned.
     SampleData.save(
       spark,
-      sampleNonPartitionedParquetDataLocation,
+      nonPartitionedDataPath,
       dataColumns)
-    nonPartitionedDataDF = spark.read.parquet(sampleNonPartitionedParquetDataLocation)
+    nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
 
     // save test data partitioned.
     SampleData.save(
       spark,
-      samplePartitionedParquetDataLocation,
+      partitionedDataPath,
       dataColumns,
       Some(partitionKeys))
-    partitionedDataDF = spark.read.parquet(samplePartitionedParquetDataLocation)
+    partitionedDataDF = spark.read.parquet(partitionedDataPath)
   }
 
   override def afterAll(): Unit = {
@@ -171,9 +171,9 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
 
       // For non-partitioned data, only file name lineage column should be added to index schema.
       assert(
-        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)
     }
   }
 
@@ -186,9 +186,9 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // For partitioned data, beside file name lineage column all partition keys columns
       // should be added to index schema if they are not already among index config columns.
       assert(
-        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN) ++ partitionKeys).sorted)(_.equals(_)))
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN) ++ partitionKeys).sorted)
     }
   }
 
@@ -201,9 +201,9 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // For partitioned data, if partition keys are already in index config columns,
       // there should be no duplicates due to adding lineage.
       assert(
-        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)(_.equals(_)))
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)
     }
   }
 
@@ -211,7 +211,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       val dataDF =
         spark.read.parquet(
-          s"$samplePartitionedParquetDataLocation/${partitionKeys.head}=2017-09-03")
+          s"$partitionedDataPath/${partitionKeys.head}=2017-09-03")
       hyperspace.createIndex(dataDF, indexConfig3)
       val indexRecordsDF = spark.read.parquet(
         s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
@@ -219,10 +219,9 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // As data load path includes first partition key, index schema should only contain
       // file name column and second partition key column as lineage columns.
       assert(
-        indexRecordsDF.schema.fieldNames.sorted.corresponds(
+        indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKeys(1))).sorted)(
-          _.equals(_)))
+            Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKeys(1))).sorted)
     }
   }
 }
