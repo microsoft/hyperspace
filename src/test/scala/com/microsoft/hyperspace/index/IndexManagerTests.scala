@@ -77,7 +77,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             indexConfig1.includedColumns,
             200,
             expectedSchema.json,
-            s"${systemPath.toUri.toString}/${indexConfig1.indexName}/v__=0",
+            s"$systemPath/${indexConfig1.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Constants.States.ACTIVE)
           assert(actual.equals(expected))
         }
@@ -212,7 +213,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         hyperspace.createIndex(df, indexConfig)
         var indexCount =
           spark.read
-            .parquet(s"${systemPath.toUri.toString}/index_$format" +
+            .parquet(s"$systemPath/index_$format" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
             .count()
         assert(indexCount == 10)
@@ -228,7 +229,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .save(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
         indexCount = spark.read
-          .parquet(s"${systemPath.toUri.toString}/index_$format" +
+          .parquet(s"$systemPath/index_$format" +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
@@ -291,7 +292,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content(
-            s"${systemPath.toUri.toString}/${indexConfig.indexName}" +
+            s"$systemPath/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
           Source(SparkPlan(sourcePlanProperties)),
