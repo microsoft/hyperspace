@@ -86,6 +86,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHe
           Constants.States.ACTIVE)
         assert(actual.equals(expected))
       }
+      hyperspace.deleteIndex(indexConfig1.indexName)
       FileUtils.delete(new Path(indexStorageLocation))
     }
   }
