@@ -89,10 +89,9 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
       Seq(true, false).foreach { enableLineage =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
-          val indexName = "filterIndex"
-          withIndex(indexName) {
+          withIndex("filterIndex") {
             val df = spark.read.parquet(loc)
-            val indexConfig = IndexConfig(indexName, Seq("c3"), Seq("c1"))
+            val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
 
             hyperspace.createIndex(df, indexConfig)
 
@@ -141,8 +140,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
       Seq(true, false).foreach { enableLineage =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
-          val indexName = "filterIndex"
-          withIndex(indexName) {
+          withIndex("filterIndex") {
             val df = spark.read.parquet(loc)
             val indexConfig = IndexConfig("filterIndex", Seq("c4", "c3"), Seq("c1", "c2", "c5"))
 
@@ -166,15 +164,14 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
       Seq(true, false).foreach { enableLineage =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
-          val indexNames = Seq("leftIndex", "rightIndex")
-          withIndex(indexNames: _*) {
+          withIndex("leftIndex", "rightIndex") {
             val leftDf = spark.read.parquet(loc)
-            val leftDfIndexConfig = IndexConfig(indexNames.head, Seq("c3"), Seq("c1"))
+            val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
 
             hyperspace.createIndex(leftDf, leftDfIndexConfig)
 
             val rightDf = spark.read.parquet(loc)
-            val rightDfIndexConfig = IndexConfig(indexNames(1), Seq("c3"), Seq("c4"))
+            val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
             hyperspace.createIndex(rightDf, rightDfIndexConfig)
 
             def query(): DataFrame = {

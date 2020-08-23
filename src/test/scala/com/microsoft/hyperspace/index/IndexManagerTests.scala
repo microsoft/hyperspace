@@ -17,23 +17,22 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHelper {
+class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexStorageLocation =
-    PathUtils.makeAbsolute("src/test/resources/indexLocation").toString
+  override val systemPath =
+    PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -41,22 +40,17 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHe
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexStorageLocation)
 
-    FileUtils.delete(new Path(indexStorageLocation))
     FileUtils.delete(new Path(sampleParquetDataLocation))
-
-    import spark.implicits._
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .write
-      .parquet(sampleParquetDataLocation)
-
+    SampleData.save(
+      spark,
+      sampleParquetDataLocation,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     df = spark.read.parquet(sampleParquetDataLocation)
   }
 
   after {
-    FileUtils.delete(new Path(indexStorageLocation))
+    FileUtils.delete(systemPath, true)
   }
 
   override def afterAll(): Unit = {
@@ -67,27 +61,27 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHe
   test("Verify that indexes() returns the correct dataframe with and without lineage.") {
     Seq(true, false).foreach { enableLineage =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
-        import spark.implicits._
-        hyperspace.createIndex(df, indexConfig1)
-        val actual = hyperspace.indexes.as[IndexSummary].collect()(0)
-        var expectedSchema =
-          StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
-        if (enableLineage) {
-          expectedSchema =
-            expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
+        withIndex(indexConfig1.indexName) {
+          import spark.implicits._
+          hyperspace.createIndex(df, indexConfig1)
+          val actual = hyperspace.indexes.as[IndexSummary].collect().head
+          var expectedSchema =
+            StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
+          if (enableLineage) {
+            expectedSchema =
+              expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
+          }
+          val expected = new IndexSummary(
+            indexConfig1.indexName,
+            indexConfig1.indexedColumns,
+            indexConfig1.includedColumns,
+            200,
+            expectedSchema.json,
+            s"${systemPath.toUri.toString}/${indexConfig1.indexName}/v__=0",
+            Constants.States.ACTIVE)
+          assert(actual.equals(expected))
         }
-        val expected = new IndexSummary(
-          indexConfig1.indexName,
-          indexConfig1.indexedColumns,
-          indexConfig1.includedColumns,
-          200,
-          expectedSchema.json,
-          s"$indexStorageLocation/index1/v__=0",
-          Constants.States.ACTIVE)
-        assert(actual.equals(expected))
       }
-      hyperspace.deleteIndex(indexConfig1.indexName)
-      FileUtils.delete(new Path(indexStorageLocation))
     }
   }
 
@@ -218,7 +212,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHe
         hyperspace.createIndex(df, indexConfig)
         var indexCount =
           spark.read
-            .parquet(s"$indexStorageLocation/index_$format" +
+            .parquet(s"${systemPath.toUri.toString}/index_$format" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
             .count()
         assert(indexCount == 10)
@@ -234,7 +228,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHe
           .save(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
         indexCount = spark.read
-          .parquet(s"$indexStorageLocation/index_$format" +
+          .parquet(s"${systemPath.toUri.toString}/index_$format" +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
@@ -297,7 +291,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite with SQLHe
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content(
-            s"$indexStorageLocation/${indexConfig.indexName}" +
+            s"${systemPath.toUri.toString}/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
           Source(SparkPlan(sourcePlanProperties)),
