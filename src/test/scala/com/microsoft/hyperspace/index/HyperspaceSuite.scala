@@ -74,8 +74,8 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   /**
-    * Vacuum indexes with the given names after calling `f`.
-    */
+   * Vacuum indexes with the given names after calling `f`.
+   */
   protected def withIndex(indexNames: String*)(f: => Unit): Unit = {
     try f
     finally {
