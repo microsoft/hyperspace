@@ -136,26 +136,26 @@ object JoinIndexRule
    * @return replacement plan
    */
   private def getReplacementPlan(index: IndexLogEntry, plan: LogicalPlan): LogicalPlan = {
-    val bucketSpec = BucketSpec(
-      numBuckets = index.numBuckets,
-      bucketColumnNames = index.indexedColumns,
-      sortColumnNames = index.indexedColumns)
-
-    val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
-    val relation = HadoopFsRelation(
-      location,
-      new StructType(),
-      index.schema,
-      Some(bucketSpec),
-      new ParquetFileFormat,
-      Map())(spark)
-
     // Here we can't replace the plan completely with the index. This will create problems.
     // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
     // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
     // lead to wrong results. So we only replace the base relation.
     plan transform {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
+        val bucketSpec = BucketSpec(
+          numBuckets = index.numBuckets,
+          bucketColumnNames = index.indexedColumns,
+          sortColumnNames = index.indexedColumns)
+
+        val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
+        val relation = HadoopFsRelation(
+          location,
+          new StructType(),
+          StructType(index.schema.filter(baseRelation.schema.contains(_))),
+          Some(bucketSpec),
+          new ParquetFileFormat,
+          Map())(spark)
+
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
