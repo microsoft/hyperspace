@@ -34,33 +34,25 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Generate the signature of logical plan.
    *
    * @param logicalPlan logical plan of data frame.
+   * @param targetFiles list of file paths used to calculate signature
    * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String] = {
-    fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
-  }
-
-  /**
-   * Generate the signature of logical plan.
-   *
-   * @param logicalPlan logical plan of data frame.
-   * @param whiteListFiles white list of file paths used to calculate signature
-   * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
-   */
-  override def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = {
-    fingerprintVisitor(logicalPlan, whiteListFiles).map(HashingUtils.md5Hex)
+  override def signature(
+      logicalPlan: LogicalPlan,
+      targetFiles: Option[Set[Path]]): Option[String] = {
+    fingerprintVisitor(logicalPlan, targetFiles).map(HashingUtils.md5Hex)
   }
 
   /**
    * Visit logical plan and collect info needed for fingerprint.
    *
    * @param logicalPlan logical plan of data frame.
-   * @param whiteListFiles white list of file paths used to calculate signature
+   * @param targetFiles list of file paths used to calculate signature
    * @return fingerprint, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
   private def fingerprintVisitor(
       logicalPlan: LogicalPlan,
-      whiteListFiles: Set[Path] = Set()): Option[String] = {
+      targetFiles: Option[Set[Path]]): Option[String] = {
     var fingerprint = ""
     logicalPlan.foreachUp {
       // Currently we are only collecting plan fingerprint from hdfs file based scan nodes.
@@ -71,7 +63,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
           _) =>
         fingerprint ++= location.allFiles.foldLeft("")(
           (accumulate: String, fileStatus: FileStatus) =>
-            if (whiteListFiles.isEmpty || whiteListFiles.contains(fileStatus.getPath)) {
+            if (targetFiles.isEmpty || targetFiles.get.contains(fileStatus.getPath)) {
               HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus))
             } else accumulate)
       case _ =>

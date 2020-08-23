@@ -86,13 +86,13 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   test("Verify indexes are matched by signature correctly.") {
     val indexManager = IndexCollectionManager(spark)
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, spark).length === 3)
-    assert(RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode, spark).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t1ProjectNode).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t2ProjectNode).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, spark).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t1ProjectNode).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {

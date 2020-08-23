@@ -20,16 +20,14 @@ import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.BucketUnionLogicalPlan
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
 object RuleUtils {
 
@@ -42,28 +40,32 @@ object RuleUtils {
    * @return indexes built for this plan
    */
   def getCandidateIndexes(
+      spark: SparkSession,
       indexManager: IndexManager,
-      plan: LogicalPlan,
-      spark: SparkSession): Seq[IndexLogEntry] = {
+      plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
-    val signatureMap = mutable.Map[(String, Set[Path]), Option[String]]()
+    val signatureMap = mutable.Map[(String, Option[Set[Path]]), Option[String]]()
+    val hybridScanEnabled = spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+      .toBoolean
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
       val sourcePlanSignature = sourcePlanSignatures.head
-      val hybridScanEnabled = spark.sessionState.conf
-        .getConfString(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
-        .toBoolean
-      val indexSourceFileSet: Set[Path] = if (hybridScanEnabled) entry.allSourceFileSet else Set()
+
+      val sourceFileSet = if (hybridScanEnabled) {
+        assert(entry.relations.length == 1)
+        Some(entry.allSourceFiles)
+      } else None
 
       signatureMap.getOrElseUpdate(
-        (sourcePlanSignature.provider, indexSourceFileSet),
+        (sourcePlanSignature.provider, sourceFileSet),
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan, indexSourceFileSet)) match {
+          .signature(plan, sourceFileSet)) match {
         case Some(s) => s.equals(sourcePlanSignature.value)
         case None => false
       }
@@ -155,7 +157,7 @@ object RuleUtils {
         val filesNotCovered =
           fsRelation.location.inputFiles
             .map(new Path(_))
-            .filter(!index.allSourceFileSet.contains(_))
+            .filter(!index.allSourceFiles.contains(_))
 
         if (filesNotCovered.nonEmpty) {
           val newLocation =
@@ -178,23 +180,27 @@ object RuleUtils {
       // Perform on-the-fly shuffle with the same partition structure of index
       // so that we could avoid incurring shuffle whole index data at merge stage.
       val shuffled = if (attrs.size != index.indexedColumns.size) {
-        // There should be a project node.
-        complementIndexPlan transformUp {
-          case project@Project(
-          _,
-          child) =>
+        // There should be a project node which excludes one or more indexedColumns.
+        // In this case, shuffle will be replaced to RoundRobinPartitioning which can cause
+        // wrong result issue. So shuffle should be located before the project node.
+        var projectSeen = false
+        val transformed = complementIndexPlan transformUp {
+          case project @ Project(_, child) =>
             val childAttrs = child.output.attrs.filter { attr =>
               index.indexedColumns contains attr.name
             }
+            projectSeen = true
             assert(childAttrs.size == index.indexedColumns.size)
             project.copy(child = RepartitionByExpression(childAttrs, child, index.numBuckets))
         }
+        assert(projectSeen)
+        transformed
       } else {
         RepartitionByExpression(attrs, complementIndexPlan, index.numBuckets)
       }
       // Merge index data & newly shuffled data by using bucket-aware union.
       // Currently, BucketUnion does not keep the sort order within a bucket.
-      BucketUnionLogicalPlan(Seq(indexPlan, shuffled), bucketSpec)
+      BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
     } else {
       indexPlan
     }

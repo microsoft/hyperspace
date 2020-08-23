@@ -38,28 +38,15 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
   /**
    * Generate the signature of logical plan.
    *
-   * @param logicalPlan logical plan.
-   * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
-   *         can generate signature for the logical plan; Otherwise None.
-   */
-  def signature(logicalPlan: LogicalPlan): Option[String] = {
-    fileBasedSignatureProvider.signature(logicalPlan).flatMap { f =>
-      planSignatureProvider.signature(logicalPlan).map { p =>
-        HashingUtils.md5Hex(f + p)
-      }
-    }
-  }
-
-  /**
-   * Generate the signature of logical plan.
-   *
    * @param logicalPlan logical plan of data frame.
-   * @param whiteListFiles white list of file paths used to calculate signature
+   * @param targetFiles list of file paths used to calculate signature
    * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
    *         can generate signature for the logical plan; Otherwise None.
    */
-  override def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] = {
-    fileBasedSignatureProvider.signature(logicalPlan, whiteListFiles).flatMap { f =>
+  override def signature(
+      logicalPlan: LogicalPlan,
+      targetFiles: Option[Set[Path]] = None): Option[String] = {
+    fileBasedSignatureProvider.signature(logicalPlan, targetFiles).flatMap { f =>
       planSignatureProvider.signature(logicalPlan).map { p =>
         HashingUtils.md5Hex(f + p)
       }

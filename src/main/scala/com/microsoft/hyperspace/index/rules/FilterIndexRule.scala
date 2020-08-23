@@ -102,7 +102,7 @@ object FilterIndexRule
         val indexManager = Hyperspace
           .getContext(spark)
           .indexCollectionManager
-        val candidateIndexes = RuleUtils.getCandidateIndexes(indexManager, r, spark)
+        val candidateIndexes = RuleUtils.getCandidateIndexes(spark, indexManager, r)
 
         candidateIndexes.filter { index =>
           indexCoversPlan(

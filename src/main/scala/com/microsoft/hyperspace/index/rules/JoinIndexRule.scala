@@ -109,7 +109,7 @@ object JoinIndexRule
     val lIndexes =
       RuleUtils
         .getLogicalRelation(left)
-        .map(RuleUtils.getCandidateIndexes(indexManager, _, spark))
+        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
     if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
@@ -117,7 +117,7 @@ object JoinIndexRule
     val rIndexes =
       RuleUtils
         .getLogicalRelation(right)
-        .map(RuleUtils.getCandidateIndexes(indexManager, _, spark))
+        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
     if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }

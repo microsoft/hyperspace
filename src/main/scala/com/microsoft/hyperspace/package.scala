@@ -18,7 +18,7 @@ package com.microsoft
 
 import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.BucketUnionStrategy
+import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 
 package object hyperspace {

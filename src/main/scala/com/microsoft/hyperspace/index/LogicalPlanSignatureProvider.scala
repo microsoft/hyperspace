@@ -35,19 +35,10 @@ trait LogicalPlanSignatureProvider {
    * Interface that provides the signature of logical plan.
    *
    * @param logicalPlan logical plan.
+   * @param targetFiles white list of file paths used to calculate signature
    * @return signature if it can be computed w.r.t signature provider assumptions; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String]
-
-  /**
-   * Interface that provides the signature of logical plan.
-   *
-   * @param logicalPlan logical plan.
-   * @param whiteListFiles white list of file paths used to calculate signature
-   * @return signature if it can be computed w.r.t signature provider assumptions; Otherwise None.
-   */
-  def signature(logicalPlan: LogicalPlan, whiteListFiles: Set[Path]): Option[String] =
-    signature(logicalPlan)
+  def signature(logicalPlan: LogicalPlan, targetFiles: Option[Set[Path]] = None): Option[String]
 }
 
 /**
