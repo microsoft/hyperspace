@@ -72,4 +72,18 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
       }
     }
   }
+
+  /**
+   * Vacuum indexes with the given names after calling `f`.
+   */
+  protected def withIndex(indexNames: String*)(f: => Unit): Unit = {
+    try f
+    finally {
+      val hs = new Hyperspace(spark)
+      indexNames.foreach { name =>
+        hs.deleteIndex(name)
+        hs.vacuumIndex(name)
+      }
+    }
+  }
 }

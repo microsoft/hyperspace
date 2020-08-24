@@ -112,15 +112,6 @@ object RuleUtils {
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan): LogicalPlan = {
-    val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
-    val relation = HadoopFsRelation(
-      location,
-      new StructType(),
-      index.schema,
-      Some(index.bucketSpec),
-      new ParquetFileFormat,
-      Map())(spark)
-
     // Here we can't replace the plan completely with the index. This will create problems.
     // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
     // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
@@ -128,6 +119,16 @@ object RuleUtils {
 
     val replacedPlan = plan transformUp {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
+        val location =
+          new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
+        val relation = HadoopFsRelation(
+          location,
+          new StructType(),
+          StructType(index.schema.filter(baseRelation.schema.contains(_))),
+          Some(index.bucketSpec),
+          new ParquetFileFormat,
+          Map())(spark)
+
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
