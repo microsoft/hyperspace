@@ -79,7 +79,6 @@ class HybridScanTest extends HyperspaceSuite {
   }
 
   test("HybridScan filter rule test") {
-    // append data by copying
     spark.conf.set("spark.hyperspace.index.hybridscan.enabled", false)
 
     df = spark.read.parquet(sampleParquetDataLocation)
@@ -95,12 +94,8 @@ class HybridScanTest extends HyperspaceSuite {
   }
 
   test("HybridScan join rule test") {
-    // append data by copying
     spark.conf.set("spark.hyperspace.index.hybridscan.enabled", false)
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
-    val sourcePath = new Path(files.head.name)
-    val destPath = new Path(files.head.name.replace("part-00000", "part-00100"))
-    sourcePath.getFileSystem(new Configuration).copyToLocalFile(sourcePath, destPath)
 
     df = spark.read.parquet(sampleParquetDataLocation)
     val query = df.filter(df("clicks") <= 2000).select(df("clicks"), df("query"))
