@@ -17,7 +17,12 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.sources.DataSourceRegister
+
+import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.index.{Content, Hdfs, NoOpFingerprint, Relation}
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 
 /**
  * Utility functions for logical plan.
@@ -35,4 +40,36 @@ object LogicalPlanUtils {
       case _ => false
     }
   }
+
+  def sourceRelations(plan: LogicalPlan): Seq[Relation] =
+    plan.collect {
+      case LogicalRelation(
+          HadoopFsRelation(
+            location: PartitioningAwareFileIndex,
+            _,
+            dataSchema,
+            _,
+            fileFormat,
+            options),
+          _,
+          _,
+          _) =>
+        val files = location.allFiles.map(FileInfo(_))
+        // Note that source files are currently fingerprinted when the optimized plan is
+        // fingerprinted by LogicalPlanFingerprint.
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val fileFormatName = fileFormat match {
+          case d: DataSourceRegister => d.shortName
+          case other => throw HyperspaceException(s"Unsupported file format: $other")
+        }
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts = options - "path"
+        Relation(
+          location.rootPaths.map(_.toString),
+          Hdfs(sourceDataProperties),
+          dataSchema.json,
+          fileFormatName,
+          opts)
+    }
 }

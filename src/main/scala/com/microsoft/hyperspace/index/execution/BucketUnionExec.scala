@@ -72,24 +72,8 @@ private[hyperspace] class BucketAwareUnionRDD[T: ClassTag](
 
 private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketSpec: BucketSpec)
     extends SparkPlan {
-  require(allChildrenCompatible)
-
   override protected def doExecute(): RDD[InternalRow] = {
     new BucketAwareUnionRDD[InternalRow](sparkContext, children.map(_.execute()), bucketSpec)
-  }
-
-  private def allChildrenCompatible: Boolean = {
-    val head = children.head
-    children.tail.forall(
-      child =>
-        // compare the number of partitions
-        child.outputPartitioning.numPartitions == head.outputPartitioning.numPartitions &&
-          // compare the attribute number with the first child
-          child.output.length == head.output.length &&
-          // compare the data types with the first child
-          child.output.zip(head.output).forall {
-            case (l, r) => l.dataType.equals(r.dataType)
-          })
   }
 
   override def output: Seq[Attribute] = children.head.output

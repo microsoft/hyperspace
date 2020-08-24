@@ -95,6 +95,8 @@ object RuleUtils {
 
   /**
    * Get replacement plan for current plan. The replacement plan reads data from indexes
+   * If HybridScan is enabled, an invalidated index by appended data(files) can be applied.
+   * Refer [[getComplementIndexPlan]]
    *
    * Pre-requisites
    * - We know for sure the index which can be used to replace the plan.
@@ -144,11 +146,32 @@ object RuleUtils {
     }
   }
 
+  /**
+   * Get complement plan for an index with appended data.
+   *
+   * This method consists of the following steps
+   * 1) Get a plan from originalPlan by replacing data location with appended data
+   * 2) On-the-fly shuffle for the appended data, using indexedColumns & numBuckets.
+   *   - Shuffle is located before Project to utilize Push-down Filters
+   *     - Shuffle => Project => Filter => Relation
+   *   - if Project filters indexedColumns, then Shuffle should be located after the node
+   *     - Project => Shuffle => Filter => Relation
+   * 3) Bucket-aware union both indexPlan and complementPlan to avoid repartitioning index data
+   *
+   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
+   *
+   * @param spark Spark session
+   * @param index index used in replacement plan
+   * @param originalPlan original plan
+   * @param indexPlan replaced plan with index
+   * @return complementIndexPlan integrated plan of indexPlan and complementPlan
+   */
   private def getComplementIndexPlan(
       spark: SparkSession,
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
       indexPlan: LogicalPlan): LogicalPlan = {
+    // 1) Replace the location of LogicalRelation with appended files
     val complementIndexPlan = originalPlan transformUp {
       case baseRelation @ LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
         val updatedOutput =
@@ -177,7 +200,7 @@ object RuleUtils {
         index.indexedColumns contains attr.name
       }
 
-      // Perform on-the-fly shuffle with the same partition structure of index
+      // 2) Perform on-the-fly shuffle with the same partition structure of index
       // so that we could avoid incurring shuffle whole index data at merge stage.
       val shuffled = if (attrs.size != index.indexedColumns.size) {
         // There should be a project node which excludes one or more indexedColumns.
@@ -198,7 +221,7 @@ object RuleUtils {
       } else {
         RepartitionByExpression(attrs, complementIndexPlan, index.numBuckets)
       }
-      // Merge index data & newly shuffled data by using bucket-aware union.
+      // 3) Merge index plan & newly shuffled plan by using bucket-aware union.
       // Currently, BucketUnion does not keep the sort order within a bucket.
       BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
     } else {
