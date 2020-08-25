@@ -26,7 +26,6 @@ import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.Content.Directory
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
@@ -84,9 +83,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(schema),
               numBuckets)),
-          Content(
-            absolutePath.toString,
-            Seq(Directory("", indexFilesInfo(absolutePath), NoOpFingerprint()))),
+          NewContent(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -107,11 +104,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           _,
           _,
           _) =>
-        val files = location.allFiles.map(FileInfo(_))
+        val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val sourceDataProperties = Hdfs.Properties(NewContent.fromLeafFiles(files))
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")

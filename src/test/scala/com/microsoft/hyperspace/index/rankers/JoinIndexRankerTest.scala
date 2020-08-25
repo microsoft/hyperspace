@@ -75,7 +75,7 @@ class JoinIndexRankerTest extends SparkFunSuite {
             .Columns(indexCols.map(_.name), includedCols.map(_.name)),
           IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
           numBuckets)),
-      Content(name, Seq()),
+      NewContent(Directory(name)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE

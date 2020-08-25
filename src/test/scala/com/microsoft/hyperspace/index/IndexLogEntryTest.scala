@@ -19,7 +19,6 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.JsonUtils
 
 class IndexLogEntryTest extends SparkFunSuite {
@@ -112,20 +111,13 @@ class IndexLogEntryTest extends SparkFunSuite {
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
-      Seq(
-        Relation(
-          Seq("rootpath"),
-          Hdfs(
-            Hdfs.Properties(
-              Content(
-                "",
-                Seq(Content.Directory(
-                  "",
-                  Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)),
-                  NoOpFingerprint()))))),
-          "schema",
-          "type",
-          Map())),
+      Seq(Relation(
+        Seq("rootpath"),
+        Hdfs(Hdfs.Properties(NewContent(
+          Directory("", Seq(FileInfo1("f1", 100L, 100L), FileInfo1("f2", 200L, 200L)), Seq())))),
+        "schema",
+        "type",
+        Map())),
       null,
       null,
       LogicalPlanFingerprint(
@@ -139,7 +131,7 @@ class IndexLogEntryTest extends SparkFunSuite {
             .Columns(Seq("col1"), Seq("col2", "col3")),
           schema.json,
           200)),
-      Content("rootContentPath", Seq()),
+      NewContent(Directory("rootContentPath")),
       Source(SparkPlan(expectedSourcePlanProperties)),
       Map())
     expected.state = "ACTIVE"

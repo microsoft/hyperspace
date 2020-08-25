@@ -26,7 +26,6 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
@@ -253,9 +252,8 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               _,
               _,
               _) =>
-            val files = location.allFiles.map(FileInfo(_))
-            val sourceDataProperties =
-              Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+            val files = location.allFiles
+            val sourceDataProperties = Hdfs.Properties(NewContent.fromLeafFiles(files))
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
@@ -283,10 +281,9 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-          Content(
-            s"$indexStorageLocation/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Seq()),
+          NewContent(
+            Directory(s"$indexStorageLocation/${indexConfig.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state

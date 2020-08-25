@@ -69,7 +69,7 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: Content)
+  case class Properties(content: NewContent)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -100,7 +100,7 @@ case class Source(plan: SparkPlan)
 case class IndexLogEntry(
     name: String,
     derivedDataset: CoveringIndex,
-    content: Content,
+    content: NewContent,
     source: Source,
     extra: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
