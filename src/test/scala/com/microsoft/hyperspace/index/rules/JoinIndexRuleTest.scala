@@ -401,7 +401,12 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
       updatedPlan: LogicalPlan,
       indexPaths: Seq[Path]): Unit = {
     assert(treeStructureEquality(originalPlan, updatedPlan))
-    assert(basePaths(updatedPlan) == indexPaths)
+    val bP = basePaths(updatedPlan)
+    assert(bP.length == indexPaths.length)
+    assert(bP.zip(indexPaths).forall {
+      case (a, b) =>
+        a.toString.startsWith(b.toString)
+    })
   }
 
   /** method to check if tree structures of two logical plans are the same. */
