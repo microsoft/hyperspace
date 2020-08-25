@@ -50,8 +50,7 @@ private[hyperspace] class BucketAwareUnionRDD[T: ClassTag](
   // copy from org.apache.spark.rdd.PartitionerAwareUnionRDD
   override def getPartitions: Array[Partition] = {
     val numBuckets = bucketSpec.numBuckets
-    (0 until numBuckets).map { index =>
-      new BucketAwareUnionRDDPartition(rdds, index)
+    (0 until numBuckets).map { index => new BucketAwareUnionRDDPartition(rdds, index)
     }.toArray
   }
 

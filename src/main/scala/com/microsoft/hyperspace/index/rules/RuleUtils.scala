@@ -94,9 +94,9 @@ object RuleUtils {
   }
 
   /**
-   * Get replacement plan for current plan. The replacement plan reads data from indexes
-   * If HybridScan is enabled, an invalidated index by appended data(files) can be applied.
-   * Refer [[getComplementIndexPlan]]
+   * Get replacement plan for current plan. The replacement plan reads data from indexes.
+   * If HybridScan is enabled, additional logical plans for the appended data would be
+   * generated and merged with index data plan. Refer [[getComplementIndexPlan]].
    *
    * Pre-requisites
    * - We know for sure the index which can be used to replace the plan.
@@ -116,6 +116,11 @@ object RuleUtils {
     // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
     // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
     // lead to wrong results. So we only replace the base relation.
+    val hybridScanEnabled = spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+      .toBoolean
 
     val replacedPlan = plan transformUp {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
@@ -133,12 +138,6 @@ object RuleUtils {
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
     }
-
-    val hybridScanEnabled = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
-      .toBoolean
 
     if (hybridScanEnabled) {
       getComplementIndexPlan(spark, index, plan, replacedPlan)
@@ -227,6 +226,61 @@ object RuleUtils {
       BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
     } else {
       indexPlan
+    }
+  }
+
+  /**
+   * Get replacement plan for current plan. The replacement plan reads data from indexes.
+   * If HybridScan is enabled, the plan includes the appended source files for Filter Plan
+   * , so that the outdated index can be still utilized.
+   *
+   * Pre-requisites
+   * - We know for sure the index which can be used to replace the plan.
+   *
+   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
+   *
+   * @param spark Spark session
+   * @param index index used in replacement plan
+   * @param plan current plan
+   * @return replacement plan
+   */
+  def getReplacementPlanForFilter(
+      spark: SparkSession,
+      index: IndexLogEntry,
+      plan: LogicalPlan): LogicalPlan = {
+    // Here we can't replace the plan completely with the index. This will create problems.
+    // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
+    // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
+    // lead to wrong results. So we only replace the base relation.
+    val hybridScanEnabled = spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+      .toBoolean
+
+    plan transformUp {
+      case baseRelation@LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
+        val paths = if (hybridScanEnabled) {
+          (fsRelation.location.inputFiles ++ Seq(index.content.root))
+            .map(new Path(_))
+            .filter(!index.allSourceFiles.contains(_))
+            .toSeq
+        } else {
+          Seq(new Path(index.content.root))
+        }
+        val location =
+          new InMemoryFileIndex(spark, paths, Map(), None)
+        val relation = HadoopFsRelation(
+          location,
+          new StructType(),
+          StructType(index.schema.filter(baseRelation.schema.contains(_))),
+          None,
+          new ParquetFileFormat,
+          Map())(spark)
+
+        val updatedOutput =
+          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
+        baseRelation.copy(relation = relation, output = updatedOutput)
     }
   }
 }

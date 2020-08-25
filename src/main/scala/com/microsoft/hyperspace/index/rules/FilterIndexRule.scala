@@ -60,7 +60,7 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
           rank(candidateIndexes) match {
             case Some(index) =>
-              val replacedPlan = RuleUtils.getReplacementPlan(spark, index, originalPlan)
+              val replacedPlan = RuleUtils.getReplacementPlanForFilter(spark, index, originalPlan)
               logEvent(
                 HyperspaceIndexUsageEvent(
                   AppInfo(
