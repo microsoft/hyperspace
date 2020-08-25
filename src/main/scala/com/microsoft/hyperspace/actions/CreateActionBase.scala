@@ -207,7 +207,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
       df.select(allIndexColumns.head, allIndexColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, getFileName(input_file_name()))
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, input_file_name())
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }
@@ -225,7 +225,4 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     assert(partitionSchemas.length == 1)
     partitionSchemas.head.map(_.name)
   }
-
-  private val getFileName: UserDefinedFunction = udf(
-    (fullFilePath: String) => FilenameUtils.getName(fullFilePath))
 }
