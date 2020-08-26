@@ -163,7 +163,7 @@ private[hyperspace] object IndexSummary {
     var indexDirPath = entry.content.root.name
     while (root.files.isEmpty) {
       root = root.subDirs.head
-      indexDirPath += Path.SEPARATOR + root.name
+      indexDirPath += root.name + Path.SEPARATOR
     }
     IndexSummary(
       entry.name,
