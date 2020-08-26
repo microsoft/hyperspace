@@ -74,7 +74,7 @@ object Directory {
     val files: Seq[FileInfo1] = {
       try {
         val fs = path.getFileSystem(new Configuration)
-        val statuses = fs.listStatus(path)
+        val statuses = fs.listStatus(path).filter(status => isDataPath(status.getPath))
 
         // Assuming index directories don't contain nested directories. Only Leaf files.
         assert(statuses.forall(!_.isDirectory))
@@ -91,6 +91,12 @@ object Directory {
     } else {
       Directory(path.getParent, Directory(path.getName, files, Seq()))
     }
+  }
+
+  /* from PartitionAwareFileIndex */
+  private def isDataPath(path: Path): Boolean = {
+    val name = path.getName
+    !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
   }
 
   def apply(path: Path, child: Directory): Directory = {

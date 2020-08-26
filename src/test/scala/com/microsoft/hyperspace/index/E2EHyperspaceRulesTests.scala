@@ -90,7 +90,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c1")
 
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+    verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
   }
 
   test("E2E test for case insensitive filter query utilizing indexes.") {
@@ -102,7 +102,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
 
     // Verify if case-insensitive index works with case-insensitive query.
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+    verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
   }
 
   test("E2E test for case sensitive filter query where changing conf changes behavior.") {
@@ -119,7 +119,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }
 
     withSQLConf("spark.sql.caseSensitive" -> "false") {
-      verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+      verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
     }
   }
 
@@ -135,7 +135,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     // Verify no Project node is present in the query plan, as a result of using SELECT *
     assert(query().queryExecution.optimizedPlan.collect { case p: Project => p }.isEmpty)
 
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+    verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
   }
 
   test("E2E test for join query.") {
@@ -154,9 +154,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     verifyIndexUsage(
       query,
-      Seq(
-        getIndexFilesPath(leftDfIndexConfig.indexName),
-        getIndexFilesPath(rightDfIndexConfig.indexName)))
+      getIndexFilesPath(leftDfIndexConfig.indexName) ++
+        getIndexFilesPath(rightDfIndexConfig.indexName))
   }
 
   test("E2E test for join query with case-insensitive column names.") {
@@ -174,9 +173,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     verifyIndexUsage(
       query,
-      Seq(
-        getIndexFilesPath(leftDfIndexConfig.indexName),
-        getIndexFilesPath(rightDfIndexConfig.indexName)))
+      getIndexFilesPath(leftDfIndexConfig.indexName) ++
+        getIndexFilesPath(rightDfIndexConfig.indexName))
   }
 
   test("E2E test for join query with alias columns is not supported.") {
@@ -231,9 +229,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
       verifyIndexUsage(
         query,
-        Seq(
-          getIndexFilesPath(leftDfIndexConfig.indexName),
-          getIndexFilesPath(rightDfIndexConfig.indexName)))
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
     }
   }
 
@@ -267,9 +264,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       def query(): DataFrame = spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
       verifyIndexUsage(
         query,
-        Seq(
-          getIndexFilesPath(leftDfIndexConfig.indexName),
-          getIndexFilesPath(rightDfIndexConfig.indexName)))
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
     }
   }
 
@@ -292,9 +288,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       def query(): DataFrame = spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
       verifyIndexUsage(
         query,
-        Seq(
-          getIndexFilesPath(leftDfIndexConfig.indexName),
-          getIndexFilesPath(rightDfIndexConfig.indexName)))
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
     }
   }
 
@@ -325,9 +320,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     verifyIndexUsage(
       query(leftDf, rightDf),
-      Seq(
-        getIndexFilesPath(leftDfJoinIndexConfig.indexName),
-        getIndexFilesPath(rightDfJoinIndexConfig.indexName)))
+      getIndexFilesPath(leftDfJoinIndexConfig.indexName) ++
+        getIndexFilesPath(rightDfJoinIndexConfig.indexName))
   }
 
   test("E2E test for first enableHyperspace() followed by disableHyperspace().") {
@@ -351,7 +345,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     assert(
       queryPlanHasExpectedRootPaths(
         dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
-        Seq(getIndexFilesPath(indexConfig.indexName))))
+        getIndexFilesPath(indexConfig.indexName)))
 
     assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
     assert(sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))
@@ -403,12 +397,14 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
           _,
           _,
           _) =>
-        location.rootPaths.head
-    }
+        location.rootPaths
+    }.flatten
   }
 
-  private def getIndexFilesPath(indexName: String): Path = {
-    new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+  private def getIndexFilesPath(indexName: String): Seq[Path] = {
+    NewContent(new Path(
+      systemPath,
+      s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")).files
   }
 
   /**
