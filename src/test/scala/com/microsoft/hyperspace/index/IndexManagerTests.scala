@@ -282,8 +282,8 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           NewContent(
-            Directory(s"$indexStorageLocation/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
+            PathUtils.makeAbsolute(new Path(s"$indexStorageLocation/${indexConfig.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state

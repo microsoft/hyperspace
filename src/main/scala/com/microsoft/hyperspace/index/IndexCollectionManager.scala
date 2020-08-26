@@ -171,7 +171,7 @@ private[hyperspace] object IndexSummary {
       entry.derivedDataset.properties.columns.included,
       entry.numBuckets,
       entry.derivedDataset.properties.schemaString,
-      indexDirPath,
+      new Path(indexDirPath).toUri.toString,
       entry.state)
   }
 }
