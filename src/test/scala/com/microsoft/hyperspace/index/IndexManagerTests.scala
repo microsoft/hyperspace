@@ -68,8 +68,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
           if (enableLineage) {
-            expectedSchema =
-              expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
+            expectedSchema = expectedSchema.add(
+              StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType, false))
           }
           val expected = new IndexSummary(
             indexConfig1.indexName,
