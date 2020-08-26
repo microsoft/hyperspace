@@ -18,13 +18,11 @@ package com.microsoft.hyperspace.actions
 
 import java.io.FileNotFoundException
 
-import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.{input_file_name, udf}
+import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException

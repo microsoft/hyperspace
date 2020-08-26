@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index
 
 import scala.collection.mutable.WrappedArray
 
-import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
@@ -221,11 +220,10 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify content of lineage column.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      val dataFileNames = new Path(nonPartitionedDataPath)
-        .getFileSystem(new Configuration)
-        .listStatus(new Path(nonPartitionedDataPath))
-        .map(f => f.getPath.toUri.toString)
-        .filter(FilenameUtils.getExtension(_).equals("parquet"))
+      val dataPath = new Path(nonPartitionedDataPath, "*parquet")
+      val dataFileNames = dataPath.getFileSystem(new Configuration)
+        .globStatus(dataPath)
+        .map(_.getPath)
 
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
       val indexRecordsDF = spark.read.parquet(
@@ -234,9 +232,9 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
         .select(IndexConstants.DATA_FILE_NAME_COLUMN)
         .distinct()
         .collect()
-        .map(_.getString(0))
+        .map(r => new Path(r.getString(0)))
 
-      assert(lineageFileNames.sorted === dataFileNames.sorted)
+      assert(lineageFileNames.toSet === dataFileNames.toSet)
     }
   }
 }
