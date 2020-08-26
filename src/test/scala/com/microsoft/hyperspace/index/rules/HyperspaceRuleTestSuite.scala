@@ -51,10 +51,10 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          NewContent(
+          Content(
             Directory(
               getIndexDataFilesPath(name).toUri.toString,
-              Seq(FileInfo1("v__=0/f1.parquet", 10, 10)))),
+              Seq(FileInfo("v__=0/f1.parquet", 10, 10)))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

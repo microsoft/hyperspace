@@ -52,7 +52,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
                   .Columns(Seq("RGUID"), Seq("Date")),
                 "",
                 10)),
-            NewContent(
+            Content(
               Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
             Source(SparkPlan(sourcePlanProperties)),
             Map())
@@ -105,7 +105,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
               .Columns(Seq("RGUID"), Seq("Date")),
             "",
             10)),
-        NewContent(Directory(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
+        Content(Directory(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
         Source(SparkPlan(sourcePlanProperties)),
         Map())
       entry.state = Constants.States.ACTIVE

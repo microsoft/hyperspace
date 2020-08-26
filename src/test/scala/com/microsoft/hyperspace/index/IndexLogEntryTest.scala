@@ -110,8 +110,8 @@ class IndexLogEntryTest extends SparkFunSuite {
     val expectedSourcePlanProperties = SparkPlan.Properties(
       Seq(Relation(
         Seq("rootpath"),
-        Hdfs(Hdfs.Properties(NewContent(
-          Directory("", Seq(FileInfo1("f1", 100L, 100L), FileInfo1("f2", 200L, 200L)), Seq())))),
+        Hdfs(Hdfs.Properties(Content(
+          Directory("", Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)), Seq())))),
         "schema",
         "type",
         Map())),
@@ -128,7 +128,7 @@ class IndexLogEntryTest extends SparkFunSuite {
             .Columns(Seq("col1"), Seq("col2", "col3")),
           schema.json,
           200)),
-      NewContent(Directory("rootContentPath")),
+      Content(Directory("rootContentPath")),
       Source(SparkPlan(expectedSourcePlanProperties)),
       Map())
     expected.state = "ACTIVE"

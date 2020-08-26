@@ -39,31 +39,31 @@ class IndexLogManagerImplTest
         CoveringIndex.Properties.Columns(Seq("id"), Seq("name", "school")),
         "id INT name STRING school STRING",
         100)),
-    NewContent(
+    Content(
       Directory(
         "/root/log",
         files = Seq(),
         subDirs = Seq(
           Directory(
             "dir1",
-            Seq(FileInfo1("1.json", 100L, 200L), FileInfo1("2.json", 100L, 200L))),
+            Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L))),
           Directory(
             "dir2",
-            Seq(FileInfo1("1.json", 100L, 200L), FileInfo1("2.json", 100L, 200L)))))),
+            Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)))))),
     Source(
       SparkPlan(SparkPlan.Properties(
         Seq(Relation(
           Seq("rootpath"),
-          Hdfs(properties = Hdfs.Properties(content = NewContent(Directory(
+          Hdfs(properties = Hdfs.Properties(content = Content(Directory(
             "/root/data",
             files = Seq(),
             subDirs = Seq(
               Directory(
                 "dir1",
-                Seq(FileInfo1("1.json", 100L, 200L), FileInfo1("2.json", 100L, 200L))),
+                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L))),
               Directory(
                 "dir2",
-                Seq(FileInfo1("1.json", 100L, 200L), FileInfo1("2.json", 100L, 200L)))))))),
+                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)))))))),
           "schema",
           "type",
           Map())),

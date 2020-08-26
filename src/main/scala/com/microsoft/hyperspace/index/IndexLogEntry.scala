@@ -16,11 +16,14 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.FileStatus
+import java.io.FileNotFoundException
+
+import com.fasterxml.jackson.annotation.JsonIgnore
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -29,17 +32,112 @@ case class NoOpFingerprint() {
 }
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
-case class Content(root: String, directories: Seq[Content.Directory])
-object Content {
-  case class Directory(path: String, files: Seq[FileInfo], fingerprint: NoOpFingerprint)
-  object Directory {
-    // modifiedTime is an Epoch time in milliseconds. (ms since 1970-01-01T00:00:00.000 UTC).
-    case class FileInfo(name: String, size: Long, modifiedTime: Long)
-    object FileInfo {
-      def apply(s: FileStatus): FileInfo =
-        FileInfo(s.getPath.toString, s.getLen, s.getModificationTime)
+case class Content(root: Directory) {
+  @JsonIgnore
+  lazy val files: Seq[Path] = rec(new Path(root.name), root)
+
+  private def rec(prefixPath: Path, directory: Directory): Seq[Path] = {
+    val files = directory.files.map(f => new Path(prefixPath, f.name))
+    files ++ directory.subDirs.flatMap { dir =>
+      rec(new Path(prefixPath, dir.name), dir)
     }
   }
+}
+
+object Content {
+  def apply(path: Path): Content = Content(Directory(path))
+
+  def fromLeafFiles(files: Seq[FileStatus]): Content = {
+    val leafDirToChildrenFiles: Map[Path, Array[FileStatus]] =
+      files.toArray.groupBy(_.getPath.getParent)
+    val rootPath = getRoot(leafDirToChildrenFiles.head._1)
+
+    val subDirs = leafDirToChildrenFiles
+      .filterNot(_._1.isRoot)
+      .map {
+        case (dir, statuses) =>
+          createDirectoryTreeWithoutRoot(dir, statuses)
+      }
+      .toSeq
+
+    val rootFiles: Seq[FileInfo] =
+      leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
+    Content(Directory(rootPath.toString, rootFiles, subDirs))
+  }
+
+  private def getRoot(path: Path): Path = {
+    if (path.isRoot) path else getRoot(path.getParent)
+  }
+
+  private def createDirectoryTreeWithoutRoot(
+      dirPath: Path,
+      statuses: Array[FileStatus]): Directory = {
+    if (dirPath.getParent.isRoot) {
+      Directory(dirPath.getName, files = statuses.map(FileInfo(_)))
+    } else {
+      createTopLevelNonRootDirectory(
+        dirPath.getParent,
+        Directory(dirPath.getName, files = statuses.map(FileInfo(_))))
+    }
+  }
+
+  private def createTopLevelNonRootDirectory(dirPath: Path, child: Directory): Directory = {
+    if (dirPath.getParent.isRoot) {
+      Directory(dirPath.getName, files = Seq(), subDirs = Seq(child))
+    } else {
+      createTopLevelNonRootDirectory(
+        dirPath.getParent,
+        Directory(dirPath.getName, files = Seq(), subDirs = Seq(child)))
+    }
+  }
+}
+
+case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
+
+object Directory {
+  def apply(path: Path): Directory = {
+    val files: Seq[FileInfo] = {
+      try {
+        val fs = path.getFileSystem(new Configuration)
+        val statuses = fs.listStatus(path).filter(status => isDataPath(status.getPath))
+
+        // TODO: support recursive listing of files below, remove the assert.
+        assert(statuses.forall(!_.isDirectory))
+
+        statuses.map(FileInfo(_)).toSeq
+      } catch {
+        // FileNotFoundException is an expected exception before index gets created.
+        case _: FileNotFoundException => Seq()
+        case e: Throwable => throw e
+      }
+    }
+    if (path.isRoot) {
+      Directory(path.toString, files, Seq())
+    } else {
+      Directory(path.getParent, Directory(path.getName, files, Seq()))
+    }
+  }
+
+  /* from PartitionAwareFileIndex */
+  private def isDataPath(path: Path): Boolean = {
+    val name = path.getName
+    !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
+  }
+
+  def apply(path: Path, child: Directory): Directory = {
+    if (path.isRoot) {
+      Directory(path.toString, Seq(), Seq(child))
+    } else {
+      Directory(path.getParent, Directory(path.getName, Seq(), Seq(child)))
+    }
+  }
+}
+
+case class FileInfo(name: String, size: Long, modifiedTime: Long)
+
+object FileInfo {
+  def apply(s: FileStatus): FileInfo =
+    FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
 }
 
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.
@@ -69,7 +167,7 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: NewContent)
+  case class Properties(content: Content)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -100,7 +198,7 @@ case class Source(plan: SparkPlan)
 case class IndexLogEntry(
     name: String,
     derivedDataset: CoveringIndex,
-    content: NewContent,
+    content: Content,
     source: Source,
     extra: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {

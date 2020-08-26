@@ -44,7 +44,7 @@ class JsonUtilsTests extends SparkFunSuite {
           CoveringIndex.Properties.Columns(Seq("id"), Seq("name", "school")),
           IndexLogEntry.schemaString(schema),
           10)),
-      NewContent(Directory("path")),
+      Content(Directory("path")),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
     index.state = Constants.States.ACTIVE

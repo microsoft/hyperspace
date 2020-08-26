@@ -260,7 +260,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _) =>
             val files = location.allFiles
-            val sourceDataProperties = Hdfs.Properties(NewContent.fromLeafFiles(files))
+            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
@@ -288,7 +288,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-          NewContent(
+          Content(
             PathUtils.makeAbsolute(new Path(s"$systemPath/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
           Source(SparkPlan(sourcePlanProperties)),
