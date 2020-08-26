@@ -219,7 +219,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Verify content of lineage column") {
+  test("Verify content of lineage column.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       val dataFileNames = new Path(nonPartitionedDataPath)
         .getFileSystem(new Configuration)
