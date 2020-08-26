@@ -527,7 +527,8 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   private def getIndexFilesPath(indexName: String): Path = {
     val path = getIndexRootPath(indexName)
     val fs = path.getFileSystem(new Configuration)
-    fs.listStatus(path).head.getPath
+    // Pick any files path but remove the _SUCCESS file.
+    fs.listStatus(path).filterNot(_.getPath.getName.startsWith("_")).head.getPath
   }
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(
