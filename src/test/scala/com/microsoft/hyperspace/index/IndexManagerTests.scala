@@ -78,6 +78,16 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             s"$systemPath/${indexConfig1.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Constants.States.ACTIVE)
+          // scalastyle:off
+          println("actual  : ", actual)
+          println("expected: ", expected)
+          println("actual == expected? ", actual == expected)
+          println("enableLineage :", enableLineage)
+          logError(s"actual  : $actual")
+          logError(s"expected: $expected")
+          logError(s"actual == expected? ${actual == expected}")
+          logError(s"enableLineage : $enableLineage")
+          // scalastyle:on
           assert(actual.equals(expected))
         }
       }
