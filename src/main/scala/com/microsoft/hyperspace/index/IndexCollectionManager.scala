@@ -66,7 +66,13 @@ class IndexCollectionManager(
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
-      new RefreshAction(spark, logManager, dataManager).run()
+      if (spark.sessionState.conf
+            .getConfString(IndexConstants.REFRESH_DELETE_ENABLED, "false")
+            .toBoolean) {
+        new RefreshDeleteAction(spark, logManager, dataManager).run()
+      } else {
+        new RefreshAction(spark, logManager, dataManager).run()
+      }
     }
   }
 
