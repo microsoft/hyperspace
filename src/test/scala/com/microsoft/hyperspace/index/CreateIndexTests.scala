@@ -18,6 +18,8 @@ package com.microsoft.hyperspace.index
 
 import scala.collection.mutable.WrappedArray
 
+import org.apache.commons.io.FilenameUtils
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
@@ -48,18 +50,11 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
 
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
     // save test data non-partitioned.
-    SampleData.save(
-      spark,
-      nonPartitionedDataPath,
-      dataColumns)
+    SampleData.save(spark, nonPartitionedDataPath, dataColumns)
     nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
 
     // save test data partitioned.
-    SampleData.save(
-      spark,
-      partitionedDataPath,
-      dataColumns,
-      Some(partitionKeys))
+    SampleData.save(spark, partitionedDataPath, dataColumns, Some(partitionKeys))
     partitionedDataDF = spark.read.parquet(partitionedDataPath)
   }
 
@@ -210,8 +205,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   test("Check lineage in index records for partitioned data when partition key is in load path.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       val dataDF =
-        spark.read.parquet(
-          s"$partitionedDataPath/${partitionKeys.head}=2017-09-03")
+        spark.read.parquet(s"$partitionedDataPath/${partitionKeys.head}=2017-09-03")
       hyperspace.createIndex(dataDF, indexConfig3)
       val indexRecordsDF = spark.read.parquet(
         s"$systemPath/${indexConfig3.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
@@ -222,6 +216,27 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
         indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
             Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKeys(1))).sorted)
+    }
+  }
+
+  test("Verify content of lineage column") {
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      val dataFileNames = new Path(nonPartitionedDataPath)
+        .getFileSystem(new Configuration)
+        .listStatus(new Path(nonPartitionedDataPath))
+        .map(f => f.getPath.toUri.toString)
+        .filter(FilenameUtils.getExtension(_).equals("parquet"))
+
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+      val indexRecordsDF = spark.read.parquet(
+        s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+      val lineageFileNames = indexRecordsDF
+        .select(IndexConstants.DATA_FILE_NAME_COLUMN)
+        .distinct()
+        .collect()
+        .map(_.getString(0))
+
+      assert(lineageFileNames.sorted === dataFileNames.sorted)
     }
   }
 }

@@ -80,7 +80,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             s"$systemPath/${indexConfig1.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Constants.States.ACTIVE)
-          val xx = actual.equals(expected)
           assert(actual.equals(expected))
         }
       }
