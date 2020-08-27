@@ -18,13 +18,11 @@ package com.microsoft.hyperspace.actions
 
 import java.io.FileNotFoundException
 
-import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.{input_file_name, udf}
+import org.apache.spark.sql.functions.input_file_name
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
@@ -174,7 +172,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
       df.select(allIndexColumns.head, allIndexColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, getFileName(input_file_name()))
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, input_file_name())
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }
@@ -192,7 +190,4 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     assert(partitionSchemas.length == 1)
     partitionSchemas.head.map(_.name)
   }
-
-  private val getFileName: UserDefinedFunction = udf(
-    (fullFilePath: String) => FilenameUtils.getName(fullFilePath))
 }
