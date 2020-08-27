@@ -121,7 +121,7 @@ object JoinRuleUtils {
     val newRelation = HadoopFsRelation(
       location,
       new StructType(),
-      index.schema,
+      StructType(index.schema.filter(relation.schema.contains(_))),
       Some(bucketSpec),
       new ParquetFileFormat,
       Map())(spark)

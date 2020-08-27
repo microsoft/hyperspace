@@ -25,27 +25,30 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule, JoinIndexRuleV2}
+import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
-  private val sampleData = SampleData.testData
   private val testDir = "src/test/resources/e2eTests/"
-  private val sampleParquetDataLocation = testDir + "sampleparquet"
-  override val systemPath = new Path(testDir + "indexLocation")
-  private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
+  private val nonPartitionedDataPath = testDir + "sampleparquet"
+  private val partitionedDataPath = testDir + "samplepartitionedparquet"
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  private val fileSystem =
+    new Path(nonPartitionedDataPath).getFileSystem(new Configuration)
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
-
-    import spark.implicits._
     hyperspace = new Hyperspace(spark)
+    fileSystem.delete(new Path(testDir), true)
 
-    fileSystem.delete(new Path(sampleParquetDataLocation), true)
+    val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+    // save test data non-partitioned.
+    SampleData.save(spark, nonPartitionedDataPath, dataColumns)
 
-    val dfFromSample = sampleData.toDF("c1", "c2", "c3", "c4", "c5")
-    dfFromSample.write.parquet(sampleParquetDataLocation)
+    // save test data partitioned.
+    SampleData.save(spark, partitionedDataPath, dataColumns, Some(Seq("c1", "c3")))
   }
 
   before {
@@ -101,19 +104,28 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("E2E test for filter query.") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
-    val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+  test(
+    "E2E test for filter query on partitioned and non-partitioned data with and without lineage.") {
+    Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
+      Seq(true, false).foreach { enableLineage =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+          withIndex("filterIndex") {
+            val df = spark.read.parquet(loc)
+            val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
 
-    hyperspace.createIndex(df, indexConfig)
+            hyperspace.createIndex(df, indexConfig)
 
-    def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c1")
+            def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c1")
 
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+            verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+          }
+        }
+      }
+    }
   }
 
   test("E2E test for case insensitive filter query utilizing indexes.") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
+    val df = spark.read.parquet(nonPartitionedDataPath)
     val indexConfig = IndexConfig("filterIndex", Seq("C3"), Seq("C1"))
 
     hyperspace.createIndex(df, indexConfig)
@@ -125,7 +137,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("E2E test for case sensitive filter query where changing conf changes behavior.") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
+    val df = spark.read.parquet(nonPartitionedDataPath)
     val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
 
     hyperspace.createIndex(df, indexConfig)
@@ -142,47 +154,69 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("E2E test for filter query when all columns are selected.") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
-    val indexConfig = IndexConfig("filterIndex", Seq("c4", "c3"), Seq("c1", "c2", "c5"))
+  test(
+    "E2E test for filter query when all columns are selected on partitioned and " +
+      "non-partitioned data with and without lineage.") {
+    Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
+      Seq(true, false).foreach { enableLineage =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+          withIndex("filterIndex") {
+            val df = spark.read.parquet(loc)
+            val indexConfig = IndexConfig("filterIndex", Seq("c4", "c3"), Seq("c1", "c2", "c5"))
 
-    hyperspace.createIndex(df, indexConfig)
-    df.createOrReplaceTempView("t")
+            hyperspace.createIndex(df, indexConfig)
+            df.createOrReplaceTempView("t")
 
-    def query(): DataFrame = spark.sql("SELECT * from t where c4 = 1")
+            def query(): DataFrame = spark.sql("SELECT * from t where c4 = 1")
 
-    // Verify no Project node is present in the query plan, as a result of using SELECT *
-    assert(query().queryExecution.optimizedPlan.collect { case p: Project => p }.isEmpty)
+            // Verify no Project node is present in the query plan, as a result of using SELECT *
+            assert(query().queryExecution.optimizedPlan.collect { case p: Project => p }.isEmpty)
 
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+            verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+          }
+        }
+      }
+    }
   }
 
-  test("E2E test for join query.") {
-    val leftDf = spark.read.parquet(sampleParquetDataLocation)
-    val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
-    hyperspace.createIndex(leftDf, leftDfIndexConfig)
+  test(
+    "E2E test for join query on partitioned and non-partitioned data with and without lineage.") {
+    Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
+      Seq(true, false).foreach { enableLineage =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+          withIndex("leftIndex", "rightIndex") {
+            val leftDf = spark.read.parquet(loc)
+            val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
 
-    val rightDf = spark.read.parquet(sampleParquetDataLocation)
-    val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
-    hyperspace.createIndex(rightDf, rightDfIndexConfig)
+            hyperspace.createIndex(leftDf, leftDfIndexConfig)
 
-    def query(): DataFrame = {
-      leftDf.join(rightDf, leftDf("c3") === rightDf("c3")).select(leftDf("c1"), rightDf("c4"))
+            val rightDf = spark.read.parquet(loc)
+            val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
+            hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+            def query(): DataFrame = {
+              leftDf
+                .join(rightDf, leftDf("c3") === rightDf("c3"))
+                .select(leftDf("c1"), rightDf("c4"))
+            }
+
+            verifyIndexUsage(
+              query,
+              Seq(
+                getIndexFilesPath(leftDfIndexConfig.indexName),
+                getIndexFilesPath(rightDfIndexConfig.indexName)))
+          }
+        }
+      }
     }
-
-    verifyIndexUsage(
-      query,
-      Seq(
-        getIndexFilesPath(leftDfIndexConfig.indexName),
-        getIndexFilesPath(rightDfIndexConfig.indexName)))
   }
 
   test("E2E test for join query with case-insensitive column names.") {
-    val leftDf = spark.read.parquet(sampleParquetDataLocation)
+    val leftDf = spark.read.parquet(nonPartitionedDataPath)
     val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
     hyperspace.createIndex(leftDf, leftDfIndexConfig)
 
-    val rightDf = spark.read.parquet(sampleParquetDataLocation)
+    val rightDf = spark.read.parquet(nonPartitionedDataPath)
     val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
     hyperspace.createIndex(rightDf, rightDfIndexConfig)
 
@@ -206,11 +240,11 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }
 
     withView("t1", "t2") {
-      val leftDf = spark.read.parquet(sampleParquetDataLocation)
+      val leftDf = spark.read.parquet(nonPartitionedDataPath)
       val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
       hyperspace.createIndex(leftDf, leftDfIndexConfig)
 
-      val rightDf = spark.read.parquet(sampleParquetDataLocation)
+      val rightDf = spark.read.parquet(nonPartitionedDataPath)
       val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
       hyperspace.createIndex(rightDf, rightDfIndexConfig)
 
@@ -234,8 +268,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   test("E2E test for join rule V2: optimizes SortMergeJoin, ignores BroadcastHashJoin.") {
     // Choose a threshold based on the data, which makes some tables small and eligible for BHJ.
     withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "6000") {
-      val df1 = spark.read.parquet(sampleParquetDataLocation)
-      val df2 = spark.read.parquet(sampleParquetDataLocation)
+      val df1 = spark.read.parquet(nonPartitionedDataPath)
+      val df2 = spark.read.parquet(nonPartitionedDataPath)
       df1.union(df1).union(df1).write.mode("overwrite").parquet(testDir + "bigdata")
       val bigDataPath = testDir + "bigdata"
       val bigDf = spark.read.parquet(bigDataPath)
@@ -270,7 +304,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
           dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
           Seq(
             getIndexFilesPath(bigDfIndexConfig.indexName),
-            new Path(sampleParquetDataLocation).makeQualified(fileSystem),
+            new Path(nonPartitionedDataPath).makeQualified(fileSystem),
             getIndexFilesPath(df2IndexConfig2.indexName))))
 
       assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
@@ -281,11 +315,11 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
   test("E2E test for join query on catalog temp tables/views") {
     withView("t1", "t2") {
-      val leftDf = spark.read.parquet(sampleParquetDataLocation)
+      val leftDf = spark.read.parquet(nonPartitionedDataPath)
       val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
       hyperspace.createIndex(leftDf, leftDfIndexConfig)
 
-      val rightDf = spark.read.parquet(sampleParquetDataLocation)
+      val rightDf = spark.read.parquet(nonPartitionedDataPath)
       val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
       hyperspace.createIndex(rightDf, rightDfIndexConfig)
 
@@ -311,13 +345,13 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
           |CREATE EXTERNAL TABLE t1
           |(c1 string, c3 string)
           |STORED AS PARQUET
-          |LOCATION '$sampleParquetDataLocation'
+          |LOCATION '$nonPartitionedDataPath'
         """.stripMargin)
       spark.sql(s"""
           |CREATE EXTERNAL TABLE t2
           |(c3 string, c4 int)
           |STORED AS PARQUET
-          |LOCATION '$sampleParquetDataLocation'
+          |LOCATION '$nonPartitionedDataPath'
         """.stripMargin)
 
       val leftDf = spark.table("t1")
@@ -343,7 +377,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     withTable("t1", "t2") {
       val table1Location = testDir + "tables/t1"
       val table2Location = testDir + "tables/t2"
-      val originalDf = spark.read.parquet(sampleParquetDataLocation)
+      val originalDf = spark.read.parquet(nonPartitionedDataPath)
       originalDf.select("c1", "c3").write.option("path", table1Location).saveAsTable("t1")
       originalDf.select("c3", "c4").write.option("path", table2Location).saveAsTable("t2")
 
@@ -365,14 +399,14 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("E2E test for join query with two child sub-query as both filter query.") {
-    val leftDf = spark.read.parquet(sampleParquetDataLocation)
+    val leftDf = spark.read.parquet(nonPartitionedDataPath)
     val leftDfJoinIndexConfig = IndexConfig("leftJoinIndex", Seq("c3"), Seq("c4"))
     hyperspace.createIndex(leftDf, leftDfJoinIndexConfig)
 
     val leftDfFilterIndexConfig = IndexConfig("leftDfFilterIndex", Seq("c4"), Seq("c3"))
     hyperspace.createIndex(leftDf, leftDfFilterIndexConfig)
 
-    val rightDf = spark.read.parquet(sampleParquetDataLocation)
+    val rightDf = spark.read.parquet(nonPartitionedDataPath)
     val rightDfJoinIndexConfig = IndexConfig("rightDfJoinIndex", Seq("c3"), Seq("c5"))
 
     hyperspace.createIndex(rightDf, rightDfJoinIndexConfig)
@@ -397,7 +431,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("E2E test for first enableHyperspace() followed by disableHyperspace().") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
+    val df = spark.read.parquet(nonPartitionedDataPath)
     val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
     hyperspace.createIndex(df, indexConfig)
 

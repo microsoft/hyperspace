@@ -24,6 +24,7 @@ import org.apache.spark.SparkFunSuite
 import org.scalatest.BeforeAndAfterAll
 
 import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
@@ -42,8 +43,14 @@ class IndexLogManagerImplTest
     Content(
       "/root/log",
       Seq(
-        Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
-        Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint()))),
+        Content.Directory(
+          "dir1",
+          Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
+          NoOpFingerprint()),
+        Content.Directory(
+          "dir2",
+          Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
+          NoOpFingerprint()))),
     Source(
       SparkPlan(SparkPlan.Properties(
         Seq(Relation(
@@ -51,8 +58,15 @@ class IndexLogManagerImplTest
           Hdfs(properties = Hdfs.Properties(content = Content(
             "/root/data",
             Seq(
-              Content.Directory("dir1", Seq("1.json", "2.json"), NoOpFingerprint()),
-              Content.Directory("dir2", Seq("1.json", "2.json"), NoOpFingerprint()))))),
+              Content
+                .Directory(
+                  "dir1",
+                  Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
+                  NoOpFingerprint()),
+              Content.Directory(
+                "dir2",
+                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
+                NoOpFingerprint()))))),
           "schema",
           "type",
           Map())),

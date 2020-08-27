@@ -17,20 +17,22 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.index.Content.Directory.FileInfo
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
+class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val indexStorageLocation = "src/test/resources/indexLocation"
+  override val systemPath =
+    PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -38,22 +40,17 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexStorageLocation)
 
-    FileUtils.delete(new Path(indexStorageLocation))
     FileUtils.delete(new Path(sampleParquetDataLocation))
-
-    import spark.implicits._
-    SampleData.testData
-      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      .write
-      .parquet(sampleParquetDataLocation)
-
+    SampleData.save(
+      spark,
+      sampleParquetDataLocation,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     df = spark.read.parquet(sampleParquetDataLocation)
   }
 
   after {
-    FileUtils.delete(new Path(indexStorageLocation))
+    FileUtils.delete(systemPath, true)
   }
 
   override def afterAll(): Unit = {
@@ -61,19 +58,32 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
     super.afterAll()
   }
 
-  test("Verify that indexes() returns the correct dataframe.") {
-    import spark.implicits._
-    hyperspace.createIndex(df, indexConfig1)
-    val actual = hyperspace.indexes.as[IndexSummary].collect()(0)
-    val expected = new IndexSummary(
-      indexConfig1.indexName,
-      indexConfig1.indexedColumns,
-      indexConfig1.includedColumns,
-      200,
-      StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))).json,
-      s"$indexStorageLocation/index1/v__=0",
-      Constants.States.ACTIVE)
-    assert(actual.equals(expected))
+  test("Verify that indexes() returns the correct dataframe with and without lineage.") {
+    Seq(true, false).foreach { enableLineage =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+        withIndex(indexConfig1.indexName) {
+          import spark.implicits._
+          hyperspace.createIndex(df, indexConfig1)
+          val actual = hyperspace.indexes.as[IndexSummary].collect().head
+          var expectedSchema =
+            StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
+          if (enableLineage) {
+            expectedSchema = expectedSchema.add(
+              StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType, false))
+          }
+          val expected = new IndexSummary(
+            indexConfig1.indexName,
+            indexConfig1.indexedColumns,
+            indexConfig1.includedColumns,
+            200,
+            expectedSchema.json,
+            s"$systemPath/${indexConfig1.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
+            Constants.States.ACTIVE)
+          assert(actual.equals(expected))
+        }
+      }
+    }
   }
 
   test("Verify getIndexes()") {
@@ -203,7 +213,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
         hyperspace.createIndex(df, indexConfig)
         var indexCount =
           spark.read
-            .parquet(s"$indexStorageLocation/index_$format" +
+            .parquet(s"$systemPath/index_$format" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
             .count()
         assert(indexCount == 10)
@@ -219,7 +229,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
           .save(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
         indexCount = spark.read
-          .parquet(s"$indexStorageLocation/index_$format" +
+          .parquet(s"$systemPath/index_$format" +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
@@ -251,7 +261,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               _,
               _,
               _) =>
-            val files = location.allFiles.map(_.getPath.toString)
+            val files = location.allFiles.map(FileInfo(_))
             val sourceDataProperties =
               Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
             val fileFormatName = fileFormat match {
@@ -282,7 +292,7 @@ class IndexManagerTests extends SparkFunSuite with SparkInvolvedSuite {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content(
-            s"$indexStorageLocation/${indexConfig.indexName}" +
+            s"$systemPath/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Seq()),
           Source(SparkPlan(sourcePlanProperties)),

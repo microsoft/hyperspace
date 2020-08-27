@@ -109,7 +109,7 @@ object FilterIndexRule
         val newRelation = HadoopFsRelation(
           newLocation,
           new StructType(),
-          index.schema,
+          StructType(index.schema.filter(fsRelation.schema.contains)),
           None, // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
           new ParquetFileFormat,
           Map())(spark)
