@@ -119,10 +119,9 @@ case class IndexLogEntry(
 
   def relations: Seq[Relation] = source.plan.properties.relations
 
-  def allSourceFiles: Set[Path] = {
+  def allSourceFiles: Set[FileInfo] = {
     relations
-      .flatMap(
-        _.data.properties.content.directories.flatMap(_.files.map(f => new Path(f.name))))
+      .flatMap(_.data.properties.content.directories.flatMap(_.files))
       .toSet
   }
 
