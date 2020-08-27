@@ -33,21 +33,31 @@ case class NoOpFingerprint() {
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
 case class Content(root: Directory) {
-  @JsonIgnore
-  lazy val files: Seq[Path] = rec(new Path(root.name), root)
 
-  private def rec(prefixPath: Path, directory: Directory): Seq[Path] = {
-    val files = directory.files.map(f => new Path(prefixPath, f.name))
-    files ++ directory.subDirs.flatMap { dir =>
-      rec(new Path(prefixPath, dir.name), dir)
+  // List of fully qualified paths of all files mentioned in this Content object.
+  @JsonIgnore
+  lazy val files: Seq[Path] = {
+    // Recursively append parent dir path to subdirs and files.
+    def rec(prefixPath: Path, directory: Directory): Seq[Path] = {
+      val files = directory.files.map(f => new Path(prefixPath, f.name))
+      files ++ directory.subDirs.flatMap { dir =>
+        rec(new Path(prefixPath, dir.name), dir)
+      }
     }
+
+    rec(new Path(root.name), root)
   }
 }
 
 object Content {
+  // Create a Content object from a directory path by recursively listing its leaf files. All
+  // files from the directory tree will be part of the Content.
   def apply(path: Path): Content = Content(Directory(path))
 
+  // Create a Content object from a specified list of leaf files. Any files not listed here will
+  // NOT be part of the returned object
   def fromLeafFiles(files: Seq[FileStatus]): Content = {
+    /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
     val leafDirToChildrenFiles: Map[Path, Array[FileStatus]] =
       files.toArray.groupBy(_.getPath.getParent)
     val rootPath = getRoot(leafDirToChildrenFiles.head._1)
@@ -55,37 +65,42 @@ object Content {
     val subDirs = leafDirToChildrenFiles
       .filterNot(_._1.isRoot)
       .map {
-        case (dir, statuses) =>
-          createDirectoryTreeWithoutRoot(dir, statuses)
+        case (dir, statuses) => createSubDirectoryTree(dir, statuses)
       }
       .toSeq
 
     val rootFiles: Seq[FileInfo] =
       leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
+
     Content(Directory(rootPath.toString, rootFiles, subDirs))
   }
 
+  // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
+  // For linux systems, this root will be "file:/". Other hdfs compatible file systems will have
+  // corresponding roots.
   private def getRoot(path: Path): Path = {
     if (path.isRoot) path else getRoot(path.getParent)
   }
 
-  private def createDirectoryTreeWithoutRoot(
+  // Create leaf subdirectory. Leaf Subdirectory is the first parent of leaf files.
+  private def createSubDirectoryTree(
       dirPath: Path,
       statuses: Array[FileStatus]): Directory = {
     if (dirPath.getParent.isRoot) {
       Directory(dirPath.getName, files = statuses.map(FileInfo(_)))
     } else {
-      createTopLevelNonRootDirectory(
+      createNonLeafSubDirectoryHelper(
         dirPath.getParent,
         Directory(dirPath.getName, files = statuses.map(FileInfo(_))))
     }
   }
 
-  private def createTopLevelNonRootDirectory(dirPath: Path, child: Directory): Directory = {
+  // Create Non-Leaf subdirectory tree starting from the topmost non-root directory.
+  private def createNonLeafSubDirectoryHelper(dirPath: Path, child: Directory): Directory = {
     if (dirPath.getParent.isRoot) {
       Directory(dirPath.getName, files = Seq(), subDirs = Seq(child))
     } else {
-      createTopLevelNonRootDirectory(
+      createNonLeafSubDirectoryHelper(
         dirPath.getParent,
         Directory(dirPath.getName, files = Seq(), subDirs = Seq(child)))
     }
@@ -95,40 +110,45 @@ object Content {
 case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
+  // Create a Directory object from a directory path by recursively listing its leaf files. All
+  // files from the directory tree will be part of the Content.
   def apply(path: Path): Directory = {
     val files: Seq[FileInfo] = {
       try {
         val fs = path.getFileSystem(new Configuration)
+
+        // Filter out files like _SUCCESS.
         val statuses = fs.listStatus(path).filter(status => isDataPath(status.getPath))
 
-        // TODO: support recursive listing of files below, remove the assert.
+        // TODO: Implement support for recursive listing of files below and remove the assert.
         assert(statuses.forall(!_.isDirectory))
 
         statuses.map(FileInfo(_)).toSeq
       } catch {
-        // FileNotFoundException is an expected exception before index gets created.
+        // FileNotFoundException is an expected exception if path doesn't exist. This will happen,
+        // for e.g. when creating an IndexLogEntry object just before creation of an index.
         case _: FileNotFoundException => Seq()
         case e: Throwable => throw e
       }
     }
     if (path.isRoot) {
-      Directory(path.toString, files, Seq())
+      Directory(path.toString, files)
     } else {
-      Directory(path.getParent, Directory(path.getName, files, Seq()))
+      createFromChild(path.getParent, Directory(path.getName, files))
     }
   }
 
-  /* from PartitionAwareFileIndex */
+  /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
   private def isDataPath(path: Path): Boolean = {
     val name = path.getName
     !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
   }
 
-  def apply(path: Path, child: Directory): Directory = {
+  def createFromChild(path: Path, child: Directory): Directory = {
     if (path.isRoot) {
       Directory(path.toString, Seq(), Seq(child))
     } else {
-      Directory(path.getParent, Directory(path.getName, Seq(), Seq(child)))
+      createFromChild(path.getParent, Directory(path.getName, Seq(), Seq(child)))
     }
   }
 }
