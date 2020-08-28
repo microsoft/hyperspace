@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation}
@@ -43,6 +43,14 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
 
+        val indexFile = new FileStatus(
+          10,
+          false,
+          1,
+          10,
+          10,
+          new Path(getIndexDataFilesPath(name), "f1.parquet"))
+
         val indexLogEntry = IndexLogEntry(
           name,
           CoveringIndex(
@@ -51,10 +59,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          Content(
-            Directory(
-              getIndexDataFilesPath(name).toUri.toString,
-              Seq(FileInfo("v__=0/f1.parquet", 10, 10)))),
+          Content.fromLeafFiles(Seq(indexFile)),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

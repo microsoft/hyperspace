@@ -26,9 +26,10 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.PathUtils
 
 class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
-  override val systemPath = new Path("src/test/resources/joinIndexTest")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexTest")
   val indexName1 = "filterIxTestIndex1"
   val indexName2 = "filterIxTestIndex2"
 
