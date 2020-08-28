@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{Path, PathFilter}
 
 object PathUtils {
   def makeAbsolute(path: String): Path = makeAbsolute(new Path(path))
@@ -27,9 +27,11 @@ object PathUtils {
     fs.makeQualified(path)
   }
 
-  /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
-  def isDataPath(path: Path): Boolean = {
-    val name = path.getName
-    !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
+  /* Definition taken from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
+  object DataPathFilter extends PathFilter {
+    override def accept(path: Path): Boolean = {
+      val name = path.getName
+      !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
+    }
   }
 }

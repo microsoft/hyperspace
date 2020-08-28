@@ -121,7 +121,7 @@ object Directory {
    */
   def fromDir(
       path: Path,
-      pathFilter: PathFilter = (path: Path) => PathUtils.isDataPath(path),
+      pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Directory = {
     val files: Seq[FileInfo] = {
       try {

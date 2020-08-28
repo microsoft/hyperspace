@@ -25,6 +25,7 @@ import org.apache.spark.sql.DataFrame
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -528,7 +529,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val path = getIndexRootPath(indexName)
     val fs = path.getFileSystem(new Configuration)
     // Pick any files path but remove the _SUCCESS file.
-    fs.listStatus(path).filter(s => PathUtils.isDataPath(s.getPath)).head.getPath
+    fs.listStatus(path).filter(s => DataPathFilter.accept(s.getPath)).head.getPath
   }
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(
