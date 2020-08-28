@@ -158,7 +158,7 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    var useBucketUnion = useBucketSpec
+    val useBucketUnion = useBucketSpec
     val replacedPlan = plan transformUp {
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
@@ -234,6 +234,7 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
+        // Set the same output schema with the index plan to merge them using BucketUnion
         val updatedOutput =
           baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
 
@@ -256,7 +257,7 @@ object RuleUtils {
     }
 
     if (!originalPlan.equals(complementIndexPlan)) {
-      // Remove sort order because original data isn't sorted by the same columns as the index.
+      // Remove sort order because we cannot guarantee the ordering of source files
       val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
       val attrs = complementIndexPlan.output.attrs.filter { attr =>
         index.indexedColumns contains attr.name
