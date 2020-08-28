@@ -20,14 +20,14 @@ import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, In, Literal, NamedExpression, Not}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{Metadata, StringType, StructType}
+import org.apache.spark.sql.types.StructType
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
@@ -41,10 +41,7 @@ object RuleUtils {
    * @param spark Spark session
    * @return indexes built for this plan
    */
-  def getCandidateIndexes(
-      spark: SparkSession,
-      indexManager: IndexManager,
-      plan: LogicalPlan): Seq[IndexLogEntry] = {
+  def getCandidateIndexes(spark: SparkSession, plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[(String, Option[Set[Path]]), Option[String]]()
     val hybridScanEnabled = spark.sessionState.conf
@@ -53,9 +50,13 @@ object RuleUtils {
         IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
       .toBoolean
 
-    def signatureValid(entry: IndexLogEntry, sourceFileSet: Option[Set[Path]]): Boolean = {
+    def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
+      val sourceFileSet = if (hybridScanEnabled) {
+        assert(entry.relations.length == 1)
+        Some(entry.allSourceFiles.map(f => new Path(f.name)))
+      } else None
       val sourcePlanSignature = sourcePlanSignatures.head
       signatureMap.getOrElseUpdate(
         (sourcePlanSignature.provider, sourceFileSet),
@@ -66,33 +67,15 @@ object RuleUtils {
         case None => false
       }
     }
-
-    def isCandidate(entry: IndexLogEntry): Boolean = {
-      if (hybridScanEnabled) {
-        assert(entry.relations.length == 1)
-        // entry.allSourceFiles
-        var files = scala.collection.mutable.Seq[FileInfo]()
-        plan.foreach {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-              _,
-              _,
-              _) =>
-            files ++= location.allFiles.map(f =>
-              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-        }
-        val commonFiles = files.toSet.intersect(entry.allSourceFiles)
-        commonFiles.nonEmpty
-      } else {
-        signatureValid(entry, None)
-      }
-    }
+    val indexManager = Hyperspace
+      .getContext(spark)
+      .indexCollectionManager
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    allIndexes.filter(index => index.created && isCandidate(index))
+    allIndexes.filter(index => index.created && signatureValid(index))
   }
 
   /**
@@ -178,7 +161,7 @@ object RuleUtils {
     var useBucketUnion = useBucketSpec
     val replacedPlan = plan transformUp {
       case baseRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
@@ -190,23 +173,7 @@ object RuleUtils {
         val filesAppended = if (!useBucketUnion) {
           (curFileSet -- index.allSourceFiles).map(f => new Path(f.name)).toSeq
         } else Seq()
-        val filesDeleted =
-          (index.allSourceFiles -- curFileSet).toSeq.map(f =>
-            f.name.replace("file:/C:", "file:///C:")) // TODO fix
 
-        if (filesAppended.nonEmpty && filesDeleted.nonEmpty) {
-          // Because appended source files do not have the lineage column in its schema,
-          // we cannot read with the files with the lineage column. Therefore we cannot
-          // handle both appended data & deleted data by adding appended file paths to
-          // the location & injecting the lineage filter for deleted files concurrently.
-          useBucketUnion = true
-        }
-
-        val readSchema = if (filesDeleted.isEmpty) {
-          StructType(index.schema.filter(baseRelation.schema.contains(_)))
-        } else {
-          StructType(index.schema)
-        }
         val readPaths = if (useBucketUnion || filesAppended.isEmpty) {
           Seq(new Path(index.content.root))
         } else {
@@ -217,24 +184,14 @@ object RuleUtils {
         val relation = HadoopFsRelation(
           newLocation,
           new StructType(),
-          readSchema,
+          StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketUnion) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map())(spark)
 
-        if (filesDeleted.isEmpty) {
-          val updatedOutput =
-            baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-          baseRelation.copy(relation = relation, output = updatedOutput)
-        } else {
-          val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
-            NamedExpression.newExprId)
-          val updatedOutput =
-            baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-          val deletedFileNames = filesDeleted.map(Literal(_)).toArray
-          val rel = baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lAttr))
-          Project(updatedOutput, Filter(Not(In(lAttr, deletedFileNames)), rel))
-        }
+        val updatedOutput =
+          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
+        baseRelation.copy(relation = relation, output = updatedOutput)
     }
     if (useBucketUnion) {
       // if BucketSpec of the index is used to read the index data, we need to shuffle

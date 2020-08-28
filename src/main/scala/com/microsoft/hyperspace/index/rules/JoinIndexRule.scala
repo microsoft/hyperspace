@@ -24,9 +24,9 @@ import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{LogicalRelation}
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
@@ -102,14 +102,10 @@ object JoinIndexRule
       left: LogicalPlan,
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
-
     val lIndexes =
       RuleUtils
         .getLogicalRelation(left)
-        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
+        .map(RuleUtils.getCandidateIndexes(spark, _))
     if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
@@ -117,7 +113,7 @@ object JoinIndexRule
     val rIndexes =
       RuleUtils
         .getLogicalRelation(right)
-        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
+        .map(RuleUtils.getCandidateIndexes(spark, _))
     if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }

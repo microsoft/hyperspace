@@ -100,10 +100,7 @@ object FilterIndexRule
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
     RuleUtils.getLogicalRelation(filter) match {
       case Some(r) =>
-        val indexManager = Hyperspace
-          .getContext(spark)
-          .indexCollectionManager
-        val candidateIndexes = RuleUtils.getCandidateIndexes(spark, indexManager, r)
+        val candidateIndexes = RuleUtils.getCandidateIndexes(spark, r)
 
         candidateIndexes.filter { index =>
           indexCoversPlan(
