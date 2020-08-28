@@ -77,7 +77,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets)),
-          Content(absolutePath),
+          Content.fromPath(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

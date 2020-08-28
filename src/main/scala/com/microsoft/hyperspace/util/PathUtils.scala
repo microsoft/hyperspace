@@ -26,4 +26,10 @@ object PathUtils {
     val fs = path.getFileSystem(new Configuration)
     fs.makeQualified(path)
   }
+
+  /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
+  def isDataPath(path: Path): Boolean = {
+    val name = path.getName
+    !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
+  }
 }

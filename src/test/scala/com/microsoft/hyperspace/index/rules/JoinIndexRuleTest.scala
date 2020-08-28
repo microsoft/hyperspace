@@ -401,9 +401,9 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
       updatedPlan: LogicalPlan,
       indexPaths: Seq[Path]): Unit = {
     assert(treeStructureEquality(originalPlan, updatedPlan))
-    val bP = basePaths(updatedPlan)
-    assert(bP.length == indexPaths.length)
-    assert(bP.zip(indexPaths).forall {
+    val rootPaths = getRootPaths(updatedPlan)
+    assert(rootPaths.length == indexPaths.length)
+    assert(rootPaths.zip(indexPaths).forall {
       case (a, b) =>
         a.toString.startsWith(b.toString)
     })
@@ -431,7 +431,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
   }
 
   /** Returns tuple of left and right base relation paths for a logical plan */
-  private def basePaths(plan: LogicalPlan): Seq[Path] = {
+  private def getRootPaths(plan: LogicalPlan): Seq[Path] = {
     plan
       .collectLeaves()
       .collect {

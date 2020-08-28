@@ -50,6 +50,10 @@ class IndexLogEntryTest extends SparkFunSuite {
         |      "name" : "rootContentPath",
         |      "files" : [ ],
         |      "subDirs" : [ ]
+        |    },
+        |    "fingerprint" : {
+        |      "kind" : "NoOp",
+        |      "properties" : { }
         |    }
         |  },
         |  "source" : {
@@ -72,6 +76,10 @@ class IndexLogEntryTest extends SparkFunSuite {
         |                    "modifiedTime" : 200
         |                  } ],
         |                  "subDirs" : [ ]
+        |                },
+        |                "fingerprint" : {
+        |                  "kind" : "NoOp",
+        |                  "properties" : { }
         |                }
         |              }
         |            },

@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -32,8 +33,7 @@ case class NoOpFingerprint() {
 }
 
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
-case class Content(root: Directory) {
-
+case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerprint()) {
   // List of fully qualified paths of all files mentioned in this Content object.
   @JsonIgnore
   lazy val files: Seq[Path] = {
@@ -52,14 +52,13 @@ case class Content(root: Directory) {
 object Content {
   // Create a Content object from a directory path by recursively listing its leaf files. All
   // files from the directory tree will be part of the Content.
-  def apply(path: Path): Content = Content(Directory(path))
+  def fromPath(path: Path): Content = Content(Directory.fromDir(path))
 
   // Create a Content object from a specified list of leaf files. Any files not listed here will
   // NOT be part of the returned object
   def fromLeafFiles(files: Seq[FileStatus]): Content = {
     /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
-    val leafDirToChildrenFiles: Map[Path, Array[FileStatus]] =
-      files.toArray.groupBy(_.getPath.getParent)
+    val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
     val rootPath = getRoot(leafDirToChildrenFiles.head._1)
 
     val subDirs = leafDirToChildrenFiles
@@ -69,8 +68,7 @@ object Content {
       }
       .toSeq
 
-    val rootFiles: Seq[FileInfo] =
-      leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
+    val rootFiles = leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
 
     Content(Directory(rootPath.toString, rootFiles, subDirs))
   }
@@ -112,13 +110,13 @@ case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Di
 object Directory {
   // Create a Directory object from a directory path by recursively listing its leaf files. All
   // files from the directory tree will be part of the Content.
-  def apply(path: Path): Directory = {
+  def fromDir(path: Path): Directory = {
     val files: Seq[FileInfo] = {
       try {
         val fs = path.getFileSystem(new Configuration)
 
         // Filter out files like _SUCCESS.
-        val statuses = fs.listStatus(path).filter(status => isDataPath(status.getPath))
+        val statuses = fs.listStatus(path).filter(status => PathUtils.isDataPath(status.getPath))
 
         // TODO: Implement support for recursive listing of files below and remove the assert.
         assert(statuses.forall(!_.isDirectory))
@@ -138,12 +136,6 @@ object Directory {
     }
   }
 
-  /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
-  private def isDataPath(path: Path): Boolean = {
-    val name = path.getName
-    !((name.startsWith("_") && !name.contains("=")) || name.startsWith("."))
-  }
-
   def createFromChild(path: Path, child: Directory): Directory = {
     if (path.isRoot) {
       Directory(path.toString, Seq(), Seq(child))
@@ -153,6 +145,7 @@ object Directory {
   }
 }
 
+// modifiedTime is an Epoch time in milliseconds. (ms since 1970-01-01T00:00:00.000 UTC).
 case class FileInfo(name: String, size: Long, modifiedTime: Long)
 
 object FileInfo {
