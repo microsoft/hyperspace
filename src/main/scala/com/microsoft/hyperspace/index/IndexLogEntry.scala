@@ -20,7 +20,7 @@ import java.io.FileNotFoundException
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, Path}
+import org.apache.hadoop.fs.{FileStatus, Path, PathFilter}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
@@ -81,9 +81,7 @@ object Content {
   }
 
   // Create leaf subdirectory. Leaf Subdirectory is the first parent of leaf files.
-  private def createSubDirectoryTree(
-      dirPath: Path,
-      statuses: Array[FileStatus]): Directory = {
+  private def createSubDirectoryTree(dirPath: Path, statuses: Array[FileStatus]): Directory = {
     if (dirPath.getParent.isRoot) {
       Directory(dirPath.getName, files = statuses.map(FileInfo(_)))
     } else {
@@ -108,39 +106,49 @@ object Content {
 case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
-  // Create a Directory object from a directory path by recursively listing its leaf files. All
-  // files from the directory tree will be part of the Content.
-  def fromDir(path: Path): Directory = {
+
+  /**
+   * Create a Directory object from a directory path by recursively listing its leaf files. All
+   * files from the directory tree will be part of the Content.
+   *
+   * @param path Starting directory path under which the files will be considered part of the
+   *             Directory object.
+   * @param pathFilter Filter for accepting paths. The default filter is picked from spark
+   *                   codebase, which filters out files like _SUCCESS.
+   * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
+   *                         blank directory tree with no files.
+   * @return Directory tree starting at root, and containing the files from "path" argument.
+   */
+  def fromDir(
+      path: Path,
+      pathFilter: PathFilter = (path: Path) => PathUtils.isDataPath(path),
+      throwIfNotExists: Boolean = false): Directory = {
     val files: Seq[FileInfo] = {
       try {
         val fs = path.getFileSystem(new Configuration)
-
-        // Filter out files like _SUCCESS.
-        val statuses = fs.listStatus(path).filter(status => PathUtils.isDataPath(status.getPath))
+        val statuses = fs.listStatus(path).filter(s => pathFilter.accept(s.getPath))
 
         // TODO: Implement support for recursive listing of files below and remove the assert.
         assert(statuses.forall(!_.isDirectory))
 
         statuses.map(FileInfo(_)).toSeq
       } catch {
-        // FileNotFoundException is an expected exception if path doesn't exist. This will happen,
-        // for e.g. when creating an IndexLogEntry object just before creation of an index.
-        case _: FileNotFoundException => Seq()
+        case _: FileNotFoundException if !throwIfNotExists => Seq()
         case e: Throwable => throw e
       }
     }
     if (path.isRoot) {
       Directory(path.toString, files)
     } else {
-      createFromChild(path.getParent, Directory(path.getName, files))
+      prependDirectory(path.getParent, Directory(path.getName, files))
     }
   }
 
-  def createFromChild(path: Path, child: Directory): Directory = {
+  private def prependDirectory(path: Path, child: Directory): Directory = {
     if (path.isRoot) {
       Directory(path.toString, Seq(), Seq(child))
     } else {
-      createFromChild(path.getParent, Directory(path.getName, Seq(), Seq(child)))
+      prependDirectory(path.getParent, Directory(path.getName, Seq(), Seq(child)))
     }
   }
 }
