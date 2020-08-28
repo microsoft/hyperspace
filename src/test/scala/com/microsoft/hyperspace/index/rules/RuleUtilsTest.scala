@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, P
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.IndexCollectionManager
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite {
@@ -84,15 +85,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify indexes are matched by signature correctly.") {
-    val indexManager = IndexCollectionManager(spark)
-
-    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t1ProjectNode).length === 3)
-    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t2ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, t1ProjectNode).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, t2ProjectNode).length === 2)
 
     // Delete an index for t1ProjectNode
+    val indexManager = Hyperspace
+      .getContext(spark)
+      .indexCollectionManager
     indexManager.delete("t1i1")
 
-    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t1ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, t1ProjectNode).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
