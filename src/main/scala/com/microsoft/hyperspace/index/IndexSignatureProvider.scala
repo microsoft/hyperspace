@@ -47,10 +47,9 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
       logicalPlan: LogicalPlan,
       targetFiles: Option[Set[Path]] = None): Option[String] = {
     fileBasedSignatureProvider.signature(logicalPlan, targetFiles).flatMap { f =>
-      planSignatureProvider.signature(logicalPlan).map { p =>
+      planSignatureProvider.signature(logicalPlan, targetFiles).map { p =>
         HashingUtils.md5Hex(f + p)
       }
     }
   }
-
 }

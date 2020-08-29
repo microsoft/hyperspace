@@ -170,14 +170,14 @@ object RuleUtils {
           .toSet
         // if BucketSpec of index data isn't used, we could read appended data from
         // source files directly.
-        val filesAppended = if (!useBucketUnion) {
-          (curFileSet -- index.allSourceFiles).map(f => new Path(f.name)).toSeq
-        } else Seq()
-
-        val readPaths = if (useBucketUnion || filesAppended.isEmpty) {
-          Seq(new Path(index.content.root))
-        } else {
-          Seq(new Path(index.content.root)) ++ filesAppended
+        val readPaths = {
+          if (useBucketUnion) {
+            Seq(new Path(index.content.root))
+          } else {
+            val filesAppended =
+              (curFileSet -- index.allSourceFiles).map(f => new Path(f.name)).toSeq
+            Seq(new Path(index.content.root)) ++ filesAppended
+          }
         }
 
         val newLocation = new InMemoryFileIndex(spark, readPaths, Map(), None)
@@ -239,7 +239,7 @@ object RuleUtils {
           baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
 
         val filesNotCovered = (location.allFiles
-          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+          .map(FileInfo(_))
           .toSet -- index.allSourceFiles).toSeq.map(f => new Path(f.name))
 
         if (filesNotCovered.nonEmpty) {
@@ -273,7 +273,7 @@ object RuleUtils {
         val transformed = complementIndexPlan transformUp {
           case project @ Project(_, child) =>
             val childAttrs = child.output.attrs.filter { attr =>
-              index.indexedColumns contains attr.name
+              index.indexedColumns.contains(attr.name)
             }
             projectSeen = true
             assert(childAttrs.size == index.indexedColumns.size)
