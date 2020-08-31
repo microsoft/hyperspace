@@ -27,7 +27,7 @@ import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
 class ContentTest extends SparkFunSuite with SQLHelper {
 
-  test("testFiles") {
+  test("test files api") {
     withTempPath { p =>
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
@@ -46,7 +46,7 @@ class ContentTest extends SparkFunSuite with SQLHelper {
     }
   }
 
-  test("testFromPath") {
+  test("test fromPath api") {
     withTempPath { p =>
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
@@ -57,7 +57,7 @@ class ContentTest extends SparkFunSuite with SQLHelper {
 
       val path = PathUtils.makeAbsolute(dir.toString)
 
-      // Create expected Directory object.
+      // Create expected Content object.
       val fs = path.getFileSystem(new Configuration)
       val fileInfos =
         Array(f1, f2, f3)
@@ -75,7 +75,7 @@ class ContentTest extends SparkFunSuite with SQLHelper {
         Content(rooDirectory, NoOpFingerprint())
       }
 
-      // Create actual Directory object.
+      // Create actual Content object.
       val actual = Content.fromPath(path)
 
       // scalastyle:off
@@ -92,6 +92,38 @@ class ContentTest extends SparkFunSuite with SQLHelper {
     }
   }
 
-  test("testFromLeafFiles") {}
+  test("test fromLeafFiles api") {
+    withTempPath { p =>
+      // Prepare some files and directories.
+      Files.createDirectories(Paths.get(p.getAbsolutePath))
+      val dir: Path = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      val f1 = Files.createTempFile(dir, "f1", "")
+      val f2 = Files.createTempFile(dir, "f2", "")
+      val f3 = Files.createTempFile(dir, "f3", "")
 
+      val path = PathUtils.makeAbsolute(dir.toString)
+
+      // Create expected Content object.
+      val fs = path.getFileSystem(new Configuration)
+      val fileStatuses = Array(f1, f2, f3)
+        .map(f => PathUtils.makeAbsolute(f.toString))
+        .map(fs.getFileStatus)
+
+      val fileInfos = fileStatuses.map(FileInfo(_))
+      val bottomDir = Directory(path.getName, fileInfos)
+
+      val expected = {
+        val rooDirectory = TestUtils.splitPath(path.getParent).foldLeft(bottomDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+
+        Content(rooDirectory, NoOpFingerprint())
+      }
+
+      // Create actual Content object.
+      val actual = Content.fromLeafFiles(fileStatuses)
+      assert(actual.equals(expected))
+    }
+  }
 }
