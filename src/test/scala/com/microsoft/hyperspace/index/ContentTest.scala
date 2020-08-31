@@ -21,12 +21,30 @@ import java.nio.file.{Files, Path, Paths}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.plans.SQLHelper
+
 import com.microsoft.hyperspace.TestUtils
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
 class ContentTest extends SparkFunSuite with SQLHelper {
 
-  test("testFiles") {}
+  test("testFiles") {
+    withTempPath { p =>
+      // Prepare some files and directories.
+      Files.createDirectories(Paths.get(p.getAbsolutePath))
+      val dir: Path = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      val f1 = Files.createTempFile(dir, "f1", "")
+      val f2 = Files.createTempFile(dir, "f2", "")
+      val f3 = Files.createTempFile(dir, "f3", "")
+
+      val path = PathUtils.makeAbsolute(dir.toString)
+
+      val content = Content.fromPath(path)
+
+      val expected = Seq(f1, f2, f3).map(f => PathUtils.makeAbsolute(f.toString))
+      val actual = content.files
+      assert(actual.equals(expected))
+    }
+  }
 
   test("testFromPath") {
     withTempPath { p =>
