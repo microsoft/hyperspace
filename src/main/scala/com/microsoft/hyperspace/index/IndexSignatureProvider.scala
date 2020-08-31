@@ -39,7 +39,7 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
    * Generate the signature of logical plan.
    *
    * @param logicalPlan logical plan of data frame.
-   * @param targetFiles list of file paths used to calculate signature
+   * @param targetFiles List of file paths used to calculate signature.
    * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
    *         can generate signature for the logical plan; Otherwise None.
    */

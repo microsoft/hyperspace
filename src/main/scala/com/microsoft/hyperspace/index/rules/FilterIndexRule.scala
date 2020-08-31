@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
@@ -53,7 +53,7 @@ object FilterIndexRule
           filter,
           outputColumns,
           filterColumns,
-          logicalRelation,
+          _,
           fsRelation) =>
         try {
           val candidateIndexes =

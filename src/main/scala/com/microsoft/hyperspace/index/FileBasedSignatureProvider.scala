@@ -34,7 +34,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Generate the signature of logical plan.
    *
    * @param logicalPlan logical plan of data frame.
-   * @param targetFiles list of file paths used to calculate signature
+   * @param targetFiles List of file paths used to calculate signature.
    * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
   override def signature(
@@ -47,7 +47,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Visit logical plan and collect info needed for fingerprint.
    *
    * @param logicalPlan logical plan of data frame.
-   * @param targetFiles list of file paths used to calculate signature
+   * @param targetFiles List of file paths used to calculate signature.
    * @return fingerprint, if the logical plan has some LogicalRelation operator(s); Otherwise None.
    */
   private def fingerprintVisitor(
@@ -61,11 +61,13 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
           _,
           _,
           _) =>
-        fingerprint ++= location.allFiles.foldLeft("")(
+        fingerprint += location.allFiles.foldLeft("")(
           (accumulate: String, fileStatus: FileStatus) =>
             if (targetFiles.isEmpty || targetFiles.get.contains(fileStatus.getPath)) {
               HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus))
-            } else accumulate)
+            } else {
+              accumulate
+          })
       case _ =>
     }
 
