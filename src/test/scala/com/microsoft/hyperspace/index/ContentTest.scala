@@ -25,8 +25,11 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import com.microsoft.hyperspace.TestUtils
 import com.microsoft.hyperspace.util.PathUtils
 
-class DirectoryTest extends SparkFunSuite with SQLHelper {
-  test("testFromDir") {
+class ContentTest extends SparkFunSuite with SQLHelper {
+
+  test("testFiles") {}
+
+  test("testFromPath") {
     withTempPath { p =>
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
@@ -46,15 +49,23 @@ class DirectoryTest extends SparkFunSuite with SQLHelper {
           .map(FileInfo(_))
       val bottomDir = Directory(path.getName, fileInfos)
 
-      val expected = TestUtils.splitPath(path.getParent).foldLeft(bottomDir) { (accum, name) =>
-        Directory(name, Seq(), Seq(accum))
+      val expected = {
+        val rooDirectory = TestUtils.splitPath(path.getParent).foldLeft(bottomDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+
+        Content(rooDirectory, NoOpFingerprint())
       }
 
       // Create actual Directory object.
-      val actual = Directory.fromDir(path)
+      val actual = Content.fromPath(path)
 
       // Compare.
       assert(actual.equals(expected))
     }
   }
+
+  test("testFromLeafFiles") {}
+
 }
