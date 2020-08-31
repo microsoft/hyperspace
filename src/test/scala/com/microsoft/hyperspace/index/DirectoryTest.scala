@@ -45,7 +45,7 @@ class DirectoryTest extends SparkFunSuite with SQLHelper {
       }
 
       // Create actual Directory object.
-      val actual = Directory.fromDir(dirPath)
+      val actual = Directory.fromPath(dirPath)
 
       // Compare.
       assert(actual.equals(expected))

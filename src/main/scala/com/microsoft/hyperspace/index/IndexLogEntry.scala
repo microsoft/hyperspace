@@ -52,11 +52,40 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 object Content {
   // Create a Content object from a directory path by recursively listing its leaf files. All
   // files from the directory tree will be part of the Content.
-  def fromPath(path: Path): Content = Content(Directory.fromDir(path))
+  def fromPath(path: Path): Content = Content(Directory.fromPath(path))
 
   // Create a Content object from a specified list of leaf files. Any files not listed here will
   // NOT be part of the returned object
-  def fromLeafFiles(files: Seq[FileStatus]): Content = {
+  def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
+}
+
+case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
+
+object Directory {
+
+  /**
+   * Create a Directory object from a directory path by recursively listing its leaf files. All
+   * files from the directory tree will be part of the Directory.
+   *
+   * @param path Starting directory path under which the files will be considered part of the
+   *             Directory object.
+   * @param pathFilter Filter for accepting paths. The default filter is picked from spark
+   *                   codebase, which filters out files like _SUCCESS.
+   * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
+   *                         blank directory tree with no files.
+   * @return Directory tree starting at root, and containing the files from "path" argument.
+   */
+  def fromPath(
+      path: Path,
+      pathFilter: PathFilter = PathUtils.DataPathFilter,
+      throwIfNotExists: Boolean = false): Directory = {
+    val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists)
+    if (leafFiles.nonEmpty) fromLeafFiles(leafFiles) else createSubDirectoryTree(path, Array())
+  }
+
+  // Create a Content object from a specified list of leaf files. Any files not listed here will
+  // NOT be part of the returned object
+  def fromLeafFiles(files: Seq[FileStatus]): Directory = {
     /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
     val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
     val rootPath = getRoot(leafDirToChildrenFiles.head._1)
@@ -70,7 +99,7 @@ object Content {
 
     val rootFiles = leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
 
-    Content(Directory(rootPath.toString, rootFiles, subDirs))
+    Directory(rootPath.toString, rootFiles, subDirs)
   }
 
   // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
@@ -101,54 +130,19 @@ object Content {
         Directory(dirPath.getName, files = Seq(), subDirs = Seq(child)))
     }
   }
-}
 
-case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
-
-object Directory {
-
-  /**
-   * Create a Directory object from a directory path by recursively listing its leaf files. All
-   * files from the directory tree will be part of the Content.
-   *
-   * @param path Starting directory path under which the files will be considered part of the
-   *             Directory object.
-   * @param pathFilter Filter for accepting paths. The default filter is picked from spark
-   *                   codebase, which filters out files like _SUCCESS.
-   * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
-   *                         blank directory tree with no files.
-   * @return Directory tree starting at root, and containing the files from "path" argument.
-   */
-  def fromDir(
+  private def listLeafFiles(
       path: Path,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
-      throwIfNotExists: Boolean = false): Directory = {
-    val files: Seq[FileInfo] = {
-      try {
-        val fs = path.getFileSystem(new Configuration)
-        val statuses = fs.listStatus(path).filter(s => pathFilter.accept(s.getPath))
-
-        // TODO: Implement support for recursive listing of files below and remove the assert.
-        assert(statuses.forall(!_.isDirectory))
-
-        statuses.map(FileInfo(_)).toSeq
-      } catch {
-        case _: FileNotFoundException if !throwIfNotExists => Seq()
-        case e: Throwable => throw e
-      }
-    }
-    if (path.isRoot) {
-      Directory(path.toString, files)
-    } else {
-      prependDirectory(path.getParent, Directory(path.getName, files))
-    }
-  }
-
-  private def prependDirectory(path: Path, child: Directory): Directory = {
-    if (path.isRoot) {
-      Directory(path.toString, Seq(), Seq(child))
-    } else {
-      prependDirectory(path.getParent, Directory(path.getName, Seq(), Seq(child)))
+      throwIfNotExists: Boolean = false): Seq[FileStatus] = {
+    try {
+      val fs = path.getFileSystem(new Configuration)
+      val (files, directories) = fs.listStatus(path).partition(_.isFile)
+      files.filter(s => pathFilter.accept(s.getPath)) ++
+        directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, throwIfNotExists))
+    } catch {
+      case _: FileNotFoundException if !throwIfNotExists => Seq()
+      case e: Throwable => throw e
     }
   }
 }
