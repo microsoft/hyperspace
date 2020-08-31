@@ -21,9 +21,8 @@ import java.nio.file.{Files, Path, Paths}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.plans.SQLHelper
-
 import com.microsoft.hyperspace.TestUtils
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
 class ContentTest extends SparkFunSuite with SQLHelper {
 
@@ -61,6 +60,15 @@ class ContentTest extends SparkFunSuite with SQLHelper {
       // Create actual Directory object.
       val actual = Content.fromPath(path)
 
+      // scalastyle:off
+      println("testing build failures")
+      println("actual")
+      println(actual)
+      println(JsonUtils.toJson(actual))
+
+      println("expected")
+      println(expected)
+      println(JsonUtils.toJson(expected))
       // Compare.
       assert(actual.equals(expected))
     }
