@@ -157,8 +157,10 @@ object Directory {
 case class FileInfo(name: String, size: Long, modifiedTime: Long)
 
 object FileInfo {
-  def apply(s: FileStatus): FileInfo =
+  def apply(s: FileStatus): FileInfo = {
+    require(s.isFile, s"${FileInfo.getClass.getName} is applicable for files, not directories.")
     FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
+  }
 }
 
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.
