@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkFunSuite
@@ -30,28 +30,22 @@ class DirectoryTest extends SparkFunSuite with SQLHelper {
     withTempPath { p =>
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val dir: Path = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val f1 = Files.createTempFile(dir, "f1", "")
-      val f2 = Files.createTempFile(dir, "f2", "")
-      val f3 = Files.createTempFile(dir, "f3", "")
-
-      val path = PathUtils.makeAbsolute(dir.toString)
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
 
       // Create expected Directory object.
-      val fs = path.getFileSystem(new Configuration)
-      val fileInfos =
-        Array(f1, f2, f3)
-          .map(f => PathUtils.makeAbsolute(f.toString))
-          .map(fs.getFileStatus)
-          .map(FileInfo(_))
-      val bottomDir = Directory(path.getName, fileInfos)
-
-      val expected = TestUtils.splitPath(path.getParent).foldLeft(bottomDir) { (accum, name) =>
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val fileInfos = fs.listStatus(dirPath).map(FileInfo(_))
+      val bottomDir = Directory(dirPath.getName, fileInfos)
+      val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(bottomDir) { (accum, name) =>
         Directory(name, Seq(), Seq(accum))
       }
 
       // Create actual Directory object.
-      val actual = Directory.fromDir(path)
+      val actual = Directory.fromDir(dirPath)
 
       // Compare.
       assert(actual.equals(expected))

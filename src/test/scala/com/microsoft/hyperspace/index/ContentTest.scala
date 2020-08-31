@@ -31,17 +31,17 @@ class ContentTest extends SparkFunSuite with SQLHelper {
     withTempPath { p =>
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val dir: Path = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val f1 = Files.createTempFile(dir, "f1", "")
-      val f2 = Files.createTempFile(dir, "f2", "")
-      val f3 = Files.createTempFile(dir, "f3", "")
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
 
-      val path = PathUtils.makeAbsolute(dir.toString)
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val content = Content.fromPath(dirPath)
 
-      val content = Content.fromPath(path)
-
-      val expected = Seq(f1, f2, f3).map(f => PathUtils.makeAbsolute(f.toString))
-      val actual = content.files
+      val expected = fs.listStatus(dirPath).map(_.getPath).toSet
+      val actual = content.files.toSet
       assert(actual.equals(expected))
     }
   }
@@ -51,23 +51,17 @@ class ContentTest extends SparkFunSuite with SQLHelper {
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
       val dir: Path = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val f1 = Files.createTempFile(dir, "f1", "")
-      val f2 = Files.createTempFile(dir, "f2", "")
-      val f3 = Files.createTempFile(dir, "f3", "")
-
-      val path = PathUtils.makeAbsolute(dir.toString)
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
 
       // Create expected Content object.
-      val fs = path.getFileSystem(new Configuration)
-      val fileInfos =
-        Array(f1, f2, f3)
-          .map(f => PathUtils.makeAbsolute(f.toString))
-          .map(fs.getFileStatus)
-          .map(FileInfo(_))
-      val bottomDir = Directory(path.getName, fileInfos)
-
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val fileInfos = fs.listStatus(dirPath).map(FileInfo(_))
+      val bottomDir = Directory(dirPath.getName, fileInfos)
       val expected = {
-        val rooDirectory = TestUtils.splitPath(path.getParent).foldLeft(bottomDir) {
+        val rooDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(bottomDir) {
           (accum, name) =>
             Directory(name, Seq(), Seq(accum))
         }
@@ -76,17 +70,8 @@ class ContentTest extends SparkFunSuite with SQLHelper {
       }
 
       // Create actual Content object.
-      val actual = Content.fromPath(path)
+      val actual = Content.fromPath(dirPath)
 
-      // scalastyle:off
-      println("testing build failures")
-      println("actual")
-      println(actual)
-      println(JsonUtils.toJson(actual))
-
-      println("expected")
-      println(expected)
-      println(JsonUtils.toJson(expected))
       // Compare.
       assert(actual.equals(expected))
     }
@@ -97,23 +82,19 @@ class ContentTest extends SparkFunSuite with SQLHelper {
       // Prepare some files and directories.
       Files.createDirectories(Paths.get(p.getAbsolutePath))
       val dir: Path = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val f1 = Files.createTempFile(dir, "f1", "")
-      val f2 = Files.createTempFile(dir, "f2", "")
-      val f3 = Files.createTempFile(dir, "f3", "")
-
-      val path = PathUtils.makeAbsolute(dir.toString)
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
 
       // Create expected Content object.
-      val fs = path.getFileSystem(new Configuration)
-      val fileStatuses = Array(f1, f2, f3)
-        .map(f => PathUtils.makeAbsolute(f.toString))
-        .map(fs.getFileStatus)
-
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val fileStatuses = fs.listStatus(dirPath)
       val fileInfos = fileStatuses.map(FileInfo(_))
-      val bottomDir = Directory(path.getName, fileInfos)
+      val bottomDir = Directory(dirPath.getName, fileInfos)
 
       val expected = {
-        val rooDirectory = TestUtils.splitPath(path.getParent).foldLeft(bottomDir) {
+        val rooDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(bottomDir) {
           (accum, name) =>
             Directory(name, Seq(), Seq(accum))
         }
