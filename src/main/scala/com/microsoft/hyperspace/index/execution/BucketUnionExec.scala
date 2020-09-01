@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.execution
 import scala.reflect.ClassTag
 
 import org.apache.spark.{OneToOneDependency, Partition, SparkContext, TaskContext}
+import org.apache.spark.rdd.PartitionerAwareUnionRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -26,19 +27,29 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.SparkPlan
 
-/*
-  For now, these bucket union plan should be internal use only.
+import com.microsoft.hyperspace.index.plans.logical.BucketUnion
+
+// scalastyle:off filelinelengthchecker
+/**
+ * [[BucketAwareUnionRDD]] is required for index HybridScan to merge index data and
+ * appended data without re-shuffling of index data. Spark does not support Union using
+ * Partition Spec, but just [[PartitionerAwareUnionRDD]] operation and even it does not
+ * retain outputPartitioning of result. So we define a new Union operation complying with
+ * the following conditions.
+ *   - input RDDs must have the same number of partitions.
+ *   - input RDDs must have the same partitioning keys.
+ *   - input RDDs must have the same column schema.
+ *
+ * Unfortunately, there is no explicit API for Partitioning keys in RDD, we have to
+ * assure that on the caller side. Therefore, [[BucketAwareUnionRDD]] is Hyperspace
+ * internal use only.
+ *
+ * You can find more detailed information about Bucketing optimization in
+ * Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle
+ * [[https://databricks.com/session_na20/bucketing-2-0-improve-spark-sql-performance-by-removing-shuffle
+ Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle]]
  */
-private[hyperspace] class BucketAwareUnionRDDPartition(
-    @transient val rdds: Seq[RDD[_]],
-    override val index: Int)
-    extends Partition {
-  val parents: Array[Partition] = rdds.map(_.partitions(index)).toArray
-
-  override def hashCode(): Int = index
-  override def equals(other: Any): Boolean = super.equals(other)
-}
-
+// scalastyle:on filelinelengthchecker
 private[hyperspace] class BucketAwareUnionRDD[T: ClassTag](
     sc: SparkContext,
     var rdds: Seq[RDD[T]],
@@ -50,7 +61,8 @@ private[hyperspace] class BucketAwareUnionRDD[T: ClassTag](
   // copy from org.apache.spark.rdd.PartitionerAwareUnionRDD
   override def getPartitions: Array[Partition] = {
     val numBuckets = bucketSpec.numBuckets
-    (0 until numBuckets).map { index => new BucketAwareUnionRDDPartition(rdds, index)
+    (0 until numBuckets).map { index =>
+      new BucketAwareUnionRDDPartition(rdds, index)
     }.toArray
   }
 
@@ -69,6 +81,27 @@ private[hyperspace] class BucketAwareUnionRDD[T: ClassTag](
   }
 }
 
+/**
+ * [[BucketAwareUnionRDDPartition]] keeps partitions for each partition index.
+ * @param rdds  Input RDDs.
+ * @param index Partition index.
+ */
+private[hyperspace] class BucketAwareUnionRDDPartition(
+    @transient val rdds: Seq[RDD[_]],
+    override val index: Int)
+    extends Partition {
+  val parents: Array[Partition] = rdds.map(_.partitions(index)).toArray
+
+  override def hashCode(): Int = index
+  override def equals(other: Any): Boolean = super.equals(other)
+}
+
+/**
+ * [[BucketUnionExec]] is Spark Plan for [[BucketUnion]].
+ *
+ * @param children Child plans.
+ * @param bucketSpec Bucket specification.
+ */
 private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketSpec: BucketSpec)
     extends SparkPlan {
   override protected def doExecute(): RDD[InternalRow] = {

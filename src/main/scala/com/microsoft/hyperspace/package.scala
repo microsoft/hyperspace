@@ -62,6 +62,8 @@ package object hyperspace {
       val experimentalMethods = sparkSession.sessionState.experimentalMethods
       experimentalMethods.extraOptimizations =
         experimentalMethods.extraOptimizations.filterNot(hyperspaceOptimizationRuleBatch.contains)
+      experimentalMethods.extraStrategies =
+        experimentalMethods.extraStrategies.filterNot(BucketUnionStrategy.equals)
       sparkSession
     }
 
@@ -71,8 +73,9 @@ package object hyperspace {
      * @return true if Hyperspace is enabled or false otherwise.
      */
     def isHyperspaceEnabled(): Boolean = {
-      hyperspaceOptimizationRuleBatch.forall(
-        sparkSession.sessionState.experimentalMethods.extraOptimizations.contains)
+      val experimentalMethods = sparkSession.sessionState.experimentalMethods
+      hyperspaceOptimizationRuleBatch.forall(experimentalMethods.extraOptimizations.contains) &&
+        experimentalMethods.extraStrategies.contains(BucketUnionStrategy)
     }
   }
 }

@@ -37,11 +37,18 @@ class BucketUnionTest extends HyperspaceSuite {
     import spark.implicits._
     val df1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
     val df1_1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
+    val df1_2 = Seq(("name1", 1), ("name2", 2)).toDF("name", "id")
     val df2 = Seq((1, "name1", 20), (2, "name2", 10)).toDF("id", "name", "age")
 
     intercept[IllegalArgumentException] {
       BucketUnion(
         Seq(df1.queryExecution.optimizedPlan, df2.queryExecution.optimizedPlan),
+        BucketSpec(1, Seq(), Seq()))
+      fail("shouldn't be reached")
+    }
+    intercept[IllegalArgumentException] {
+      BucketUnion(
+        Seq(df1.queryExecution.optimizedPlan, df1_2.queryExecution.optimizedPlan),
         BucketSpec(1, Seq(), Seq()))
       fail("shouldn't be reached")
     }

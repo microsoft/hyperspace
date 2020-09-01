@@ -259,11 +259,32 @@ object RuleUtils {
       // Remove sort order because we cannot guarantee the ordering of source files
       val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
 
-      def getIndexedAttrs(
-          plan: LogicalPlan,
-          indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
-        val attrMap = plan.output.attrs.map(attr => (attr.name, attr)).toMap
-        indexedColumns.map(colName => attrMap.get(colName))
+      object ExtractTopLevelPlanForShuffle {
+        type returnType = (LogicalPlan, Seq[Option[Attribute]], Boolean)
+        def unapply(plan: LogicalPlan): Option[returnType] = plan match {
+          case project @ Project(
+                _,
+                Filter(_, LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _))) =>
+            val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
+            Some(project, indexedAttrs, true)
+          case project @ Project(
+                _,
+                LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _)) =>
+            val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
+            Some(project, indexedAttrs, true)
+          case filter @ Filter(_, LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _)) =>
+            val indexedAttrs = getIndexedAttrs(filter, index.indexedColumns)
+            Some(filter, indexedAttrs, false)
+          case relation @ LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _) =>
+            val indexedAttrs = getIndexedAttrs(relation, index.indexedColumns)
+            Some(relation, indexedAttrs, false)
+        }
+        def getIndexedAttrs(
+            plan: LogicalPlan,
+            indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
+          val attrMap = plan.output.attrs.map(attr => (attr.name, attr)).toMap
+          indexedColumns.map(colName => attrMap.get(colName))
+        }
       }
 
       // 2) Perform on-the-fly Shuffle with the same partition structure of index
@@ -277,30 +298,11 @@ object RuleUtils {
       // Case 2) Project => Shuffle => Filter => Relation (Filter will be pushed down)
       var shuffleInjected = false
       val shuffled = complementIndexPlan transformDown {
-        case project @ Project(
-              _,
-              Filter(_, LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _)))
-            if getIndexedAttrs(project, index.indexedColumns).forall(_.isDefined) &&
-              !shuffleInjected =>
+        case p if shuffleInjected => p
+        case ExtractTopLevelPlanForShuffle(plan, indexedAttr, isProject)
+            if !isProject || indexedAttr.forall(_.isDefined) =>
           shuffleInjected = true
-          val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
-          RepartitionByExpression(indexedAttrs.flatten, project, index.numBuckets)
-        case project @ Project(_, LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _))
-            if getIndexedAttrs(project, index.indexedColumns).forall(_.isDefined) &&
-              !shuffleInjected =>
-          shuffleInjected = true
-          val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
-          RepartitionByExpression(indexedAttrs.flatten, project, index.numBuckets)
-        case filter @ Filter(_, LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _))
-            if !shuffleInjected =>
-          shuffleInjected = true
-          val indexedAttrs = getIndexedAttrs(filter, index.indexedColumns)
-          RepartitionByExpression(indexedAttrs.flatten, filter, index.numBuckets)
-        case relation @ LogicalRelation(HadoopFsRelation(_, _, _, _, _, _), _, _, _)
-            if !shuffleInjected =>
-          shuffleInjected = true
-          val indexedAttrs = getIndexedAttrs(relation, index.indexedColumns)
-          RepartitionByExpression(indexedAttrs.flatten, relation, index.numBuckets)
+          RepartitionByExpression(indexedAttr.flatten, plan, index.numBuckets)
       }
       // 3) Merge index plan & newly shuffled plan by using bucket-aware union.
       // Currently, BucketUnion does not keep the sort order within a bucket.

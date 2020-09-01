@@ -21,6 +21,10 @@ import org.apache.spark.sql.execution.{SparkPlan, SparkStrategy}
 
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
+/**
+ * [[BucketUnionStrategy]] is SparkStrategy for converting [[BucketUnion]] (Logical Plan)
+ * to [[BucketUnionExec]] (Spark Plan)
+ */
 private[hyperspace] object BucketUnionStrategy extends SparkStrategy {
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case p: BucketUnion =>
