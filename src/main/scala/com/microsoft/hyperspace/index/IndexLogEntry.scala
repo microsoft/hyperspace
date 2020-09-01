@@ -64,15 +64,15 @@ object Content {
    * @return Content object with Directory tree starting at root, and containing all leaf files
    *         from "path" argument.
    */
-  def fromPath(
+  def fromDirectory(
       path: Path,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromPath(path, pathFilter, throwIfNotExists))
+    Content(Directory.fromDirectory(path, pathFilter, throwIfNotExists))
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
-   * NOT be part of the returned object
+   * NOT be part of the returned object.
    *
    * @param files List of leaf files.
    * @return Content object with Directory tree from leaf files.
@@ -92,11 +92,11 @@ object Directory {
    *             Directory object.
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
-   * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
-   *                         blank directory tree with no files.
+   * @param throwIfNotExists If true, throw FileNotFoundException if path is not found. If set to
+   *                         false, create a blank directory tree with no files.
    * @return Directory tree starting at root, and containing the files from "path" argument.
    */
-  def fromPath(
+  def fromDirectory(
       path: Path,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Directory = {

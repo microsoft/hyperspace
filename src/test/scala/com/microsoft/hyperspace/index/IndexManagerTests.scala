@@ -288,7 +288,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-          Content.fromPath(
+          Content.fromDirectory(
             PathUtils.makeAbsolute(new Path(s"$systemPath/${indexConfig.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
           Source(SparkPlan(sourcePlanProperties)),
