@@ -18,6 +18,8 @@ package com.microsoft.hyperspace.index
 
 import java.io.FileNotFoundException
 
+import scala.annotation.tailrec
+
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
@@ -37,7 +39,7 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
   // List of fully qualified paths of all files mentioned in this Content object.
   @JsonIgnore
   lazy val files: Seq[Path] = {
-    // Recursively append parent dir path to subdirs and files.
+    // Recursively find files from directory tree.
     def rec(prefixPath: Path, directory: Directory): Seq[Path] = {
       val files = directory.files.map(f => new Path(prefixPath, f.name))
       files ++ directory.subDirs.flatMap { dir =>
@@ -106,7 +108,7 @@ object Directory {
     if (leafFiles.nonEmpty) {
       fromLeafFiles(leafFiles)
     } else {
-      createSubDirectoryTree(path, Array())
+      createDirectory(path, Array())
     }
   }
 
@@ -135,7 +137,7 @@ object Directory {
     val subDirs = leafDirToChildrenFiles
       .filterNot(_._1.isRoot)
       .map {
-        case (dir, statuses) => createSubDirectoryTree(dir, statuses)
+        case (dir, statuses) => createDirectory(dir, statuses)
       }
       .toSeq
 
@@ -147,29 +149,31 @@ object Directory {
   // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
   // For linux systems, this root will be "file:/". Other hdfs compatible file systems will have
   // corresponding roots.
+  @tailrec
   private def getRoot(path: Path): Path = {
     if (path.isRoot) path else getRoot(path.getParent)
   }
 
-  // Create leaf subdirectory. Leaf Subdirectory is the first parent of leaf files.
-  private def createSubDirectoryTree(dirPath: Path, statuses: Array[FileStatus]): Directory = {
-    if (dirPath.getParent.isRoot) {
-      Directory(dirPath.getName, files = statuses.map(FileInfo(_)))
-    } else {
-      createNonLeafSubDirectoryHelper(
-        dirPath.getParent,
-        Directory(dirPath.getName, files = statuses.map(FileInfo(_))))
+  // Create Directory from `dirPath` where `dirPath` is the directory containing
+  // all `leafFiles`.
+  private def createDirectory(dirPath: Path, leafFiles: Array[FileStatus]): Directory = {
+    // Recursively creates parent directory to have the given `subDir`.
+    @tailrec
+    def createParentDirectory(dirPath: Path, subDir: Directory): Directory = {
+      if (dirPath.getParent.isRoot) {
+        Directory(dirPath.getName, files = Seq(), subDirs = Seq(subDir))
+      } else {
+        createParentDirectory(
+          dirPath.getParent,
+          Directory(dirPath.getName, files = Seq(), subDirs = Seq(subDir)))
+      }
     }
-  }
 
-  // Create Non-Leaf subdirectory tree starting from the topmost non-root directory.
-  private def createNonLeafSubDirectoryHelper(dirPath: Path, child: Directory): Directory = {
+    val files = leafFiles.map(FileInfo(_))
     if (dirPath.getParent.isRoot) {
-      Directory(dirPath.getName, files = Seq(), subDirs = Seq(child))
+      Directory(dirPath.getName, files = files)
     } else {
-      createNonLeafSubDirectoryHelper(
-        dirPath.getParent,
-        Directory(dirPath.getName, files = Seq(), subDirs = Seq(child)))
+      createParentDirectory(dirPath.getParent, Directory(dirPath.getName, files = files))
     }
   }
 

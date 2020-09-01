@@ -159,19 +159,23 @@ private[hyperspace] case class IndexSummary(
 
 private[hyperspace] object IndexSummary {
   def apply(spark: SparkSession, entry: IndexLogEntry): IndexSummary = {
-    var root = entry.content.root
-    var indexDirPath = new Path(entry.content.root.name)
-    while (root.files.isEmpty) {
-      root = root.subDirs.head
-      indexDirPath = new Path(indexDirPath, root.name)
-    }
     IndexSummary(
       entry.name,
       entry.derivedDataset.properties.columns.indexed,
       entry.derivedDataset.properties.columns.included,
       entry.numBuckets,
       entry.derivedDataset.properties.schemaString,
-      indexDirPath.toString,
+      indexDirPath(entry),
       entry.state)
+  }
+
+  private def indexDirPath(entry: IndexLogEntry): String = {
+    var root = entry.content.root
+    var indexDirPath = new Path(entry.content.root.name)
+    while (root.files.isEmpty) {
+      root = root.subDirs.head
+      indexDirPath = new Path(indexDirPath, root.name)
+    }
+    indexDirPath.toString
   }
 }

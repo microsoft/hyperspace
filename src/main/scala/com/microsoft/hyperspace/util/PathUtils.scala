@@ -28,6 +28,8 @@ object PathUtils {
   }
 
   /* Definition taken from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
+  // SPARK-15895: Metadata files (e.g. Parquet summary files) and temporary files should not be
+  // counted as data files, so that they shouldn't participate partition discovery.
   object DataPathFilter extends PathFilter {
     override def accept(path: Path): Boolean = {
       val name = path.getName
