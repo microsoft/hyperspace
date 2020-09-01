@@ -322,7 +322,13 @@ object JoinIndexRule
     val rUsable = getUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
     val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
 
-    compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
+    val hybridScanEnabled = spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+      .toBoolean
+
+    compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs, hybridScanEnabled).head)
   }
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {

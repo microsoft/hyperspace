@@ -35,14 +35,22 @@ object JoinIndexRanker {
    *
    * @param indexPairs index pairs for left and right side of the join. All index pairs are
    *                   compatible with each other.
+   * @param hybridScanEnabled hybridScan config
    * @return rearranged index pairs according to their ranking. The first is the best.
    */
   def rank(
-      indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
+      indexPairs: Seq[(IndexLogEntry, IndexLogEntry)],
+      hybridScanEnabled: Boolean = false): Seq[(IndexLogEntry, IndexLogEntry)] = {
 
     indexPairs.sortWith {
       case ((left1, left2), (right1, right2)) =>
-        if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
+        if (hybridScanEnabled && ((left1.allSourceFiles.size + left2.allSourceFiles.size) >
+              (right1.allSourceFiles.size + right2.allSourceFiles.size))) {
+          true
+        } else if (hybridScanEnabled && ((left1.allSourceFiles.size + left2.allSourceFiles.size) <
+                     (right1.allSourceFiles.size + right2.allSourceFiles.size))) {
+          false
+        } else if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
           left1.numBuckets > right1.numBuckets
         } else if (left1.numBuckets == left2.numBuckets) {
           true

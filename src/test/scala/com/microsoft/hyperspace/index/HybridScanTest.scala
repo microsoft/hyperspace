@@ -18,15 +18,16 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{Hyperspace, SampleData}
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
+import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.FileUtils
 
-class HybridScanTest extends HyperspaceSuite {
+class HybridScanTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
 
   private val sampleData = SampleData.testData
@@ -50,13 +51,7 @@ class HybridScanTest extends HyperspaceSuite {
 
     files = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(
-            location: PartitioningAwareFileIndex,
-            _,
-            dataSchema,
-            _,
-            fileFormat,
-            options),
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
           _,
           _,
           _) =>
@@ -91,6 +86,18 @@ class HybridScanTest extends HyperspaceSuite {
     assert(
       !planWithHybridScan.equals(query.queryExecution.optimizedPlan),
       "Plan should be transformed.")
+
+    // check appended file is added to relation node or not
+    var relationCnt = 0
+    planWithHybridScan foreach {
+      case LogicalRelation(
+      fsRelation: HadoopFsRelation, _, _, _) =>
+        assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
+        assert(fsRelation.location.inputFiles.count(_.contains("index1")) === 4)
+        relationCnt += 1
+      case _ =>
+      }
+    assert(relationCnt === 1)
   }
 
   test("HybridScan join rule test") {
@@ -109,5 +116,23 @@ class HybridScanTest extends HyperspaceSuite {
     assert(
       !planWithHybridScan.equals(join.queryExecution.optimizedPlan),
       "Plan should be transformed.")
+
+    // check appended file is added to relation node or not
+    var relationCnt = 0
+    var bucketUnionCnt = 0
+    planWithHybridScan foreach {
+      case LogicalRelation(
+      fsRelation: HadoopFsRelation, _, _, _) =>
+        val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
+        val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index1"))
+        assert(appendedFileCnt === 1 || indexFileCnt === 4)
+        assert(appendedFileCnt  * indexFileCnt === 0)
+        relationCnt += 1
+      case BucketUnion(_, _) =>
+        bucketUnionCnt += 1
+      case _ =>
+    }
+    assert(bucketUnionCnt === 2)
+    assert(relationCnt === 4)
   }
 }

@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.ActiveSparkSession
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
 
@@ -48,17 +48,16 @@ object FilterIndexRule
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
-      case ExtractFilterNode(
-          originalPlan,
-          filter,
-          outputColumns,
-          filterColumns,
-          _,
-          fsRelation) =>
+      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, fsRelation) =>
         try {
           val candidateIndexes =
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
-          rank(candidateIndexes) match {
+          val hybridScanEnabled = spark.sessionState.conf
+            .getConfString(
+              IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
+              IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+            .toBoolean
+          rank(candidateIndexes, hybridScanEnabled) match {
             case Some(index) =>
               val replacedPlan =
                 RuleUtils.getReplacementPlan(spark, index, originalPlan, useBucketSpec = false)
@@ -147,11 +146,18 @@ object FilterIndexRule
    * @return top-most index which is expected to maximize performance gain
    *         according to ranking algorithm.
    */
-  private def rank(candidates: Seq[IndexLogEntry]): Option[IndexLogEntry] = {
+  private def rank(
+      candidates: Seq[IndexLogEntry],
+      hybridScanEnabled: Boolean = false): Option[IndexLogEntry] = {
     // TODO: Add ranking algorithm to sort candidates.
     candidates match {
       case Nil => None
-      case _ => Some(candidates.head)
+      case _ =>
+        if (hybridScanEnabled) {
+          Some(candidates.maxBy(_.allSourceFiles.size))
+        } else {
+          Some(candidates.head)
+        }
     }
   }
 }

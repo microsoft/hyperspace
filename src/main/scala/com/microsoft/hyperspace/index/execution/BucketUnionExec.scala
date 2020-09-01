@@ -45,7 +45,6 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
  * internal use only.
  *
  * You can find more detailed information about Bucketing optimization in
- * Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle
  * [[https://databricks.com/session_na20/bucketing-2-0-improve-spark-sql-performance-by-removing-shuffle
  Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle]]
  */
