@@ -20,7 +20,7 @@ import java.io.FileNotFoundException
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, Path, PathFilter}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
@@ -50,12 +50,33 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 }
 
 object Content {
-  // Create a Content object from a directory path by recursively listing its leaf files. All
-  // files from the directory tree will be part of the Content.
-  def fromPath(path: Path): Content = Content(Directory.fromPath(path))
 
-  // Create a Content object from a specified list of leaf files. Any files not listed here will
-  // NOT be part of the returned object
+  /**
+   * Create a Content object from a directory path by recursively listing its leaf files. All
+   * files from the directory tree will be part of the Directory.
+   *
+   * @param path Starting directory path under which the files will be considered part of the
+   *             Directory object.
+   * @param pathFilter Filter for accepting paths. The default filter is picked from spark
+   *                   codebase, which filters out files like _SUCCESS.
+   * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
+   *                         blank directory tree with no files.
+   * @return Content object with Directory tree starting at root, and containing all leaf files
+   *         from "path" argument.
+   */
+  def fromPath(
+      path: Path,
+      pathFilter: PathFilter = PathUtils.DataPathFilter,
+      throwIfNotExists: Boolean = false): Content =
+    Content(Directory.fromPath(path, pathFilter, throwIfNotExists))
+
+  /**
+   * Create a Content object from a specified list of leaf files. Any files not listed here will
+   * NOT be part of the returned object
+   *
+   * @param files List of leaf files.
+   * @return Content object with Directory tree from leaf files.
+   */
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
@@ -79,13 +100,34 @@ object Directory {
       path: Path,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Directory = {
-    val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists)
-    if (leafFiles.nonEmpty) fromLeafFiles(leafFiles) else createSubDirectoryTree(path, Array())
+    val fs = path.getFileSystem(new Configuration)
+    val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists, fs)
+
+    if (leafFiles.nonEmpty) {
+      fromLeafFiles(leafFiles)
+    } else {
+      createSubDirectoryTree(path, Array())
+    }
   }
 
-  // Create a Content object from a specified list of leaf files. Any files not listed here will
-  // NOT be part of the returned object
+  /**
+   * Create a Content object from a specified list of leaf files. Any files not listed here will
+   * NOT be part of the returned object
+   * Pre-requisite: files list should be non-empty.
+   * Pre-requisite: all files must be leaf files.
+   *
+   * @param files List of leaf files.
+   * @return Content object with Directory tree from leaf files.
+   */
   def fromLeafFiles(files: Seq[FileStatus]): Directory = {
+    require(
+      files.nonEmpty,
+      s"Empty files list found while creating a ${Directory.getClass.getName}.")
+
+    require(
+      files.forall(!_.isDirectory),
+      "All files must be leaf files for creation of Directory.")
+
     /* from org.apache.spark.sql.execution.datasources.InMemoryFileIndex. */
     val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
     val rootPath = getRoot(leafDirToChildrenFiles.head._1)
@@ -134,12 +176,12 @@ object Directory {
   private def listLeafFiles(
       path: Path,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
-      throwIfNotExists: Boolean = false): Seq[FileStatus] = {
+      throwIfNotExists: Boolean = false,
+      fs: FileSystem): Seq[FileStatus] = {
     try {
-      val fs = path.getFileSystem(new Configuration)
       val (files, directories) = fs.listStatus(path).partition(_.isFile)
       files.filter(s => pathFilter.accept(s.getPath)) ++
-        directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, throwIfNotExists))
+        directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, throwIfNotExists, fs))
     } catch {
       case _: FileNotFoundException if !throwIfNotExists => Seq()
       case e: Throwable => throw e
@@ -225,21 +267,7 @@ case class IndexLogEntry(
 
   def created: Boolean = state.equals(Constants.States.ACTIVE)
 
-  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
-
-  def includedColumns: Seq[String] = derivedDataset.properties.columns.included
-
-  def numBuckets: Int = derivedDataset.properties.numBuckets
-
   def relations: Seq[Relation] = source.plan.properties.relations
-
-  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
-
-  def signature: Signature = {
-    val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
-    assert(sourcePlanSignatures.length == 1)
-    sourcePlanSignatures.head
-  }
 
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
@@ -250,6 +278,20 @@ case class IndexLogEntry(
         source.equals(that.source) &&
         state.equals(that.state)
     case _ => false
+  }
+
+  def numBuckets: Int = derivedDataset.properties.numBuckets
+
+  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
+
+  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
+
+  def includedColumns: Seq[String] = derivedDataset.properties.columns.included
+
+  def signature: Signature = {
+    val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
+    assert(sourcePlanSignatures.length == 1)
+    sourcePlanSignatures.head
   }
 
   override def hashCode(): Int = {
