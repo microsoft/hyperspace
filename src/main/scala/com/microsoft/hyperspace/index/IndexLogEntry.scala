@@ -86,7 +86,7 @@ object Directory {
   // Create a Content object from a specified list of leaf files. Any files not listed here will
   // NOT be part of the returned object
   def fromLeafFiles(files: Seq[FileStatus]): Directory = {
-    /* from org.apache.spark.sql.execution.datasources.PartitionAwareFileIndex. */
+    /* from org.apache.spark.sql.execution.datasources.InMemoryFileIndex. */
     val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
     val rootPath = getRoot(leafDirToChildrenFiles.head._1)
 
