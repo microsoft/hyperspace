@@ -17,18 +17,41 @@
 package com.microsoft.hyperspace.index
 
 import java.io.FileNotFoundException
+import java.nio.file
 import java.nio.file.{Files, Paths}
 
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.scalatest.BeforeAndAfter
 
 import com.microsoft.hyperspace.TestUtils
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
+// scalastyle:off
+class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter {
+  var testDir: file.Path = _
+  var f1: file.Path = _
+  var f2: file.Path = _
+  var nestedDir: file.Path = _
+  var f3: file.Path = _
+  var f4: file.Path = _
 
-class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
+  override def beforeAll(): Unit = {
+    testDir = Files.createDirectories(Paths.get("src/test/resources/testDir"))
+    f1 = Files.createFile(Paths.get(testDir + "/f1"))
+    f2 = Files.createFile(Paths.get(testDir + "/f2"))
+    nestedDir = Files.createDirectories(Paths.get(testDir + "/nested"))
+    f3 = Files.createFile(Paths.get(nestedDir + "/f3"))
+    f4 = Files.createFile(Paths.get(nestedDir + "/f4"))
+  }
+
+  override def afterAll(): Unit = {
+    FileUtils.deleteDirectory(testDir.toFile)
+  }
+
   test("IndexLogEntry spec example") {
     val schemaString =
       """{\"type\":\"struct\",
@@ -155,107 +178,64 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
 
   // CONTENT Tests
   test("Test files api lists all files from Content object.") {
-    withTempPath { p =>
-      // Prepare some files and directories.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
+    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
+    val content = Content.fromDirectory(dir2Path)
 
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val fs = dirPath.getFileSystem(new Configuration)
-      val content = Content.fromDirectory(dirPath)
-
-      val expected = fs.listStatus(dirPath).map(_.getPath).toSet
-      val actual = content.files.toSet
-      assert(actual.equals(expected))
-    }
+    val expected = Seq(f3, f4).map(f => PathUtils.makeAbsolute(f.toString)).toSet
+    val actual = content.files.toSet
+    assert(actual.equals(expected))
   }
 
   // CONTENT Tests
   test("Test files api lists all files recursively from Content object.") {
-    withTempPath { p =>
-      // Prepare some files and directories. This time, we make multi-level directory tree.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
-      val d1 = Files.createTempDirectory(dir, "d1")
-      val d1Path = PathUtils.makeAbsolute(d1.toString)
-      Files.createTempFile(d1, "f4", "")
+    val dirPath = PathUtils.makeAbsolute(testDir.toString)
+    val content = Content.fromDirectory(dirPath)
 
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val fs = dirPath.getFileSystem(new Configuration)
-      val content = Content.fromDirectory(dirPath)
-
-      val expected =
-        (fs.listStatus(dirPath).filter(_.isFile) ++ fs.listStatus(d1Path)).map(_.getPath).toSet
-
-      val actual = content.files.toSet
-      assert(actual.equals(expected))
-    }
+    val expected = Seq(f1, f2, f3, f4).map(f => PathUtils.makeAbsolute(f.toString)).toSet
+    val actual = content.files.toSet
+    assert(actual.equals(expected))
   }
 
   // CONTENT Tests
   test("Test fromDirectory api creates the correct Content object.") {
-    withTempPath { p =>
-      // Prepare some files and directories.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
+    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
 
-      // Create expected Content object.
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val fs = dirPath.getFileSystem(new Configuration)
-      val fileInfos = fs.listStatus(dirPath).map(FileInfo(_))
-      val expected = {
-        val leafDir = Directory(dirPath.getName, fileInfos)
-        val rootDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
-          (accum, name) =>
-            Directory(name, Seq(), Seq(accum))
-        }
+    val fs = dir2Path.getFileSystem(new Configuration)
+    val fileInfos = Seq(f3, f4).map { f =>
+      fs.getFileStatus(PathUtils.makeAbsolute(f.toString))
+    }.map(FileInfo(_))
 
-        Content(rootDirectory, NoOpFingerprint())
+    val expected = {
+      val leafDir = Directory("nested", fileInfos)
+      val rootDirectory = TestUtils.splitPath(dir2Path.getParent).foldLeft(leafDir) {
+        (accum, name) =>
+          Directory(name, Seq(), Seq(accum))
       }
-
-      // Create actual Content object.
-      val actual = Content.fromDirectory(dirPath)
-
-      // Compare.
-      assert(actual.equals(expected))
+      Content(rootDirectory, NoOpFingerprint())
     }
+
+    val actual = Content.fromDirectory(dir2Path)
+    assert(actual.equals(expected))
   }
 
   // CONTENT Tests
   test("Test fromLeafFiles api creates the correct Content object.") {
-    withTempPath { p =>
-      // Prepare some files and directories.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
+    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
+    val fs = dir2Path.getFileSystem(new Configuration)
+    val fileStatuses = Seq(f3, f4).map(f => fs.getFileStatus(PathUtils.makeAbsolute(f.toString)))
 
-      // Create expected Content object.
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val fs = dirPath.getFileSystem(new Configuration)
-      val fileStatuses = fs.listStatus(dirPath)
+    val expected = {
       val fileInfos = fileStatuses.map(FileInfo(_))
-
-      val expected = {
-        val leafDir = Directory(dirPath.getName, fileInfos)
-        val rootDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
-          (accum, name) =>
-            Directory(name, Seq(), Seq(accum))
-        }
-
-        Content(rootDirectory, NoOpFingerprint())
+      val leafDir = Directory("nested", fileInfos)
+      val rootDirectory = TestUtils.splitPath(dir2Path.getParent).foldLeft(leafDir) {
+        (accum, name) =>
+          Directory(name, Seq(), Seq(accum))
       }
-
-      // Create actual Content object.
-      val actual = Content.fromLeafFiles(fileStatuses)
-      assert(actual.equals(expected))
+      Content(rootDirectory, NoOpFingerprint())
     }
+
+    val actual = Content.fromDirectory(dir2Path)
+    assert(actual.equals(expected))
   }
 
   // Directory Tests
