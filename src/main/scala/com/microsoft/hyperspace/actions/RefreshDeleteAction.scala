@@ -74,6 +74,14 @@ class RefreshDeleteAction(
       indexConfig.indexedColumns)
   }
 
+  final override val transientState: String = REFRESHING
+
+  final override val finalState: String = ACTIVE
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
+  }
+
   private def getDeletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
     // Currently we only support to create an index on a LogicalRelation.
@@ -90,14 +98,6 @@ class RefreshDeleteAction(
     }
 
     originalFiles diff currentFiles
-  }
-
-  final override val transientState: String = REFRESHING
-
-  final override val finalState: String = ACTIVE
-
-  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
   private def listLeafFiles(path: Path, fs: FileSystem): Seq[String] = {
