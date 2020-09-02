@@ -63,18 +63,15 @@ class RefreshDeleteAction(
     getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override def op(): Unit = {
-    val diff = getDeletedFiles
-    if (diff.nonEmpty) {
-      val indexDF = spark.read.parquet(previousIndexLogEntry.content.root)
-      val refreshDF =
-        indexDF.filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(diff: _*))
+    val indexDF = spark.read.parquet(previousIndexLogEntry.content.root)
+    val refreshDF =
+      indexDF.filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
 
-      refreshDF.write.saveWithBuckets(
-        refreshDF,
-        indexDataPath.toString,
-        logEntry.asInstanceOf[IndexLogEntry].numBuckets,
-        indexConfig.indexedColumns)
-    }
+    refreshDF.write.saveWithBuckets(
+      refreshDF,
+      indexDataPath.toString,
+      logEntry.asInstanceOf[IndexLogEntry].numBuckets,
+      indexConfig.indexedColumns)
   }
 
   private def getDeletedFiles: Seq[String] = {
@@ -82,7 +79,7 @@ class RefreshDeleteAction(
     // Currently we only support to create an index on a LogicalRelation.
     assert(rels.size == 1)
 
-    val previousFiles =
+    val originalFiles =
       rels.head.data.properties.content.directories.flatMap(_.files).map(_.name)
 
     var currentFiles = Seq[String]()
@@ -92,7 +89,7 @@ class RefreshDeleteAction(
       currentFiles ++= listLeafFiles(path, fs)
     }
 
-    previousFiles diff currentFiles
+    originalFiles diff currentFiles
   }
 
   final override val transientState: String = REFRESHING
