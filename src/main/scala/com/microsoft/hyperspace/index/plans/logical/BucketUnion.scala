@@ -21,9 +21,9 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 /**
- * [[BucketUnion]] is logical plan for Bucket-aware(partition-aware) Union operation
- * which retains outputPartitioning of result RDDs so as to avoid performing unnecessary
- * Shuffle after Union operation per partition.
+ * [[BucketUnion]] is logical plan for Bucket-aware Union operation which retains
+ * outputPartitioning of result RDDs so as to avoid performing unnecessary Shuffle after
+ * Union operation per bucket.
  *
  * @param children Child plans.
  * @param bucketSpec Bucket Specification.

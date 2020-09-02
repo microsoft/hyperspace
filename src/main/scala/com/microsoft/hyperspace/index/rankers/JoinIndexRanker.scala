@@ -33,9 +33,12 @@ object JoinIndexRanker {
    * number of buckets, better the parallelism achieved during join in general, assuming there is
    * no resource constraint.
    *
+   * If hybridScanEnabled is true, pick the index pair which covers the most source data
+   * so that we could minimize the amount of data for on-the-fly shuffle or merge.
+   *
    * @param indexPairs index pairs for left and right side of the join. All index pairs are
    *                   compatible with each other.
-   * @param hybridScanEnabled hybridScan config
+   * @param hybridScanEnabled HybridScan config.
    * @return rearranged index pairs according to their ranking. The first is the best.
    */
   def rank(

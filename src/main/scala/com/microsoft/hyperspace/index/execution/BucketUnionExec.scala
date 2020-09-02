@@ -33,14 +33,14 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 /**
  * [[BucketAwareUnionRDD]] is required for index HybridScan to merge index data and
  * appended data without re-shuffling of index data. Spark does not support Union using
- * Partition Spec, but just [[PartitionerAwareUnionRDD]] operation and even it does not
- * retain outputPartitioning of result. So we define a new Union operation complying with
- * the following conditions.
+ * Partition Specification, but just [[PartitionerAwareUnionRDD]] operation and even it
+ * does not retain outputPartitioning of result. So we define a new Union operation
+ * complying with the following conditions.
  *   - input RDDs must have the same number of partitions.
  *   - input RDDs must have the same partitioning keys.
  *   - input RDDs must have the same column schema.
  *
- * Unfortunately, there is no explicit API for Partitioning keys in RDD, we have to
+ * Unfortunately, there is no explicit API to check Partitioning keys in RDD, we have to
  * assure that on the caller side. Therefore, [[BucketAwareUnionRDD]] is Hyperspace
  * internal use only.
  *
@@ -108,5 +108,10 @@ private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketS
   }
 
   override def output: Seq[Attribute] = children.head.output
+
+  // Here we could not add some check for outputPartitioning of children because the
+  // child plans do not have the correct outputPartitioning until the generation of a
+  // complete physical plan. Therefore, let [[BucketAwareUnionRDD]] check the number
+  // of partitions after this.
   override def outputPartitioning: Partitioning = children.head.outputPartitioning
 }

@@ -103,20 +103,17 @@ object RuleUtils {
    *
    * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
    *
-   * @param spark Spark session
-   * @param index index used in replacement plan
-   * @param plan current plan
-   * @return replacement plan
+   * @param spark Spark session.
+   * @param index Index used in replacement plan.
+   * @param plan Current logical plan.
+   * @param useBucketSpec Option whether to use BucketSpec for reading index data.
+   * @return Replacement plan.
    */
   def getReplacementPlan(
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    // Here we can't replace the plan completely with the index. This will create problems.
-    // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
-    // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
-    // lead to wrong results. So we only replace the base relation.
     val hybridScanEnabled = spark.sessionState.conf
       .getConfString(
         IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
@@ -130,11 +127,24 @@ object RuleUtils {
     }
   }
 
+  /**
+   * Get alternative logical plan of the current plan using the given index.
+   *
+   * @param spark Spark session.
+   * @param index Index used in replacement plan.
+   * @param plan Current logical plan.
+   * @param useBucketSpec Option whether to use BucketSpec for reading index data.
+   * @return Alternative logical plan.
+   */
   private def getIndexPlan(
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
+    // Here we can't replace the plan completely with the index. This will create problems.
+    // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
+    // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
+    // lead to wrong results. So we only replace the base relation.
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val location =
@@ -153,11 +163,24 @@ object RuleUtils {
     }
   }
 
+  /**
+   * Get alternative logical plan of the current plan using the given index.
+   * With HybridScan, indexes with newly appended files to its source relation are also
+   * eligible and we reconstruct new plans for the appended files so as to merge into
+   * the index data.
+   *
+   * @param spark Spark session.
+   * @param index Index used in replacement plan.
+   * @param plan Current logical plan.
+   * @param useBucketSpec Option whether to use BucketSpec for reading index data.
+   * @return Alternative logical plan.
+   */
   private def getHybridScanIndexPlan(
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
+    val useBucketUnion = useBucketSpec || !index.relations.head.fileFormat.equals("parquet")
     val replacedPlan = plan transformDown {
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
@@ -170,7 +193,7 @@ object RuleUtils {
         // if BucketSpec of index data isn't used, we could read appended data from
         // source files directly.
         val readPaths = {
-          if (useBucketSpec) {
+          if (useBucketUnion) {
             Seq(new Path(index.content.root))
           } else {
             val filesAppended =
@@ -184,7 +207,7 @@ object RuleUtils {
           newLocation,
           new StructType(),
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
-          if (useBucketSpec) Some(index.bucketSpec) else None,
+          if (useBucketUnion) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map())(spark)
 
@@ -192,7 +215,7 @@ object RuleUtils {
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
     }
-    if (useBucketSpec) {
+    if (useBucketUnion) {
       // if BucketSpec of the index is used to read the index data, we need to shuffle
       // the appended data in the same way to avoid additional shuffle of index data.
       getComplementIndexPlan(spark, index, plan, replacedPlan)

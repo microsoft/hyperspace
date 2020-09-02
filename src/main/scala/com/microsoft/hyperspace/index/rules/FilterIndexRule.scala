@@ -25,6 +25,7 @@ import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry}
+import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
 
@@ -57,7 +58,7 @@ object FilterIndexRule
               IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
               IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
             .toBoolean
-          rank(candidateIndexes, hybridScanEnabled) match {
+          FilterIndexRanker.rank(candidateIndexes, hybridScanEnabled) match {
             case Some(index) =>
               val replacedPlan =
                 RuleUtils.getReplacementPlan(spark, index, originalPlan, useBucketSpec = false)
@@ -139,26 +140,6 @@ object FilterIndexRule
     // TODO: Normalize predicates into CNF and incorporate more conditions.
     ResolverUtils.resolve(spark, indexedColumns.head, filterColumns).isDefined &&
     ResolverUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex).isDefined
-  }
-
-  /**
-   * @param candidates List of all indexes that fully cover logical plan.
-   * @return top-most index which is expected to maximize performance gain
-   *         according to ranking algorithm.
-   */
-  private def rank(
-      candidates: Seq[IndexLogEntry],
-      hybridScanEnabled: Boolean = false): Option[IndexLogEntry] = {
-    // TODO: Add ranking algorithm to sort candidates.
-    candidates match {
-      case Nil => None
-      case _ =>
-        if (hybridScanEnabled) {
-          Some(candidates.maxBy(_.allSourceFiles.size))
-        } else {
-          Some(candidates.head)
-        }
-    }
   }
 }
 

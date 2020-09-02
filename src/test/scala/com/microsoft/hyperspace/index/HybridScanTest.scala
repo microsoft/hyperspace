@@ -16,13 +16,18 @@
 
 package com.microsoft.hyperspace.index
 
+import scala.util.Try
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
+import org.apache.spark.sql.execution.{FileSourceScanExec, InputAdapter, ProjectExec, WholeStageCodegenExec}
 import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeExec}
 
-import com.microsoft.hyperspace.{Hyperspace, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
+import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.FileUtils
@@ -32,23 +37,14 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet2"
+  private val sampleJsonDataLocation = "src/test/resources/samplejson"
   private var df: DataFrame = _
   private var hyperspace: Hyperspace = _
   private var files: Seq[FileInfo] = _
   private val indexConfig1 = IndexConfig("index1", Seq("clicks"), Seq("query"))
+  private val indexConfig2 = IndexConfig("index2", Seq("clicks"), Seq("query"))
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    val sparkSession = spark
-    import sparkSession.implicits._
-    hyperspace = new Hyperspace(spark)
-    FileUtils.delete(new Path(sampleParquetDataLocation))
-    val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-    dfFromSample.write.parquet(sampleParquetDataLocation)
-
-    df = spark.read.parquet(sampleParquetDataLocation)
-    hyperspace.createIndex(df, indexConfig1)
-
+  private def copyFirstFile(df: DataFrame): Unit = {
     files = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
           HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
@@ -62,77 +58,211 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     sourcePath.getFileSystem(new Configuration).copyToLocalFile(sourcePath, destPath)
   }
 
-  before {}
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    val sparkSession = spark
+    import sparkSession.implicits._
+    hyperspace = new Hyperspace(spark)
+    FileUtils.delete(new Path(sampleParquetDataLocation))
+    FileUtils.delete(new Path(sampleJsonDataLocation))
+    val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+    dfFromSample.write.parquet(sampleParquetDataLocation)
+    dfFromSample.write.json(sampleJsonDataLocation)
 
-  after {}
+    df = spark.read.parquet(sampleParquetDataLocation)
+    hyperspace.createIndex(df, indexConfig1)
+    copyFirstFile(df)
+
+    df = spark.read.json(sampleJsonDataLocation)
+    hyperspace.createIndex(df, indexConfig2)
+    copyFirstFile(df)
+  }
+
+  after {
+    spark.disableHyperspace()
+  }
 
   override def afterAll(): Unit = {
     super.afterAll()
-    spark.sessionState.conf.unsetConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED)
-    spark.sessionState.conf.unsetConf("spark.sql.autoBroadcastJoinThreshold")
     FileUtils.delete(new Path(sampleParquetDataLocation))
+    FileUtils.delete(new Path(sampleJsonDataLocation))
   }
 
   test("HybridScan filter rule test") {
-    spark.conf.set("spark.hyperspace.index.hybridscan.enabled", false)
-
     df = spark.read.parquet(sampleParquetDataLocation)
     val query = df.filter(df("clicks") <= 2000).select(df("query"))
-    val transformed = FilterIndexRule(query.queryExecution.optimizedPlan)
-    assert(transformed.equals(query.queryExecution.optimizedPlan), "No plan transformation.")
+    val expectedResult = query.collect
 
-    spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-    val planWithHybridScan = FilterIndexRule(query.queryExecution.optimizedPlan)
-    assert(
-      !planWithHybridScan.equals(query.queryExecution.optimizedPlan),
-      "Plan should be transformed.")
+    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+      val transformed = FilterIndexRule(query.queryExecution.optimizedPlan)
+      assert(transformed.equals(query.queryExecution.optimizedPlan), "No plan transformation.")
+    }
 
-    // check appended file is added to relation node or not
-    var relationCnt = 0
-    planWithHybridScan foreach {
-      case LogicalRelation(
-      fsRelation: HadoopFsRelation, _, _, _) =>
-        assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
-        assert(fsRelation.location.inputFiles.count(_.contains("index1")) === 4)
-        relationCnt += 1
-      case _ =>
+    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "true") {
+      val planWithHybridScan = FilterIndexRule(query.queryExecution.optimizedPlan)
+      assert(
+        !planWithHybridScan.equals(query.queryExecution.optimizedPlan),
+        "Plan should be transformed.")
+
+      // check appended file is added to relation node or not
+      var relationCnt = 0
+      planWithHybridScan foreach {
+        case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+          assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
+          assert(fsRelation.location.inputFiles.count(_.contains("index1")) === 4)
+          relationCnt += 1
+        case _ =>
       }
-    assert(relationCnt === 1)
+      assert(relationCnt === 1)
+
+      spark.enableHyperspace()
+      val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
+      val res = query2.collect()
+
+      assert(expectedResult.nonEmpty)
+      assert(res.nonEmpty)
+      assert(expectedResult.sortBy(_.toString).toSeq === res.sortBy(_.toString).toSeq)
+    }
   }
 
   test("HybridScan join rule test") {
-    spark.conf.set("spark.hyperspace.index.hybridscan.enabled", false)
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
-
     df = spark.read.parquet(sampleParquetDataLocation)
-    val query = df.filter(df("clicks") <= 2000).select(df("clicks"), df("query"))
-    val query2 = df.filter(df("clicks") >= 4000).select(df("clicks"), df("query"))
+    val query = df.filter(df("clicks") >= 2000).select(df("clicks"), df("query"))
+    val query2 = df.filter(df("clicks") <= 4000).select(df("clicks"), df("query"))
     val join = query.join(query2, "clicks")
-    val transformed = JoinIndexRule(join.queryExecution.optimizedPlan)
-    assert(transformed.equals(join.queryExecution.optimizedPlan), "No plan transformation.")
+    val expectedResult = join.collect()
 
-    spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-    val planWithHybridScan = JoinIndexRule(join.queryExecution.optimizedPlan)
-    assert(
-      !planWithHybridScan.equals(join.queryExecution.optimizedPlan),
-      "Plan should be transformed.")
+    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+      withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+        val transformed = JoinIndexRule(join.queryExecution.optimizedPlan)
+        assert(transformed.equals(join.queryExecution.optimizedPlan), "No plan transformation.")
+      }
 
-    // check appended file is added to relation node or not
-    var relationCnt = 0
-    var bucketUnionCnt = 0
-    planWithHybridScan foreach {
-      case LogicalRelation(
-      fsRelation: HadoopFsRelation, _, _, _) =>
-        val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
-        val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index1"))
-        assert(appendedFileCnt === 1 || indexFileCnt === 4)
-        assert(appendedFileCnt  * indexFileCnt === 0)
-        relationCnt += 1
-      case BucketUnion(_, _) =>
-        bucketUnionCnt += 1
-      case _ =>
+      withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "true") {
+        val planWithHybridScan = JoinIndexRule(join.queryExecution.optimizedPlan)
+        assert(
+          !planWithHybridScan.equals(join.queryExecution.optimizedPlan),
+          "Plan should be transformed.")
+
+        // check appended file is added to relation node or not
+        var relationCnt = 0
+        var bucketUnionCnt = 0
+        planWithHybridScan foreach {
+          case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+            val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
+            val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index1"))
+            assert(appendedFileCnt === 1 || indexFileCnt === 4)
+            assert(appendedFileCnt * indexFileCnt === 0)
+            relationCnt += 1
+          case BucketUnion(_, _) =>
+            bucketUnionCnt += 1
+          case _ =>
+        }
+        assert(bucketUnionCnt === 2)
+        assert(relationCnt === 4)
+
+        spark.enableHyperspace()
+        val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
+        var dataFiltersCnt = 0
+        var bucketUnionExecCnt = 0
+        execPlan foreach {
+          case BucketUnionExec(children, bucketSpec) =>
+            assert(children.size === 2)
+            bucketUnionExecCnt += 1
+            // head is always the index plan
+            assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
+            assert(
+              Try(children.last.asInstanceOf[ShuffleExchangeExec]).isSuccess || Try(
+                children.last.asInstanceOf[ReusedExchangeExec]).isSuccess)
+            assert(bucketSpec.numBuckets === 200)
+          case FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+            // check filter pushed down properly
+            assert(
+              dataFilters.toString.contains(" >= 2000)") && dataFilters.toString.contains(
+                " <= 4000)"))
+            dataFiltersCnt += 1
+          case _ =>
+        }
+        assert(bucketUnionExecCnt === 2)
+        assert(dataFiltersCnt === 3) // 2 of index, 1 of appended file (1 is reused)
+
+        val join2 = query.join(query2, "clicks")
+        val res = join2.collect()
+
+        assert(expectedResult.nonEmpty)
+        assert(res.nonEmpty)
+        assert(expectedResult.sortBy(_.toString).toSeq === res.sortBy(_.toString).toSeq)
+      }
     }
-    assert(bucketUnionCnt === 2)
-    assert(relationCnt === 4)
+  }
+
+  test("HybridScan filter rule test with Json input") {
+    df = spark.read.json(sampleJsonDataLocation)
+    val query = df.filter(df("clicks") <= 2000).select(df("query"))
+    val expectedResult = query.collect
+
+    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+      val transformed = FilterIndexRule(query.queryExecution.optimizedPlan)
+      assert(transformed.equals(query.queryExecution.optimizedPlan), "No plan transformation.")
+    }
+
+    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "true") {
+      val planWithHybridScan = FilterIndexRule(query.queryExecution.optimizedPlan)
+      assert(
+        !planWithHybridScan.equals(query.queryExecution.optimizedPlan),
+        "Plan should be transformed.")
+
+      // check appended file is added to relation node or not
+      var relationCnt = 0
+      var bucketUnionCnt = 0
+      planWithHybridScan foreach {
+        case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+          val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
+          val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index2"))
+          assert(appendedFileCnt === 1 || indexFileCnt === 4)
+          assert(appendedFileCnt * indexFileCnt === 0)
+          relationCnt += 1
+        case BucketUnion(_, _) =>
+          bucketUnionCnt += 1
+        case _ =>
+      }
+      assert(bucketUnionCnt === 1)
+      assert(relationCnt === 2)
+
+      spark.enableHyperspace()
+      val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
+
+      var dataFiltersCnt = 0
+      var bucketUnionExecCnt = 0
+      execPlan foreach {
+        case BucketUnionExec(children, bucketSpec) =>
+          assert(children.size === 2)
+          bucketUnionExecCnt += 1
+          // head is always the index plan
+          assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
+          assert(Try(children.last.asInstanceOf[WholeStageCodegenExec]).isSuccess)
+          children.last match {
+            case WholeStageCodegenExec(
+                ProjectExec(_, InputAdapter(ShuffleExchangeExec(partitioning, _, _)))) =>
+              assert(partitioning.numPartitions === 200)
+            case _ => fail("Unexpected type of child of BucketUnion")
+          }
+          assert(bucketSpec.numBuckets === 200)
+        case FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+          // check filter pushed down properly
+          assert(dataFilters.toString.contains(" <= 2000)"))
+          dataFiltersCnt += 1
+        case _ =>
+      }
+
+      assert(bucketUnionExecCnt === 1)
+      assert(dataFiltersCnt === 2) // 1 of index, 1 of appended file
+
+      val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
+      val res = query2.collect()
+      assert(expectedResult.nonEmpty)
+      assert(res.nonEmpty)
+      assert(expectedResult.sortBy(_.toString).toSeq === res.sortBy(_.toString).toSeq)
+    }
   }
 }
