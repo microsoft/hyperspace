@@ -209,12 +209,12 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
       val fileInfos = fs.listStatus(dirPath).map(FileInfo(_))
       val leafDir = Directory(dirPath.getName, fileInfos)
       val expected = {
-        val rooDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
+        val rootDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
           (accum, name) =>
             Directory(name, Seq(), Seq(accum))
         }
 
-        Content(rooDirectory, NoOpFingerprint())
+        Content(rootDirectory, NoOpFingerprint())
       }
 
       // Create actual Content object.
@@ -242,12 +242,12 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
       val leafDir = Directory(dirPath.getName, fileInfos)
 
       val expected = {
-        val rooDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
+        val rootDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
           (accum, name) =>
             Directory(name, Seq(), Seq(accum))
         }
 
-        Content(rooDirectory, NoOpFingerprint())
+        Content(rootDirectory, NoOpFingerprint())
       }
 
       // Create actual Content object.

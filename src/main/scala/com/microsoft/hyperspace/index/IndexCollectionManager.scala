@@ -169,6 +169,13 @@ private[hyperspace] object IndexSummary {
       entry.state)
   }
 
+  /**
+   * This method extracts out the first index leaf directory path from a log entry. A leaf directory
+   * is defined as one with at least one leaf file in it.
+   *
+   * @param entry Index log entry.
+   * @return Path to the first leaf directory starting from the root.
+   */
   private def indexDirPath(entry: IndexLogEntry): String = {
     var root = entry.content.root
     var indexDirPath = new Path(entry.content.root.name)

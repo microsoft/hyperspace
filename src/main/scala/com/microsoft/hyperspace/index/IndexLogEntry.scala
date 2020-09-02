@@ -52,7 +52,6 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 }
 
 object Content {
-
   /**
    * Create a Content object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -85,7 +84,6 @@ object Content {
 case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
-
   /**
    * Create a Directory object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -132,7 +130,6 @@ object Directory {
 
     /* from org.apache.spark.sql.execution.datasources.InMemoryFileIndex. */
     val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
-    val rootPath = getRoot(leafDirToChildrenFiles.head._1)
 
     val subDirs = leafDirToChildrenFiles
       .filterNot(_._1.isRoot)
@@ -141,6 +138,7 @@ object Directory {
       }
       .toSeq
 
+    val rootPath = getRoot(leafDirToChildrenFiles.head._1)
     val rootFiles = leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
 
     Directory(rootPath.toString, rootFiles, subDirs)
@@ -184,6 +182,7 @@ object Directory {
       fs: FileSystem): Seq[FileStatus] = {
     try {
       val (files, directories) = fs.listStatus(path).partition(_.isFile)
+      // TODO: explore fs.listFiles(recursive = true) for better performance of file listing.
       files.filter(s => pathFilter.accept(s.getPath)) ++
         directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, throwIfNotExists, fs))
     } catch {
