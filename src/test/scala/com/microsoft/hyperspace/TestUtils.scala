@@ -36,14 +36,12 @@ object TestUtils {
    * @return Segments as a seq.
    */
   def splitPath(path: Path): Seq[String] = {
-    var initialPath = path
-    var splits = Seq[String]()
-    while (initialPath.getParent != null) {
-      splits :+= initialPath.getName
-      initialPath = initialPath.getParent
-    }
     // Initial path is now root. It's getName returns "" but toString returns actual path,
     // E.g. "file:/C:/" for Windows.
-    splits :+ initialPath.toString
+    if (path.getParent == null) {
+      Seq(path.toString)
+    } else {
+      path.getName +: splitPath(path.getParent)
+    }
   }
 }
