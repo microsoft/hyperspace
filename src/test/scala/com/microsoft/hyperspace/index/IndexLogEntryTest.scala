@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.FileNotFoundException
+import java.io.{File, FileNotFoundException}
 import java.nio.file
 import java.nio.file.{Files, Paths}
 
@@ -43,7 +43,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   override def beforeAll(): Unit = {
     val testDirPath = Paths.get("src/test/resources/testDir")
     if (Files.exists(testDirPath)) {
-      Files.delete(testDirPath)
+      FileUtils.deleteDirectory(new File("src/test/resources/testDir"))
     }
 
     testDir = Files.createDirectories(Paths.get("src/test/resources/testDir"))
@@ -293,125 +293,98 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   // Directory Tests
   test("Test fromLeafFiles api creates the correct Directory object.") {
-    withTempPath { p =>
-      // Prepare some files and directories.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
+    val dirPath = PathUtils.makeAbsolute(testDir.toString)
+    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
-      // Create expected Directory object.
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val fileStatuses = fs.listStatus(dirPath)
-      val fileInfos = fileStatuses.map(FileInfo(_))
-
-      val expected = {
-        val leafDir = Directory(dirPath.getName, fileInfos)
-         TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
-          (accum, name) =>
-            Directory(name, Seq(), Seq(accum))
-        }
-      }
-
-      // Create actual Directory object.
-      val actual = Directory.fromLeafFiles(fileStatuses)
-      assert(actual.equals(expected))
+    val testDirLeafFiles = Seq(f1, f2).map(toFileStatus).map(FileInfo(_))
+    val nestedLeafFiles = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
+    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
+    val leafDir2 = Directory(name = "nested", files = nestedLeafFiles)
+    val expected2 = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
+      Directory(name, Seq(), Seq(accum))
     }
+    val expected1 = TestUtils.splitPath(nestedDirPath.getParent)
+      .foldLeft(leafDir2) { (accum, name) =>
+        Directory(name, Seq(), Seq(accum))
+      }
+    val expected = Directory(
+      expected1.name,
+      subDirs = Seq(expected1.subDirs.head, expected2.subDirs.head)
+    )
+
+    val actual = Directory.fromLeafFiles(Seq(f1, f2, f3, f4).map(toFileStatus))
+
+    assert(actual.equals(expected))
   }
 
   // Directory Tests
   test("Test fromLeafFiles api does not include other files in the directory.") {
-    withTempPath { p =>
-      // Prepare some files and directories.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
+    val dirPath = PathUtils.makeAbsolute(testDir.toString)
+    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
-      // Create expected Directory object.
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-
-      // Remove some files from available files on the disk. These shouldn't be in Directory.
-      val fileStatuses = fs.listStatus(dirPath).take(2)
-      val fileInfos = fileStatuses.map(FileInfo(_))
-
-      val expected = {
-        val leafDir = Directory(dirPath.getName, fileInfos)
-        TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
-          (accum, name) =>
-            Directory(name, Seq(), Seq(accum))
-        }
-      }
-
-      // Create actual Directory object.
-      val actual = Directory.fromLeafFiles(fileStatuses)
-
-      // Assert that a Directory object created from subset of files only contains those files.
-      assert(actual.equals(expected))
+    val testDirLeafFiles = Seq(f1).map(toFileStatus).map(FileInfo(_))
+    val nestedLeafFiles = Seq(f4).map(toFileStatus).map(FileInfo(_))
+    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
+    val leafDir2 = Directory(name = "nested", files = nestedLeafFiles)
+    val expected2 = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
+      Directory(name, Seq(), Seq(accum))
     }
+    val expected1 = TestUtils.splitPath(nestedDirPath.getParent)
+      .foldLeft(leafDir2) { (accum, name) =>
+        Directory(name, Seq(), Seq(accum))
+      }
+    val expected = Directory(
+      expected1.name,
+      subDirs = Seq(expected1.subDirs.head, expected2.subDirs.head)
+    )
+
+    val actual = Directory.fromLeafFiles(Seq(f1, f4).map(toFileStatus))
+
+    assert(actual.equals(expected))
   }
 
   // Directory Tests
   test("Test throwIfNotExist flag throws exception for non-existent directory, " +
     "otherwise works as expected.") {
-    withTempPath { p =>
-      // No files/directories exist at this point.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val nonExistentDir = new Path(dirPath, "nonexistent")
+    val dirPath = PathUtils.makeAbsolute(testDir.toString)
+    val nonExistentDir = new Path(dirPath, "nonexistent")
 
-      // Try create Directory object with throwIfNotExists to true. This should throw exception.
-      intercept[FileNotFoundException] {
-        Directory.fromDirectory(nonExistentDir, throwIfNotExists = true)
-      }
-
-      // Try create Directory object with throwifNotExists to false. This should create empt
-      // Directory.
-      val expected = {
-        val leafDir = Directory(nonExistentDir.getName)
-        TestUtils.splitPath(nonExistentDir.getParent).foldLeft(leafDir) {
-          (accum, name) =>
-            Directory(name, Seq(), Seq(accum))
-        }
-      }
-
-      val actual = Directory.fromDirectory(nonExistentDir, throwIfNotExists = false)
-      assert(actual.equals(expected))
+    // Try create Directory object with throwIfNotExists to true. This should throw exception.
+    intercept[FileNotFoundException] {
+      Directory.fromDirectory(nonExistentDir, throwIfNotExists = true)
     }
+
+    // Try create Directory object with throwifNotExists to false. This should create empt
+    // Directory.
+    val expected = {
+      val leafDir = Directory(nonExistentDir.getName)
+      TestUtils.splitPath(nonExistentDir.getParent).foldLeft(leafDir) {
+        (accum, name) =>
+          Directory(name, Seq(), Seq(accum))
+      }
+    }
+
+    val actual = Directory.fromDirectory(nonExistentDir, throwIfNotExists = false)
+    assert(actual.equals(expected))
   }
 
   // Directory Tests
   test("Test pathfilter adds only valid files to Directory object.") {
-    withTempPath { p =>
-      // Prepare some files and directories.
-      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
-      Files.createTempFile(dir, "f1", "")
-      Files.createTempFile(dir, "f2", "")
-      Files.createTempFile(dir, "f3", "")
-
-      val pathFilter = new PathFilter {
-        override def accept(path: Path): Boolean = path.getName.startsWith("f1")
-      }
-
-      // Create expected Directory object.
-      val dirPath = PathUtils.makeAbsolute(dir.toString)
-      val fileInfos = fs
-        .listStatus(dirPath)
-        .filter(_.getPath.getName.startsWith("f1"))
-        .map(FileInfo(_))
-      val expected = {
-        val leafDir = Directory(dirPath.getName, fileInfos)
-        TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
-          (accum, name) =>
-            Directory(name, Seq(), Seq(accum))
-        }
-      }
-
-      // Create actual Directory object.
-      val actual = Directory.fromDirectory(dirPath, pathFilter)
-
-      // Compare.
-      assert(actual.equals(expected))
+    val dirPath = PathUtils.makeAbsolute(testDir.toString)
+    val pathFilter = new PathFilter {
+      override def accept(path: Path): Boolean = path.getName.startsWith("f1")
     }
+
+    val testDirLeafFiles = Seq(f1).map(toFileStatus).map(FileInfo(_))
+    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
+    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
+      Directory(name, Seq(), Seq(accum))
+    }
+
+    // Create actual Directory object. Path filter should filter only files starting with "f1"
+    val actual = Directory.fromDirectory(dirPath, pathFilter)
+
+    // Compare.
+    assert(actual.equals(expected))
   }
 }
