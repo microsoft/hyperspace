@@ -41,7 +41,7 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
     hyperspace = new Hyperspace(sparkSession)
     FileUtils.delete(new Path(testDir))
 
-    // save test data non-partitioned
+    // save test data non-partitioned.
     SampleData.save(
       spark,
       nonPartitionedDataPath,
