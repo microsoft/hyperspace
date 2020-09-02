@@ -52,6 +52,7 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 }
 
 object Content {
+
   /**
    * Create a Content object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -84,6 +85,7 @@ object Content {
 case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
+
   /**
    * Create a Directory object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -106,7 +108,12 @@ object Directory {
     if (leafFiles.nonEmpty) {
       fromLeafFiles(leafFiles)
     } else {
-      createDirectory(path, Array())
+      val rootPath = getRoot(path)
+      if (rootPath.equals(path)) {
+        createDirectory(path, Array())
+      } else {
+        Directory(rootPath.toString, Seq(), Seq(createDirectory(path, Array())))
+      }
     }
   }
 

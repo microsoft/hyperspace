@@ -16,9 +16,11 @@
 
 package com.microsoft.hyperspace.index
 
+import java.io.FileNotFoundException
 import java.nio.file.{Files, Paths}
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
@@ -151,10 +153,10 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
     assert(actual.equals(expected))
   }
 
+  // CONTENT Tests
   test("Test files api lists all files from Content object.") {
     withTempPath { p =>
       // Prepare some files and directories.
-      Files.createDirectories(Paths.get(p.getAbsolutePath))
       val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
       Files.createTempFile(dir, "f1", "")
       Files.createTempFile(dir, "f2", "")
@@ -170,10 +172,10 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
     }
   }
 
+  // CONTENT Tests
   test("Test files api lists all files recursively from Content object.") {
     withTempPath { p =>
       // Prepare some files and directories. This time, we make multi-level directory tree.
-      Files.createDirectories(Paths.get(p.getAbsolutePath))
       val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
       Files.createTempFile(dir, "f1", "")
       Files.createTempFile(dir, "f2", "")
@@ -194,10 +196,10 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
     }
   }
 
-  test("Test fromPath api creates the correct Content object.") {
+  // CONTENT Tests
+  test("Test fromDirectory api creates the correct Content object.") {
     withTempPath { p =>
       // Prepare some files and directories.
-      Files.createDirectories(Paths.get(p.getAbsolutePath))
       val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
       Files.createTempFile(dir, "f1", "")
       Files.createTempFile(dir, "f2", "")
@@ -207,8 +209,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
       val dirPath = PathUtils.makeAbsolute(dir.toString)
       val fs = dirPath.getFileSystem(new Configuration)
       val fileInfos = fs.listStatus(dirPath).map(FileInfo(_))
-      val leafDir = Directory(dirPath.getName, fileInfos)
       val expected = {
+        val leafDir = Directory(dirPath.getName, fileInfos)
         val rootDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
           (accum, name) =>
             Directory(name, Seq(), Seq(accum))
@@ -225,10 +227,10 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
     }
   }
 
+  // CONTENT Tests
   test("Test fromLeafFiles api creates the correct Content object.") {
     withTempPath { p =>
       // Prepare some files and directories.
-      Files.createDirectories(Paths.get(p.getAbsolutePath))
       val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
       Files.createTempFile(dir, "f1", "")
       Files.createTempFile(dir, "f2", "")
@@ -239,9 +241,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
       val fs = dirPath.getFileSystem(new Configuration)
       val fileStatuses = fs.listStatus(dirPath)
       val fileInfos = fileStatuses.map(FileInfo(_))
-      val leafDir = Directory(dirPath.getName, fileInfos)
 
       val expected = {
+        val leafDir = Directory(dirPath.getName, fileInfos)
         val rootDirectory = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
           (accum, name) =>
             Directory(name, Seq(), Seq(accum))
@@ -256,10 +258,40 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
     }
   }
 
-  test("Test fromDir api creates the correct Directory objects, with all files recursively.") {
+  // Directory Tests
+  test("Test fromDirectory api creates the correct Directory object.") {
     withTempPath { p =>
       // Prepare some files and directories.
-      Files.createDirectories(Paths.get(p.getAbsolutePath))
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
+
+      // Create expected Directory object.
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val fileInfos = fs.listStatus(dirPath).map(FileInfo(_))
+      val expected = {
+        val leafDir = Directory(dirPath.getName, fileInfos)
+        TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+      }
+
+      // Create actual Directory object.
+      val actual = Directory.fromDirectory(dirPath)
+
+      // Compare.
+      assert(actual.equals(expected))
+    }
+  }
+
+  // Directory Tests
+  test("Test fromDirectory api creates the correct Directory objects, " +
+    "recursively listing all leaf files.") {
+    withTempPath { p =>
+      // Prepare some files and directories.
       val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
       Files.createTempFile(dir, "f1", "")
       Files.createTempFile(dir, "f2", "")
@@ -276,6 +308,133 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper {
 
       // Create actual Directory object.
       val actual = Directory.fromDirectory(dirPath)
+
+      // Compare.
+      assert(actual.equals(expected))
+    }
+  }
+
+  // Directory Tests
+  test("Test fromLeafFiles api creates the correct Directory object.") {
+    withTempPath { p =>
+      // Prepare some files and directories.
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
+
+      // Create expected Directory object.
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val fileStatuses = fs.listStatus(dirPath)
+      val fileInfos = fileStatuses.map(FileInfo(_))
+
+      val expected = {
+        val leafDir = Directory(dirPath.getName, fileInfos)
+         TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+      }
+
+      // Create actual Directory object.
+      val actual = Directory.fromLeafFiles(fileStatuses)
+      assert(actual.equals(expected))
+    }
+  }
+
+  // Directory Tests
+  test("Test fromLeafFiles api does not include other files in the directory.") {
+    withTempPath { p =>
+      // Prepare some files and directories.
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
+
+      // Create expected Directory object.
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+
+      // Remove some files from available files on the disk. These shouldn't be in Directory.
+      val fileStatuses = fs.listStatus(dirPath).take(2)
+      val fileInfos = fileStatuses.map(FileInfo(_))
+
+      val expected = {
+        val leafDir = Directory(dirPath.getName, fileInfos)
+        TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+      }
+
+      // Create actual Directory object.
+      val actual = Directory.fromLeafFiles(fileStatuses)
+
+      // Assert that a Directory object created from subset of files only contains those files.
+      assert(actual.equals(expected))
+    }
+  }
+
+  // Directory Tests
+  test("Test throwIfNotExist flag throws exception for non-existent directory, " +
+    "otherwise works as expected.") {
+    withTempPath { p =>
+      // No files/directories exist at this point.
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val nonExistentDir = new Path(dirPath, "nonexistent")
+
+      // Try create Directory object with throwIfNotExists to true. This should throw exception.
+      intercept[FileNotFoundException] {
+        Directory.fromDirectory(nonExistentDir, throwIfNotExists = true)
+      }
+
+      // Try create Directory object with throwifNotExists to false. This should create empt
+      // Directory.
+      val expected = {
+        val leafDir = Directory(nonExistentDir.getName)
+        TestUtils.splitPath(nonExistentDir.getParent).foldLeft(leafDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+      }
+
+      val actual = Directory.fromDirectory(nonExistentDir, throwIfNotExists = false)
+      assert(actual.equals(expected))
+    }
+  }
+
+  // Directory Tests
+  test("Test pathfilter adds only valid files to Directory object.") {
+    withTempPath { p =>
+      // Prepare some files and directories.
+      val dir = Files.createDirectories(Paths.get(p.getAbsolutePath))
+      Files.createTempFile(dir, "f1", "")
+      Files.createTempFile(dir, "f2", "")
+      Files.createTempFile(dir, "f3", "")
+
+      val pathFilter = new PathFilter {
+        override def accept(path: Path): Boolean = path.getName.startsWith("f1")
+      }
+
+      // Create expected Directory object.
+      val dirPath = PathUtils.makeAbsolute(dir.toString)
+      val fs = dirPath.getFileSystem(new Configuration)
+      val fileInfos = fs
+        .listStatus(dirPath)
+        .filter(_.getPath.getName.startsWith("f1"))
+        .map(FileInfo(_))
+      val expected = {
+        val leafDir = Directory(dirPath.getName, fileInfos)
+        TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir) {
+          (accum, name) =>
+            Directory(name, Seq(), Seq(accum))
+        }
+      }
+
+      // Create actual Directory object.
+      val actual = Directory.fromDirectory(dirPath, pathFilter)
 
       // Compare.
       assert(actual.equals(expected))
