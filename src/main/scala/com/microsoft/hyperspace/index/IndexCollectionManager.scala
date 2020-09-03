@@ -170,8 +170,8 @@ private[hyperspace] object IndexSummary {
   }
 
   /**
-   * This method extracts out the first index leaf directory path from a log entry. A leaf directory
-   * is defined as one with at least one leaf file in it.
+   * This method extracts the most top-level (or top-most) index directory which
+   * has at least one file from a log entry.
    *
    * @param entry Index log entry.
    * @return Path to the first leaf directory starting from the root.
