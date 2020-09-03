@@ -226,13 +226,28 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .format(format)
           .save(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
+        val newIndexLocation = s"$systemPath/index_$format"
         indexCount = spark.read
-          .parquet(s"$systemPath/index_$format" +
+          .parquet(newIndexLocation +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
         // Check if index got updated
         assert(indexCount == 3)
+
+        // Check if lastest log file is updated with newly created index files
+        val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+        val latestLog = logManager.getLatestLog()
+        assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+        val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+        assert(indexLog.content.directories.nonEmpty)
+        assert(indexLog.content.directories.head.files.nonEmpty)
+        // The below condition will fail when _SUCCESS is removed. Update the check then.
+        assert(indexLog.content.directories.head.files.forall { f =>
+          f.name.contains("part-0") || f.name.contains("_SUCCESS")
+        })
+        assert(indexLog.state.equals("ACTIVE"))
 
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
