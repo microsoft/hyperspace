@@ -16,8 +16,7 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException

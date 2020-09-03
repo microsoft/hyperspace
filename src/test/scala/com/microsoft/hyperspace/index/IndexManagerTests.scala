@@ -31,8 +31,7 @@ import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  override val systemPath =
-    PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -228,13 +227,25 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .format(format)
           .save(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
+        val newIndexLocation = s"$systemPath/index_$format"
         indexCount = spark.read
-          .parquet(s"$systemPath/index_$format" +
+          .parquet(newIndexLocation +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
         // Check if index got updated
         assert(indexCount == 3)
+
+        // Check if lastest log file is updated with newly created index files
+        val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+        val latestLog = logManager.getLatestLog()
+        assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+        val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+        assert(indexLog.content.directories.nonEmpty)
+        assert(indexLog.content.directories.head.files.nonEmpty)
+        // TODO: change the below condition from `exists` to `forall` when _SUCCESS is removed.
+        assert(indexLog.content.directories.head.files.exists(_.name.contains("part-000")))
 
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
