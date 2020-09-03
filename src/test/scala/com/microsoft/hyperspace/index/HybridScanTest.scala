@@ -105,15 +105,13 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         "Plan should be transformed.")
 
       // check appended file is added to relation node or not
-      var relationCnt = 0
-      planWithHybridScan foreach {
-        case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+      val nodes = planWithHybridScan collect {
+        case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
           assert(fsRelation.location.inputFiles.count(_.contains("index1")) === 4)
-          relationCnt += 1
-        case _ =>
+          p
       }
-      assert(relationCnt === 1)
+      assert(nodes.length === 1)
 
       spark.enableHyperspace()
       val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
@@ -145,46 +143,40 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           "Plan should be transformed.")
 
         // check appended file is added to relation node or not
-        var relationCnt = 0
-        var bucketUnionCnt = 0
-        planWithHybridScan foreach {
-          case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+        val nodes = planWithHybridScan collect {
+          case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
             val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
             val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index1"))
             assert(appendedFileCnt === 1 || indexFileCnt === 4)
             assert(appendedFileCnt * indexFileCnt === 0)
-            relationCnt += 1
-          case BucketUnion(_, _) =>
-            bucketUnionCnt += 1
-          case _ =>
+            p
+          case p @ BucketUnion(_, _) => p
         }
-        assert(bucketUnionCnt === 2)
-        assert(relationCnt === 4)
+        assert(nodes.count(p => p.getClass.toString.contains("LogicalRelation")) === 4)
+        assert(nodes.count(p => p.getClass.toString.contains("BucketUnion")) === 2)
 
         spark.enableHyperspace()
         val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-        var dataFiltersCnt = 0
-        var bucketUnionExecCnt = 0
-        execPlan foreach {
-          case BucketUnionExec(children, bucketSpec) =>
+        val execNodes = execPlan collect {
+          case p @ BucketUnionExec(children, bucketSpec) =>
             assert(children.size === 2)
-            bucketUnionExecCnt += 1
             // head is always the index plan
             assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
             assert(
               Try(children.last.asInstanceOf[ShuffleExchangeExec]).isSuccess || Try(
                 children.last.asInstanceOf[ReusedExchangeExec]).isSuccess)
             assert(bucketSpec.numBuckets === 200)
-          case FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+            p
+          case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
             // check filter pushed down properly
             assert(
               dataFilters.toString.contains(" >= 2000)") && dataFilters.toString.contains(
                 " <= 4000)"))
-            dataFiltersCnt += 1
-          case _ =>
+            p
         }
-        assert(bucketUnionExecCnt === 2)
-        assert(dataFiltersCnt === 3) // 2 of index, 1 of appended file (1 is reused)
+        assert(execNodes.count(p => p.getClass.toString.contains("BucketUnionExec")) === 2)
+        // 2 of index, 1 of appended file (1 is reused)
+        assert(execNodes.count(p => p.getClass.toString.contains("FileSourceScanExec")) === 3)
 
         val join2 = query.join(query2, "clicks")
         val res = join2.collect()
@@ -213,31 +205,24 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         "Plan should be transformed.")
 
       // check appended file is added to relation node or not
-      var relationCnt = 0
-      var bucketUnionCnt = 0
-      planWithHybridScan foreach {
-        case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+      val nodes = planWithHybridScan collect {
+        case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
           val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index2"))
           assert(appendedFileCnt === 1 || indexFileCnt === 4)
           assert(appendedFileCnt * indexFileCnt === 0)
-          relationCnt += 1
-        case BucketUnion(_, _) =>
-          bucketUnionCnt += 1
-        case _ =>
+          p
+        case p @ BucketUnion(_, _) => p
       }
-      assert(bucketUnionCnt === 1)
-      assert(relationCnt === 2)
+      assert(nodes.count(p => p.getClass.toString.contains("LogicalRelation")) === 2)
+      assert(nodes.count(p => p.getClass.toString.contains("BucketUnion")) === 1)
 
       spark.enableHyperspace()
       val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
 
-      var dataFiltersCnt = 0
-      var bucketUnionExecCnt = 0
-      execPlan foreach {
-        case BucketUnionExec(children, bucketSpec) =>
+      val execNodes = execPlan collect {
+        case p @ BucketUnionExec(children, bucketSpec) =>
           assert(children.size === 2)
-          bucketUnionExecCnt += 1
           // head is always the index plan
           assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
           assert(Try(children.last.asInstanceOf[WholeStageCodegenExec]).isSuccess)
@@ -248,15 +233,16 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             case _ => fail("Unexpected type of child of BucketUnion")
           }
           assert(bucketSpec.numBuckets === 200)
-        case FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+          p
+        case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
           // check filter pushed down properly
           assert(dataFilters.toString.contains(" <= 2000)"))
-          dataFiltersCnt += 1
-        case _ =>
+          p
       }
 
-      assert(bucketUnionExecCnt === 1)
-      assert(dataFiltersCnt === 2) // 1 of index, 1 of appended file
+      assert(execNodes.count(p => p.getClass.toString.contains("BucketUnionExec")) === 1)
+      // 1 of index, 1 of appended file
+      assert(execNodes.count(p => p.getClass.toString.contains("FileSourceScanExec")) === 2)
 
       val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
       val res = query2.collect()

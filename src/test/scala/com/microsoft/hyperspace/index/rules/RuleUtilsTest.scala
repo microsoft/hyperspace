@@ -61,8 +61,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     t1Relation = baseRelation(t1Location, t1Schema)
     t2Relation = baseRelation(t2Location, t2Schema)
 
-    t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
-    t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, false)
+    t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, isStreaming = false)
+    t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, isStreaming = false)
 
     t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
     t2FilterNode = Filter(IsNotNull(t2c1), t2ScanNode)
@@ -85,16 +85,23 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify indexes are matched by signature correctly.") {
-    assert(RuleUtils.getCandidateIndexes(spark, t1ProjectNode).length === 3)
-    assert(RuleUtils.getCandidateIndexes(spark, t2ProjectNode).length === 2)
+    val indexManager = IndexCollectionManager(spark)
+    assert(
+      RuleUtils
+        .getCandidateIndexes(indexManager, t1ProjectNode, hybridScanEnabled = false)
+        .length === 3)
+    assert(
+      RuleUtils
+        .getCandidateIndexes(indexManager, t2ProjectNode, hybridScanEnabled = false)
+        .length === 2)
 
     // Delete an index for t1ProjectNode
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
     indexManager.delete("t1i1")
 
-    assert(RuleUtils.getCandidateIndexes(spark, t1ProjectNode).length === 2)
+    assert(
+      RuleUtils
+        .getCandidateIndexes(indexManager, t1ProjectNode, hybridScanEnabled = false)
+        .length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {

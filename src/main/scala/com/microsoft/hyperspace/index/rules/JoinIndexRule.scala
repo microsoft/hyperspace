@@ -26,10 +26,11 @@ import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
-import com.microsoft.hyperspace.ActiveSparkSession
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
+import com.microsoft.hyperspace.util.ConfigUtils
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -102,10 +103,14 @@ object JoinIndexRule
       left: LogicalPlan,
       right: LogicalPlan,
       condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
+    val indexManager = Hyperspace
+      .getContext(spark)
+      .indexCollectionManager
+    val hybridScanEnabled = ConfigUtils.getHybridScanEnabled(spark)
     val lIndexes =
       RuleUtils
         .getLogicalRelation(left)
-        .map(RuleUtils.getCandidateIndexes(spark, _))
+        .map(RuleUtils.getCandidateIndexes(indexManager, _, hybridScanEnabled))
     if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
@@ -113,7 +118,7 @@ object JoinIndexRule
     val rIndexes =
       RuleUtils
         .getLogicalRelation(right)
-        .map(RuleUtils.getCandidateIndexes(spark, _))
+        .map(RuleUtils.getCandidateIndexes(indexManager, _, hybridScanEnabled))
     if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }
@@ -322,13 +327,9 @@ object JoinIndexRule
     val rUsable = getUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
     val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
 
-    val hybridScanEnabled = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
-      .toBoolean
-
-    compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs, hybridScanEnabled).head)
+    val hybridScanEnabled = ConfigUtils.getHybridScanEnabled(spark)
+    compatibleIndexPairs.map(indexPairs =>
+      JoinIndexRanker.rank(indexPairs, hybridScanEnabled).head)
   }
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {

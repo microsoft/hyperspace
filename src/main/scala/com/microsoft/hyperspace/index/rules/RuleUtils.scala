@@ -26,29 +26,28 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
+import com.microsoft.hyperspace.util.ConfigUtils
 
 object RuleUtils {
 
   /**
    * Get active indexes for the given logical plan by matching signatures.
    *
-   * @param plan logical plan
-   * @param spark Spark session
-   * @return indexes built for this plan
+   * @param indexManager Index Manager.
+   * @param plan Logical plan.
+   * @param hybridScanEnabled HybridScan config.
+   * @return Indexes built for this plan.
    */
-  def getCandidateIndexes(spark: SparkSession, plan: LogicalPlan): Seq[IndexLogEntry] = {
+  def getCandidateIndexes(
+      indexManager: IndexManager,
+      plan: LogicalPlan,
+      hybridScanEnabled: Boolean): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[(String, Option[Set[Path]]), Option[String]]()
-    val hybridScanEnabled = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
-      .toBoolean
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
@@ -67,9 +66,6 @@ object RuleUtils {
         case None => false
       }
     }
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
@@ -114,13 +110,7 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    val hybridScanEnabled = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
-      .toBoolean
-
-    if (hybridScanEnabled) {
+    if (ConfigUtils.getHybridScanEnabled(spark)) {
       getHybridScanIndexPlan(spark, index, plan, useBucketSpec)
     } else {
       getIndexPlan(spark, index, plan, useBucketSpec)

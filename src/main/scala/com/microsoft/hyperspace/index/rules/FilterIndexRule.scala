@@ -23,11 +23,11 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 
-import com.microsoft.hyperspace.ActiveSparkSession
-import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry}
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.{ConfigUtils, ResolverUtils}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -53,12 +53,7 @@ object FilterIndexRule
         try {
           val candidateIndexes =
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
-          val hybridScanEnabled = spark.sessionState.conf
-            .getConfString(
-              IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-              IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
-            .toBoolean
-          FilterIndexRanker.rank(candidateIndexes, hybridScanEnabled) match {
+          FilterIndexRanker.rank(candidateIndexes, ConfigUtils.getHybridScanEnabled(spark)) match {
             case Some(index) =>
               val replacedPlan =
                 RuleUtils.getReplacementPlan(spark, index, originalPlan, useBucketSpec = false)
@@ -98,9 +93,14 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
+    val indexManager = Hyperspace
+      .getContext(spark)
+      .indexCollectionManager
+    val hybridScanEnabled = ConfigUtils.getHybridScanEnabled(spark)
     RuleUtils.getLogicalRelation(filter) match {
       case Some(r) =>
-        val candidateIndexes = RuleUtils.getCandidateIndexes(spark, r)
+        val candidateIndexes =
+          RuleUtils.getCandidateIndexes(indexManager, r, hybridScanEnabled)
 
         candidateIndexes.filter { index =>
           indexCoversPlan(
