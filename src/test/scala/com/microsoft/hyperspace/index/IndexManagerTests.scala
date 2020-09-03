@@ -244,9 +244,12 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
         assert(indexLog.content.directories.nonEmpty)
         assert(indexLog.content.directories.head.files.nonEmpty)
-        // TODO: change the below condition from `exists` to `forall` when _SUCCESS is removed.
-        assert(indexLog.content.directories.head.files.exists(_.name.contains("part-000")))
-
+        // The below condition will fail when _SUCCESS is removed. Update the check then.
+        assert(indexLog.content.directories.head.files.forall { f =>
+          f.name.startsWith("_") || f.name.contains("part-000")
+        })
+        assert(indexLog.state.equals("ACTIVE"))
+      
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
     }
