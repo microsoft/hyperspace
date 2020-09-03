@@ -188,74 +188,72 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  test("Content Test: files api lists all files from Content object.") {
-    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
-    val content = Content.fromDirectory(dir2Path)
+  test("Content.files api lists all files from Content object.") {
+    val content = Content(Directory("file:/", subDirs =
+      Seq(
+        Directory("a",
+          files = Seq(FileInfo("f1", 0, 0), FileInfo("f2", 0, 0)),
+          subDirs = Seq(
+            Directory("b",
+              files = Seq(FileInfo("f3", 0, 0), FileInfo("f4", 0, 0)))))
+      )))
 
-    val expected = Seq(f3, f4).map(toPath).toSet
+    val expected =
+      Seq("file:/a/f1", "file:/a/f2", "file:/a/b/f3", "file:/a/b/f4").map(new Path(_)).toSet
     val actual = content.files.toSet
     assert(actual.equals(expected))
   }
 
-  test("Content Test: files api lists all files recursively from Content object.") {
-    val dirPath = PathUtils.makeAbsolute(testDir.toString)
-    val content = Content.fromDirectory(dirPath)
-
-    val expected = Seq(f1, f2, f3, f4).map(toPath).toSet
-    val actual = content.files.toSet
-    assert(actual.equals(expected))
-  }
-
-  test("Content Test: fromDirectory api creates the correct Content object.") {
-    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
+  test("Content.fromDirectory api creates the correct Content object.") {
+    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
     val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
 
     val expected = {
       val leafDir = Directory("nested", fileInfos)
-      val rootDirectory = TestUtils.splitPath(dir2Path.getParent).foldLeft(leafDir) {
+      val rootDirectory = TestUtils.splitPath(nestedDirPath.getParent).foldLeft(leafDir) {
         (accum, name) =>
           Directory(name, Seq(), Seq(accum))
       }
       Content(rootDirectory, NoOpFingerprint())
     }
 
-    val actual = Content.fromDirectory(dir2Path)
+    val actual = Content.fromDirectory(nestedDirPath)
     assert(actual.equals(expected))
   }
 
-  test("Content Test: fromLeafFiles api creates the correct Content object.") {
-    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
+  test("Content.fromLeafFiles api creates the correct Content object.") {
+    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
     val fileStatuses = Seq(f3, f4).map(toFileStatus)
 
     val expected = {
       val fileInfos = fileStatuses.map(FileInfo(_))
       val leafDir = Directory("nested", fileInfos)
-      val rootDirectory = TestUtils.splitPath(dir2Path.getParent).foldLeft(leafDir) {
+      val rootDirectory = TestUtils.splitPath(nestedDirPath.getParent).foldLeft(leafDir) {
         (accum, name) =>
           Directory(name, Seq(), Seq(accum))
       }
       Content(rootDirectory, NoOpFingerprint())
     }
 
-    val actual = Content.fromDirectory(dir2Path)
+    val actual = Content.fromDirectory(nestedDirPath)
     assert(actual.equals(expected))
   }
 
-  test("Directory Test: fromDirectory api creates the correct Directory object.") {
-    val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
+  test("Directory.fromDirectory api creates the correct Directory object.") {
+    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
     val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
 
     val expected = {
       val leafDir = Directory("nested", fileInfos)
-      TestUtils.splitPath(dir2Path.getParent).foldLeft(leafDir) {
+      TestUtils.splitPath(nestedDirPath.getParent).foldLeft(leafDir) {
         (accum, name) =>
           Directory(name, Seq(), Seq(accum))
       }
     }
 
-    val actual = Directory.fromDirectory(dir2Path)
+    val actual = Directory.fromDirectory(nestedDirPath)
     assert(actual.equals(expected))
   }
 
@@ -273,8 +271,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     }
     val expected1 = TestUtils.splitPath(nestedDirPath.getParent)
       .foldLeft(leafDir2) { (accum, name) =>
-      Directory(name, Seq(), Seq(accum))
-    }
+        Directory(name, Seq(), Seq(accum))
+      }
     val expected = Directory(
       expected1.name,
       subDirs = Seq(expected1.subDirs.head, expected2.subDirs.head)
@@ -285,7 +283,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  test("Directory Test: fromLeafFiles api creates the correct Directory object.") {
+  test("Directory.fromLeafFiles api creates the correct Directory object.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
@@ -310,7 +308,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  test("Directory Test: fromLeafFiles api does not include other files in the directory.") {
+  test("Directory.fromLeafFiles api does not include other files in the directory.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
@@ -335,8 +333,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  test("Directory Test: throwIfNotExist flag throws exception for non-existent directory, " +
-    "otherwise works as expected.") {
+  test("Directory.fromLeafFiles: throwIfNotExist flag throws exception for non-existent" +
+    "directory, otherwise works as expected.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nonExistentDir = new Path(dirPath, "nonexistent")
 
