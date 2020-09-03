@@ -188,8 +188,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // CONTENT Tests
-  test("Test files api lists all files from Content object.") {
+  test("Content Test: files api lists all files from Content object.") {
     val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
     val content = Content.fromDirectory(dir2Path)
 
@@ -198,8 +197,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // CONTENT Tests
-  test("Test files api lists all files recursively from Content object.") {
+  test("Content Test: files api lists all files recursively from Content object.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val content = Content.fromDirectory(dirPath)
 
@@ -208,8 +206,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // CONTENT Tests
-  test("Test fromDirectory api creates the correct Content object.") {
+  test("Content Test: fromDirectory api creates the correct Content object.") {
     val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
 
     val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
@@ -227,8 +224,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // CONTENT Tests
-  test("Test fromLeafFiles api creates the correct Content object.") {
+  test("Content Test: fromLeafFiles api creates the correct Content object.") {
     val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
     val fileStatuses = Seq(f3, f4).map(toFileStatus)
 
@@ -246,8 +242,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // Directory Tests
-  test("Test fromDirectory api creates the correct Directory object.") {
+  test("Directory Test: fromDirectory api creates the correct Directory object.") {
     val dir2Path = PathUtils.makeAbsolute(nestedDir.toString)
 
     val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
@@ -264,8 +259,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // Directory Tests
-  test("Test fromDirectory api creates the correct Directory objects, " +
+  test("Directory Test: fromDirectory api creates the correct Directory objects, " +
     "recursively listing all leaf files.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
@@ -291,8 +285,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // Directory Tests
-  test("Test fromLeafFiles api creates the correct Directory object.") {
+  test("Directory Test: fromLeafFiles api creates the correct Directory object.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
@@ -317,8 +310,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // Directory Tests
-  test("Test fromLeafFiles api does not include other files in the directory.") {
+  test("Directory Test: fromLeafFiles api does not include other files in the directory.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
@@ -343,8 +335,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // Directory Tests
-  test("Test throwIfNotExist flag throws exception for non-existent directory, " +
+  test("Directory Test: throwIfNotExist flag throws exception for non-existent directory, " +
     "otherwise works as expected.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val nonExistentDir = new Path(dirPath, "nonexistent")
@@ -368,8 +359,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  // Directory Tests
-  test("Test pathfilter adds only valid files to Directory object.") {
+  test("Directory Test: pathfilter adds only valid files to Directory object.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
     val pathFilter = new PathFilter {
       override def accept(path: Path): Boolean = path.getName.startsWith("f1")
