@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index
 import java.io.FileNotFoundException
 
 import scala.annotation.tailrec
+import scala.collection.mutable.HashMap
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
@@ -82,7 +83,10 @@ object Content {
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
-case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
+case class Directory(
+    name: String,
+    var files: Seq[FileInfo] = Seq(),
+    var subDirs: Seq[Directory] = Seq())
 
 object Directory {
 
@@ -138,17 +142,42 @@ object Directory {
     /* from org.apache.spark.sql.execution.datasources.InMemoryFileIndex. */
     val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
 
-    val subDirs = leafDirToChildrenFiles
-      .filterNot(_._1.isRoot)
-      .map {
-        case (dir, statuses) => createDirectory(dir, statuses)
+    // Hashmap from directory path to Directory object, used below for quick access from path.
+    val pathToDirectory = HashMap[Path, Directory]()
+
+    for (path <- leafDirToChildrenFiles.keys) {
+      val files = leafDirToChildrenFiles.getOrElse(path, Array()).map(FileInfo(_))
+      if (pathToDirectory.contains(path)) {
+        // Map already contains this directory. Just append the files to its existing list.
+        pathToDirectory(path).files ++= files
+      } else {
+        var location = path
+        // Create a new Directory object and add it to Map
+        var directory = Directory(location.getName, files = files)
+        pathToDirectory.put(location, directory)
+
+        // Keep creating parent Directory objects and add to the map if non-existing.
+        while (location.getParent != null && !pathToDirectory.contains(location.getParent)) {
+          location = location.getParent
+          if (location.isRoot) {
+            directory = Directory(location.toString, subDirs = Seq(directory))
+          } else {
+            directory = Directory(location.getName, subDirs = Seq(directory))
+          }
+          pathToDirectory.put(location, directory)
+        }
+
+        // Either root is reached (parent == null) or an existing directory is found. If it's the
+        // latter, add the newly created directory tree to its subDirs.
+        if (location.getParent != null) {
+          pathToDirectory(location.getParent).subDirs :+= directory
+        }
       }
-      .toSeq
+    }
 
     val rootPath = getRoot(leafDirToChildrenFiles.head._1)
-    val rootFiles = leafDirToChildrenFiles.getOrElse(rootPath, Array()).map(FileInfo(_))
 
-    Directory(rootPath.toString, rootFiles, subDirs)
+    pathToDirectory(rootPath)
   }
 
   // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
