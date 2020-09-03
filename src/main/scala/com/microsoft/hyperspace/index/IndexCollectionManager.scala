@@ -171,7 +171,10 @@ private[hyperspace] object IndexSummary {
 
   /**
    * This method extracts the most top-level (or top-most) index directory which
-   * has at least one file from a log entry.
+   * has either
+   * - at least one leaf file, or
+   * - more than one subdirectories, or
+   * - no files and no subdirectories (this case will not happen for real index scenarios).
    *
    * @param entry Index log entry.
    * @return Path to the first leaf directory starting from the root.
@@ -179,7 +182,7 @@ private[hyperspace] object IndexSummary {
   private def indexDirPath(entry: IndexLogEntry): String = {
     var root = entry.content.root
     var indexDirPath = new Path(entry.content.root.name)
-    while (root.files.isEmpty) {
+    while (root.files.isEmpty && root.subDirs.size == 1) {
       root = root.subDirs.head
       indexDirPath = new Path(indexDirPath, root.name)
     }
