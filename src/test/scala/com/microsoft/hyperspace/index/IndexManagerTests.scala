@@ -246,10 +246,10 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         assert(indexLog.content.directories.head.files.nonEmpty)
         // The below condition will fail when _SUCCESS is removed. Update the check then.
         assert(indexLog.content.directories.head.files.forall { f =>
-          f.name.startsWith("_") || f.name.contains("part-000")
+          f.name.contains("part-0") || f.name.contains("_SUCCESS")
         })
         assert(indexLog.state.equals("ACTIVE"))
-      
+
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
     }
