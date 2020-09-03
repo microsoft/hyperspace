@@ -23,8 +23,8 @@ import com.microsoft.hyperspace.index.IndexConstants
 /**
  * Helper class to extract Hyperspace config value
  */
-object ConfigUtils {
-  def getHybridScanEnabled(spark: SparkSession): Boolean = {
+object HyperspaceConf {
+  def hybridScanEnabled(spark: SparkSession): Boolean = {
     spark.sessionState.conf
       .getConfString(
         IndexConstants.INDEX_HYBRID_SCAN_ENABLED,

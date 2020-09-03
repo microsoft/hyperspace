@@ -27,7 +27,7 @@ import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.{ConfigUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -53,7 +53,7 @@ object FilterIndexRule
         try {
           val candidateIndexes =
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
-          FilterIndexRanker.rank(candidateIndexes, ConfigUtils.getHybridScanEnabled(spark)) match {
+          FilterIndexRanker.rank(candidateIndexes, HyperspaceConf.hybridScanEnabled(spark)) match {
             case Some(index) =>
               val replacedPlan =
                 RuleUtils.getReplacementPlan(spark, index, originalPlan, useBucketSpec = false)
@@ -96,7 +96,7 @@ object FilterIndexRule
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
-    val hybridScanEnabled = ConfigUtils.getHybridScanEnabled(spark)
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     RuleUtils.getLogicalRelation(filter) match {
       case Some(r) =>
         val candidateIndexes =

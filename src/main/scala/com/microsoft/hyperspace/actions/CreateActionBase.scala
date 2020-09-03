@@ -21,15 +21,16 @@ import java.io.FileNotFoundException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Content.Directory
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.util.{LogicalPlanUtils, PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -62,7 +63,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val relations = LogicalPlanUtils.sourceRelations(df.queryExecution.optimizedPlan)
+        val relations = sourceRelations(df)
         // Currently we only support to create an index on a LogicalRelation.
         assert(relations.size == 1)
 
@@ -91,6 +92,38 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
+  protected def sourceRelations(df: DataFrame): Seq[Relation] =
+    df.queryExecution.optimizedPlan.collect {
+      case LogicalRelation(
+          HadoopFsRelation(
+            location: PartitioningAwareFileIndex,
+            _,
+            dataSchema,
+            _,
+            fileFormat,
+            options),
+          _,
+          _,
+          _) =>
+        val files = location.allFiles.map(FileInfo(_))
+        // Note that source files are currently fingerprinted when the optimized plan is
+        // fingerprinted by LogicalPlanFingerprint.
+        val sourceDataProperties =
+          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val fileFormatName = fileFormat match {
+          case d: DataSourceRegister => d.shortName
+          case other => throw HyperspaceException(s"Unsupported file format: $other")
+        }
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts = options - "path"
+        Relation(
+          location.rootPaths.map(_.toString),
+          Hdfs(sourceDataProperties),
+          dataSchema.json,
+          fileFormatName,
+          opts)
+    }
+
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = spark.sessionState.conf
       .getConfString(
@@ -98,7 +131,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
 
-    val (indexDataFrame, resolvedIndexedColumns, _) = prepareIndexDataFrame(spark, df, indexConfig)
+    val (indexDataFrame, resolvedIndexedColumns, _) =
+      prepareIndexDataFrame(spark, df, indexConfig)
 
     // run job
     val repartitionedIndexDataFrame =

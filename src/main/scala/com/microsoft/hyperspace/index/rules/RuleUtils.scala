@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
-import com.microsoft.hyperspace.util.ConfigUtils
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
 
@@ -110,7 +110,7 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    if (ConfigUtils.getHybridScanEnabled(spark)) {
+    if (HyperspaceConf.hybridScanEnabled(spark)) {
       getHybridScanIndexPlan(spark, index, plan, useBucketSpec)
     } else {
       getIndexPlan(spark, index, plan, useBucketSpec)
@@ -170,6 +170,11 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
+    // Other than "parquet" format, we cannot read source files along with index data
+    // files in parquet format with 1 FileScan node. In this case, we need to read the
+    // appended source files by another FileScan node and merge into the index data.
+    // Though BucketUnion (using BucketSpec and on-the-fly Shuffle) is used to merge
+    // them for now, we will try to optimize these plans with Union operator.
     val useBucketUnion = useBucketSpec || !index.relations.head.fileFormat.equals("parquet")
     val replacedPlan = plan transformDown {
       case baseRelation @ LogicalRelation(

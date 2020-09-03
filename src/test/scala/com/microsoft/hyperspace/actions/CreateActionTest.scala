@@ -25,7 +25,7 @@ import org.mockito.Mockito._
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.{FileUtils, LogicalPlanUtils}
+import com.microsoft.hyperspace.util.FileUtils
 
 class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHelper {
   private val indexSystemPath = "src/test/resources/indexLocation"
@@ -36,6 +36,10 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
 
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
+
+  object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+  }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -152,7 +156,7 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
         (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
         .foreach {
           case (df, expectedPaths, expectedCount) =>
-            val relation = LogicalPlanUtils.sourceRelations(df.queryExecution.optimizedPlan).head
+            val relation = CreateActionBaseWrapper.getSourceRelations(df).head
             def normalize(path: String): String = {
               new Path(path).toUri.getPath
             }

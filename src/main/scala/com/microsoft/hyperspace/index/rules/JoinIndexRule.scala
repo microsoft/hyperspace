@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.ConfigUtils
+import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -106,7 +106,7 @@ object JoinIndexRule
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
-    val hybridScanEnabled = ConfigUtils.getHybridScanEnabled(spark)
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     val lIndexes =
       RuleUtils
         .getLogicalRelation(left)
@@ -327,7 +327,7 @@ object JoinIndexRule
     val rUsable = getUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
     val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
 
-    val hybridScanEnabled = ConfigUtils.getHybridScanEnabled(spark)
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     compatibleIndexPairs.map(indexPairs =>
       JoinIndexRanker.rank(indexPairs, hybridScanEnabled).head)
   }
