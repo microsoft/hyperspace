@@ -59,8 +59,7 @@ class RefreshDeleteAction(
       .load(rels.head.rootPaths: _*)
   }
 
-  final override lazy val logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+  final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override def op(): Unit = {
     val indexDF = spark.read.parquet(previousIndexLogEntry.content.root)
