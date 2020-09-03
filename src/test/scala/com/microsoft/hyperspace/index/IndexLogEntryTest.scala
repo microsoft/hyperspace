@@ -219,7 +219,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     }
 
     val actual = Content.fromDirectory(nestedDirPath)
-    assert(actual.equals(expected))
+    assert(contentEquals(actual, expected))
   }
 
   test("Content.fromLeafFiles api creates the correct Content object.") {
@@ -237,7 +237,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     }
 
     val actual = Content.fromDirectory(nestedDirPath)
-    assert(actual.equals(expected))
+    assert(contentEquals(actual, expected))
   }
 
   test("Directory.fromDirectory api creates the correct Directory object.") {
@@ -254,83 +254,59 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     }
 
     val actual = Directory.fromDirectory(nestedDirPath)
-    assert(actual.equals(expected))
+    assert(directoryEquals(actual, expected))
   }
 
-  test("Directory Test: fromDirectory api creates the correct Directory objects, " +
+  test("Directory.fromDirectory api creates the correct Directory objects, " +
     "recursively listing all leaf files.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
-    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
     val testDirLeafFiles = Seq(f1, f2).map(toFileStatus).map(FileInfo(_))
     val nestedLeafFiles = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
-    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
-    val leafDir2 = Directory(name = "nested", files = nestedLeafFiles)
-    val expected2 = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
-      Directory(name, Seq(), Seq(accum))
+    val testDirDirectory = Directory(name = "testDir",
+      files = testDirLeafFiles,
+      subDirs = Seq(Directory(name = "nested", files = nestedLeafFiles)))
+    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(testDirDirectory) {
+      (accum, name) => Directory(name, Seq(), Seq(accum))
     }
-    val expected1 = TestUtils.splitPath(nestedDirPath.getParent)
-      .foldLeft(leafDir2) { (accum, name) =>
-        Directory(name, Seq(), Seq(accum))
-      }
-    val expected = Directory(
-      expected1.name,
-      subDirs = Seq(expected1.subDirs.head, expected2.subDirs.head)
-    )
 
     val actual = Directory.fromDirectory(dirPath)
 
-    assert(actual.equals(expected))
+    assert(directoryEquals(actual, expected))
   }
 
   test("Directory.fromLeafFiles api creates the correct Directory object.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
-    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
     val testDirLeafFiles = Seq(f1, f2).map(toFileStatus).map(FileInfo(_))
     val nestedLeafFiles = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
-    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
-    val leafDir2 = Directory(name = "nested", files = nestedLeafFiles)
-    val expected2 = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
-      Directory(name, Seq(), Seq(accum))
+    val testDirDirectory = Directory(name = "testDir",
+      files = testDirLeafFiles,
+      subDirs = Seq(Directory(name = "nested", files = nestedLeafFiles)))
+    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(testDirDirectory) {
+      (accum, name) => Directory(name, Seq(), Seq(accum))
     }
-    val expected1 = TestUtils.splitPath(nestedDirPath.getParent)
-      .foldLeft(leafDir2) { (accum, name) =>
-        Directory(name, Seq(), Seq(accum))
-      }
-    val expected = Directory(
-      expected1.name,
-      subDirs = Seq(expected1.subDirs.head, expected2.subDirs.head)
-    )
 
     val actual = Directory.fromLeafFiles(Seq(f1, f2, f3, f4).map(toFileStatus))
 
-    assert(actual.equals(expected))
+    assert(directoryEquals(actual, expected))
   }
 
   test("Directory.fromLeafFiles api does not include other files in the directory.") {
     val dirPath = PathUtils.makeAbsolute(testDir.toString)
-    val nestedDirPath = PathUtils.makeAbsolute(nestedDir.toString)
 
     val testDirLeafFiles = Seq(f1).map(toFileStatus).map(FileInfo(_))
     val nestedLeafFiles = Seq(f4).map(toFileStatus).map(FileInfo(_))
-    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
-    val leafDir2 = Directory(name = "nested", files = nestedLeafFiles)
-    val expected2 = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
-      Directory(name, Seq(), Seq(accum))
+    val testDirDirectory = Directory(name = "testDir",
+      files = testDirLeafFiles,
+      subDirs = Seq(Directory(name = "nested", files = nestedLeafFiles)))
+    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(testDirDirectory) {
+      (accum, name) => Directory(name, Seq(), Seq(accum))
     }
-    val expected1 = TestUtils.splitPath(nestedDirPath.getParent)
-      .foldLeft(leafDir2) { (accum, name) =>
-        Directory(name, Seq(), Seq(accum))
-      }
-    val expected = Directory(
-      expected1.name,
-      subDirs = Seq(expected1.subDirs.head, expected2.subDirs.head)
-    )
 
     val actual = Directory.fromLeafFiles(Seq(f1, f4).map(toFileStatus))
 
-    assert(actual.equals(expected))
+    assert(directoryEquals(actual, expected))
   }
 
   test("Directory.fromLeafFiles: throwIfNotExist flag throws exception for non-existent" +
@@ -354,7 +330,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     }
 
     val actual = Directory.fromDirectory(nonExistentDir, throwIfNotExists = false)
-    assert(actual.equals(expected))
+    assert(directoryEquals(actual, expected))
   }
 
   test("Directory Test: pathfilter adds only valid files to Directory object.") {
@@ -373,6 +349,18 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val actual = Directory.fromDirectory(dirPath, pathFilter)
 
     // Compare.
-    assert(actual.equals(expected))
+    assert(directoryEquals(actual, expected))
+  }
+
+  private def contentEquals(content1: Content, content2: Content): Boolean = {
+    directoryEquals(content1.root, content2.root)
+  }
+
+  private def directoryEquals(dir1: Directory, dir2: Directory): Boolean = {
+    dir1.name.equals(dir2.name) &&
+      dir1.files.toSet.equals(dir2.files.toSet) &&
+      dir1.subDirs.sortBy(_.name).zip(dir2.subDirs.sortBy(_.name)).forall{
+        case (d1, d2) => directoryEquals(d1, d2)
+      }
   }
 }
