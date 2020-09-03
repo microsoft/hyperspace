@@ -209,11 +209,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
     val expected = {
       val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
-      val leafDir = Directory("nested", fileInfos)
-      val rootDirectory = TestUtils.splitPath(nestedDirPath.getParent).foldLeft(leafDir) {
-        (accum, name) =>
-          Directory(name, Seq(), Seq(accum))
-      }
+      val nestedDirDirectory = Directory("nested", fileInfos)
+      val rootDirectory = createDirectory(nestedDirPath, nestedDirDirectory)
       Content(rootDirectory, NoOpFingerprint())
     }
 
@@ -226,11 +223,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
     val expected = {
       val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
-      val leafDir = Directory("nested", fileInfos)
-      val rootDirectory = TestUtils.splitPath(nestedDirPath.getParent).foldLeft(leafDir) {
-        (accum, name) =>
-          Directory(name, Seq(), Seq(accum))
-      }
+      val nestedDirDirectory = Directory("nested", fileInfos)
+      val rootDirectory = createDirectory(nestedDirPath, nestedDirDirectory)
       Content(rootDirectory, NoOpFingerprint())
     }
 
@@ -243,11 +237,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
     val expected = {
       val fileInfos = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
-      val leafDir = Directory("nested", fileInfos)
-      TestUtils.splitPath(nestedDirPath.getParent).foldLeft(leafDir) {
-        (accum, name) =>
-          Directory(name, Seq(), Seq(accum))
-      }
+      val nestedDirDirectory = Directory("nested", fileInfos)
+      createDirectory(nestedDirPath, nestedDirDirectory)
     }
 
     val actual = Directory.fromDirectory(nestedDirPath)
@@ -256,24 +247,22 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   test("Directory.fromDirectory api creates the correct Directory objects, " +
     "recursively listing all leaf files.") {
-    val dirPath = toPath(testDir)
+    val testDirPath = toPath(testDir)
 
     val testDirLeafFiles = Seq(f1, f2).map(toFileStatus).map(FileInfo(_))
     val nestedDirLeafFiles = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
     val testDirDirectory = Directory(name = "testDir",
       files = testDirLeafFiles,
       subDirs = Seq(Directory(name = "nested", files = nestedDirLeafFiles)))
-    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(testDirDirectory) {
-      (accum, name) => Directory(name, Seq(), Seq(accum))
-    }
+    val expected = createDirectory(testDirPath, testDirDirectory)
 
-    val actual = Directory.fromDirectory(dirPath)
+    val actual = Directory.fromDirectory(testDirPath)
 
     assert(directoryEquals(actual, expected))
   }
 
   test("Directory.fromLeafFiles api creates the correct Directory object.") {
-    val dirPath = toPath(testDir)
+    val testDirPath = toPath(testDir)
 
     val testDirLeafFiles = Seq(f1, f2).map(toFileStatus).map(FileInfo(_))
     val nestedDirLeafFiles = Seq(f3, f4).map(toFileStatus).map(FileInfo(_))
@@ -281,9 +270,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       files = testDirLeafFiles,
       subDirs = Seq(Directory(name = "nested", files = nestedDirLeafFiles)))
 
-    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(testDirDirectory) {
-      (accum, name) => Directory(name, Seq(), Seq(accum))
-    }
+    val expected = createDirectory(testDirPath, testDirDirectory)
 
     val actual = Directory.fromLeafFiles(Seq(f1, f2, f3, f4).map(toFileStatus))
 
@@ -291,7 +278,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   }
 
   test("Directory.fromLeafFiles api does not include other files in the directory.") {
-    val dirPath = toPath(testDir)
+    val testDirPath = toPath(testDir)
 
     val testDirLeafFiles = Seq(f1).map(toFileStatus).map(FileInfo(_))
     val nestedDirLeafFiles = Seq(f4).map(toFileStatus).map(FileInfo(_))
@@ -299,9 +286,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       files = testDirLeafFiles,
       subDirs = Seq(Directory(name = "nested", files = nestedDirLeafFiles)))
 
-    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(testDirDirectory) {
-      (accum, name) => Directory(name, Seq(), Seq(accum))
-    }
+    val expected = createDirectory(testDirPath, testDirDirectory)
 
     val actual = Directory.fromLeafFiles(Seq(f1, f4).map(toFileStatus))
 
@@ -310,8 +295,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   test("Directory.fromLeafFiles: throwIfNotExist flag throws exception for non-existent" +
     "directory, otherwise works as expected.") {
-    val dirPath = toPath(testDir)
-    val nonExistentDir = new Path(dirPath, "nonexistent")
+    val testDirPath = toPath(testDir)
+    val nonExistentDir = new Path(testDirPath, "nonexistent")
 
     // Try create Directory object with throwIfNotExists to true. This should throw exception.
     intercept[FileNotFoundException] {
@@ -321,11 +306,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     // Try create Directory object with throwifNotExists to false. This should create empt
     // Directory.
     val expected = {
-      val leafDir = Directory(nonExistentDir.getName)
-      TestUtils.splitPath(nonExistentDir.getParent).foldLeft(leafDir) {
-        (accum, name) =>
-          Directory(name, Seq(), Seq(accum))
-      }
+      val nonExistentDirDirectory = Directory(nonExistentDir.getName)
+      createDirectory(nonExistentDir, nonExistentDirDirectory)
     }
 
     val actual = Directory.fromDirectory(nonExistentDir, throwIfNotExists = false)
@@ -333,19 +315,17 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   }
 
   test("Directory Test: pathfilter adds only valid files to Directory object.") {
-    val dirPath = toPath(testDir)
+    val testDirPath = toPath(testDir)
     val pathFilter = new PathFilter {
       override def accept(path: Path): Boolean = path.getName.startsWith("f1")
     }
 
     val testDirLeafFiles = Seq(f1).map(toFileStatus).map(FileInfo(_))
-    val leafDir1 = Directory(name = "testDir", files = testDirLeafFiles)
-    val expected = TestUtils.splitPath(dirPath.getParent).foldLeft(leafDir1) { (accum, name) =>
-      Directory(name, Seq(), Seq(accum))
-    }
+    val testDirDirectory = Directory(name = "testDir", files = testDirLeafFiles)
+    val expected = createDirectory(testDirPath, testDirDirectory)
 
     // Create actual Directory object. Path filter should filter only files starting with "f1"
-    val actual = Directory.fromDirectory(dirPath, pathFilter)
+    val actual = Directory.fromDirectory(testDirPath, pathFilter)
 
     assert(directoryEquals(actual, expected))
   }
@@ -360,5 +340,14 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       dir1.subDirs.sortBy(_.name).zip(dir2.subDirs.sortBy(_.name)).forall{
         case (d1, d2) => directoryEquals(d1, d2)
       }
+  }
+
+  // Using `directoryPath`, create a Directory tree starting from root and ending at
+  // `leafDirectory`.
+  private def createDirectory(directoryPath: Path, leafDirectory: Directory): Directory = {
+    TestUtils.splitPath(directoryPath.getParent).foldLeft(leafDirectory) {
+      (accum, name) =>
+        Directory(name, Seq(), Seq(accum))
+    }
   }
 }
