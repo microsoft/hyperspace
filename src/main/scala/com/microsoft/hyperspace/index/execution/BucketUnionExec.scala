@@ -35,7 +35,7 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
  * appended data without re-shuffling of index data. Spark does not support Union using
  * Partition Specification, but just [[PartitionerAwareUnionRDD]] operation and even it
  * does not retain outputPartitioning of result. So we define a new Union operation
- * complying with the following conditions.
+ * complying with the following conditions:
  *   - input RDDs must have the same number of partitions.
  *   - input RDDs must have the same partitioning keys.
  *   - input RDDs must have the same column schema.
