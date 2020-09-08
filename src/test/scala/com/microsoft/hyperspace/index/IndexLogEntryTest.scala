@@ -347,6 +347,98 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(directoryEquals(actual, expected))
   }
 
+  test("Directory.fromDirectory and fromLeafFileswhere files are at same level but different" +
+    "dirs.") {
+    // File Structure
+    // temp/a/f1
+    // temp/b/f2
+
+    val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
+    val a = Files.createDirectories(Paths.get(tempDir + "/a"))
+    val b = Files.createDirectories(Paths.get(tempDir + "/b"))
+    val f1 = Files.createFile(Paths.get(a + "/f1"))
+    val f2 = Files.createFile(Paths.get(b + "/f2"))
+
+    val aDirectory = Directory("a", Seq(f1).map(toFileStatus).map(FileInfo(_)))
+    val bDirectory = Directory("b", Seq(f2).map(toFileStatus).map(FileInfo(_)))
+    val tempDirectory = Directory("temp", subDirs = Seq(aDirectory, bDirectory))
+    val tempDirectoryPath = toPath(tempDir)
+
+    val expected = createDirectory(tempDirectoryPath, tempDirectory)
+
+    val actual1 = Directory.fromLeafFiles(Seq(f1, f2).map(toFileStatus))
+    val actual2 = Directory.fromDirectory(toPath(tempDir))
+
+    assert(directoryEquals(actual1, expected))
+    assert(directoryEquals(actual2, expected))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("Directory.fromDirectory and fromLeafFiles where there is a gap in directories.") {
+    // File Structure
+    // testDir/a/f1
+    // testDir/b/c/f2
+
+    val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
+    val a = Files.createDirectories(Paths.get(tempDir + "/a"))
+    val b = Files.createDirectories(Paths.get(tempDir + "/b"))
+    val c = Files.createDirectories(Paths.get(b + "/c"))
+    val f1 = Files.createFile(Paths.get(a + "/f1"))
+    val f2 = Files.createFile(Paths.get(c + "/f2"))
+
+    val cDirectory = Directory("c", Seq(f2).map(toFileStatus).map(FileInfo(_)))
+    val bDirectory = Directory("b", subDirs = Seq(cDirectory))
+    val aDirectory = Directory("a", Seq(f1).map(toFileStatus).map(FileInfo(_)))
+
+    val tempDirectory = Directory("temp", subDirs = Seq(aDirectory, bDirectory))
+    val tempDirectoryPath = toPath(tempDir)
+
+    val expected = createDirectory(tempDirectoryPath, tempDirectory)
+    val actual1 = Directory.fromLeafFiles(Seq(f1, f2).map(toFileStatus))
+    val actual2 = Directory.fromDirectory(toPath(tempDir))
+
+    assert(directoryEquals(actual1, expected))
+    assert(directoryEquals(actual2, expected))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
+  test("Directory.fromDirectory and fromLeafFiles where files belong to multiple" +
+    "subdirectories.") {
+    // File Structure
+    // testDir/a/f1
+    // testDir/a/b/f2
+    // testDir/a/c/f3
+
+    val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
+    val a = Files.createDirectories(Paths.get(tempDir + "/a"))
+    val b = Files.createDirectories(Paths.get(a + "/b"))
+    val c = Files.createDirectories(Paths.get(a + "/c"))
+    val f1 = Files.createFile(Paths.get(a + "/f1"))
+    val f2 = Files.createFile(Paths.get(b + "/f2"))
+    val f3 = Files.createFile(Paths.get(c + "/f3"))
+
+    val bDirectory = Directory("b", Seq(f2).map(toFileStatus).map(FileInfo(_)))
+    val cDirectory = Directory("c", Seq(f3).map(toFileStatus).map(FileInfo(_)))
+    val aDirectory = Directory(
+      "a",
+      Seq(f1).map(toFileStatus).map(FileInfo(_)),
+      Seq(bDirectory, cDirectory)
+    )
+    val tempDirectory = Directory("temp", subDirs = Seq(aDirectory))
+    val tempDirectoryPath = toPath(tempDir)
+
+    val expected = createDirectory(tempDirectoryPath, tempDirectory)
+    val actual1 = Directory.fromLeafFiles(Seq(f1, f2, f3).map(toFileStatus))
+    val actual2 = Directory.fromDirectory(toPath(a))
+
+    assert(directoryEquals(actual1, expected))
+    assert(directoryEquals(actual2, expected))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
   private def contentEquals(content1: Content, content2: Content): Boolean = {
     directoryEquals(content1.root, content2.root)
   }
@@ -354,6 +446,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   private def directoryEquals(dir1: Directory, dir2: Directory): Boolean = {
     dir1.name.equals(dir2.name) &&
       dir1.files.toSet.equals(dir2.files.toSet) &&
+      dir1.subDirs.size.equals(dir2.subDirs.size) &&
       dir1.subDirs.sortBy(_.name).zip(dir2.subDirs.sortBy(_.name)).forall{
         case (d1, d2) => directoryEquals(d1, d2)
       }

@@ -53,6 +53,7 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 }
 
 object Content {
+
   /**
    * Create a Content object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -85,6 +86,7 @@ object Content {
 case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
+
   /**
    * Create a Directory object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -123,7 +125,7 @@ object Directory {
     if (path.isRoot) {
       Directory(path.toString, subDirs = subDirs)
     } else {
-      createEmptyDirectory(path.getParent, Seq(Directory(path.getName)))
+      createEmptyDirectory(path.getParent, Seq(Directory(path.getName, subDirs = subDirs)))
     }
   }
 
