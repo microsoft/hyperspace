@@ -151,50 +151,43 @@ object Directory {
     // Hashmap from directory path to Directory object, used below for quick access from path.
     val pathToDirectory = HashMap[Path, Directory]()
 
-    for (path <- leafDirToChildrenFiles.keys) {
-      val files = ListBuffer[FileInfo]()
-      files.appendAll(leafDirToChildrenFiles.getOrElse(path, Array()).map(FileInfo(_)))
+    for ((dirPath, files) <- leafDirToChildrenFiles) {
+      val allFiles = ListBuffer[FileInfo]()
+      allFiles.appendAll(files.map(FileInfo(_)))
 
-      if (pathToDirectory.contains(path)) {
+      if (pathToDirectory.contains(dirPath)) {
         // Map already contains this directory. Just append the files to its existing list.
-        pathToDirectory(path).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(files)
+        pathToDirectory(dirPath).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(allFiles)
       } else {
-        var location = path
+        var curDirPath = dirPath
         // Create a new Directory object and add it to Map
         val subDirs = ListBuffer[Directory]()
-        var directory = Directory(location.getName, files = files, subDirs = subDirs)
-        pathToDirectory.put(location, directory)
+        var directory = Directory(curDirPath.getName, files = allFiles, subDirs = subDirs)
+        pathToDirectory.put(curDirPath, directory)
 
         // Keep creating parent Directory objects and add to the map if non-existing.
-        while (location.getParent != null && !pathToDirectory.contains(location.getParent)) {
-          location = location.getParent
-          if (location.isRoot) {
-            directory = Directory(
-              location.toString,
-              subDirs = ListBuffer(directory),
-              files = ListBuffer[FileInfo]())
-          } else {
-            directory = Directory(
-              location.getName,
-              subDirs = ListBuffer(directory),
-              files = ListBuffer[FileInfo]())
-          }
-          pathToDirectory.put(location, directory)
+        while (curDirPath.getParent != null && !pathToDirectory.contains(curDirPath.getParent)) {
+          curDirPath = curDirPath.getParent
+
+          directory = Directory(
+            if (curDirPath.isRoot) curDirPath.toString else curDirPath.getName,
+            subDirs = ListBuffer(directory),
+            files = ListBuffer[FileInfo]())
+
+          pathToDirectory.put(curDirPath, directory)
         }
 
         // Either root is reached (parent == null) or an existing directory is found. If it's the
         // latter, add the newly created directory tree to its subDirs.
-        if (location.getParent != null) {
-          pathToDirectory(location.getParent).subDirs
+        if (curDirPath.getParent != null) {
+          pathToDirectory(curDirPath.getParent).subDirs
             .asInstanceOf[ListBuffer[Directory]]
             .append(directory)
         }
       }
     }
 
-    val rootPath = getRoot(leafDirToChildrenFiles.head._1)
-
-    pathToDirectory(rootPath)
+    pathToDirectory(getRoot(files.head.getPath))
   }
 
   // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
