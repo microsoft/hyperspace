@@ -89,9 +89,9 @@ object Directory {
    * Create a Directory object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
    *
-   * If the directory doesn't exist on file system, this will create an empty Directory object
-   * starting at the root, ending at the directory path specified. The `files` and `subDirs` will
-   * be empty.
+   * If the directory doesn't exist on file system, it will either throw an exception if
+   * throwIfNotExists flag is set. Otherwise, this will create an empty Directory object
+   * starting at the root, ending at the directory path specified.
    *
    * @param path Starting directory path under which the files will be considered part of the
    *             Directory object.

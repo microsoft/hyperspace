@@ -28,6 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
+  private val filename = "f1.parquet"
   def createIndex(
       name: String,
       indexCols: Seq[AttributeReference],
@@ -49,7 +50,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           1,
           10,
           10,
-          new Path(getIndexDataFilesPath(name), "f1.parquet"))
+          getIndexDataFilesPath(name))
 
         val indexLogEntry = IndexLogEntry(
           name,
@@ -73,9 +74,9 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   }
 
   def getIndexDataFilesPath(indexName: String): Path =
-    new Path(
+    new Path(new Path(
       new Path(systemPath, indexName),
-      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"), filename)
 
   def schemaFromAttributes(attributes: Attribute*): StructType =
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))

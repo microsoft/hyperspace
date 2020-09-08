@@ -38,6 +38,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   var nestedDir: file.Path = _
   var f3: file.Path = _
   var f4: file.Path = _
+  var emptyDir: file.Path = _
   var fs: FileSystem = _
 
   override def beforeAll(): Unit = {
@@ -52,6 +53,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     nestedDir = Files.createDirectories(Paths.get(testDir + "/nested"))
     f3 = Files.createFile(Paths.get(nestedDir + "/f3"))
     f4 = Files.createFile(Paths.get(nestedDir + "/f4"))
+    emptyDir = Files.createDirectories(Paths.get(testDir + "/empty"))
 
     fs = toPath(testDir).getFileSystem(new Configuration)
   }
@@ -303,7 +305,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       Directory.fromDirectory(nonExistentDir, throwIfNotExists = true)
     }
 
-    // Try create Directory object with throwifNotExists to false. This should create empt
+    // Try create Directory object with throwIfNotExists to false. This should create empty
     // Directory.
     val expected = {
       val nonExistentDirDirectory = Directory(nonExistentDir.getName)
@@ -311,6 +313,21 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     }
 
     val actual = Directory.fromDirectory(nonExistentDir, throwIfNotExists = false)
+    assert(directoryEquals(actual, expected))
+  }
+
+  test("Directory.fromDirectory where the directory is empty.") {
+    val testDirPath = toPath(testDir)
+    val emptyDirPath = new Path(testDirPath, "empty")
+
+    // Try create Directory object with throwifNotExists to false. This should create empt
+    // Directory.
+    val expected = {
+      val emptyDirDirectory = Directory(emptyDirPath.getName)
+      createDirectory(emptyDirPath, emptyDirDirectory)
+    }
+
+    val actual = Directory.fromDirectory(emptyDirPath)
     assert(directoryEquals(actual, expected))
   }
 
