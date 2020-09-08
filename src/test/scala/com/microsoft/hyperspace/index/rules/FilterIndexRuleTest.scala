@@ -157,8 +157,8 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
       dataSchema: StructType,
       bucketSpec: Option[BucketSpec]): Unit = {
     val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-    val expectedLocation = getIndexDataFilesPath(indexName)
-    assert(location.rootPaths.head.equals(expectedLocation))
+    val expectedLocation = getIndexDataFilesPaths(indexName)
+    assert(location.rootPaths.equals(expectedLocation))
     assert(partitionSchema.equals(new StructType()))
     assert(dataSchema.equals(allIndexes.filter(_.name.equals(indexName)).head.schema))
     assert(bucketSpec.isEmpty)

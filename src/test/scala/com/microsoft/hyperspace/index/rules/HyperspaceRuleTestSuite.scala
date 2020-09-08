@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
-  private val filename = "f1.parquet"
+  private val filenames = Seq("f1.parquet", "f2.parquet")
   def createIndex(
       name: String,
       indexCols: Seq[AttributeReference],
@@ -44,13 +44,9 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
 
-        val indexFile = new FileStatus(
-          10,
-          false,
-          1,
-          10,
-          10,
-          getIndexDataFilesPath(name))
+        val indexFiles = getIndexDataFilesPaths(name).map { path =>
+          new FileStatus(10, false, 1, 10, 10, path)
+        }
 
         val indexLogEntry = IndexLogEntry(
           name,
@@ -60,7 +56,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          Content.fromLeafFiles(Seq(indexFile)),
+          Content.fromLeafFiles(indexFiles),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -73,10 +69,14 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     }
   }
 
-  def getIndexDataFilesPath(indexName: String): Path =
-    new Path(new Path(
-      new Path(systemPath, indexName),
-      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"), filename)
+  def getIndexDataFilesPaths(indexName: String): Seq[Path] =
+    filenames.map { f =>
+      new Path(
+        new Path(
+          new Path(systemPath, indexName),
+          s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
+        f)
+    }
 
   def schemaFromAttributes(attributes: Attribute*): StructType =
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
