@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import java.io.FileNotFoundException
 
 import scala.annotation.tailrec
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
@@ -83,10 +83,7 @@ object Content {
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
-case class Directory(
-    name: String,
-    var files: Seq[FileInfo] = Seq(),
-    var subDirs: Seq[Directory] = Seq())
+case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
 
@@ -146,23 +143,32 @@ object Directory {
     val pathToDirectory = HashMap[Path, Directory]()
 
     for (path <- leafDirToChildrenFiles.keys) {
-      val files = leafDirToChildrenFiles.getOrElse(path, Array()).map(FileInfo(_))
+      val files = ListBuffer[FileInfo]()
+      files.appendAll(leafDirToChildrenFiles.getOrElse(path, Array()).map(FileInfo(_)))
+
       if (pathToDirectory.contains(path)) {
         // Map already contains this directory. Just append the files to its existing list.
-        pathToDirectory(path).files ++= files
+        pathToDirectory(path).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(files)
       } else {
         var location = path
         // Create a new Directory object and add it to Map
-        var directory = Directory(location.getName, files = files)
+        val subDirs = ListBuffer[Directory]()
+        var directory = Directory(location.getName, files = files, subDirs = subDirs)
         pathToDirectory.put(location, directory)
 
         // Keep creating parent Directory objects and add to the map if non-existing.
         while (location.getParent != null && !pathToDirectory.contains(location.getParent)) {
           location = location.getParent
           if (location.isRoot) {
-            directory = Directory(location.toString, subDirs = Seq(directory))
+            directory = Directory(
+              location.toString,
+              subDirs = ListBuffer(directory),
+              files = ListBuffer[FileInfo]())
           } else {
-            directory = Directory(location.getName, subDirs = Seq(directory))
+            directory = Directory(
+              location.getName,
+              subDirs = ListBuffer(directory),
+              files = ListBuffer[FileInfo]())
           }
           pathToDirectory.put(location, directory)
         }
@@ -170,7 +176,9 @@ object Directory {
         // Either root is reached (parent == null) or an existing directory is found. If it's the
         // latter, add the newly created directory tree to its subDirs.
         if (location.getParent != null) {
-          pathToDirectory(location.getParent).subDirs :+= directory
+          pathToDirectory(location.getParent).subDirs
+            .asInstanceOf[ListBuffer[Directory]]
+            .append(directory)
         }
       }
     }
