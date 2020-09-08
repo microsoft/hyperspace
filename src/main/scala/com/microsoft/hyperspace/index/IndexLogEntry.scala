@@ -53,7 +53,6 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 }
 
 object Content {
-
   /**
    * Create a Content object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
@@ -86,10 +85,13 @@ object Content {
 case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
 
 object Directory {
-
   /**
    * Create a Directory object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
+   *
+   * If the directory doesn't exist on file system, this will create an empty Directory object
+   * starting at the root, ending at the directory path specified. The `files` and `subDirs` will
+   * be empty.
    *
    * @param path Starting directory path under which the files will be considered part of the
    *             Directory object.
@@ -109,12 +111,19 @@ object Directory {
     if (leafFiles.nonEmpty) {
       fromLeafFiles(leafFiles)
     } else {
-      val rootPath = getRoot(path)
-      if (rootPath.equals(path)) {
-        createDirectory(path, Array())
-      } else {
-        Directory(rootPath.toString, Seq(), Seq(createDirectory(path, Array())))
-      }
+      // leafFiles is empty either because the directory doesn't exist on disk or this directory
+      // and all its subdirectories, if present, are empty. In both cases, create an empty
+      // directory object.
+      createEmptyDirectory(path)
+    }
+  }
+
+  @tailrec
+  private def createEmptyDirectory(path: Path, subDirs: Seq[Directory] = Seq()): Directory = {
+    if (path.isRoot) {
+      Directory(path.toString, subDirs = subDirs)
+    } else {
+      createEmptyDirectory(path.getParent, Seq(Directory(path.getName)))
     }
   }
 
@@ -194,29 +203,6 @@ object Directory {
   @tailrec
   private def getRoot(path: Path): Path = {
     if (path.isRoot) path else getRoot(path.getParent)
-  }
-
-  // Create Directory from `dirPath` where `dirPath` is the directory containing
-  // all `leafFiles`.
-  private def createDirectory(dirPath: Path, leafFiles: Array[FileStatus]): Directory = {
-    // Recursively creates parent directory to have the given `subDir`.
-    @tailrec
-    def createParentDirectory(dirPath: Path, subDir: Directory): Directory = {
-      if (dirPath.getParent.isRoot) {
-        Directory(dirPath.getName, files = Seq(), subDirs = Seq(subDir))
-      } else {
-        createParentDirectory(
-          dirPath.getParent,
-          Directory(dirPath.getName, files = Seq(), subDirs = Seq(subDir)))
-      }
-    }
-
-    val files = leafFiles.map(FileInfo(_))
-    if (dirPath.getParent.isRoot) {
-      Directory(dirPath.getName, files = files)
-    } else {
-      createParentDirectory(dirPath.getParent, Directory(dirPath.getName, files = files))
-    }
   }
 
   private def listLeafFiles(
