@@ -427,7 +427,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     }
   }
 
-  /** Returns tuple of left and right base relation paths for a logical plan */
+  /** Returns all root paths from a logical plan */
   private def basePaths(plan: LogicalPlan): Seq[Path] = {
     plan
       .collectLeaves()
