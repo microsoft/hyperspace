@@ -45,7 +45,7 @@ class IndexTests extends SparkFunSuite {
             .Columns(config.indexedColumns, config.includedColumns),
           IndexLogEntry.schemaString(schema),
           10)),
-      Content(path, Seq()),
+      Content(Directory(path)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE

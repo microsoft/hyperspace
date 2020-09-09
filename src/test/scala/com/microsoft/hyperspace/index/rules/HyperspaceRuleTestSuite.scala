@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation}
@@ -25,9 +25,10 @@ import org.apache.spark.sql.types.{StructField, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, HyperspaceSuite, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
+import com.microsoft.hyperspace.index._
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
+  private val filenames = Seq("f1.parquet", "f2.parquet")
   def createIndex(
       name: String,
       indexCols: Seq[AttributeReference],
@@ -43,6 +44,10 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
 
+        val indexFiles = getIndexDataFilesPaths(name).map { path =>
+          new FileStatus(10, false, 1, 10, 10, path)
+        }
+
         val indexLogEntry = IndexLogEntry(
           name,
           CoveringIndex(
@@ -51,7 +56,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
+          Content.fromLeafFiles(indexFiles),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -64,10 +69,14 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     }
   }
 
-  def getIndexDataFilesPath(indexName: String): Path =
-    new Path(
-      new Path(systemPath, indexName),
-      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+  def getIndexDataFilesPaths(indexName: String): Seq[Path] =
+    filenames.map { f =>
+      new Path(
+        new Path(
+          new Path(systemPath, indexName),
+          s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
+        f)
+    }
 
   def schemaFromAttributes(attributes: Attribute*): StructType =
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))

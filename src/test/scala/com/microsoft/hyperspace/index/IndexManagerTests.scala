@@ -26,7 +26,6 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
@@ -242,12 +241,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         val latestLog = logManager.getLatestLog()
         assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
         val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
-        assert(indexLog.content.directories.nonEmpty)
-        assert(indexLog.content.directories.head.files.nonEmpty)
-        // The below condition will fail when _SUCCESS is removed. Update the check then.
-        assert(indexLog.content.directories.head.files.forall { f =>
-          f.name.contains("part-0") || f.name.contains("_SUCCESS")
-        })
+        val indexFiles = indexLog.content.files
+        assert(indexFiles.nonEmpty)
+        assert(indexFiles.forall(_.getName.startsWith("part-0")))
         assert(indexLog.state.equals("ACTIVE"))
 
         FileUtils.delete(new Path(refreshTestLocation))
@@ -275,9 +271,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _,
               _) =>
-            val files = location.allFiles.map(FileInfo(_))
-            val sourceDataProperties =
-              Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+            val files = location.allFiles
+            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
@@ -305,10 +300,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-          Content(
-            s"$systemPath/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Seq()),
+          Content.fromDirectory(
+            PathUtils.makeAbsolute(new Path(s"$systemPath/${indexConfig.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state

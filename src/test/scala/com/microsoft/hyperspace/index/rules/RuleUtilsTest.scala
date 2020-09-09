@@ -24,9 +24,10 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index.IndexCollectionManager
+import com.microsoft.hyperspace.util.PathUtils
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite {
-  override val systemPath = new Path("src/test/resources/ruleUtilsTest")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
