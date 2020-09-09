@@ -19,7 +19,6 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 import scala.util.Try
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -147,7 +146,7 @@ object JoinIndexRule
           bucketColumnNames = index.indexedColumns,
           sortColumnNames = index.indexedColumns)
 
-        val location = new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
+        val location = new InMemoryFileIndex(spark, index.content.files, Map(), None)
         val relation = HadoopFsRelation(
           location,
           new StructType(),

@@ -25,6 +25,7 @@ import org.apache.spark.sql.DataFrame
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -121,7 +122,9 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
      */
     // scalastyle:on filelinelengthchecker
 
-    val joinIndexPath = getIndexFilesPath("joinIndex")
+    val joinIndexFilePath = getIndexFilesPath("joinIndex")
+
+    val joinIndexPath = getIndexRootPath("joinIndex")
 
     // scalastyle:off filelinelengthchecker
     expectedOutput
@@ -138,7 +141,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
       .append(s"<----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
-        truncate(s"InMemoryFileIndex[$joinIndexPath]") +
+        truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(2) Project [Col1#21, Col2#22]---->")
@@ -146,7 +149,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
       .append(defaultDisplayMode.newLine)
       .append(s"      <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
-        truncate(s"InMemoryFileIndex[$joinIndexPath]") +
+        truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
@@ -229,6 +232,9 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val df = spark.read.parquet(sampleParquetDataLocation)
     val indexConfig =
       IndexConfig("filterIndex", Seq("Col2"), Seq("Col1"))
+    df.createOrReplaceTempView("query")
+    hyperspace.createIndex(df, indexConfig)
+
     val displayMode = new PlainTextMode(getHighlightConf("<----", "---->"))
     // Constructing expected output for given query from explain API
     val expectedOutput = new StringBuilder
@@ -372,7 +378,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("=============================================================")
       .append(displayMode.newLine)
-      .append("filterIndex:" + getIndexFilesPath("filterIndex"))
+      .append("filterIndex:" + getIndexRootPath("filterIndex"))
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append("=============================================================")
@@ -400,8 +406,6 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
     // scalastyle:on filelinelengthchecker
 
-    df.createOrReplaceTempView("query")
-    hyperspace.createIndex(df, indexConfig)
     val dfSubquery =
       spark.sql("""select Col1 from query where
           |Col1 == (select Col1 from query where Col2==1)""".stripMargin)
@@ -507,7 +511,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append("=============================================================")
       .append(displayMode.newLine)
       .append("filterIndex:")
-      .append(getIndexFilesPath("filterIndex"))
+      .append(getIndexRootPath("filterIndex"))
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append(displayMode.beginEndTag.close)
@@ -518,8 +522,14 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     verifyExplainOutput(df, expectedOutput.toString, verbose = false) { filterQuery }
   }
 
-  private def getIndexFilesPath(indexName: String): Path = {
+  private def getIndexRootPath(indexName: String): Path =
     new Path(systemPath, s"$indexName/v__=0")
+
+  private def getIndexFilesPath(indexName: String): Path = {
+    val path = getIndexRootPath(indexName)
+    val fs = path.getFileSystem(new Configuration)
+    // Pick any files path but remove the _SUCCESS file.
+    fs.listStatus(path).filter(s => DataPathFilter.accept(s.getPath)).head.getPath
   }
 
   private def verifyExplainOutput(df: DataFrame, expected: String, verbose: Boolean)(
