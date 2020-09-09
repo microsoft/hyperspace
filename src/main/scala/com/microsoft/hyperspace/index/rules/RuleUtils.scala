@@ -27,8 +27,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
+import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -138,7 +137,7 @@ object RuleUtils {
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val location =
-          new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
+          new InMemoryFileIndex(spark, index.content.files, Map(), None)
         val relation = HadoopFsRelation(
           location,
           new StructType(),
@@ -189,11 +188,11 @@ object RuleUtils {
         // source files directly.
         val readPaths = {
           if (useBucketUnion) {
-            Seq(new Path(index.content.root))
+            index.content.files
           } else {
             val filesAppended =
               (curFileSet -- index.allSourceFiles).map(f => new Path(f.name)).toSeq
-            Seq(new Path(index.content.root)) ++ filesAppended
+            index.content.files ++ filesAppended
           }
         }
 

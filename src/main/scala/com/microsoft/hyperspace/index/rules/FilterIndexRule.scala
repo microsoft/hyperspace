@@ -55,6 +55,7 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
           FilterIndexRanker.rank(candidateIndexes, HyperspaceConf.hybridScanEnabled(spark)) match {
             case Some(index) =>
+              // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
               val replacedPlan =
                 RuleUtils.getReplacementPlan(spark, index, originalPlan, useBucketSpec = false)
               logEvent(

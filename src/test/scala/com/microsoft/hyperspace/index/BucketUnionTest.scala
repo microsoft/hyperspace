@@ -20,7 +20,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 
-import com.microsoft.hyperspace.index.execution.{BucketAwareUnionRDD, BucketAwareUnionRDDPartition, BucketUnionExec, BucketUnionStrategy}
+import com.microsoft.hyperspace.index.execution.{BucketUnionExec, BucketUnionRDD, BucketUnionRDDPartition, BucketUnionStrategy}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
 class BucketUnionTest extends HyperspaceSuite {
@@ -108,7 +108,7 @@ class BucketUnionTest extends HyperspaceSuite {
     }
   }
 
-  test("BucketAwareUnionRDD test") {
+  test("BucketUnionRDD test") {
     import spark.implicits._
     val df1 = Seq((2, "name1"), (3, "name2")).toDF("id", "name")
     val p1 = df1.repartition(10, $"id")
@@ -116,10 +116,10 @@ class BucketUnionTest extends HyperspaceSuite {
     val p1_1 = df1_1.repartition(10, $"id")
     val bucketSpec = BucketSpec(10, Seq("id"), Seq())
 
-    val rdd = new BucketAwareUnionRDD[Row](spark.sparkContext, Seq(p1.rdd, p1_1.rdd), bucketSpec)
+    val rdd = new BucketUnionRDD[Row](spark.sparkContext, Seq(p1.rdd, p1_1.rdd), bucketSpec)
     assert(rdd.getPartitions.length == 10)
     assert(rdd.collect.length == 4)
-    rdd.partitions.head.asInstanceOf[BucketAwareUnionRDDPartition]
+    rdd.partitions.head.asInstanceOf[BucketUnionRDDPartition]
 
     val partitionSum = rdd
       .mapPartitionsWithIndex {
