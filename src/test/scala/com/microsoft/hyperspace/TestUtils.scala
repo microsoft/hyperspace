@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace
 
+import org.apache.hadoop.fs.Path
+
 import com.microsoft.hyperspace.index.IndexLogEntry
 
 object TestUtils {
@@ -23,5 +25,23 @@ object TestUtils {
     val result = index.copy()
     result.state = state
     result
+  }
+
+  /**
+   * Split path into its segments and return segment names as a sequence.
+   * For e.g. a path "file:/C:/d1/d2/d3/f1.parquet" will return
+   * Seq("f1.parquet", "d3", "d2", "d1", "file:/C:/")
+   *
+   * @param path Path to split into segments.
+   * @return Segments as a seq.
+   */
+  def splitPath(path: Path): Seq[String] = {
+    if (path.getParent == null) {
+      // `path` is now root. It's getName returns "" but toString returns actual path,
+      // E.g. "file:/C:/" for Windows.
+      Seq(path.toString)
+    } else {
+      path.getName +: splitPath(path.getParent)
+    }
   }
 }

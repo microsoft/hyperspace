@@ -24,7 +24,6 @@ import org.apache.spark.SparkFunSuite
 import org.scalatest.BeforeAndAfterAll
 
 import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
@@ -41,32 +40,30 @@ class IndexLogManagerImplTest
         "id INT name STRING school STRING",
         100)),
     Content(
-      "/root/log",
-      Seq(
-        Content.Directory(
-          "dir1",
-          Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
-          NoOpFingerprint()),
-        Content.Directory(
-          "dir2",
-          Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
-          NoOpFingerprint()))),
+      Directory(
+        "/root/log",
+        files = Seq(),
+        subDirs = Seq(
+          Directory(
+            "dir1",
+            Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L))),
+          Directory(
+            "dir2",
+            Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)))))),
     Source(
       SparkPlan(SparkPlan.Properties(
         Seq(Relation(
           Seq("rootpath"),
-          Hdfs(properties = Hdfs.Properties(content = Content(
+          Hdfs(properties = Hdfs.Properties(content = Content(Directory(
             "/root/data",
-            Seq(
-              Content
-                .Directory(
-                  "dir1",
-                  Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
-                  NoOpFingerprint()),
-              Content.Directory(
+            files = Seq(),
+            subDirs = Seq(
+              Directory(
+                "dir1",
+                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L))),
+              Directory(
                 "dir2",
-                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)),
-                NoOpFingerprint()))))),
+                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)))))))),
           "schema",
           "type",
           Map())),
