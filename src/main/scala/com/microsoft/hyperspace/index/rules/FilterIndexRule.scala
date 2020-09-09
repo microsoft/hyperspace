@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
@@ -103,8 +102,7 @@ object FilterIndexRule
     rank(candidateIndexes) match {
       case Some(index) =>
         val spark = fsRelation.sparkSession
-        val newLocation =
-          new InMemoryFileIndex(spark, Seq(new Path(index.content.root)), Map(), None)
+        val newLocation = new InMemoryFileIndex(spark, index.content.files, Map(), None)
 
         val newRelation = HadoopFsRelation(
           newLocation,

@@ -26,10 +26,10 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
-  override val systemPath = new Path("src/test/resources/joinIndexRuleTest")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexRuleTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -109,7 +109,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -122,7 +122,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -226,7 +226,8 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
       val updatedPlan = JoinIndexRule(originalPlan)
       assert(!updatedPlan.equals(originalPlan))
 
-      val indexPaths = Seq(getIndexDataFilesPath("t1Idx"), getIndexDataFilesPath("t2Idx"))
+      val indexPaths =
+        Seq(getIndexDataFilesPaths("t1Idx"), getIndexDataFilesPaths("t2Idx")).flatten
       verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
 
       // Cleanup created indexes after test
@@ -280,7 +281,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i2"), getIndexDataFilesPath("t2i2"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -298,7 +299,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i2"), getIndexDataFilesPath("t2i2"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -315,7 +316,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i2"), getIndexDataFilesPath("t2i2"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -360,7 +361,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -377,7 +378,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i2"), getIndexDataFilesPath("t2i2"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -410,7 +411,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     val updatedPlan = JoinIndexRule(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths = Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
+    val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
@@ -446,7 +447,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     }
   }
 
-  /** Returns tuple of left and right base relation paths for a logical plan */
+  /** Returns all root paths from a logical plan */
   private def basePaths(plan: LogicalPlan): Seq[Path] = {
     plan
       .collectLeaves()

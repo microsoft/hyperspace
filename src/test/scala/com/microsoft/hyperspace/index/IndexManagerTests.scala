@@ -26,13 +26,11 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  override val systemPath =
-    PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -228,13 +226,25 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .format(format)
           .save(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
+        val newIndexLocation = s"$systemPath/index_$format"
         indexCount = spark.read
-          .parquet(s"$systemPath/index_$format" +
+          .parquet(newIndexLocation +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
         // Check if index got updated
         assert(indexCount == 3)
+
+        // Check if lastest log file is updated with newly created index files
+        val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+        val latestLog = logManager.getLatestLog()
+        assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+        val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+        val indexFiles = indexLog.content.files
+        assert(indexFiles.nonEmpty)
+        assert(indexFiles.forall(_.getName.startsWith("part-0")))
+        assert(indexLog.state.equals("ACTIVE"))
 
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
@@ -261,9 +271,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _,
               _) =>
-            val files = location.allFiles.map(FileInfo(_))
-            val sourceDataProperties =
-              Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+            val files = location.allFiles
+            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
@@ -291,10 +300,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-          Content(
-            s"$systemPath/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Seq()),
+          Content.fromDirectory(
+            PathUtils.makeAbsolute(new Path(s"$systemPath/${indexConfig.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state

@@ -16,9 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import java.io.FileNotFoundException
-
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
@@ -27,8 +24,6 @@ import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.Content.Directory
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
 
@@ -82,9 +77,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets)),
-          Content(
-            absolutePath.toString,
-            Seq(Directory("", indexFilesInfo(absolutePath), NoOpFingerprint()))),
+          Content.fromDirectory(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -105,11 +98,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           _,
           _,
           _) =>
-        val files = location.allFiles.map(FileInfo(_))
+        val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties =
-          Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")
@@ -131,7 +123,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
       .toInt
 
-    val (indexDataFrame, resolvedIndexedColumns, _) = prepareIndexDataFrame(spark, df, indexConfig)
+    val (indexDataFrame, resolvedIndexedColumns, _) =
+      prepareIndexDataFrame(spark, df, indexConfig)
 
     // run job
     val repartitionedIndexDataFrame =
@@ -144,22 +137,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         indexDataPath.toString,
         numBuckets,
         resolvedIndexedColumns)
-  }
-
-  private def indexFilesInfo(path: Path): Seq[FileInfo] = {
-    try {
-      val fs = path.getFileSystem(new Configuration)
-      val statuses = fs.listStatus(path)
-
-      // Assuming index directories don't contain nested directories. Only Leaf files.
-      assert(statuses.forall(!_.isDirectory))
-
-      statuses.map(FileInfo(_)).toSeq
-    } catch {
-      // FileNotFoundException is an expected exception before index gets created.
-      case _: FileNotFoundException => Seq()
-      case e: Throwable => throw e
-    }
   }
 
   private def resolveConfig(
