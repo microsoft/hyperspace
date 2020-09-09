@@ -26,7 +26,6 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeExec}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
@@ -40,21 +39,20 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   private val sampleJsonDataLocation = "src/test/resources/samplejson"
   private var df: DataFrame = _
   private var hyperspace: Hyperspace = _
-  private var files: Seq[FileInfo] = _
   private val indexConfig1 = IndexConfig("index1", Seq("clicks"), Seq("query"))
   private val indexConfig2 = IndexConfig("index2", Seq("clicks"), Seq("query"))
 
   private def copyFirstFile(df: DataFrame): Unit = {
-    files = df.queryExecution.optimizedPlan.collect {
+    val files = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
           HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
           _,
           _,
           _) =>
-        location.allFiles.map(FileInfo(_))
+        location.allFiles
     }.flatten
-    val sourcePath = new Path(files.head.name)
-    val destPath = new Path(files.head.name + ".copy")
+    val sourcePath = files.head.getPath
+    val destPath = new Path(files.head.getPath + ".copy")
     sourcePath.getFileSystem(new Configuration).copyToLocalFile(sourcePath, destPath)
   }
 

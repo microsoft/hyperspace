@@ -126,6 +126,7 @@ object JoinIndexRule
     getBestIndexPair(left, right, condition, lIndexes.get, rIndexes.get)
   }
 
+  /**
    * Checks whether this join rule is applicable for the current node
    *
    * @param l left logical plan

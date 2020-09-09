@@ -53,7 +53,7 @@ object RuleUtils {
       assert(sourcePlanSignatures.length == 1)
       val sourceFileSet = if (hybridScanEnabled) {
         assert(entry.relations.length == 1)
-        Some(entry.allSourceFiles.map(f => new Path(f.name)))
+        Some(entry.allSourceFiles)
       } else None
       val sourcePlanSignature = sourcePlanSignatures.head
       signatureMap.getOrElseUpdate(
@@ -191,7 +191,7 @@ object RuleUtils {
             index.content.files
           } else {
             val filesAppended =
-              (curFileSet -- index.allSourceFiles).map(f => new Path(f.name)).toSeq
+              (curFileSet -- index.allSourceFileInfos).map(f => new Path(f.name)).toSeq
             index.content.files ++ filesAppended
           }
         }
@@ -255,8 +255,8 @@ object RuleUtils {
           baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
 
         val filesAppended = (location.allFiles
-          .map(FileInfo(_))
-          .toSet -- index.allSourceFiles).toSeq.map(f => new Path(f.name))
+          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+          .toSet -- index.allSourceFileInfos).toSeq.map(f => new Path(f.name))
 
         if (filesAppended.nonEmpty) {
           val newLocation =

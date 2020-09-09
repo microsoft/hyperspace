@@ -19,7 +19,8 @@ package com.microsoft.hyperspace.index
 import java.io.FileNotFoundException
 
 import scala.annotation.tailrec
-import scala.collection.mutable.{HashMap, ListBuffer}
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
@@ -50,6 +51,20 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
     }
 
     rec(new Path(root.name), root)
+  }
+
+  @JsonIgnore
+  lazy val fileInfos: Set[FileInfo] = {
+    // Recursively find files from directory tree.
+    def rec(prefixPath: Path, directory: Directory): Seq[FileInfo] = {
+      val files = directory.files.map(f =>
+        FileInfo(new Path(prefixPath, f.name).toString, f.size, f.modifiedTime))
+      files ++ directory.subDirs.flatMap { dir =>
+        rec(new Path(prefixPath, dir.name), dir)
+      }
+    }
+
+    rec(new Path(root.name), root).toSet
   }
 }
 
@@ -152,7 +167,7 @@ object Directory {
     val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
 
     // Hashmap from directory path to Directory object, used below for quick access from path.
-    val pathToDirectory = HashMap[Path, Directory]()
+    val pathToDirectory = mutable.HashMap[Path, Directory]()
 
     for ((dirPath, files) <- leafDirToChildrenFiles) {
       val allFiles = ListBuffer[FileInfo]()
@@ -298,9 +313,15 @@ case class IndexLogEntry(
 
   def relations: Seq[Relation] = source.plan.properties.relations
 
-  def allSourceFiles: Set[FileInfo] = {
+  def allSourceFiles: Set[Path] = {
     relations
-      .flatMap(_.data.properties.content.directories.flatMap(_.files))
+      .flatMap(_.data.properties.content.files)
+      .toSet
+  }
+
+  def allSourceFileInfos: Set[FileInfo] = {
+    relations
+      .flatMap(_.data.properties.content.fileInfos)
       .toSet
   }
 
@@ -309,14 +330,6 @@ case class IndexLogEntry(
       numBuckets = numBuckets,
       bucketColumnNames = indexedColumns,
       sortColumnNames = indexedColumns)
-
-  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
-
-  def signature: Signature = {
-    val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
-    assert(sourcePlanSignatures.length == 1)
-    sourcePlanSignatures.head
-  }
 
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
