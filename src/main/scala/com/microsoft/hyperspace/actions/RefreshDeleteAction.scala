@@ -20,8 +20,10 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.util.ResolverUtils
 
 class RefreshDeleteAction(
     spark: SparkSession,
@@ -31,14 +33,22 @@ class RefreshDeleteAction(
 
   final override def op(): Unit = {
     val indexDF = spark.read.parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-    val refreshDF =
-      indexDF.filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
 
-    refreshDF.write.saveWithBuckets(
-      refreshDF,
-      indexDataPath.toString,
-      logEntry.asInstanceOf[IndexLogEntry].numBuckets,
-      indexConfig.indexedColumns)
+    ResolverUtils
+      .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, indexDF.schema.fieldNames) match {
+      case Some(_) =>
+        val refreshDF =
+          indexDF.filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
+
+        refreshDF.write.saveWithBuckets(
+          refreshDF,
+          indexDataPath.toString,
+          logEntry.asInstanceOf[IndexLogEntry].numBuckets,
+          indexConfig.indexedColumns)
+
+      case None =>
+        throw HyperspaceException(s"Refresh delete is only supported on an index with lineage.")
+    }
   }
 
   private def getDeletedFiles: Seq[String] = {

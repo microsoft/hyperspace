@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 
-import com.microsoft.hyperspace.{Hyperspace, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
 class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
@@ -68,7 +68,7 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(systemPath)
   }
 
-  test("validate refresg index when some file gets deleted.") {
+  test("Validate refresh index when some file gets deleted.") {
     Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
       withSQLConf(
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
@@ -116,6 +116,17 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
           assert(!lineageFileNames.contains(fileToDelete))
         }
       }
+    }
+  }
+
+  test("Validate refresh delete fails as expected on an index without lineage.") {
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "false",
+      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+
+      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+      assert(ex.getMessage.contains("Refresh delete is only supported on an index with lineage."))
     }
   }
 }
