@@ -30,4 +30,10 @@ object Constants {
   }
 
   val STABLE_STATES: Set[String] = Set(States.ACTIVE, States.DELETED, States.DOESNOTEXIST)
+
+  object RefreshModes {
+    val FULL = "FULL"
+    val QUICK = "QUICK"
+    val SMART = "SMART"
+  }
 }

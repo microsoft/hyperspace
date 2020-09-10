@@ -16,8 +16,7 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -62,7 +61,7 @@ class RefreshDeleteAction(
   final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override def op(): Unit = {
-    val indexDF = spark.read.parquet(previousIndexLogEntry.content.root)
+    val indexDF = spark.read.parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
     val refreshDF =
       indexDF.filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
 
@@ -86,22 +85,15 @@ class RefreshDeleteAction(
     // Currently we only support to create an index on a LogicalRelation.
     assert(rels.size == 1)
 
-    val originalFiles =
-      rels.head.data.properties.content.directories.flatMap(_.files).map(_.name)
-
+    val originalFiles = rels.head.data.properties.content.files.map(_.toString)
     var currentFiles = Seq[String]()
-    rels.head.rootPaths.foreach { r =>
-      val path = new Path(r)
-      val fs = path.getFileSystem(new Configuration)
-      currentFiles ++= listLeafFiles(path, fs)
+    rels.head.rootPaths.foreach { p =>
+      currentFiles ++= Content
+        .fromDirectory(path = new Path(p))
+        .files
+        .map(_.toString)
     }
 
     originalFiles diff currentFiles
-  }
-
-  private def listLeafFiles(path: Path, fs: FileSystem): Seq[String] = {
-    val (files, directories) = fs.listStatus(path).partition(_.isFile)
-    files.map(_.getPath.toString) ++
-      directories.flatMap(d => listLeafFiles(d.getPath, fs))
   }
 }
