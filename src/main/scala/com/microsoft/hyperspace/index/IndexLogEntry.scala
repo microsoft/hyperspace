@@ -63,8 +63,11 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
         rec(new Path(prefixPath, dir.name), dir)
       }
     }
-
-    rec(new Path(root.name), root).toSet
+    if (root.name.isEmpty) {
+      Set()
+    } else {
+      rec(new Path(root.name), root).toSet
+    }
   }
 }
 
@@ -313,13 +316,8 @@ case class IndexLogEntry(
 
   def relations: Seq[Relation] = source.plan.properties.relations
 
-  def allSourceFiles: Set[Path] = {
-    relations
-      .flatMap(_.data.properties.content.files)
-      .toSet
-  }
-
-  def allSourceFileInfos: Set[FileInfo] = {
+  @JsonIgnore
+  lazy val allSourceFileInfos: Set[FileInfo] = {
     relations
       .flatMap(_.data.properties.content.fileInfos)
       .toSet

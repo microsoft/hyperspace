@@ -47,11 +47,12 @@ object JoinIndexRanker {
 
     indexPairs.sortWith {
       case ((left1, left2), (right1, right2)) =>
-        if (hybridScanEnabled && ((left1.allSourceFiles.size + left2.allSourceFiles.size) >
-              (right1.allSourceFiles.size + right2.allSourceFiles.size))) {
+        if (hybridScanEnabled && ((left1.allSourceFileInfos.size + left2.allSourceFileInfos.size) >
+              (right1.allSourceFileInfos.size + right2.allSourceFileInfos.size))) {
           true
-        } else if (hybridScanEnabled && ((left1.allSourceFiles.size + left2.allSourceFiles.size) <
-                     (right1.allSourceFiles.size + right2.allSourceFiles.size))) {
+        } else if (hybridScanEnabled &&
+                   ((left1.allSourceFileInfos.size + left2.allSourceFileInfos.size) <
+                     (right1.allSourceFileInfos.size + right2.allSourceFileInfos.size))) {
           false
         } else if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
           left1.numBuckets > right1.numBuckets

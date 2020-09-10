@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.util.HashingUtils
@@ -34,7 +33,7 @@ class PlanSignatureProvider extends LogicalPlanSignatureProvider {
    * @param logicalPlan logical plan.
    * @return signature if there is at least one operator in the plan; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan, targetFiles: Option[Set[Path]] = None): Option[String] = {
+  def signature(logicalPlan: LogicalPlan): Option[String] = {
     var signature = ""
     logicalPlan.foreachUp(p => signature = HashingUtils.md5Hex(signature + p.nodeName))
     signature match {

@@ -46,31 +46,51 @@ object RuleUtils {
       plan: LogicalPlan,
       hybridScanEnabled: Boolean): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
-    val signatureMap = mutable.Map[(String, Option[Set[Path]]), Option[String]]()
+    val signatureMap = mutable.Map[String, Option[String]]()
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
-      val sourceFileSet = if (hybridScanEnabled) {
-        assert(entry.relations.length == 1)
-        Some(entry.allSourceFiles)
-      } else None
       val sourcePlanSignature = sourcePlanSignatures.head
       signatureMap.getOrElseUpdate(
-        (sourcePlanSignature.provider, sourceFileSet),
+        sourcePlanSignature.provider,
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
-          .signature(plan, sourceFileSet)) match {
+          .signature(plan)) match {
         case Some(s) => s.equals(sourcePlanSignature.value)
         case None => false
       }
     }
 
+    def isHybridScanCandidate(entry: IndexLogEntry, files: Set[FileInfo]): Boolean = {
+      // compare all the metadata of source files
+      assert(entry.relations.length == 1)
+      val commonFiles = files.intersect(entry.allSourceFileInfos)
+      // TODO threshold for the number of CommonFiles
+      // TODO plan signature
+      commonFiles.nonEmpty
+    }
+
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-
-    allIndexes.filter(index => index.created && signatureValid(index))
+    if (!hybridScanEnabled) {
+      allIndexes.filter(index => index.created && signatureValid(index))
+    } else {
+      val files = plan
+        .collect {
+          case LogicalRelation(
+              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              _,
+              _,
+              _) =>
+            location.allFiles.map(f =>
+              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+        }
+        .flatten
+        .toSet
+      allIndexes.filter(index => index.created && isHybridScanCandidate(index, files))
+    }
   }
 
   /**
@@ -184,6 +204,7 @@ object RuleUtils {
         val curFileSet = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
           .toSet
+
         // if BucketSpec of index data isn't used, we could read appended data from
         // source files directly.
         val readPaths = {

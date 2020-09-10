@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.util.HashingUtils
@@ -39,15 +38,12 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
    * Generate the signature of logical plan.
    *
    * @param logicalPlan logical plan of data frame.
-   * @param targetFiles List of file paths used to calculate signature.
    * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
    *         can generate signature for the logical plan; Otherwise None.
    */
-  override def signature(
-      logicalPlan: LogicalPlan,
-      targetFiles: Option[Set[Path]] = None): Option[String] = {
-    fileBasedSignatureProvider.signature(logicalPlan, targetFiles).flatMap { f =>
-      planSignatureProvider.signature(logicalPlan, targetFiles).map { p =>
+  override def signature(logicalPlan: LogicalPlan): Option[String] = {
+    fileBasedSignatureProvider.signature(logicalPlan).flatMap { f =>
+      planSignatureProvider.signature(logicalPlan).map { p =>
         HashingUtils.md5Hex(f + p)
       }
     }

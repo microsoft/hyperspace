@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.microsoft.hyperspace.index.rankers
 
 import com.microsoft.hyperspace.index.IndexLogEntry
@@ -41,7 +42,7 @@ object FilterIndexRanker {
       case Nil => None
       case _ =>
         if (hybridScanEnabled) {
-          Some(candidates.maxBy(_.allSourceFiles.size))
+          Some(candidates.maxBy(_.allSourceFileInfos.size))
         } else {
           // TODO: Add ranking algorithm to sort candidates.
           Some(candidates.head)

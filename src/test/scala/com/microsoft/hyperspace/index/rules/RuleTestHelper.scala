@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
@@ -24,7 +23,7 @@ import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
 object RuleTestHelper {
   class TestSignatureProvider extends LogicalPlanSignatureProvider {
-    def signature(plan: LogicalPlan, targetFiles: Option[Set[Path]] = None): Option[String] =
+    def signature(plan: LogicalPlan): Option[String] =
       plan
         .collectFirst {
           case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
