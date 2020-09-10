@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
@@ -30,8 +29,6 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
   private val nonPartitionedDataPath = testDir + "nonpartitioned"
   private val partitionedDataPath = testDir + "partitioned"
   private val indexConfig = IndexConfig("index1", Seq("Query"), Seq("imprs"))
-  private var nonPartitionedDataDF: DataFrame = _
-  private var partitionedDataDF: DataFrame = _
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
@@ -40,23 +37,6 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
     val sparkSession = spark
     hyperspace = new Hyperspace(sparkSession)
     FileUtils.delete(new Path(testDir))
-
-    // save test data non-partitioned.
-    SampleData.save(
-      spark,
-      nonPartitionedDataPath,
-      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-
-    nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
-
-    // save test data partitioned.
-    SampleData.save(
-      spark,
-      partitionedDataPath,
-      Seq("Date", "RGUID", "Query", "imprs", "clicks"),
-      Some(Seq("Date", "Query")))
-
-    partitionedDataDF = spark.read.parquet(partitionedDataPath)
   }
 
   override def afterAll(): Unit = {
@@ -65,10 +45,26 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
   }
 
   after {
+    FileUtils.delete(new Path(testDir))
     FileUtils.delete(systemPath)
   }
 
   test("Validate refresh index when some file gets deleted.") {
+    // save test data non-partitioned.
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    // save test data partitioned.
+    SampleData.save(
+      spark,
+      partitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"),
+      Some(Seq("Date", "Query")))
+    val partitionedDataDF = spark.read.parquet(partitionedDataPath)
+
     Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
       withSQLConf(
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
@@ -120,6 +116,12 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Validate refresh delete fails as expected on an index without lineage.") {
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "false",
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
