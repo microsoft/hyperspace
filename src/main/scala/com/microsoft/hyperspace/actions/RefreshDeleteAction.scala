@@ -19,46 +19,15 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActionEvent}
 
 class RefreshDeleteAction(
     spark: SparkSession,
-    final override protected val logManager: IndexLogManager,
+    logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends CreateActionBase(dataManager)
-    with Action {
-  private lazy val previousLogEntry: LogEntry = {
-    logManager.getLog(baseId).getOrElse {
-      throw HyperspaceException("LogEntry must exist for refresh operation.")
-    }
-  }
-
-  private lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
-
-  private lazy val indexConfig: IndexConfig = {
-    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
-  }
-
-  private lazy val df = {
-    val rels = previousIndexLogEntry.relations
-    // Currently we only support to create an index on a LogicalRelation.
-    assert(rels.size == 1)
-    val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
-    spark.read
-      .schema(dataSchema)
-      .format(rels.head.fileFormat)
-      .options(rels.head.options)
-      .load(rels.head.rootPaths: _*)
-  }
-
-  final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    extends RefreshActionBase(spark, logManager, dataManager) {
 
   final override def op(): Unit = {
     val indexDF = spark.read.parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
@@ -70,14 +39,6 @@ class RefreshDeleteAction(
       indexDataPath.toString,
       logEntry.asInstanceOf[IndexLogEntry].numBuckets,
       indexConfig.indexedColumns)
-  }
-
-  final override val transientState: String = REFRESHING
-
-  final override val finalState: String = ACTIVE
-
-  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
   private def getDeletedFiles: Seq[String] = {
