@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning}
 import org.apache.spark.sql.execution.SparkPlan
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
 /**
  * [[BucketUnionRDD]] is required for index HybridScan to merge index data and appended
@@ -106,11 +106,8 @@ private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketS
   override def output: Seq[Attribute] = children.head.output
 
   override def outputPartitioning: Partitioning = {
-    val childPartitions = children.map(_.outputPartitioning).collect {
-      case h: HashPartitioning => h.numPartitions
-      case _ => throw HyperspaceException("Only HashPartitioning is supported.")
-    }
-    assert(childPartitions.toSet.size == 1)
+    assert(children.map(_.outputPartitioning).toSet.size == 1)
+    assert(children.head.outputPartitioning.isInstanceOf[HashPartitioning])
     children.head.outputPartitioning
   }
 }
