@@ -28,7 +28,7 @@ object IndexConstants {
   val INDEX_NUM_BUCKETS = "spark.hyperspace.index.num.buckets"
 
   val INDEX_HYBRID_SCAN_ENABLED = "spark.hyperspace.index.hybridscan.enabled"
-  val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = false
+  val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = "false"
 
   // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
   val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get

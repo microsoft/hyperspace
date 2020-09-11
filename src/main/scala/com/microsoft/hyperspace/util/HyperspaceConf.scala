@@ -21,14 +21,14 @@ import org.apache.spark.sql.SparkSession
 import com.microsoft.hyperspace.index.IndexConstants
 
 /**
- * Helper class to extract Hyperspace config value
+ * Helper class to extract Hyperspace-related configs from SparkSession.
  */
 object HyperspaceConf {
   def hybridScanEnabled(spark: SparkSession): Boolean = {
-    spark.sessionState.conf
-      .getConfString(
+    spark.conf
+      .get(
         IndexConstants.INDEX_HYBRID_SCAN_ENABLED,
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT.toString)
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT)
       .toBoolean
   }
 }
