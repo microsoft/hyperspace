@@ -58,10 +58,9 @@ object RuleUtils {
     def isHybridScanCandidate(entry: IndexLogEntry, files: Set[FileInfo]): Boolean = {
       // compare all the metadata of source files
       assert(entry.relations.length == 1)
-      val commonFiles = files.intersect(entry.allSourceFileInfos)
       // TODO threshold for the number of CommonFiles
       // TODO plan signature
-      commonFiles.nonEmpty
+      files.exists(entry.allSourceFileInfos.contains)
     }
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
