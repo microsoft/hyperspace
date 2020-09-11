@@ -19,10 +19,10 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 
 object RuleUtils {
 
@@ -31,9 +31,13 @@ object RuleUtils {
    *
    * @param indexManager indexManager
    * @param plan logical plan
+   * @param hybridScanEnabled HybridScan config.
    * @return indexes built for this plan
    */
-  def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
+  def getCandidateIndexes(
+      indexManager: IndexManager,
+      plan: LogicalPlan,
+      hybridScanEnabled: Boolean = false): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
 
@@ -51,11 +55,36 @@ object RuleUtils {
       }
     }
 
+    def isHybridScanCandidate(entry: IndexLogEntry, files: Set[FileInfo]): Boolean = {
+      // compare all the metadata of source files
+      assert(entry.relations.length == 1)
+      val commonFiles = files.intersect(entry.allSourceFileInfos)
+      // TODO threshold for the number of CommonFiles
+      // TODO plan signature
+      commonFiles.nonEmpty
+    }
+
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    allIndexes.filter(index => index.created && signatureValid(index))
+    if (hybridScanEnabled) {
+      val files = plan
+        .collect {
+          case LogicalRelation(
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
+            location.allFiles.map(f =>
+              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+        }
+        .flatten
+        .toSet
+      allIndexes.filter(index => index.created && isHybridScanCandidate(index, files))
+    } else {
+      allIndexes.filter(index => index.created && signatureValid(index))
+    }
   }
 
   /**

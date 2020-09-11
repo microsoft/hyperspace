@@ -16,14 +16,15 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileUtil, Path}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.IndexCollectionManager
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
 import com.microsoft.hyperspace.util.PathUtils
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite {
@@ -108,6 +109,69 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
     val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
+  }
+
+  test("Verify getCandidateIndex for hybrid scan") {
+    val indexManager = IndexCollectionManager(spark)
+    val df = spark.range(1, 5).toDF("id")
+    val dataPath = systemPath.toString + "/hbtable"
+    df.write.parquet(dataPath)
+
+    val readDf = spark.read.parquet(dataPath)
+    indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+
+    df.write.mode("append").parquet(dataPath)
+
+    {
+      val readDf = spark.read.parquet(dataPath)
+      assert(
+        RuleUtils
+          .getCandidateIndexes(
+            indexManager,
+            readDf.queryExecution.optimizedPlan,
+            hybridScanEnabled = false)
+          .length === 0)
+
+      assert(
+        RuleUtils
+          .getCandidateIndexes(
+            indexManager,
+            readDf.queryExecution.optimizedPlan,
+            hybridScanEnabled = true)
+          .length === 1)
+    }
+
+    readDf.queryExecution.optimizedPlan foreach {
+      case LogicalRelation(
+      HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _), _, _, _) =>
+        systemPath.getFileSystem(new Configuration).delete(location.allFiles.head.getPath, false)
+      case _ =>
+    }
+
+    {
+      val readDf = spark.read.parquet(dataPath)
+      assert(
+        RuleUtils
+          .getCandidateIndexes(
+            indexManager,
+            readDf.queryExecution.optimizedPlan,
+            hybridScanEnabled = true)
+          .length === 1)
+    }
+
+    df.write.mode("overwrite").parquet(dataPath)
+
+    {
+      val readDf = spark.read.parquet(dataPath)
+      assert(
+        RuleUtils
+          .getCandidateIndexes(
+            indexManager,
+            readDf.queryExecution.optimizedPlan,
+            hybridScanEnabled = true)
+          .length === 0)
+    }
+
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
