@@ -1,4 +1,4 @@
-# Proposal: Incremental Index Maintenance for Mutable Datasets
+# Proposal: Incremental Index Maintenance for File/Partition Mutable Datasets
 
 Discussion at https://github.com/microsoft/hyperspace/issues/136.
 
