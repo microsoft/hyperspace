@@ -1,4 +1,4 @@
-# Proposal: Hybrid Scan for Mutable Datasets
+# Proposal: Hybrid Scan for File/Partition Mutable Datasets
 
 Discussion at https://github.com/microsoft/hyperspace/issues/150.
 
