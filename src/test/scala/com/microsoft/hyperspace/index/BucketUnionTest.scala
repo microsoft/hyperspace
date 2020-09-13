@@ -26,7 +26,7 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 class BucketUnionTest extends HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/bucketUnionTest")
 
-  test("BucketUnion require test") {
+  test("BucketUnion test for operator pre-requisites") {
     import spark.implicits._
     val df1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
     val df1_1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
@@ -52,7 +52,7 @@ class BucketUnionTest extends HyperspaceSuite {
       BucketSpec(1, Seq(), Seq()))
   }
 
-  test("BucketUnionStrategy test") {
+  test("BucketUnionStrategy test if strategy introduces BucketUnionExec in the Spark Plan") {
     import spark.implicits._
     val df1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
     val df1_1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
@@ -73,20 +73,20 @@ class BucketUnionTest extends HyperspaceSuite {
     import spark.implicits._
     val df1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
     val p1 = df1.repartition(10)
-    val df1_1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
-    val p1_1 = df1_1.repartition(9)
-    val p1_2 = df1_1.repartition(10)
+    val df2 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
+    val p2_1 = df2.repartition(9)
+    val p2_2 = df2.repartition(10)
 
     // different number of partition
     intercept[AssertionError] {
       val bucket = BucketUnion(
-        Seq(p1.queryExecution.optimizedPlan, p1_1.queryExecution.optimizedPlan),
+        Seq(p1.queryExecution.optimizedPlan, p2_1.queryExecution.optimizedPlan),
         BucketSpec(10, Seq(), Seq()))
       spark.sessionState.executePlan(bucket).sparkPlan
     }
 
     val bucket = BucketUnion(
-      Seq(p1.queryExecution.optimizedPlan, p1_2.queryExecution.optimizedPlan),
+      Seq(p1.queryExecution.optimizedPlan, p2_2.queryExecution.optimizedPlan),
       BucketSpec(10, Seq(), Seq()))
 
     assert(BucketUnionStrategy(bucket).collect {
@@ -98,7 +98,7 @@ class BucketUnionTest extends HyperspaceSuite {
     }.length == 1)
   }
 
-  test("BucketUnionRDD test") {
+  test("BucketUnionRDD test that partition columns with same value fall in the same partition") {
     import spark.implicits._
     val df1 = Seq((2, "name1"), (3, "name2")).toDF("id", "name")
     val p1 = df1.repartition(10, $"id")
@@ -111,16 +111,14 @@ class BucketUnionTest extends HyperspaceSuite {
     assert(rdd.collect.length == 4)
     assert(rdd.partitions.head.isInstanceOf[BucketUnionRDDPartition])
 
-    val partitionSum = rdd
-      .mapPartitionsWithIndex {
-        case (partitionNum, it) => Iterator.single(partitionNum -> it.map(r => r.getInt(0)).sum)
-      }
+    val partitionSum: Seq[Int] = rdd
+      .mapPartitions(it => Iterator.single(it.map(r => r.getInt(0)).sum))
       .collect()
       .toSeq
 
     // since rows with id=2 assigned to the same partition and likewise rows with id=3,
     // summation of each partition should be one of [0, 4, 6, 10]
     val availableSum = Set(0, 4, 6, 10)
-    assert(partitionSum.forall(p => availableSum.contains(p._2)))
+    assert(partitionSum.forall(p => availableSum.contains(p)))
   }
 }

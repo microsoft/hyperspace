@@ -29,21 +29,25 @@ import org.apache.spark.sql.execution.SparkPlan
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
 /**
- * [[BucketUnionRDD]] is required for index HybridScan to merge index data and appended
- * data without re-shuffling of index data. Spark does not support Union using Partition
- * Specification, but just [[PartitionerAwareUnionRDD]] operation and even it does not
- * retain outputPartitioning of result. So we define a new Union operation complying
- * with the following conditions:
+ * [[BucketUnionRDD]] is required for the hybrid scan operation which merges index data and 
+ * appended data without re-shuffling the index data. Spark does not support Union that retains
+ * output partition specification (i.e., using PartitionSpecification). The default operation 
+ * [[PartitionerAwareUnionRDD]] does not retain outputPartitioning of result i.e., even if both 
+ * sides are bucketed in a compatible way, it will cause a shuffle. 
+ * 
+ * To avoid these issues, we define a new BucketUnion operation that avoids a shuffle when
+ * the following conditions are satisfied:
  *   - input RDDs must have the same number of partitions.
  *   - input RDDs must have the same partitioning keys.
  *   - input RDDs must have the same column schema.
  *
- * Unfortunately, there is no explicit API to check Partitioning keys in RDD, we have to
- * assure that on the caller side. Therefore, [[BucketUnionRDD]] is Hyperspace
+ * Unfortunately, since there is no explicit API to check Partitioning keys in RDD, we have to
+ * asset the partitioning keys on the caller side. Therefore, [[BucketUnionRDD]] is Hyperspace
  * internal use only.
  *
- * You can find more detailed information about Bucketing optimization in
- * [[https://youtu.be/7cvaH33S7uc Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle]]
+ * You can find more detailed information about Bucketing optimization in:
+ * [[Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle]]
+ * Video: [[https://youtu.be/7cvaH33S7uc ]]
  */
 private[hyperspace] class BucketUnionRDD[T: ClassTag](
     sc: SparkContext,
