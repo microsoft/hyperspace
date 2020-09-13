@@ -69,7 +69,7 @@ class BucketUnionTest extends HyperspaceSuite {
     }.isEmpty)
   }
 
-  test("BucketUnionExec test") {
+  test("BucketUnionExec test that partition count matches on both sides") {
     import spark.implicits._
     val df1 = Seq((1, "name1"), (2, "name2")).toDF("id", "name")
     val p1 = df1.repartition(10)
