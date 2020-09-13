@@ -29,12 +29,12 @@ import org.apache.spark.sql.execution.SparkPlan
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
 /**
- * [[BucketUnionRDD]] is required for the hybrid scan operation which merges index data and 
+ * [[BucketUnionRDD]] is required for the hybrid scan operation which merges index data and
  * appended data without re-shuffling the index data. Spark does not support Union that retains
- * output partition specification (i.e., using PartitionSpecification). The default operation 
- * [[PartitionerAwareUnionRDD]] does not retain outputPartitioning of result i.e., even if both 
- * sides are bucketed in a compatible way, it will cause a shuffle. 
- * 
+ * output partition specification (i.e., using PartitionSpecification). The default operation
+ * [[PartitionerAwareUnionRDD]] does not retain outputPartitioning of result i.e., even if both
+ * sides are bucketed in a compatible way, it will cause a shuffle.
+ *
  * To avoid these issues, we define a new BucketUnion operation that avoids a shuffle when
  * the following conditions are satisfied:
  *   - input RDDs must have the same number of partitions.
@@ -46,7 +46,7 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
  * internal use only.
  *
  * You can find more detailed information about Bucketing optimization in:
- * [[Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle]]
+ * ''Bucketing 2.0: Improve Spark SQL Performance by Removing Shuffle''
  * Video: [[https://youtu.be/7cvaH33S7uc ]]
  */
 private[hyperspace] class BucketUnionRDD[T: ClassTag](
