@@ -16,10 +16,13 @@
 
 package com.microsoft.hyperspace.index.rankers
 
-import com.microsoft.hyperspace.index.IndexLogEntry
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.rules.RuleUtils
 
 /**
- * Ranker class for Join rule indexes
+ * Ranker class for Join rule indexes.
  */
 object JoinIndexRanker {
 
@@ -27,29 +30,50 @@ object JoinIndexRanker {
    * Rearranges all available index options according to their cost. The first one is the best
    * with minimum cost.
    *
-   * Pick the one with least amount of shuffling and most number of buckets. When two indices have
-   * same number of buckets, there is zero shuffling. If number of buckets differ, one of the
-   * indices gets reshuffled into the number of buckets equal to the other. Secondly, more the
-   * number of buckets, better the parallelism achieved during join in general, assuming there is
-   * no resource constraint.
+   * If hybridScanEnabled is false, pick the one with least amount of shuffling and most number
+   * of buckets. When two indices have same number of buckets, there is zero shuffling.
+   * If number of buckets differ, one of the indices gets reshuffled into the number of buckets
+   * equal to the other.
+   * Secondly, more the number of buckets, better the parallelism achieved during join in general
+   * assuming there is no resource constraint.
    *
-   * @param indexPairs index pairs for left and right side of the join. All index pairs are
+   * If hybridScanEnabled is true, rank algorithm follows the algorithm above, but we prioritize
+   * the index with larger and usable index data for each index, so as to minimize the amount of
+   * data for on-the-fly shuffle or merge.
+   *
+   * @param indexPairs Index pairs for left and right side of the join. All index pairs are
    *                   compatible with each other.
-   * @return rearranged index pairs according to their ranking. The first is the best.
+   * @param hybridScanEnabled HybridScan config.
+   * @return Rearranged index pairs according to their ranking. The first is the best.
    */
   def rank(
-      indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
-
+      leftPlan: LogicalPlan,
+      rightPlan: LogicalPlan,
+      indexPairs: Seq[(IndexLogEntry, IndexLogEntry)],
+      hybridScanEnabled: Boolean): Seq[(IndexLogEntry, IndexLogEntry)] = {
     indexPairs.sortWith {
       case ((left1, left2), (right1, right2)) =>
+        lazy val leftCommonBytes = left1
+          .getTagValue(leftPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG)
+          .get +
+          left2.getTagValue(leftPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG).get
+        lazy val rightCommonBytes = right1
+          .getTagValue(rightPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG)
+          .get +
+          right2.getTagValue(rightPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG).get
+
         if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
-          left1.numBuckets > right1.numBuckets
+          if (!hybridScanEnabled || (leftCommonBytes == rightCommonBytes)) {
+            left1.numBuckets > right1.numBuckets
+          } else {
+            leftCommonBytes > rightCommonBytes
+          }
         } else if (left1.numBuckets == left2.numBuckets) {
           true
         } else if (right1.numBuckets == right2.numBuckets) {
           false
         } else {
-          true
+          !hybridScanEnabled || leftCommonBytes > rightCommonBytes
         }
     }
   }

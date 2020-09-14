@@ -477,9 +477,6 @@ case class IndexLogEntry(
     tags.remove((null, tag))
 }
 
-// A tag of a `IndexLogEntry`, which defines name and type.
-case class IndexLogEntryTag[T](name: String)
-
 object IndexLogEntry {
   val VERSION: String = "0.1"
 

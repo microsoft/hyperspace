@@ -315,18 +315,22 @@ object JoinIndexRule
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
-    val lIndexes = RuleUtils.getCandidateIndexes(
-      spark,
-      lUsable,
-      RuleUtils.getLogicalRelation(left).get)
-    val rIndexes = RuleUtils.getCandidateIndexes(
-      spark,
-      rUsable,
-      RuleUtils.getLogicalRelation(right).get)
+    val lIndexes =
+      RuleUtils.getCandidateIndexes(spark, lUsable, RuleUtils.getLogicalRelation(left).get)
+    val rIndexes =
+      RuleUtils.getCandidateIndexes(spark, rUsable, RuleUtils.getLogicalRelation(right).get)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
-    compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
+    compatibleIndexPairs.map(
+      indexPairs =>
+        JoinIndexRanker
+          .rank(
+            RuleUtils.getLogicalRelation(left).get,
+            RuleUtils.getLogicalRelation(right).get,
+            indexPairs,
+            HyperspaceConf.hybridScanEnabled(spark))
+          .head)
   }
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {

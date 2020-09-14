@@ -79,8 +79,21 @@ object RuleUtils {
       //  See https://github.com/microsoft/hyperspace/issues/158
 
       // Find the number of common files between the source relations & index source files.
-      val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
+      val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
+        if (entry.allSourceFileInfos.contains(f)) {
+          (res._1 + 1, res._2 + f.size) // count, bytes
+        } else {
+          res
+        }
+      }
       val deletedCnt = entry.allSourceFileInfos.size - commonCnt
+      entry.setTagValue(IndexLogEntryTags.INDEX_COMMON_BYTES_TAG, commonBytes)
+
+      // If there is no change in source dataset, this index can be applied by
+      // transformPlanToUseIndexOnlyScan.
+      entry.setTagValue(
+        IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+        !(commonCnt == entry.allSourceFileInfos.size && commonCnt == inputSourceFiles.size))
 
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn(spark) &&
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
