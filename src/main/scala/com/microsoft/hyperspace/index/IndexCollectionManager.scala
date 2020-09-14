@@ -70,6 +70,10 @@ class IndexCollectionManager(
             .getConfString(IndexConstants.REFRESH_DELETE_ENABLED, "false")
             .toBoolean) {
         new RefreshDeleteAction(spark, logManager, dataManager).run()
+      } else if (spark.sessionState.conf
+        .getConfString(IndexConstants.REFRESH_APPEND_ENABLED, "false")
+        .toBoolean) {
+        new RefreshIncremental(spark, logManager, dataManager).run()
       } else {
         new RefreshAction(spark, logManager, dataManager).run()
       }

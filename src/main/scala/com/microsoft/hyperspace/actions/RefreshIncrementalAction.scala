@@ -17,6 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -27,7 +28,7 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActi
 // TODO: This class depends directly on LogEntry. This should be updated such that
 //   it works with IndexLogEntry only. (for example, this class can take in
 //   derivedDataset specific logic for refreshing).
-private[actions] abstract class RefreshActionBase(
+class RefreshIncrementalAction(
     spark: SparkSession,
     final override protected val logManager: IndexLogManager,
     dataManager: IndexDataManager)
@@ -39,27 +40,50 @@ private[actions] abstract class RefreshActionBase(
     }
   }
 
-  protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
+  private lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
 
-  // Reconstruct a df from schema
-  protected lazy val df = {
-    val rels = previousIndexLogEntry.relations
+  // Reconstruct a df from schema. Remove pre-indexed data files.
+  private lazy val df = {
     // Currently we only support to create an index on a LogicalRelation.
-    assert(rels.size == 1)
-    val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
+    assert(previousIndexLogEntry.relations.size == 1)
+    val relation = previousIndexLogEntry.relations.head
+    val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
+
     spark.read
       .schema(dataSchema)
-      .format(rels.head.fileFormat)
-      .options(rels.head.options)
-      .load(rels.head.rootPaths: _*)
+      .format(relation.fileFormat)
+      .options(relation.options)
+      .load(relation.rootPaths: _*)
   }
 
-  protected lazy val indexConfig: IndexConfig = {
+  private lazy val indexableDf = {
+    // Currently we only support to create an index on a LogicalRelation.
+    assert(previousIndexLogEntry.relations.size == 1)
+    val relation = previousIndexLogEntry.relations.head
+
+    // TODO: improve this to take last modified time of files into account.
+    val indexedFiles = relation.data.properties.content.files
+    val predicate = indexedFiles.mkString("('", "','", "')")
+
+    // To remove pre-indexed files, add file name column, add file filter and remove file name
+    // column.
+    val temporaryColumn = "_file_name"
+    df.withColumn(temporaryColumn, input_file_name)
+      .where(s"$temporaryColumn not in $predicate")
+      .drop("_file_name")
+  }
+
+  private lazy val indexConfig: IndexConfig = {
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
     IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
   }
 
-  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+  final override def logEntry: LogEntry =
+    getIndexLogEntry(
+      spark,
+      df,
+      indexConfig,
+      indexDataPath)
 
   final override val transientState: String = REFRESHING
 
@@ -71,6 +95,13 @@ private[actions] abstract class RefreshActionBase(
         s"Refresh is only supported in $ACTIVE state. " +
           s"Current index state is ${previousIndexLogEntry.state}")
     }
+  }
+
+  final override def op(): Unit = {
+    // TODO: The current implementation picks the number of buckets from session config.
+    //   This should be user-configurable to allow maintain the existing bucket numbers
+    //   in the index log entry.
+    write(spark, indexableDf, indexConfig)
   }
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
