@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider, PlanSignatureProvider}
 
 object RuleUtils {
 
@@ -55,31 +55,35 @@ object RuleUtils {
       }
     }
 
-    def isHybridScanCandidate(entry: IndexLogEntry, files: Set[FileInfo]): Boolean = {
+    def isHybridScanCandidate(entry: IndexLogEntry, files: Seq[FileInfo]): Boolean = {
+      // TODO Some threshold about the similarity of source data files - number of common
+      //  files or total size of common files.
+      //  See https://github.com/microsoft/hyperspace/issues/159
+      // TODO As in [[PlanSignatureProvider]], Source plan signature comparison is required
+      //  to support arbitrary source plans at index creation.
+      //  See https://github.com/microsoft/hyperspace/issues/158
+
       // compare all the metadata of source files
-      assert(entry.relations.length == 1)
-      // TODO threshold for the number of CommonFiles
-      // TODO plan signature
       files.exists(entry.allSourceFileInfos.contains)
     }
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
+    //  See https://github.com/microsoft/hyperspace/issues/65
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
     if (hybridScanEnabled) {
       val files = plan
         .collect {
           case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              _,
+              _,
+              _) =>
             location.allFiles.map(f =>
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
         .flatten
-        .toSet
       allIndexes.filter(index => index.created && isHybridScanCandidate(index, files))
     } else {
       allIndexes.filter(index => index.created && signatureValid(index))

@@ -120,6 +120,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val readDf = spark.read.parquet(dataPath)
     indexManager.create(readDf, IndexConfig("index1", Seq("id")))
 
+    // Append new files.
     df.write.mode("append").parquet(dataPath)
 
     {
@@ -141,6 +142,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
           .length === 1)
     }
 
+    // Delete 1 file.
     readDf.queryExecution.optimizedPlan foreach {
       case LogicalRelation(
       HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _), _, _, _) =>
@@ -159,6 +161,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
           .length === 1)
     }
 
+    // Replace all files.
     df.write.mode("overwrite").parquet(dataPath)
 
     {
@@ -171,7 +174,6 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
             hybridScanEnabled = true)
           .length === 0)
     }
-
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
