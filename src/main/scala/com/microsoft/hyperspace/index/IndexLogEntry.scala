@@ -24,6 +24,7 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
@@ -318,6 +319,12 @@ case class IndexLogEntry(
       .flatMap(_.data.properties.content.fileInfos)
       .toSet
   }
+
+  def bucketSpec: BucketSpec =
+    BucketSpec(
+      numBuckets = numBuckets,
+      bucketColumnNames = indexedColumns,
+      sortColumnNames = indexedColumns)
 
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
