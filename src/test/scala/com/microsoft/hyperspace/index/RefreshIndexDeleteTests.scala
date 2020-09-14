@@ -23,6 +23,10 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
+/**
+ * Unit test cases for RefreshDeleteAction to validate incremental index refresh when
+ * some source data files(s) are deleted.
+ */
 class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val testDir = "src/test/resources/RefreshIndexDeleteTests/"
@@ -34,8 +38,7 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val sparkSession = spark
-    hyperspace = new Hyperspace(sparkSession)
+    hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
 

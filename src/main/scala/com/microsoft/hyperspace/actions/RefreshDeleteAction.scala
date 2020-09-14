@@ -25,12 +25,28 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.ResolverUtils
 
+/**
+ * Refresh index by removing index entries for deleted source data files.
+ * If some original data file(s) are removed, in order to update index,
+ * user can trigger an index refresh action during which:
+ * 1. Deleted source data files are detected;
+ * 2. Index records' lineage is leveraged to remove any index entry coming from deleted files.
+ *
+ * @param spark SparkSession
+ * @param logManager Index LogManager for index being refreshed
+ * @param dataManager Index DataManager for index being refreshed
+ */
 class RefreshDeleteAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
+  /**
+   * For an index with lineage, find all the source data files which have been deleted,
+   * and use index records' lineage to mark and remove index entries which belong to
+   * deleted source data files as those entries are no longer valid.
+   */
   final override def op(): Unit = {
     val indexDF = spark.read.parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
 
@@ -38,7 +54,8 @@ class RefreshDeleteAction(
       .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, indexDF.schema.fieldNames) match {
       case Some(_) =>
         val refreshDF =
-          indexDF.filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
+          indexDF.filter(
+            !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
 
         refreshDF.write.saveWithBuckets(
           refreshDF,
@@ -51,15 +68,20 @@ class RefreshDeleteAction(
     }
   }
 
+  /**
+   * Compare list of source files from previous index log entry to list of current data files
+   * and detect deleted source files.
+   *
+   * @return list of full paths of deleted source files.
+   */
   private def getDeletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
     // Currently we only support to create an index on a LogicalRelation.
     assert(rels.size == 1)
 
     val originalFiles = rels.head.data.properties.content.files.map(_.toString)
-    var currentFiles = Seq[String]()
-    rels.head.rootPaths.foreach { p =>
-      currentFiles ++= Content
+    val currentFiles = rels.head.rootPaths.flatMap { p =>
+      Content
         .fromDirectory(path = new Path(p))
         .files
         .map(_.toString)
