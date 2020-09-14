@@ -63,7 +63,8 @@ object RuleUtils {
       //  to support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      // compare all the metadata of source files
+      // Find a common file between the input relation & index source files.
+      // Without the threshold described above, we can utilize exists & contain functions here.
       files.exists(entry.allSourceFileInfos.contains)
     }
 
