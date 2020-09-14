@@ -439,6 +439,34 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
+  test("Directory.merge Test: test if merge works as expected.") {
+    // File Structure
+    // testDir/a/f1
+    // testDir/a/f2
+    // testDir/a/b/f3
+    // testDir/a/b/f4
+
+    val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
+    val a = Files.createDirectories(Paths.get(tempDir + "/a"))
+    val b = Files.createDirectories(Paths.get(a + "/b"))
+    val f1 = Files.createFile(Paths.get(a + "/f1"))
+    val f2 = Files.createFile(Paths.get(a + "/f2"))
+    val f3 = Files.createFile(Paths.get(b + "/f3"))
+    val f4 = Files.createFile(Paths.get(b + "/f4"))
+
+    val aDirectory = Directory.fromDirectory(toPath(a))
+    val bDirectory = Directory.fromDirectory(toPath(b))
+
+    val expected = Directory.fromLeafFiles(Seq(f1, f2, f3, f4).map(toFileStatus))
+    val actual1 = aDirectory.merge(bDirectory)
+    val actual2 = bDirectory.merge(aDirectory)
+
+    assert(directoryEquals(actual1, expected))
+    assert(directoryEquals(actual2, expected))
+
+    FileUtils.deleteDirectory(tempDir.toFile)
+  }
+
   private def contentEquals(content1: Content, content2: Content): Boolean = {
     directoryEquals(content1.root, content2.root)
   }

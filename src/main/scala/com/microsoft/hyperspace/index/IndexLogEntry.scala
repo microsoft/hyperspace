@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -83,7 +84,32 @@ object Content {
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
-case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
+case class Directory(
+    name: String,
+    files: Seq[FileInfo] = Seq(),
+    subDirs: Seq[Directory] = Seq()) {
+  def merge(that: Directory): Directory = {
+    if (name.equals(that.name)) {
+      val allFiles = files ++ that.files
+      val subDirMap = subDirs.map(dir => dir.name -> dir).toMap
+      val thatSubDirMap = that.subDirs.map(dir => dir.name -> dir).toMap
+      val subDir: Seq[Directory] = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map {
+        dirName =>
+          if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
+            // If both directories contain a subDir with same name, merge subDirs respectively.
+            subDirMap(dirName).merge(thatSubDirMap(dirName))
+          } else {
+            // Pick the subDir from whoever contains it.
+            subDirMap.getOrElse(dirName, thatSubDirMap(dirName))
+          }
+      }
+
+      Directory(name, allFiles, subDirs = subDir)
+    } else {
+      throw HyperspaceException("Directory names should match for merging Directories.")
+    }
+  }
+}
 
 object Directory {
 
