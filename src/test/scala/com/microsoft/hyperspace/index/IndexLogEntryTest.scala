@@ -445,7 +445,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     // testDir/a/f2
     // testDir/a/b/f3
     // testDir/a/b/f4
-
+    // Expected Result: Merged Directory structure when merging Directory object of dir a with
+    // that of b.
     val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
     val a = Files.createDirectories(Paths.get(tempDir + "/a"))
     val b = Files.createDirectories(Paths.get(a + "/b"))

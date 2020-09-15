@@ -84,6 +84,14 @@ object Content {
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
+/**
+ * Directory is a representation of file system directory. It consists of a name (directory name),
+ * a list of files represented by sequence of [[FileInfo]], and a list of subdirectories.
+ *
+ * @param name Directory name.
+ * @param files List of leaf files in this directory.
+ * @param subDirs List of sub-directories in this directory.
+ */
 case class Directory(
     name: String,
     files: Seq[FileInfo] = Seq(),
