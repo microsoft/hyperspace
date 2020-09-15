@@ -117,62 +117,67 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val dataPath = systemPath.toString + "/hbtable"
     df.write.parquet(dataPath)
 
-    val readDf = spark.read.parquet(dataPath)
-    indexManager.create(readDf, IndexConfig("index1", Seq("id")))
-
-    // Append new files.
-    df.write.mode("append").parquet(dataPath)
-
-    {
+    withIndex("index1") {
       val readDf = spark.read.parquet(dataPath)
-      assert(
-        RuleUtils
-          .getCandidateIndexes(
-            indexManager,
-            readDf.queryExecution.optimizedPlan,
-            hybridScanEnabled = false)
-          .isEmpty)
+      indexManager.create(readDf, IndexConfig("index1", Seq("id")))
 
-      assert(
-        RuleUtils
-          .getCandidateIndexes(
-            indexManager,
-            readDf.queryExecution.optimizedPlan,
-            hybridScanEnabled = true)
-          .length === 1)
-    }
+      // Append new files.
+      df.write.mode("append").parquet(dataPath)
 
-    // Delete 1 file.
-    readDf.queryExecution.optimizedPlan foreach {
-      case LogicalRelation(
-      HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _), _, _, _) =>
-        systemPath.getFileSystem(new Configuration).delete(location.allFiles.head.getPath, false)
-      case _ =>
-    }
+      {
+        val readDf = spark.read.parquet(dataPath)
+        assert(
+          RuleUtils
+            .getCandidateIndexes(
+              indexManager,
+              readDf.queryExecution.optimizedPlan,
+              hybridScanEnabled = false)
+            .isEmpty)
 
-    {
-      val readDf = spark.read.parquet(dataPath)
-      assert(
-        RuleUtils
-          .getCandidateIndexes(
-            indexManager,
-            readDf.queryExecution.optimizedPlan,
-            hybridScanEnabled = true)
-          .length === 1)
-    }
+        assert(
+          RuleUtils
+            .getCandidateIndexes(
+              indexManager,
+              readDf.queryExecution.optimizedPlan,
+              hybridScanEnabled = true)
+            .length === 1)
+      }
 
-    // Replace all files.
-    df.write.mode("overwrite").parquet(dataPath)
+      // Delete 1 file.
+      readDf.queryExecution.optimizedPlan foreach {
+        case LogicalRelation(
+        HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+        _,
+        _,
+        _) =>
+          systemPath.getFileSystem(new Configuration).delete(location.allFiles.head.getPath, false)
+        case _ =>
+      }
 
-    {
-      val readDf = spark.read.parquet(dataPath)
-      assert(
-        RuleUtils
-          .getCandidateIndexes(
-            indexManager,
-            readDf.queryExecution.optimizedPlan,
-            hybridScanEnabled = true)
-          .isEmpty)
+      {
+        val readDf = spark.read.parquet(dataPath)
+        assert(
+          RuleUtils
+            .getCandidateIndexes(
+              indexManager,
+              readDf.queryExecution.optimizedPlan,
+              hybridScanEnabled = true)
+            .length === 1)
+      }
+
+      // Replace all files.
+      df.write.mode("overwrite").parquet(dataPath)
+
+      {
+        val readDf = spark.read.parquet(dataPath)
+        assert(
+          RuleUtils
+            .getCandidateIndexes(
+              indexManager,
+              readDf.queryExecution.optimizedPlan,
+              hybridScanEnabled = true)
+            .isEmpty)
+      }
     }
   }
 
