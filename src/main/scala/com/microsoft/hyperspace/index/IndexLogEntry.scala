@@ -41,14 +41,25 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
   @JsonIgnore
   lazy val files: Seq[Path] = {
     // Recursively find files from directory tree.
-    def rec(prefixPath: Path, directory: Directory): Seq[Path] = {
-      val files = directory.files.map(f => new Path(prefixPath, f.name))
-      files ++ directory.subDirs.flatMap { dir =>
-        rec(new Path(prefixPath, dir.name), dir)
-      }
-    }
+    rec(new Path(root.name), root, (f, prefix) => new Path(prefix, f.name))
+  }
 
-    rec(new Path(root.name), root)
+  @JsonIgnore
+  lazy val fileInfos: Set[FileInfo] = {
+    rec(
+      new Path(root.name),
+      root,
+      (f, prefix) => FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime)).toSet
+  }
+
+  private def rec[T](
+      prefixPath: Path,
+      directory: Directory,
+      func: (FileInfo, Path) => T): Seq[T] = {
+    val files = directory.files.map(f => func(f, prefixPath))
+    files ++ directory.subDirs.flatMap { dir =>
+      rec(new Path(prefixPath, dir.name), dir, func)
+    }
   }
 }
 
@@ -295,7 +306,18 @@ case class IndexLogEntry(
 
   def created: Boolean = state.equals(Constants.States.ACTIVE)
 
-  def relations: Seq[Relation] = source.plan.properties.relations
+  def relations: Seq[Relation] = {
+    // Only one relation is currently supported.
+    assert(source.plan.properties.relations.size == 1)
+    source.plan.properties.relations
+  }
+
+  @JsonIgnore
+  lazy val allSourceFileInfos: Set[FileInfo] = {
+    relations
+      .flatMap(_.data.properties.content.fileInfos)
+      .toSet
+  }
 
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>

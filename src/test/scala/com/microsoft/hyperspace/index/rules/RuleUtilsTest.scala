@@ -16,14 +16,15 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileUtil, Path}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.IndexCollectionManager
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
 import com.microsoft.hyperspace.util.PathUtils
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite {
@@ -108,6 +109,80 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
     val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
+  }
+
+  test("Verify getCandidateIndex for hybrid scan") {
+    val indexManager = IndexCollectionManager(spark)
+    val df = spark.range(1, 5).toDF("id")
+    val dataPath = systemPath.toString + "/hbtable"
+    df.write.parquet(dataPath)
+
+    withIndex("index1") {
+      val readDf = spark.read.parquet(dataPath)
+      indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+
+      def verify(
+          plan: LogicalPlan,
+          hybridScanEnabled: Boolean,
+          expectCandidateIndex: Boolean): Unit = {
+        val indexes = RuleUtils
+          .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
+        if (expectCandidateIndex) {
+          assert(indexes.length == 1)
+          assert(indexes.head.name == "index1")
+        } else {
+          assert(indexes.isEmpty)
+        }
+      }
+
+      // Verify that a candidate index is returned with the unmodified data files whether
+      // hybrid scan is enabled or not.
+      {
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+      }
+
+      // Scenario #1: Append new files.
+      df.write.mode("append").parquet(dataPath)
+
+      {
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+      }
+
+      // Scenario #2: Delete 1 file.
+      {
+        val readDf = spark.read.parquet(dataPath)
+        readDf.queryExecution.optimizedPlan foreach {
+          case LogicalRelation(
+              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              _,
+              _,
+              _) =>
+            systemPath
+              .getFileSystem(new Configuration)
+              .delete(location.allFiles.head.getPath, false)
+          case _ =>
+        }
+      }
+
+      {
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+      }
+
+      // Scenario #3: Replace all files.
+      df.write.mode("overwrite").parquet(dataPath)
+
+      {
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+      }
+    }
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {

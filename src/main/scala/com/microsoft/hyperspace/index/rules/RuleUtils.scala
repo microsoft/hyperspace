@@ -19,10 +19,10 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider, PlanSignatureProvider}
 
 object RuleUtils {
 
@@ -31,9 +31,13 @@ object RuleUtils {
    *
    * @param indexManager indexManager
    * @param plan logical plan
+   * @param hybridScanEnabled Flag that checks if hybrid scan is enabled or disabled.
    * @return indexes built for this plan
    */
-  def getCandidateIndexes(indexManager: IndexManager, plan: LogicalPlan): Seq[IndexLogEntry] = {
+  def getCandidateIndexes(
+      indexManager: IndexManager,
+      plan: LogicalPlan,
+      hybridScanEnabled: Boolean = false): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
 
@@ -51,11 +55,41 @@ object RuleUtils {
       }
     }
 
+    def isHybridScanCandidate(entry: IndexLogEntry, filesByRelations: Seq[FileInfo]): Boolean = {
+      // TODO: Some threshold about the similarity of source data files - number of common files or
+      //  total size of common files.
+      //  See https://github.com/microsoft/hyperspace/issues/159
+      // TODO: As in [[PlanSignatureProvider]], Source plan signature comparison is required to
+      //  support arbitrary source plans at index creation.
+      //  See https://github.com/microsoft/hyperspace/issues/158
+
+      // Find a common file between the input relation & index source files.
+      // Without the threshold described above, we can utilize exists & contain functions here.
+      filesByRelations.exists(entry.allSourceFileInfos.contains)
+    }
+
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
+    //  See https://github.com/microsoft/hyperspace/issues/65
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    allIndexes.filter(index => index.created && signatureValid(index))
+    if (hybridScanEnabled) {
+      val filesByRelations = plan
+        .collect {
+          case LogicalRelation(
+              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              _,
+              _,
+              _) =>
+            location.allFiles.map(f =>
+              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+        }
+      assert(filesByRelations.length == 1)
+      allIndexes.filter(index =>
+        index.created && isHybridScanCandidate(index, filesByRelations.flatten))
+    } else {
+      allIndexes.filter(index => index.created && signatureValid(index))
+    }
   }
 
   /**
