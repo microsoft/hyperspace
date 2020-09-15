@@ -89,7 +89,6 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test("HybridScan filter rule test") {
     df = spark.read.parquet(sampleParquetDataLocation)
     val query = df.filter(df("clicks") <= 2000).select(df("query"))
-    val expectedResult = query.collect
 
     withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
       val transformed = FilterIndexRule(query.queryExecution.optimizedPlan)
@@ -113,11 +112,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
       spark.enableHyperspace()
       val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
-      val res = query2.collect()
 
-      assert(expectedResult.nonEmpty)
-      assert(res.nonEmpty)
-      assert(expectedResult.sortBy(_.toString).toSeq === res.sortBy(_.toString).toSeq)
+      checkAnswer(query2, query)
     }
   }
 
@@ -126,7 +122,6 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     val query = df.filter(df("clicks") >= 2000).select(df("clicks"), df("query"))
     val query2 = df.filter(df("clicks") <= 4000).select(df("clicks"), df("query"))
     val join = query.join(query2, "clicks")
-    val expectedResult = join.collect()
 
     withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
       withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
@@ -177,11 +172,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         assert(execNodes.count(p => p.getClass.toString.contains("FileSourceScanExec")) === 3)
 
         val join2 = query.join(query2, "clicks")
-        val res = join2.collect()
-
-        assert(expectedResult.nonEmpty)
-        assert(res.nonEmpty)
-        assert(expectedResult.sortBy(_.toString).toSeq === res.sortBy(_.toString).toSeq)
+        checkAnswer(join2, join)
       }
     }
   }
