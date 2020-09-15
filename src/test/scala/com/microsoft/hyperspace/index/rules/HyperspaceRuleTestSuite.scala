@@ -26,6 +26,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.Hdfs.Properties
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   private val filenames = Seq("f1.parquet", "f2.parquet")
@@ -39,7 +40,13 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
       case Some(s) =>
         val sourcePlanProperties = SparkPlan.Properties(
-          Seq(),
+          Seq(
+            Relation(
+              Seq("dummy"),
+              Hdfs(Properties(Content(Directory("/")))),
+              "schema",
+              "format",
+              Map())),
           null,
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
