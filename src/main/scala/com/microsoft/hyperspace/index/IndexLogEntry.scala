@@ -96,6 +96,27 @@ case class Directory(
     name: String,
     files: Seq[FileInfo] = Seq(),
     subDirs: Seq[Directory] = Seq()) {
+  /**
+   * Merge two Directory objects. For e.g., merging the following directories
+   * /file:/C:/
+   *          a/
+   *            b/
+   *              f1, f2
+   * and
+   * /file:/C:/
+   *          a/
+   *            f3, f4
+   * will be
+   * /file:/C:/
+   *           a/
+   *             f3, f4
+   *             b/
+   *               f1, f2
+   *
+   * @param that The other directory to merge this with.
+   * @return Merged directory
+   * @throws HyperspaceException To merge two directories, their name should be same.
+   */
   def merge(that: Directory): Directory = {
     if (name.equals(that.name)) {
       val allFiles = files ++ that.files
@@ -114,7 +135,8 @@ case class Directory(
 
       Directory(name, allFiles, subDirs = subDir)
     } else {
-      throw HyperspaceException("Directory names should match for merging Directories.")
+      throw HyperspaceException(s"Merging directories with names $name and ${that.name} failed." +
+        s"Directory names must be same for merging Directories.")
     }
   }
 }
