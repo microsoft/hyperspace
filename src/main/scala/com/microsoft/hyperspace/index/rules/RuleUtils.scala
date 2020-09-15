@@ -55,7 +55,7 @@ object RuleUtils {
       }
     }
 
-    def isHybridScanCandidate(entry: IndexLogEntry, files: Seq[FileInfo]): Boolean = {
+    def isHybridScanCandidate(entry: IndexLogEntry, filesByRelations: Seq[FileInfo]): Boolean = {
       // TODO: Some threshold about the similarity of source data files - number of common files or
       //  total size of common files.
       //  See https://github.com/microsoft/hyperspace/issues/159
@@ -65,7 +65,7 @@ object RuleUtils {
 
       // Find a common file between the input relation & index source files.
       // Without the threshold described above, we can utilize exists & contain functions here.
-      files.exists(entry.allSourceFileInfos.contains)
+      filesByRelations.exists(entry.allSourceFileInfos.contains)
     }
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
@@ -74,7 +74,7 @@ object RuleUtils {
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
     if (hybridScanEnabled) {
-      val files = plan
+      val filesByRelations = plan
         .collect {
           case LogicalRelation(
               HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
@@ -84,8 +84,9 @@ object RuleUtils {
             location.allFiles.map(f =>
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
-      assert(files.length == 1)
-      allIndexes.filter(index => index.created && isHybridScanCandidate(index, files.flatten))
+      assert(filesByRelations.length == 1)
+      allIndexes.filter(index =>
+        index.created && isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
       allIndexes.filter(index => index.created && signatureValid(index))
     }
