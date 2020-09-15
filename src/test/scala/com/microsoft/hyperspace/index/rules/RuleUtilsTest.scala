@@ -121,62 +121,66 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
       val readDf = spark.read.parquet(dataPath)
       indexManager.create(readDf, IndexConfig("index1", Seq("id")))
 
-      // Append new files.
+      def verify(
+          plan: LogicalPlan,
+          hybridScanEnabled: Boolean,
+          expectCandidateIndex: Boolean): Unit = {
+        val indexes = RuleUtils
+          .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
+        if (expectCandidateIndex) {
+          assert(indexes.length == 1)
+          assert(indexes.head.name == "index1")
+        } else {
+          assert(indexes.isEmpty)
+        }
+      }
+
+      // Verify that a candidate index is returned with the unmodified data files whether
+      // hybrid scan is enabled or not.
+      {
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+      }
+
+      // Scenario #1: Append new files.
       df.write.mode("append").parquet(dataPath)
 
       {
-        val readDf = spark.read.parquet(dataPath)
-        assert(
-          RuleUtils
-            .getCandidateIndexes(
-              indexManager,
-              readDf.queryExecution.optimizedPlan,
-              hybridScanEnabled = false)
-            .isEmpty)
-
-        assert(
-          RuleUtils
-            .getCandidateIndexes(
-              indexManager,
-              readDf.queryExecution.optimizedPlan,
-              hybridScanEnabled = true)
-            .length === 1)
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
       }
 
-      // Delete 1 file.
-      readDf.queryExecution.optimizedPlan foreach {
-        case LogicalRelation(
-        HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-        _,
-        _,
-        _) =>
-          systemPath.getFileSystem(new Configuration).delete(location.allFiles.head.getPath, false)
-        case _ =>
+      // Scenario #2: Delete 1 file.
+      {
+        val readDf = spark.read.parquet(dataPath)
+        readDf.queryExecution.optimizedPlan foreach {
+          case LogicalRelation(
+              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+              _,
+              _,
+              _) =>
+            systemPath
+              .getFileSystem(new Configuration)
+              .delete(location.allFiles.head.getPath, false)
+          case _ =>
+        }
       }
 
       {
-        val readDf = spark.read.parquet(dataPath)
-        assert(
-          RuleUtils
-            .getCandidateIndexes(
-              indexManager,
-              readDf.queryExecution.optimizedPlan,
-              hybridScanEnabled = true)
-            .length === 1)
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
       }
 
-      // Replace all files.
+      // Scenario #3: Replace all files.
       df.write.mode("overwrite").parquet(dataPath)
 
       {
-        val readDf = spark.read.parquet(dataPath)
-        assert(
-          RuleUtils
-            .getCandidateIndexes(
-              indexManager,
-              readDf.queryExecution.optimizedPlan,
-              hybridScanEnabled = true)
-            .isEmpty)
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
       }
     }
   }
