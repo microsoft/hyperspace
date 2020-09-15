@@ -23,14 +23,18 @@ import org.apache.spark.sql.functions._
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshDeleteActionEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
- * Refresh index by removing index entries for deleted source data files.
- * If some original data file(s) are removed, in order to update index,
- * user can trigger an index refresh action during which:
- * 1. Deleted source data files are detected;
- * 2. Index records' lineage is leveraged to remove any index entry coming from deleted files.
+ * Refresh index by removing index entries from any deleted source data file.
+ * Note this Refresh Action only fixes an index w.r.t deleted source data files
+ * and does not consider new source data files (if any).
+ * If some original source data file(s) are removed between previous version of index and now,
+ * this Refresh Action updates the index as follows:
+ * 1. Deleted source data files are identified;
+ * 2. Index records' lineage is leveraged to remove any index entry coming
+ *    from those deleted source data files.
  *
  * @param spark SparkSession
  * @param logManager Index LogManager for index being refreshed
@@ -41,6 +45,10 @@ class RefreshDeleteAction(
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshDeleteActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
+  }
 
   /**
    * For an index with lineage, find all the source data files which have been deleted,
@@ -60,7 +68,7 @@ class RefreshDeleteAction(
         refreshDF.write.saveWithBuckets(
           refreshDF,
           indexDataPath.toString,
-          logEntry.asInstanceOf[IndexLogEntry].numBuckets,
+          previousIndexLogEntry.numBuckets,
           indexConfig.indexedColumns)
 
       case None =>
@@ -69,10 +77,10 @@ class RefreshDeleteAction(
   }
 
   /**
-   * Compare list of source files from previous index log entry to list of current data files
-   * and detect deleted source files.
+   * Compare list of source data files from previous IndexLogEntry to list of
+   * current source data files and identify deleted source data files.
    *
-   * @return list of full paths of deleted source files.
+   * @return list of full paths of deleted source data files.
    */
   private def getDeletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations

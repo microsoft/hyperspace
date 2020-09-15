@@ -182,6 +182,17 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val missingPartitionColumns = getPartitionColumns(df).filter(
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
+
+      // File path value in DATA_FILE_NAME_COLUMN column is stored as String. We normalize
+      // path values in this column by removing extra preceding `/` characters in the path
+      // and store it the same way paths are stored in Content in an IndexLogEntry instance.
+      // Normalizing path values in DATA_FILE_NAME_COLUMN column keeps path representation
+      // unified in Hyperspace (between index lineage and index metadata) and helps performance
+      // by avoiding the need to fix paths (i.e. removing extra `/` characters) each time
+      // value of DATA_FILE_NAME_COLUMN column is read.
+      val absolutePath: UserDefinedFunction = udf(
+        (filePath: String) => PathUtils.makeAbsolute(filePath).toString)
+
       df.select(allIndexColumns.head, allIndexColumns.tail: _*)
         .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, absolutePath(input_file_name()))
     } else {
@@ -201,7 +212,4 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     assert(partitionSchemas.length == 1)
     partitionSchemas.head.map(_.name)
   }
-
-  private val absolutePath: UserDefinedFunction = udf(
-    (filePath: String) => PathUtils.makeAbsolute(filePath).toString)
 }

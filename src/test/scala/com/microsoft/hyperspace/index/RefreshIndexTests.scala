@@ -24,10 +24,9 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
 /**
- * Unit test cases for RefreshDeleteAction to validate incremental index refresh when
- * some source data files(s) are deleted.
+ * Unit E2E test cases for RefreshIndex.
  */
-class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
+class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val testDir = "src/test/resources/RefreshIndexDeleteTests/"
   private val nonPartitionedDataPath = testDir + "nonpartitioned"

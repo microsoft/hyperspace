@@ -31,4 +31,10 @@ object HyperspaceConf {
         IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT)
       .toBoolean
   }
+
+  def refreshDeleteEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(IndexConstants.REFRESH_DELETE_ENABLED, "false")
+      .toBoolean
+  }
 }
