@@ -31,7 +31,7 @@ object RuleUtils {
    *
    * @param indexManager indexManager
    * @param plan logical plan
-   * @param hybridScanEnabled HybridScan config.
+   * @param hybridScanEnabled Flag that checks if hybrid scan is enabled or disabled.
    * @return indexes built for this plan
    */
   def getCandidateIndexes(
@@ -56,11 +56,11 @@ object RuleUtils {
     }
 
     def isHybridScanCandidate(entry: IndexLogEntry, files: Seq[FileInfo]): Boolean = {
-      // TODO Some threshold about the similarity of source data files - number of common
-      //  files or total size of common files.
+      // TODO: Some threshold about the similarity of source data files - number of common files or
+      //  total size of common files.
       //  See https://github.com/microsoft/hyperspace/issues/159
-      // TODO As in [[PlanSignatureProvider]], Source plan signature comparison is required
-      //  to support arbitrary source plans at index creation.
+      // TODO: As in [[PlanSignatureProvider]], Source plan signature comparison is required to
+      //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
       // Find a common file between the input relation & index source files.
@@ -84,8 +84,8 @@ object RuleUtils {
             location.allFiles.map(f =>
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
-        .flatten
-      allIndexes.filter(index => index.created && isHybridScanCandidate(index, files))
+      assert(files.length == 1)
+      allIndexes.filter(index => index.created && isHybridScanCandidate(index, files.flatten))
     } else {
       allIndexes.filter(index => index.created && signatureValid(index))
     }

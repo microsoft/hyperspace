@@ -131,7 +131,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
             indexManager,
             readDf.queryExecution.optimizedPlan,
             hybridScanEnabled = false)
-          .length === 0)
+          .isEmpty)
 
       assert(
         RuleUtils
@@ -172,7 +172,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
             indexManager,
             readDf.queryExecution.optimizedPlan,
             hybridScanEnabled = true)
-          .length === 0)
+          .isEmpty)
     }
   }
 
