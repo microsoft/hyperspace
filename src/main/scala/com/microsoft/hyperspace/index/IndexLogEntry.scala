@@ -95,29 +95,61 @@ object Content {
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
+/**
+ * Directory is a representation of file system directory. It consists of a name (directory name),
+ * a list of files represented by sequence of [[FileInfo]], and a list of subdirectories.
+ *
+ * @param name Directory name.
+ * @param files List of leaf files in this directory.
+ * @param subDirs List of sub-directories in this directory.
+ */
 case class Directory(
     name: String,
     files: Seq[FileInfo] = Seq(),
     subDirs: Seq[Directory] = Seq()) {
+
+  /**
+   * Merge two Directory objects. For e.g., merging the following directories
+   * /file:/C:/
+   *          a/
+   *            b/
+   *              f1, f2
+   * and
+   * /file:/C:/
+   *          a/
+   *            f3, f4
+   * will be
+   * /file:/C:/
+   *           a/
+   *             f3, f4
+   *             b/
+   *               f1, f2
+   *
+   * @param that The other directory to merge this with.
+   * @return Merged directory.
+   * @throws HyperspaceException If two directories to merge have different names.
+   */
   def merge(that: Directory): Directory = {
     if (name.equals(that.name)) {
       val allFiles = files ++ that.files
       val subDirMap = subDirs.map(dir => dir.name -> dir).toMap
       val thatSubDirMap = that.subDirs.map(dir => dir.name -> dir).toMap
-      val subDir: Seq[Directory] = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map {
-        dirName =>
-          if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
-            // If both directories contain a subDir with same name, merge subDirs respectively.
-            subDirMap(dirName).merge(thatSubDirMap(dirName))
-          } else {
-            // Pick the subDir from whoever contains it.
-            subDirMap.getOrElse(dirName, thatSubDirMap(dirName))
-          }
+      val mergedSubDirs = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map { dirName =>
+        if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
+          // If both directories contain a subDir with same name, merge corresponding subDirs
+          // recursively.
+          subDirMap(dirName).merge(thatSubDirMap(dirName))
+        } else {
+          // Pick the subDir from whoever contains it.
+          subDirMap.getOrElse(dirName, thatSubDirMap(dirName))
+        }
       }
 
-      Directory(name, allFiles, subDirs = subDir)
+      Directory(name, allFiles, subDirs = mergedSubDirs)
     } else {
-      throw HyperspaceException("Directory names should match for merging Directories.")
+      throw HyperspaceException(
+        s"Merging directories with names $name and ${that.name} failed. " +
+          "Directory names must be same for merging directories.")
     }
   }
 }
