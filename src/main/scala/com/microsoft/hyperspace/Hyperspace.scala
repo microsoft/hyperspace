@@ -78,6 +78,20 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
+   * Optmizes index files by merging smaller files into larger files.
+   *
+   * Note: This api does NOT refresh (i.e. update) the index if the underlying data changes. It
+   * only rearranges the index data into a better layout, by compacting small index files.
+   *
+   * @param indexName Name of the index to optimize.
+   * @param mode Index optimization mode. "quick" refers to optimization of only small index
+   *             files, based on a threshold. "full" refers to recreation of index.
+   */
+  def optimizeIndex(indexName: String, mode: String = "quick"): Unit = {
+    indexManager.optimize(indexName, mode)
+  }
+
+  /**
    * Cancel api to bring back index from an inconsistent state to the last known stable state.
    * E.g. if index fails during creation, in "CREATING" state.
    * The index will not allow any index modifying operations unless a cancel is called.

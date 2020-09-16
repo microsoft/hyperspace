@@ -312,6 +312,69 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test("Verify quick optimize rebuild of index after append.") {
+    Seq(("csv", Map("header" -> "true")), ("parquet", Map()), ("json", Map())).foreach {
+      case (format, option: Map[String, String]) =>
+        spark.conf.set(IndexConstants.REFRESH_APPEND_ENABLED, true)
+        val refreshTestLocation = sampleParquetDataLocation + "refresh_" + format
+        FileUtils.delete(new Path(refreshTestLocation))
+        val indexConfig = IndexConfig(s"index_$format", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .options(option)
+          .format(format)
+          .save(refreshTestLocation)
+        val df = spark.read.format(format).options(option).load(refreshTestLocation)
+        hyperspace.createIndex(df, indexConfig)
+        var indexCount =
+          spark.read
+            .parquet(s"$systemPath/index_$format" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+            .count()
+        assert(indexCount == 10)
+
+        // Change Original Data
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(3)
+          .write
+          .mode("append")
+          .options(option)
+          .format(format)
+          .save(refreshTestLocation)
+        hyperspace.refreshIndex(indexConfig.indexName)
+        val newIndexLocation = s"$systemPath/index_$format"
+        indexCount = spark.read
+          .parquet(newIndexLocation +
+            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+          .count()
+
+        // Check if index got updated
+        assert(indexCount == 3)
+
+        hyperspace.optimizeIndex(indexConfig.indexName)
+
+        // Check if latest log file is updated with newly created index files
+        val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+        val latestLog = logManager.getLatestLog()
+        assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+        val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+        val indexFiles = indexLog.content.files
+        assert(indexFiles.nonEmpty)
+        assert(indexFiles.forall(_.getName.startsWith("part-0")))
+        assert(indexLog.state.equals("ACTIVE"))
+        // Check there exist some files from v__=0 and some from v__=1
+        assert(indexFiles.map(_.getParent.getName).toSet.equals(Set("v__=2")))
+
+        FileUtils.delete(new Path(refreshTestLocation))
+      case _ => fail("invalid test")
+    }
+  }
+
   private def expectedIndex(
       indexConfig: IndexConfig,
       schema: StructType,

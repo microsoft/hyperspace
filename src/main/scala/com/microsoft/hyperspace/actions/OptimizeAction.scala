@@ -24,26 +24,35 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.HyperspaceConf
 
-class OptimizeQuickAction(
+class OptimizeAction(
     spark: SparkSession,
     logManager: IndexLogManager,
-    dataManager: IndexDataManager)
+    dataManager: IndexDataManager,
+    mode: String)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
   final override def op(): Unit = {
     // Rewrite index from small files
+    val numBuckets = previousIndexLogEntry.numBuckets
     val indexDF = spark.read.parquet(smallFiles.map(_.name): _*)
 
-    indexDF.write.saveWithBuckets(
-      indexDF,
+    val repartitionedDf =
+      indexDF.repartition(numBuckets, indexConfig.indexedColumns.map(indexDF(_)): _*)
+
+    repartitionedDf.write.saveWithBuckets(
+      repartitionedDf,
       indexDataPath.toString,
       logEntry.asInstanceOf[IndexLogEntry].numBuckets,
       indexConfig.indexedColumns)
   }
 
   private lazy val (smallFiles, largeFiles): (Seq[FileInfo], Seq[FileInfo]) = {
-    val threshold = HyperspaceConf.optimizeThreshold(spark)
-    previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
+    if (mode.equals("quick")) {
+      val threshold = HyperspaceConf.optimizeThreshold(spark)
+      previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
+    } else {
+      (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
+    }
   }
 
   override def logEntry: LogEntry = {
@@ -52,15 +61,19 @@ class OptimizeQuickAction(
     // 3. Merge them
 
     val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
-    val largeFilesDirectory: Directory = {
-      val fs = new Path(previousIndexLogEntry.content.fileInfos.head.name)
-        .getFileSystem(new Configuration)
-      val largeFileStatuses =
-        largeFiles.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
+    if (largeFiles.nonEmpty) {
+      val largeFilesDirectory: Directory = {
+        val fs = new Path(previousIndexLogEntry.content.fileInfos.head.name)
+          .getFileSystem(new Configuration)
+        val largeFileStatuses =
+          largeFiles.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
 
-      Directory.fromLeafFiles(largeFileStatuses)
+        Directory.fromLeafFiles(largeFileStatuses)
+      }
+      val mergedContent = Content(entry.content.root.merge(largeFilesDirectory))
+      entry.copy(content = mergedContent)
+    } else {
+      entry
     }
-    val mergedContent = Content(entry.content.root.merge(largeFilesDirectory))
-    entry.copy(content = mergedContent)
   }
 }
