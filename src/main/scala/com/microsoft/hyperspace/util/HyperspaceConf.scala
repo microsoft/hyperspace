@@ -31,4 +31,12 @@ object HyperspaceConf {
         IndexConstants.INDEX_HYBRID_SCAN_ENABLED_DEFAULT)
       .toBoolean
   }
+
+  def optimizeThreshold(spark: SparkSession): Long = {
+    spark.conf
+      .get(
+        IndexConstants.OPTIMIZE_THRESHOLD,
+        IndexConstants.OPTIMIZE_THRESHOLD_SIZE.toString)
+      .toLong
+  }
 }

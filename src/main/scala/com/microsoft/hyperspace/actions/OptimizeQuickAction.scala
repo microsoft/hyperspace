@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// scalastyle:off
+
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 class OptimizeQuickAction(
     spark: SparkSession,
@@ -29,7 +31,8 @@ class OptimizeQuickAction(
     extends RefreshActionBase(spark, logManager, dataManager) {
 
   final override def op(): Unit = {
-    val indexDF = spark.read.parquet(smallFiles.map(_.getPath.toString): _*)
+    // Rewrite index from small files
+    val indexDF = spark.read.parquet(smallFiles.map(_.name): _*)
 
     indexDF.write.saveWithBuckets(
       indexDF,
@@ -38,16 +41,25 @@ class OptimizeQuickAction(
       indexConfig.indexedColumns)
   }
 
-  lazy val (smallFiles, largeFiles): (Seq[FileStatus], Seq[FileStatus]) = ???
-  // use previousIndexLogEntry to get smallFiles and LargeFiles
+  private lazy val (smallFiles, largeFiles): (Seq[FileInfo], Seq[FileInfo]) = {
+    val threshold = HyperspaceConf.optimizeThreshold(spark)
+    previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
+  }
 
   override def logEntry: LogEntry = {
-    // 1. Create an entry with full data and newly created index files
-    // 2. Create a content object using just largeFiles
+    // 1. Create an  entry with full data and newly created index files
+    // 2. Create a Directory object using just largeFiles
     // 3. Merge them
 
     val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
-    val largeFilesDirectory: Directory = Directory.fromLeafFiles(largeFiles)
+    val largeFilesDirectory: Directory = {
+      val fs = new Path(previousIndexLogEntry.content.fileInfos.head.name)
+        .getFileSystem(new Configuration)
+      val largeFileStatuses =
+        largeFiles.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
+
+      Directory.fromLeafFiles(largeFileStatuses)
+    }
     val mergedContent = Content(entry.content.root.merge(largeFilesDirectory))
     entry.copy(content = mergedContent)
   }
