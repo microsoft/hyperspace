@@ -117,8 +117,9 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Validate refresh index (to handle deletes from the source data)" +
-    "fails as expected on an index without lineage.") {
+  test(
+    "Validate refresh index (to handle deletes from the source data)" +
+      "fails as expected on an index without lineage.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -131,7 +132,9 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(ex.getMessage.contains("Refresh delete is only supported on an index with lineage."))
+      assert(
+        ex.getMessage.contains(s"Index refresh (to handle deleted source data) is" +
+          " only supported on an index with lineage."))
     }
   }
 }
