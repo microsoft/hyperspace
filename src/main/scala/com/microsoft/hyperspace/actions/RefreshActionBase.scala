@@ -23,6 +23,13 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
 
+/**
+ * Base abstract class containing common code for different types of index refresh actions.
+ *
+ * @param spark SparkSession
+ * @param logManager Index LogManager for index being refreshed
+ * @param dataManager Index DataManager for index being refreshed
+ */
 // TODO: This class depends directly on LogEntry. This should be updated such that
 //   it works with IndexLogEntry only. (for example, this class can take in
 //   derivedDataset specific logic for refreshing).
@@ -43,8 +50,6 @@ private[actions] abstract class RefreshActionBase(
   // Reconstruct a df from schema
   protected lazy val df = {
     val rels = previousIndexLogEntry.relations
-    // Currently we only support to create an index on a LogicalRelation.
-    assert(rels.size == 1)
     val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
     spark.read
       .schema(dataSchema)

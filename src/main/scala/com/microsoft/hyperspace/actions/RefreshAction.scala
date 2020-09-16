@@ -21,6 +21,15 @@ import org.apache.spark.sql.SparkSession
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActionEvent}
 
+/**
+ * Index refresh action. This action is used when refresh does a full rebuild of index.
+ * This action does not use any existing index file and a newer version of index is built via
+ * a full scan and shuffle of latest source data files w.r.t index configs.
+ *
+ * @param spark SparkSession
+ * @param logManager Index LogManager for index being refreshed
+ * @param dataManager Index DataManager for index being refreshed
+ */
 class RefreshAction(
     spark: SparkSession,
     logManager: IndexLogManager,

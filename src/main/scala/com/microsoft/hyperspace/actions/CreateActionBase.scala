@@ -190,6 +190,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // unified in Hyperspace (between index lineage and index metadata) and helps performance
       // by avoiding the need to fix paths (i.e. removing extra `/` characters) each time
       // value of DATA_FILE_NAME_COLUMN column is read.
+      // Here is an example of normalization:
+      // - Original raw path (output of input_file_name() udf, before normalization):
+      //    + file:///C:/myGit/hyperspace-1/src/test/part-00003.snappy.parquet
+      // - Normalized path to be stored in DATA_FILE_NAME_COLUMN column:
+      //    + file:/C:/myGit/hyperspace-1/src/test/part-00003.snappy.parquet
       val absolutePath: UserDefinedFunction = udf(
         (filePath: String) => PathUtils.makeAbsolute(filePath).toString)
 

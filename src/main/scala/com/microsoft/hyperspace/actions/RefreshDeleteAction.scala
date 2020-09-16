@@ -17,6 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
@@ -44,7 +45,7 @@ class RefreshDeleteAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    extends RefreshActionBase(spark, logManager, dataManager) with Logging {
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     RefreshDeleteActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
@@ -61,6 +62,10 @@ class RefreshDeleteAction(
     ResolverUtils
       .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, indexDF.schema.fieldNames) match {
       case Some(_) =>
+        val deletedFiles = getDeletedFiles
+        logInfo("Refresh index is updating index by removing index entries " +
+          s"from ${deletedFiles.length} deleted source data files.")
+
         val refreshDF =
           indexDF.filter(
             !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
@@ -72,7 +77,9 @@ class RefreshDeleteAction(
           indexConfig.indexedColumns)
 
       case None =>
-        throw HyperspaceException(s"Refresh delete is only supported on an index with lineage.")
+        throw HyperspaceException(
+          s"Index refresh (to handle deleted source data) is" +
+            " only supported on an index with lineage.")
     }
   }
 
@@ -84,13 +91,10 @@ class RefreshDeleteAction(
    */
   private def getDeletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
-    // Currently we only support to create an index on a LogicalRelation.
-    assert(rels.size == 1)
-
     val originalFiles = rels.head.data.properties.content.files.map(_.toString)
     val currentFiles = rels.head.rootPaths.flatMap { p =>
       Content
-        .fromDirectory(path = new Path(p))
+        .fromDirectory(path = new Path(p), throwIfNotExists = true)
         .files
         .map(_.toString)
     }

@@ -51,7 +51,7 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(systemPath)
   }
 
-  test("Validate refresh index when some file gets deleted.") {
+  test("Validate refresh index when some file gets deleted from the source data.") {
     // save test data non-partitioned.
     SampleData.save(
       spark,
@@ -117,7 +117,8 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Validate refresh delete fails as expected on an index without lineage.") {
+  test("Validate refresh index (to handle deletes from the source data)" +
+    "fails as expected on an index without lineage.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
