@@ -86,7 +86,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     FileUtils.delete(new Path(sampleJsonDataLocation))
   }
 
-  test("HybridScan filter rule test") {
+  test("Append-only: filter index & parquet format, " +
+    "index relation should include appended file paths") {
     df = spark.read.parquet(sampleParquetDataLocation)
     val query = df.filter(df("clicks") <= 2000).select(df("query"))
 
@@ -117,7 +118,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("HybridScan join rule test") {
+  test("Append-only: join index, appended data should be shuffled with indexed columns " +
+    "and merged by BucketUnion") {
     df = spark.read.parquet(sampleParquetDataLocation)
     val query = df.filter(df("clicks") >= 2000).select(df("clicks"), df("query"))
     val query2 = df.filter(df("clicks") <= 4000).select(df("clicks"), df("query"))
@@ -177,7 +179,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("HybridScan filter rule test with Json input") {
+  test("Append-only: filter rule & json format, " +
+    "appended data should be shuffled and merged by BucketUnion") {
     df = spark.read.json(sampleJsonDataLocation)
     val query = df.filter(df("clicks") <= 2000).select(df("query"))
     val expectedResult = query.collect

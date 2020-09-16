@@ -156,10 +156,12 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    // Here we can't replace the plan completely with the index. This will create problems.
-    // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
-    // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
-    // lead to wrong results. So we only replace the base relation.
+    // Note that we replace *only* the base relation and not portions of the plan
+    // (e.g., filters). For instance, given the following input plan:
+    //        Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
+    // in the presence of a suitable index, the getIndexPlan() method will emit:
+    //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
+    // In other words, the Filter is unmodified to preserve correctness.
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val location =
@@ -195,11 +197,15 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    // Other than "parquet" format, we cannot read source files along with index data
-    // files in parquet format with 1 FileScan node. In this case, we need to read the
-    // appended source files by another FileScan node and merge into the index data.
+    // Since the index data is in "parquet" format, we cannot read source files in
+    // formats other than "parquet" using 1 FileScan node (as the operator requires
+    // files in one homogenous format). To address this, we need to read the appended
+    // source files using another FileScan node injected into the plan and subsequently
+    // merge the data into the index data.
+    //
     // Though BucketUnion (using BucketSpec and on-the-fly Shuffle) is used to merge
-    // them for now, we will try to optimize these plans with Union operator.
+    // them for now, these plans will be optimized with a Union operator at a later time
+    // (see #145).
     val useBucketUnion = useBucketSpec || !index.relations.head.fileFormat.equals("parquet")
     val replacedPlan = plan transformDown {
       case baseRelation @ LogicalRelation(
@@ -211,8 +217,8 @@ object RuleUtils {
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
           .toSet
 
-        // if BucketSpec of index data isn't used, we could read appended data from
-        // source files directly.
+        // if BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently),
+        // we could read appended data from source files along with the index data.
         val readPaths = {
           if (useBucketUnion) {
             index.content.files
