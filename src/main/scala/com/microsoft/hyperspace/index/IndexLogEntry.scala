@@ -107,6 +107,7 @@ case class Directory(
     name: String,
     files: Seq[FileInfo] = Seq(),
     subDirs: Seq[Directory] = Seq()) {
+
   /**
    * Merge two Directory objects. For e.g., merging the following directories
    * /file:/C:/
@@ -126,17 +127,18 @@ case class Directory(
    *
    * @param that The other directory to merge this with.
    * @return Merged directory
-   * @throws HyperspaceException To merge two directories, their name should be same.
+   * @throws HyperspaceException If two directories to merge have different names.
    */
   def merge(that: Directory): Directory = {
     if (name.equals(that.name)) {
       val allFiles = files ++ that.files
       val subDirMap = subDirs.map(dir => dir.name -> dir).toMap
       val thatSubDirMap = that.subDirs.map(dir => dir.name -> dir).toMap
-      val subDir: Seq[Directory] = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map {
+      val mergedSubDirs: Seq[Directory] = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map {
         dirName =>
           if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
-            // If both directories contain a subDir with same name, merge subDirs respectively.
+            // If both directories contain a subDir with same name, merge corresponding subDirs
+            // recursively.
             subDirMap(dirName).merge(thatSubDirMap(dirName))
           } else {
             // Pick the subDir from whoever contains it.
@@ -144,10 +146,11 @@ case class Directory(
           }
       }
 
-      Directory(name, allFiles, subDirs = subDir)
+      Directory(name, allFiles, subDirs = mergedSubDirs)
     } else {
-      throw HyperspaceException(s"Merging directories with names $name and ${that.name} failed." +
-        s"Directory names must be same for merging Directories.")
+      throw HyperspaceException(
+        s"Merging directories with names $name and ${that.name} failed. " +
+          "Directory names must be same for merging directories.")
     }
   }
 }

@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.BeforeAndAfter
 
-import com.microsoft.hyperspace.TestUtils
+import com.microsoft.hyperspace.{HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
 class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter {
@@ -350,8 +350,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   test("Directory.fromDirectory and fromLeafFileswhere files are at same level but different" +
     "dirs.") {
     // File Structure
-    // temp/a/f1
-    // temp/b/f2
+    // testDir/temp/a/f1
+    // testDir/temp/b/f2
 
     val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
     val a = Files.createDirectories(Paths.get(tempDir + "/a"))
@@ -377,8 +377,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   test("Directory.fromDirectory and fromLeafFiles where there is a gap in directories.") {
     // File Structure
-    // testDir/a/f1
-    // testDir/b/c/f2
+    // testDir/temp/a/f1
+    // testDir/temp/b/c/f2
 
     val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
     val a = Files.createDirectories(Paths.get(tempDir + "/a"))
@@ -407,9 +407,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   test("Directory.fromDirectory and fromLeafFiles where files belong to multiple" +
     "subdirectories.") {
     // File Structure
-    // testDir/a/f1
-    // testDir/a/b/f2
-    // testDir/a/c/f3
+    // testDir/temp/a/f1
+    // testDir/temp/a/b/f2
+    // testDir/temp/a/c/f3
 
     val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
     val a = Files.createDirectories(Paths.get(tempDir + "/a"))
@@ -439,33 +439,163 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
-  test("Directory.merge Test: test if merge works as expected.") {
-    // File Structure
-    // testDir/a/f1
-    // testDir/a/f2
-    // testDir/a/b/f3
-    // testDir/a/b/f4
-    // Expected Result: Merged Directory structure when merging Directory object of dir a with
-    // that of b.
-    val tempDir = Files.createDirectories(Paths.get(testDir + "/temp"))
-    val a = Files.createDirectories(Paths.get(tempDir + "/a"))
-    val b = Files.createDirectories(Paths.get(a + "/b"))
-    val f1 = Files.createFile(Paths.get(a + "/f1"))
-    val f2 = Files.createFile(Paths.get(a + "/f2"))
-    val f3 = Files.createFile(Paths.get(b + "/f3"))
-    val f4 = Files.createFile(Paths.get(b + "/f4"))
+  test("Directory.merge: test if merge works as expected.") {
+    // directory1:
+    // a/f1
+    // a/f2
+    val directory1 = Directory(
+      name = "a",
+      files = Seq(
+        FileInfo("f1", 100L, 100L),
+        FileInfo("f2", 100L, 100L)
+      )
+    )
 
-    val aDirectory = Directory.fromDirectory(toPath(a))
-    val bDirectory = Directory.fromDirectory(toPath(b))
+    // directory2:
+    // a/b/f3
+    // a/b/f4
+    val directory2 = Directory(
+      name = "a",
+      subDirs = Seq(
+        Directory(
+          name = "b",
+          files = Seq(
+            FileInfo("f3", 100L, 100L),
+            FileInfo("f4", 100L, 100L)
+          )
+        )
+      )
+    )
 
-    val expected = Directory.fromLeafFiles(Seq(f1, f2, f3, f4).map(toFileStatus))
-    val actual1 = aDirectory.merge(bDirectory)
-    val actual2 = bDirectory.merge(aDirectory)
+    // Expected result of merging directory1 and directory2:
+    // a/f1
+    // a/f2
+    // a/b/f3
+    // a/b/f4
+    val expected = Directory(
+      name = "a",
+      files = Seq(
+        FileInfo("f1", 100L, 100L),
+        FileInfo("f2", 100L, 100L)
+      ),
+      subDirs = Seq(
+        Directory(
+          name = "b",
+          files = Seq(
+            FileInfo("f3", 100L, 100L),
+            FileInfo("f4", 100L, 100L)
+          )
+        )
+      )
+    )
+
+    val actual1 = directory1.merge(directory2)
+    val actual2 = directory2.merge(directory1)
 
     assert(directoryEquals(actual1, expected))
     assert(directoryEquals(actual2, expected))
+  }
 
-    FileUtils.deleteDirectory(tempDir.toFile)
+  test("Directory.merge: test if merge works as expected when directories overlap.") {
+    // directory1:
+    // a/f1
+    // a/f2
+    // a/b/f3
+    val directory1 = Directory(
+      name = "a",
+      files = Seq(
+        FileInfo("f1", 100L, 100L),
+        FileInfo("f2", 100L, 100L)
+      ),
+      subDirs = Seq(
+        Directory(name = "b", files = Seq(FileInfo("f3", 100L, 100L)))
+      )
+    )
+
+    // directory2:
+    // a/f4
+    // a/b/f5
+    // a/b/f6
+    // a/b/c/f7
+    val directory2 = Directory(
+      name = "a",
+      files = Seq(FileInfo("f4", 100L, 100L)),
+      subDirs = Seq(
+        Directory(
+          name = "b",
+          files = Seq(
+            FileInfo("f5", 100L, 100L),
+            FileInfo("f6", 100L, 100L)
+          ),
+          subDirs = Seq(Directory(
+            name = "c",
+            files = Seq(FileInfo("f7", 100L, 100L))
+          ))
+        )
+      )
+    )
+
+    // Expected result of merging directory1 and directory2:
+    // directory1:
+    // a/f1
+    // a/f2
+    // a/f4
+    // a/b/f3
+    // a/b/f5
+    // a/b/f6
+    // a/b/c/f7
+    val expected = Directory(
+      name = "a",
+      files = Seq(
+        FileInfo("f1", 100L, 100L),
+        FileInfo("f2", 100L, 100L),
+        FileInfo("f4", 100L, 100L)
+      ),
+      subDirs = Seq(
+        Directory(
+          name = "b",
+          files = Seq(
+            FileInfo("f3", 100L, 100L),
+            FileInfo("f5", 100L, 100L),
+            FileInfo("f6", 100L, 100L)
+          ),
+          subDirs = Seq(
+            Directory("c",
+            files = Seq(FileInfo("f7", 100L, 100L)))
+          )
+        )
+      )
+    )
+
+    val actual1 = directory1.merge(directory2)
+    val actual2 = directory2.merge(directory1)
+
+    assert(directoryEquals(actual1, expected))
+    assert(directoryEquals(actual2, expected))
+  }
+
+  test("Directory.merge: test if exception is thrown when directory names are not equal.") {
+    // directory1:
+    // a/f1
+    // a/f2
+    val directory1 = Directory(
+      name = "a",
+      files = Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 100L, 100L))
+    )
+
+    // directory2:
+    // b/f3
+    // b/f4
+    val directory2 = Directory(
+      name = "b",
+      files = Seq(FileInfo("f3", 100L, 100L), FileInfo("f4", 100L, 100L))
+    )
+
+    val ex1 = intercept[HyperspaceException] (directory1.merge(directory2))
+    val ex2 = intercept[HyperspaceException] (directory2.merge(directory1))
+
+    assert(ex1.msg.contains("Merging directories with names a and b failed."))
+    assert(ex2.msg.contains("Merging directories with names b and a failed."))
   }
 
   private def contentEquals(content1: Content, content2: Content): Boolean = {
