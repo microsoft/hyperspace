@@ -126,7 +126,7 @@ case class Directory(
    *               f1, f2
    *
    * @param that The other directory to merge this with.
-   * @return Merged directory
+   * @return Merged directory.
    * @throws HyperspaceException If two directories to merge have different names.
    */
   def merge(that: Directory): Directory = {
