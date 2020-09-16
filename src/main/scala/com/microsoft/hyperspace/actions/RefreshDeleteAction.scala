@@ -68,7 +68,7 @@ class RefreshDeleteAction(
 
         val refreshDF =
           indexDF.filter(
-            !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(getDeletedFiles: _*))
+            !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles: _*))
 
         refreshDF.write.saveWithBuckets(
           refreshDF,
