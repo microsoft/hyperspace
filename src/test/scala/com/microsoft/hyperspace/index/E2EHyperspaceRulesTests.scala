@@ -22,10 +22,11 @@ import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private val testDir = "src/test/resources/e2eTests/"
@@ -396,6 +397,69 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfAfterHyperspaceDisabled)))
   }
 
+  test("Verify Join Index Rule utilizes indexes correctly after incremental refresh.") {
+    // Setup. Create Data.
+    val sampleParquetDataLocation = "src/test/resources/sampleparquet"
+    spark.conf.set(IndexConstants.REFRESH_APPEND_ENABLED, true)
+    val refreshTestLocation = sampleParquetDataLocation + "refresh"
+    FileUtils.delete(new Path(refreshTestLocation))
+    val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+    import spark.implicits._
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .limit(10)
+      .write
+      .parquet(refreshTestLocation)
+    val df = spark.read.load(refreshTestLocation)
+
+    // Create Index.
+    hyperspace.createIndex(df, indexConfig)
+
+    // Append to Original Data.
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .limit(3)
+      .write
+      .mode("append")
+      .parquet(refreshTestLocation)
+
+    // Refresh Index.
+    hyperspace.refreshIndex(indexConfig.indexName)
+
+    // Create a Join Query
+    val leftDf = spark.read.parquet(refreshTestLocation)
+    val rightDf = spark.read.parquet(refreshTestLocation)
+    def query(): DataFrame = {
+      leftDf
+        .join(rightDf, leftDf("RGUID") === rightDf("RGUID"))
+        .select(leftDf("RGUID"), rightDf("imprs"))
+    }
+
+    // Verify Indexes are used, and all index files are picked.
+    verifyIndexUsage(
+      query,
+      getIndexFilesPath(indexConfig.indexName) ++
+        getIndexFilesPath(indexConfig.indexName))
+
+    // Verify Bucketing works as expected. This is reflected in shuffle nodes being eliminated
+    // when hyperspace is enabled.
+    spark.disableHyperspace()
+    val dfWithHyperspaceDisabled = query()
+    var shuffleNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+      case s : ShuffleExchangeExec => s
+    }
+    assert(shuffleNodes.size == 2)
+
+    spark.enableHyperspace()
+    val dfWithHyperspaceEnabled = query()
+    shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+      case s : ShuffleExchangeExec => s
+    }
+    assert(shuffleNodes.isEmpty)
+
+    FileUtils.delete(new Path(refreshTestLocation))
+  }
+
   test("Test for isHyperspaceEnabled().") {
     assert(!spark.isHyperspaceEnabled(), "Hyperspace must be disabled by default.")
     spark.enableHyperspace()
@@ -435,9 +499,22 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   private def getIndexFilesPath(indexName: String): Seq[Path] = {
-    Content.fromDirectory(new Path(
-      systemPath,
-      s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")).files
+    var files = Content
+      .fromDirectory(
+        new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))
+      .files
+
+    // Append refreshed files to the list if such a directory exists.
+    val v1Dir = new Path(
+      systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+    if (fileSystem.exists(v1Dir)) {
+      files ++= Content
+        .fromDirectory(
+          new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1"))
+        .files
+    }
+
+    files
   }
 
   /**
