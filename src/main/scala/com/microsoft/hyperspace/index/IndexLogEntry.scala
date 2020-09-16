@@ -134,16 +134,15 @@ case class Directory(
       val allFiles = files ++ that.files
       val subDirMap = subDirs.map(dir => dir.name -> dir).toMap
       val thatSubDirMap = that.subDirs.map(dir => dir.name -> dir).toMap
-      val mergedSubDirs: Seq[Directory] = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map {
-        dirName =>
-          if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
-            // If both directories contain a subDir with same name, merge corresponding subDirs
-            // recursively.
-            subDirMap(dirName).merge(thatSubDirMap(dirName))
-          } else {
-            // Pick the subDir from whoever contains it.
-            subDirMap.getOrElse(dirName, thatSubDirMap(dirName))
-          }
+      val mergedSubDirs = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map { dirName =>
+        if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
+          // If both directories contain a subDir with same name, merge corresponding subDirs
+          // recursively.
+          subDirMap(dirName).merge(thatSubDirMap(dirName))
+        } else {
+          // Pick the subDir from whoever contains it.
+          subDirMap.getOrElse(dirName, thatSubDirMap(dirName))
+        }
       }
 
       Directory(name, allFiles, subDirs = mergedSubDirs)
