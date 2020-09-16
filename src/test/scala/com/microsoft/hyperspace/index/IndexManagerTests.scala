@@ -294,7 +294,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         // Check if index got updated
         assert(indexCount == 3)
 
-        // Check if lastest log file is updated with newly created index files
+        // Check if latest log file is updated with newly created index files
         val indexPath = PathUtils.makeAbsolute(newIndexLocation)
         val logManager = IndexLogManagerFactoryImpl.create(indexPath)
         val latestLog = logManager.getLatestLog()
