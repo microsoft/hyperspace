@@ -25,7 +25,6 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshDeleteActionEvent}
-import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * Refresh index by removing index entries from any deleted source data file.
@@ -45,7 +44,8 @@ class RefreshDeleteAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) with Logging {
+    extends RefreshActionBase(spark, logManager, dataManager)
+    with Logging {
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     RefreshDeleteActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
@@ -57,30 +57,31 @@ class RefreshDeleteAction(
    * deleted source data files as those entries are no longer valid.
    */
   final override def op(): Unit = {
-    val indexDF = spark.read.parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-
-    ResolverUtils
-      .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, indexDF.schema.fieldNames) match {
-      case Some(_) =>
-        val deletedFiles = getDeletedFiles
-        logInfo("Refresh index is updating index by removing index entries " +
-          s"from ${deletedFiles.length} deleted source data files.")
-
-        val refreshDF =
-          indexDF.filter(
-            !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles: _*))
-
-        refreshDF.write.saveWithBuckets(
-          refreshDF,
-          indexDataPath.toString,
-          previousIndexLogEntry.numBuckets,
-          indexConfig.indexedColumns)
-
-      case None =>
-        throw HyperspaceException(
-          s"Index refresh (to handle deleted source data) is" +
-            " only supported on an index with lineage.")
+    if (!previousIndexLogEntry.hasLineageColumn(spark)) {
+      throw HyperspaceException(
+        s"Index refresh (to handle deleted source data) is" +
+          " only supported on an index with lineage.")
     }
+
+    val deletedFiles = getDeletedFiles
+    if (deletedFiles.isEmpty) {
+      throw HyperspaceException("Refresh aborted as no deleted source data file found.")
+    }
+
+    logInfo(
+      "Refresh index is updating index by removing index entries" +
+        s" corresponding to ${deletedFiles.length} deleted source data files.")
+
+    val refreshDF =
+      spark.read
+        .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
+        .filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles: _*))
+
+    refreshDF.write.saveWithBuckets(
+      refreshDF,
+      indexDataPath.toString,
+      previousIndexLogEntry.numBuckets,
+      indexConfig.indexedColumns)
   }
 
   /**

@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   private val testDir = "src/test/resources/e2eTests/"
@@ -404,6 +404,44 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     assert(!spark.isHyperspaceEnabled())
   }
 
+  test("Validate index usage after refresh with some source data file deleted.") {
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+
+      // Save a copy of source data files.
+      val location = testDir + "ixRefreshTest"
+      val dataPath = new Path(location, "*parquet")
+      val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+      SampleData.save(spark, location, dataColumns)
+
+      // Create index on original source data files.
+      val df = spark.read.parquet(location)
+      val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+      hyperspace.createIndex(df, indexConfig)
+
+      // Delete some source data file.
+      val dataFileNames = dataPath
+        .getFileSystem(new Configuration)
+        .globStatus(dataPath)
+        .map(_.getPath)
+
+      assert(dataFileNames.length > 0)
+      val fileToDelete = dataFileNames.head
+      FileUtils.delete(fileToDelete)
+
+      // Refresh the index to remove deleted source data file records from index.
+      hyperspace.refreshIndex(indexConfig.indexName)
+
+      def query(): DataFrame =
+        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+
+      // Verify index usage on latest version of index (v=1) after refresh.
+      verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, 1))
+      FileUtils.delete(dataPath)
+    }
+  }
+
   /**
    * Check that if the query plan has the expected rootPaths.
    *
@@ -434,10 +472,13 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }.flatten
   }
 
-  private def getIndexFilesPath(indexName: String): Seq[Path] = {
-    Content.fromDirectory(new Path(
-      systemPath,
-      s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")).files
+  private def getIndexFilesPath(indexName: String, version: Int = 0): Seq[Path] = {
+    Content
+      .fromDirectory(
+        new Path(
+          systemPath,
+          s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version"))
+      .files
   }
 
   /**

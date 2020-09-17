@@ -34,7 +34,8 @@ object HyperspaceConf {
 
   def refreshDeleteEnabled(spark: SparkSession): Boolean = {
     spark.conf
-      .get(IndexConstants.REFRESH_DELETE_ENABLED, "false")
+      .get(IndexConstants.REFRESH_DELETE_ENABLED,
+        IndexConstants.REFRESH_DELETE_ENABLED_DEFAULT)
       .toBoolean
   }
 }

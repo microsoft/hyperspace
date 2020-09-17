@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
@@ -135,6 +136,63 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         ex.getMessage.contains(s"Index refresh (to handle deleted source data) is" +
           " only supported on an index with lineage."))
+    }
+  }
+
+  test("Validate refresh index (to handle deletes from the source data)" +
+    " is aborted if no source data file is deleted") {
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+
+      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+      assert(
+        ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+    }
+  }
+
+  test(
+    "Validate refresh index (to handle deletes from the source data)" +
+      " fails as expected when all source data files are deleted.") {
+    Seq(true, false).foreach { deleteDataFolder =>
+      withSQLConf(
+        IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+        IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+        SampleData.save(
+          spark,
+          nonPartitionedDataPath,
+          Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+        val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+        hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+
+        if (deleteDataFolder) {
+          FileUtils.delete(new Path(nonPartitionedDataPath))
+
+          val ex = intercept[AnalysisException](hyperspace.refreshIndex(indexConfig.indexName))
+          assert(ex.getMessage.contains("Path does not exist"))
+
+        } else {
+          val dataPath = new Path(nonPartitionedDataPath, "*parquet")
+          dataPath
+            .getFileSystem(new Configuration)
+            .globStatus(dataPath)
+            .foreach(p => FileUtils.delete(p.getPath))
+
+          val ex =
+            intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+          assert(ex.getMessage.contains("Invalid plan for creating an index."))
+        }
+        FileUtils.delete(new Path(nonPartitionedDataPath))
+        FileUtils.delete(systemPath)
+      }
     }
   }
 }
