@@ -77,19 +77,10 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
             if (loc.equals(nonPartitionedDataPath)) nonPartitionedDataDF else partitionedDataDF
           hyperspace.createIndex(dfToIndex, indexConfig)
 
-          // delete some source data file.
-          val dataPath =
-            if (loc.equals(nonPartitionedDataPath)) new Path(nonPartitionedDataPath, "*parquet")
-            else new Path(partitionedDataPath + "/Date=2018-09-03/Query=ibraco", "*parquet")
-
-          val dataFileNames = dataPath
-            .getFileSystem(new Configuration)
-            .globStatus(dataPath)
-            .map(_.getPath)
-
-          assert(dataFileNames.length > 0)
-          val fileToDelete = dataFileNames.head
-          FileUtils.delete(fileToDelete)
+          // Delete some source data file.
+          val fileToDelete =
+            if (loc.equals(nonPartitionedDataPath)) deleteDataFile(nonPartitionedDataPath)
+            else deleteDataFile(partitionedDataPath, true)
 
           val originalIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
             s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
@@ -103,7 +94,7 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
           val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
             s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
 
-          // validate only index records whose lineage is the deleted file are removed.
+          // Validate only index records whose lineage is the deleted file are removed.
           assert(refreshedIndexDF.count() == (originalIndexDF.count() - delCount))
 
           val lineageFileNames = refreshedIndexDF
@@ -132,6 +123,8 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
+      deleteDataFile(nonPartitionedDataPath)
+
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
       assert(
         ex.getMessage.contains(s"Index refresh (to handle deleted source data) is" +
@@ -139,8 +132,9 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Validate refresh index (to handle deletes from the source data)" +
-    " is aborted if no source data file is deleted") {
+  test(
+    "Validate refresh index (to handle deletes from the source data)" +
+      " is aborted if no source data file is deleted.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -153,8 +147,7 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(
-        ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+      assert(ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
     }
   }
 
@@ -194,5 +187,31 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
         FileUtils.delete(systemPath)
       }
     }
+  }
+
+  /**
+   * Delete some source data file.
+   *
+   * @param path Path to the parent folder containing data files.
+   * @param isPartitioned Is data folder partitioned or not.
+   * @return Path to the deleted file.
+   */
+  private def deleteDataFile(path: String, isPartitioned: Boolean = false): Path = {
+    val dataPath = if (isPartitioned) {
+      new Path(path + "/Date=2018-09-03/Query=ibraco", "*parquet")
+    } else {
+      new Path(path, "*parquet")
+    }
+
+    val dataFileNames = dataPath
+      .getFileSystem(new Configuration)
+      .globStatus(dataPath)
+      .map(_.getPath)
+
+    assert(dataFileNames.length > 0)
+    val fileToDelete = dataFileNames.head
+    FileUtils.delete(fileToDelete)
+
+    fileToDelete
   }
 }

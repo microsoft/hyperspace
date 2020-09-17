@@ -69,7 +69,7 @@ private[actions] abstract class RefreshActionBase(
 
   final override val finalState: String = ACTIVE
 
-  final override def validate(): Unit = {
+  override def validate(): Unit = {
     if (!previousIndexLogEntry.state.equalsIgnoreCase(ACTIVE)) {
       throw HyperspaceException(
         s"Refresh is only supported in $ACTIVE state. " +

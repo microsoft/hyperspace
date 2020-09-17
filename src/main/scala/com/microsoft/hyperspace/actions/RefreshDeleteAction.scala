@@ -52,6 +52,17 @@ class RefreshDeleteAction(
   }
 
   /**
+   * Validate index is in active state for refreshing and there are
+   * some deleted source data file(s).
+   */
+  final override def validate(): Unit = {
+    super.validate()
+    if (deletedFiles.isEmpty) {
+      throw HyperspaceException("Refresh aborted as no deleted source data file found.")
+    }
+  }
+
+  /**
    * For an index with lineage, find all the source data files which have been deleted,
    * and use index records' lineage to mark and remove index entries which belong to
    * deleted source data files as those entries are no longer valid.
@@ -61,11 +72,6 @@ class RefreshDeleteAction(
       throw HyperspaceException(
         s"Index refresh (to handle deleted source data) is" +
           " only supported on an index with lineage.")
-    }
-
-    val deletedFiles = getDeletedFiles
-    if (deletedFiles.isEmpty) {
-      throw HyperspaceException("Refresh aborted as no deleted source data file found.")
     }
 
     logInfo(
@@ -87,10 +93,8 @@ class RefreshDeleteAction(
   /**
    * Compare list of source data files from previous IndexLogEntry to list of
    * current source data files and identify deleted source data files.
-   *
-   * @return list of full paths of deleted source data files.
    */
-  private def getDeletedFiles: Seq[String] = {
+  private lazy val deletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
     val originalFiles = rels.head.data.properties.content.files.map(_.toString)
     val currentFiles = rels.head.rootPaths.flatMap { p =>
