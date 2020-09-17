@@ -183,7 +183,6 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     "appended data should be shuffled and merged by BucketUnion") {
     df = spark.read.json(sampleJsonDataLocation)
     val query = df.filter(df("clicks") <= 2000).select(df("query"))
-    val expectedResult = query.collect
 
     withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
       val transformed = FilterIndexRule(query.queryExecution.optimizedPlan)
@@ -237,10 +236,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       assert(execNodes.count(p => p.getClass.toString.contains("FileSourceScanExec")) === 2)
 
       val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
-      val res = query2.collect()
-      assert(expectedResult.nonEmpty)
-      assert(res.nonEmpty)
-      assert(expectedResult.sortBy(_.toString).toSeq === res.sortBy(_.toString).toSeq)
+      checkAnswer(query, query2)
     }
   }
 }
