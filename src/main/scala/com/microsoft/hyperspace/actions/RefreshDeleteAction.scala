@@ -52,11 +52,17 @@ class RefreshDeleteAction(
   }
 
   /**
-   * Validate index is in active state for refreshing and there are
-   * some deleted source data file(s).
+   * Validate index has lineage column and it is in active state for refreshing and
+   * there are some deleted source data file(s).
    */
   final override def validate(): Unit = {
     super.validate()
+    if (!previousIndexLogEntry.hasLineageColumn(spark)) {
+      throw HyperspaceException(
+        s"Index refresh (to handle deleted source data) is" +
+          " only supported on an index with lineage.")
+    }
+
     if (deletedFiles.isEmpty) {
       throw HyperspaceException("Refresh aborted as no deleted source data file found.")
     }
@@ -68,12 +74,6 @@ class RefreshDeleteAction(
    * deleted source data files as those entries are no longer valid.
    */
   final override def op(): Unit = {
-    if (!previousIndexLogEntry.hasLineageColumn(spark)) {
-      throw HyperspaceException(
-        s"Index refresh (to handle deleted source data) is" +
-          " only supported on an index with lineage.")
-    }
-
     logInfo(
       "Refresh index is updating index by removing index entries" +
         s" corresponding to ${deletedFiles.length} deleted source data files.")
