@@ -213,9 +213,11 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val curFileSet = location.allFiles
+        lazy val curFileSet = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
           .toSet
+        lazy val filesAppended =
+          (curFileSet -- index.allSourceFileInfos).map(f => new Path(f.name)).toSeq
 
         // if BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently),
         // we could read appended data from source files along with the index data.
@@ -223,8 +225,6 @@ object RuleUtils {
           if (useBucketUnion) {
             index.content.files
           } else {
-            val filesAppended =
-              (curFileSet -- index.allSourceFileInfos).map(f => new Path(f.name)).toSeq
             index.content.files ++ filesAppended
           }
         }
