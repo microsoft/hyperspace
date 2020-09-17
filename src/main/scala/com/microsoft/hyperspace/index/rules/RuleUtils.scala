@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
@@ -245,7 +245,7 @@ object RuleUtils {
     if (useBucketUnion) {
       // if BucketSpec of the index is used to read the index data, we need to shuffle
       // the appended data in the same way to avoid additional shuffle of index data.
-      getComplementIndexPlan(spark, index, plan, replacedPlan)
+      getComplementIndexPlan(spark, index, plan, replacedPlan, useBucketSpec)
     } else {
       replacedPlan
     }
@@ -275,7 +275,8 @@ object RuleUtils {
       spark: SparkSession,
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
-      indexPlan: LogicalPlan): LogicalPlan = {
+      indexPlan: LogicalPlan,
+      useBucketSpec: Boolean): LogicalPlan = {
     // 1) Replace the location of LogicalRelation with appended files
     val complementIndexPlan = originalPlan transformDown {
       case baseRelation @ LogicalRelation(
@@ -305,12 +306,15 @@ object RuleUtils {
         }
     }
 
-    if (!originalPlan.equals(complementIndexPlan)) {
+    if (originalPlan.equals(complementIndexPlan)) {
+      indexPlan
+    } else if (useBucketSpec) {
       // Remove sort order because we cannot guarantee the ordering of source files
       val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
 
       object ExtractTopLevelPlanForShuffle {
         type returnType = (LogicalPlan, Seq[Option[Attribute]], Boolean)
+
         def unapply(plan: LogicalPlan): Option[returnType] = plan match {
           case project @ Project(
                 _,
@@ -329,6 +333,7 @@ object RuleUtils {
             val indexedAttrs = getIndexedAttrs(relation, index.indexedColumns)
             Some(relation, indexedAttrs, false)
         }
+
         def getIndexedAttrs(
             plan: LogicalPlan,
             indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
@@ -358,7 +363,7 @@ object RuleUtils {
       // Currently, BucketUnion does not keep the sort order within a bucket.
       BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
     } else {
-      indexPlan
+      Union(Seq(indexPlan, complementIndexPlan))
     }
   }
 }
