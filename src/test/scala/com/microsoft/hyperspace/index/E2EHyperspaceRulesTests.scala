@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
+import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
@@ -449,13 +450,22 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       case s : ShuffleExchangeExec => s
     }
     assert(shuffleNodes.size == 2)
+    var sortNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+      case s : SortExec => s
+    }
+    assert(sortNodes.size == 2)
 
+    // Verify that sort nodes are not removed.
     spark.enableHyperspace()
     val dfWithHyperspaceEnabled = query()
     shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
       case s : ShuffleExchangeExec => s
     }
     assert(shuffleNodes.isEmpty)
+    sortNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+      case s : SortExec => s
+    }
+    assert(sortNodes.size == 2)
 
     FileUtils.delete(new Path(refreshTestLocation))
   }
