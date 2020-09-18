@@ -281,15 +281,15 @@ object RuleUtils {
    * @param spark Spark session.
    * @param index Index used in replacement plan.
    * @param originalPlan Original plan.
-   * @param indexPlan Replaced plan with index.
+   * @param planWithIndex Replaced plan with index.
    * @param filesAppended Appended files to the source relation.
-   * @return complementIndexPlan integrated plan of indexPlan and complementPlan.
+   * @return Consolidated plan of planWithIndex and a complement plan for filesAppended
    */
   private def getComplementIndexPlan(
       spark: SparkSession,
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
-      indexPlan: LogicalPlan,
+      planWithIndex: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
     // 1) Replace the location of LogicalRelation with appended files
     val complementIndexPlan = originalPlan transformDown {
@@ -378,6 +378,6 @@ object RuleUtils {
 
     // 3) Merge index plan & newly shuffled plan by using bucket-aware union.
     // Currently, BucketUnion does not keep the sort order within a bucket.
-    BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
+    BucketUnion(Seq(planWithIndex, shuffled), bucketSpec)
   }
 }

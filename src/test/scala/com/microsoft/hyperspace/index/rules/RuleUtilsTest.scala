@@ -171,7 +171,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
       {
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
         verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        // TODO: expectedCandidateIndex = true for delete dataset support.
+        // TODO: expectedCandidateIndex = true once delete dataset is supported.
         verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
       }
 
