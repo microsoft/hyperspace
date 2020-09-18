@@ -18,9 +18,10 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileUtil, Path}
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, IsNotNull, LessThanOrEqual}
 import org.apache.spark.sql.catalyst.plans.JoinType
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
@@ -119,6 +120,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
 
     withIndex("index1") {
       val readDf = spark.read.parquet(dataPath)
+      val indexFile = readDf.inputFiles.head
       indexManager.create(readDf, IndexConfig("index1", Seq("id")))
 
       def verify(
@@ -154,18 +156,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
 
       // Scenario #2: Delete 1 file.
       {
-        val readDf = spark.read.parquet(dataPath)
-        readDf.queryExecution.optimizedPlan foreach {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-              _,
-              _,
-              _) =>
-            systemPath
-              .getFileSystem(new Configuration)
-              .delete(location.allFiles.head.getPath, false)
-          case _ =>
-        }
+        systemPath
+          .getFileSystem(new Configuration)
+          .delete(new Path(indexFile), false)
       }
 
       {
@@ -184,6 +177,45 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
         verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
       }
     }
+  }
+
+  test("Verify the location of injected shuffle for Hybrid Scan.") {
+    val dataPath = systemPath.toString + "/hbtable"
+    import spark.implicits._
+    Seq((1, "name1", 12), (2, "name2", 10))
+      .toDF("id", "name", "age")
+      .write
+      .mode("overwrite")
+      .parquet(dataPath)
+
+    val df = spark.read.parquet(dataPath)
+    val query = df.filter(df("id") >= 3).select("id", "name")
+    val bucketSpec = BucketSpec(100, Seq("id"), Seq())
+    val shuffled = RuleUtils.shuffleUsingIndexSpec(bucketSpec, query.queryExecution.optimizedPlan)
+
+    assert((shuffled collect {
+      case RepartitionByExpression(attrs: Seq[Expression], p: Project, numBuckets: Int) =>
+        assert(numBuckets == 100)
+        assert(attrs.size == 1)
+        assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
+        assert(p.projectList.exists(a => a.name.equals("id")) && p.projectList.exists(a =>
+          a.name.equals("name")))
+        true
+    }).length == 1)
+
+    val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
+    val query2 = df.filter(df("id") <= 3).select("id", "name")
+    val shuffled2 =
+      RuleUtils.shuffleUsingIndexSpec(bucketSpec2, query2.queryExecution.optimizedPlan)
+    assert((shuffled2 collect {
+      case Project(
+          _,
+          r @ RepartitionByExpression(attrs: Seq[Expression], _: Filter, numBuckets: Int)) =>
+        assert(numBuckets == 100)
+        assert(attrs.size == 1)
+        assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
+        true
+    }).length == 1)
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {

@@ -21,9 +21,10 @@ import scala.util.Try
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
-import org.apache.spark.sql.execution.{FileSourceScanExec, InputAdapter, ProjectExec, WholeStageCodegenExec}
+import org.apache.spark.sql.catalyst.plans.logical.Union
+import org.apache.spark.sql.execution.{FileSourceScanExec, InputAdapter, ProjectExec, UnionExec, WholeStageCodegenExec}
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeExec}
+import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
@@ -203,27 +204,22 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           assert(appendedFileCnt === 1 || indexFileCnt === 4)
           assert(appendedFileCnt * indexFileCnt === 0)
           p
-        case p @ BucketUnion(_, _) => p
+        case p @ Union(_) => p
       }
       assert(nodes.count(p => p.isInstanceOf[LogicalRelation]) === 2)
-      assert(nodes.count(p => p.isInstanceOf[BucketUnion]) === 1)
+      assert(nodes.count(p => p.isInstanceOf[Union]) === 1)
+      // Make sure there is no shuffle.
+      planWithHybridScan.foreach(f => assert(Try(f.asInstanceOf[Exchange]).isFailure))
 
       spark.enableHyperspace()
       val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
 
       val execNodes = execPlan collect {
-        case p @ BucketUnionExec(children, bucketSpec) =>
+        case p @ UnionExec(children) =>
           assert(children.size === 2)
           // head is always the index plan.
           assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
           assert(Try(children.last.asInstanceOf[WholeStageCodegenExec]).isSuccess)
-          children.last match {
-            case WholeStageCodegenExec(
-                ProjectExec(_, InputAdapter(ShuffleExchangeExec(partitioning, _, _)))) =>
-              assert(partitioning.numPartitions === 200)
-            case _ => fail("Unexpected type of child of BucketUnion")
-          }
-          assert(bucketSpec.numBuckets === 200)
           p
         case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
           // Check filter pushed down properly.
@@ -231,7 +227,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           p
       }
 
-      assert(execNodes.count(p => p.isInstanceOf[BucketUnionExec]) === 1)
+      // Make sure there is no shuffle.
+      execPlan.foreach(p => assert(Try(p.asInstanceOf[ShuffleExchangeExec]).isFailure))
+      assert(execNodes.count(p => p.isInstanceOf[UnionExec]) === 1)
       // 1 of index, 1 of appended file
       assert(execNodes.count(p => p.isInstanceOf[FileSourceScanExec]) === 2)
 
