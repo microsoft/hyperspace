@@ -218,6 +218,8 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
+        // TODO: Duplicate listing files for the given relation as in isHybridScanCandidate.
+        //  See https://github.com/microsoft/hyperspace/issues/160
         lazy val curFileSet = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
           .toSet
@@ -344,15 +346,24 @@ object RuleUtils {
         }
       }
 
-      // 2) Perform on-the-fly Shuffle with the same partition structure of index
-      // so that we could avoid incurring Shuffle of whole index data at merge stage.
-      // In order to utilize push-down filters, we would locate Shuffle node after
-      // Project or Filter node. (Case 1)
-      // However, if Project node excludes any of indexedColumns, Shuffle will be
-      // converted to RoundRobinPartitioning which can cause wrong result issues.
-      // So Shuffle should be located before Project node in that case. (Case 2)
-      // Case 1) Shuffle => Project => Filter => Relation (Project&Filter will be pushed down)
-      // Case 2) Project => Shuffle => Filter => Relation (Filter will be pushed down)
+      // Step 2) During merge of the index data with the newly appended data,
+      // perform on-the-fly shuffle of the appended-data with the same partition
+      // structure of index so that we could avoid incurring shuffle of the index
+      // data (which is assumed to be the larger sized dataset).
+      //
+      // To do this optimally, we would have to push-down filters/projects before
+      // shuffling the newly appended data to reduce the amount of data that gets
+      // shuffled. However, if project excludes any of the [[indexedColumns]], Spark
+      // handles the shuffle through [[RoundRobinPartitioning]], which can cause
+      // wrong results.
+      //
+      // Therefore, we do the following:
+      // if Project node excludes any of the [[indexedColumns]]:
+      //    Case 1: Shuffle should be located **before** Project but **after** Filter
+      //                Plan: Project => Shuffle => Filter => Relation
+      // else:
+      //    Case 2: Shuffle node should come **after** Project and/or Filter node
+      //                Plan: Shuffle => Project => Filter => Relation
 
       var shuffleInjected = false
       // Remove sort order because we cannot guarantee the ordering of source files.
