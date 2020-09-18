@@ -152,6 +152,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
         verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
       }
 
+      /* Disabled delete scenario until the feature is delivered.
       // Scenario #2: Delete 1 file.
       {
         val readDf = spark.read.parquet(dataPath)
@@ -167,6 +168,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
           case _ =>
         }
       }
+       */
 
       {
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan

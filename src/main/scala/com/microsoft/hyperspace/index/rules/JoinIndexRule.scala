@@ -62,8 +62,8 @@ object JoinIndexRule
             case (lIndex, rIndex) =>
               val updatedPlan = join
                 .copy(
-                  left = RuleUtils.getReplacementPlan(spark, lIndex, l, useBucketSpec = true),
-                  right = RuleUtils.getReplacementPlan(spark, rIndex, r, useBucketSpec = true))
+                  left = RuleUtils.transformPlanWithIndex(spark, lIndex, l, useBucketSpec = true),
+                  right = RuleUtils.transformPlanWithIndex(spark, rIndex, r, useBucketSpec = true))
 
               logEvent(
                 HyperspaceIndexUsageEvent(

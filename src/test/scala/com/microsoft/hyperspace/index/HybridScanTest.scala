@@ -102,7 +102,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         !planWithHybridScan.equals(query.queryExecution.optimizedPlan),
         "Plan should be transformed.")
 
-      // check appended file is added to relation node or not
+      // Check appended file is added to relation node or not.
       val nodes = planWithHybridScan collect {
         case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
@@ -137,7 +137,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           !planWithHybridScan.equals(join.queryExecution.optimizedPlan),
           "Plan should be transformed.")
 
-        // check appended file is added to relation node or not
+        // Check appended file is added to relation node or not.
         val nodes = planWithHybridScan collect {
           case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
             val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
@@ -155,7 +155,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         val execNodes = execPlan collect {
           case p @ BucketUnionExec(children, bucketSpec) =>
             assert(children.size === 2)
-            // head is always the index plan
+            // head is always the index plan.
             assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
             assert(
               Try(children.last.asInstanceOf[ShuffleExchangeExec]).isSuccess || Try(
@@ -163,7 +163,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(bucketSpec.numBuckets === 200)
             p
           case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
-            // check filter pushed down properly
+            // Check filter pushed down properly.
             assert(
               dataFilters.toString.contains(" >= 2000)") && dataFilters.toString.contains(
                 " <= 4000)"))
@@ -195,7 +195,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         !planWithHybridScan.equals(query.queryExecution.optimizedPlan),
         "Plan should be transformed.")
 
-      // check appended file is added to relation node or not
+      // Check appended file is added to relation node or not.
       val nodes = planWithHybridScan collect {
         case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
@@ -214,7 +214,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       val execNodes = execPlan collect {
         case p @ BucketUnionExec(children, bucketSpec) =>
           assert(children.size === 2)
-          // head is always the index plan
+          // head is always the index plan.
           assert(Try(children.head.asInstanceOf[WholeStageCodegenExec]).isSuccess)
           assert(Try(children.last.asInstanceOf[WholeStageCodegenExec]).isSuccess)
           children.last match {
@@ -226,7 +226,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           assert(bucketSpec.numBuckets === 200)
           p
         case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
-          // check filter pushed down properly
+          // Check filter pushed down properly.
           assert(dataFilters.toString.contains(" <= 2000)"))
           p
       }
