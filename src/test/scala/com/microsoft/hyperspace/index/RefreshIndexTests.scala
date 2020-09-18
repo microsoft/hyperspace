@@ -217,7 +217,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
    */
   private def deleteDataFile(path: String, isPartitioned: Boolean = false): Path = {
     val dataPath = if (isPartitioned) {
-      new Path(s"$path/Date=2018-09-03/Query=ibraco", "*parquet")
+      new Path(s"$path/*/*", "*parquet")
     } else {
       new Path(path, "*parquet")
     }
