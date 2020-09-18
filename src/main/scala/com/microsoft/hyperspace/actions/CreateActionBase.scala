@@ -19,7 +19,8 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.{input_file_name, udf}
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -181,8 +182,24 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val missingPartitionColumns = getPartitionColumns(df).filter(
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
+
+      // File path value in DATA_FILE_NAME_COLUMN column is stored as String. We normalize
+      // path values in this column by removing extra preceding `/` characters in the path
+      // and store it the same way paths are stored in Content in an IndexLogEntry instance.
+      // Normalizing path values in DATA_FILE_NAME_COLUMN column keeps path representation
+      // unified in Hyperspace (between index lineage and index metadata) and helps performance
+      // by avoiding the need to fix paths (i.e. removing extra `/` characters) each time
+      // value of DATA_FILE_NAME_COLUMN column is read.
+      // Here is an example of normalization:
+      // - Original raw path (output of input_file_name() udf, before normalization):
+      //    + file:///C:/myGit/hyperspace-1/src/test/part-00003.snappy.parquet
+      // - Normalized path to be stored in DATA_FILE_NAME_COLUMN column:
+      //    + file:/C:/myGit/hyperspace-1/src/test/part-00003.snappy.parquet
+      val absolutePath: UserDefinedFunction = udf(
+        (filePath: String) => PathUtils.makeAbsolute(filePath).toString)
+
       df.select(allIndexColumns.head, allIndexColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, input_file_name())
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, absolutePath(input_file_name()))
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }
