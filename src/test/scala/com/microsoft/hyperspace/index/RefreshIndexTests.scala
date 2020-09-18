@@ -189,6 +189,34 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test(
+    "Validate refresh index (to handle deletes from the source data)" +
+      " fails as expected when file info for an existing source data file changes.") {
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+
+      // Replace a source data file with a new file with same name but different properties.
+      val deletedFile = deleteDataFile(nonPartitionedDataPath)
+      FileUtils.createFile(
+        deletedFile.getFileSystem(new Configuration),
+        deletedFile,
+        "I am some random content :).")
+
+      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+      assert(
+        ex.getMessage.contains(s"Index refresh (to handle deleted source data) aborted;" +
+          " Existing source data file info is changed"))
+    }
+  }
+
   /**
    * Delete some source data file.
    *

@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.collection.immutable.HashSet
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
@@ -91,19 +93,35 @@ class RefreshDeleteAction(
   }
 
   /**
-   * Compare list of source data files from previous IndexLogEntry to list of
-   * current source data files and identify deleted source data files.
+   * Compare list of source data files from previous IndexLogEntry to list
+   * of current source data files, validate fileInfo for existing files and
+   * identify deleted source data files.
    */
   private lazy val deletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
-    val originalFiles = rels.head.data.properties.content.files.map(_.toString)
-    val currentFiles = rels.head.rootPaths.flatMap { p =>
-      Content
-        .fromDirectory(path = new Path(p), throwIfNotExists = true)
-        .files
-        .map(_.toString)
+    val originalFiles = rels.head.data.properties.content.fileInfos
+    val currentFiles = rels.head.rootPaths
+      .flatMap { p =>
+        Content
+          .fromDirectory(path = new Path(p), throwIfNotExists = true)
+          .fileInfos
+      }
+      .map(f => f.name -> f)
+      .toMap
+
+    var delFiles = Seq[String]()
+    originalFiles.foreach { f =>
+      currentFiles.get(f.name) match {
+        case Some(i) =>
+          if (!f.equals(i)) {
+            throw HyperspaceException(
+              s"Index refresh (to handle deleted source data) aborted;" +
+                s" Existing source data file info is changed (file: ${f.name}).")
+          }
+        case None => delFiles :+= f.name
+      }
     }
 
-    originalFiles diff currentFiles
+    delFiles
   }
 }
