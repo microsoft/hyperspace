@@ -147,8 +147,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             p
           case p @ BucketUnion(_, _) => p
         }
-        assert(nodes.count(p => p.getClass.toString.contains("LogicalRelation")) === 4)
-        assert(nodes.count(p => p.getClass.toString.contains("BucketUnion")) === 2)
+        assert(nodes.count(p => p.isInstanceOf[LogicalRelation]) === 4)
+        assert(nodes.count(p => p.isInstanceOf[BucketUnion]) === 2)
 
         spark.enableHyperspace()
         val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
@@ -169,9 +169,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 " <= 4000)"))
             p
         }
-        assert(execNodes.count(p => p.getClass.toString.contains("BucketUnionExec")) === 2)
+        assert(execNodes.count(p => p.isInstanceOf[BucketUnionExec]) === 2)
         // 2 of index, 1 of appended file (1 is reused)
-        assert(execNodes.count(p => p.getClass.toString.contains("FileSourceScanExec")) === 3)
+        assert(execNodes.count(p => p.isInstanceOf[FileSourceScanExec]) === 3)
 
         val join2 = query.join(query2, "clicks")
         checkAnswer(join2, join)
@@ -205,8 +205,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           p
         case p @ BucketUnion(_, _) => p
       }
-      assert(nodes.count(p => p.getClass.toString.contains("LogicalRelation")) === 2)
-      assert(nodes.count(p => p.getClass.toString.contains("BucketUnion")) === 1)
+      assert(nodes.count(p => p.isInstanceOf[LogicalRelation]) === 2)
+      assert(nodes.count(p => p.isInstanceOf[BucketUnion]) === 1)
 
       spark.enableHyperspace()
       val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
@@ -231,9 +231,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           p
       }
 
-      assert(execNodes.count(p => p.getClass.toString.contains("BucketUnionExec")) === 1)
+      assert(execNodes.count(p => p.isInstanceOf[BucketUnionExec]) === 1)
       // 1 of index, 1 of appended file
-      assert(execNodes.count(p => p.getClass.toString.contains("FileSourceScanExec")) === 2)
+      assert(execNodes.count(p => p.isInstanceOf[FileSourceScanExec]) === 2)
 
       val query2 = df.filter(df("clicks") <= 2000).select(df("query"))
       checkAnswer(query, query2)

@@ -125,6 +125,7 @@ object RuleUtils {
    *
    * Pre-requisites
    * - We know for sure the index which can be used to replace the plan.
+   * - The plan should be linear and include 1 LogicalRelation.
    *
    * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
    *
@@ -212,6 +213,7 @@ object RuleUtils {
     // them for now, these plans will be optimized with a Union operator at a later time
     // (see #145).
     val useBucketUnion = useBucketSpec || !index.relations.head.fileFormat.equals("parquet")
+    var filesAppended: Seq[Path] = Nil
     val replacedPlan = plan transformDown {
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
@@ -220,11 +222,13 @@ object RuleUtils {
             _) =>
         // TODO: Duplicate listing files for the given relation as in isHybridScanCandidate.
         //  See https://github.com/microsoft/hyperspace/issues/160
-        lazy val curFileSet = location.allFiles
+        val curFileSet = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
           .toSet
-        lazy val filesAppended =
+        filesAppended =
           (curFileSet -- index.allSourceFileInfos).map(f => new Path(f.name)).toSeq
+
+        // TODO: Hybrid Scan delete support.
 
         // If BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently),
         // or the source format is not parquet. We could read appended data from source files
@@ -250,11 +254,11 @@ object RuleUtils {
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
     }
-    if (useBucketUnion) {
+    if (useBucketUnion && filesAppended.nonEmpty) {
       // If BucketSpec of the index is used to read the index data or the source format
       // is not parquet, we need to shuffle the appended data in the same way to correctly
       // merge with bucked index data.
-      getComplementIndexPlan(spark, index, plan, replacedPlan)
+      getComplementIndexPlan(spark, index, plan, replacedPlan, filesAppended)
     } else {
       replacedPlan
     }
@@ -274,17 +278,19 @@ object RuleUtils {
    *
    * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
    *
-   * @param spark Spark session
-   * @param index index used in replacement plan
-   * @param originalPlan original plan
-   * @param indexPlan replaced plan with index
-   * @return complementIndexPlan integrated plan of indexPlan and complementPlan
+   * @param spark Spark session.
+   * @param index Index used in replacement plan.
+   * @param originalPlan Original plan.
+   * @param indexPlan Replaced plan with index.
+   * @param filesAppended Appended files to the source relation.
+   * @return complementIndexPlan integrated plan of indexPlan and complementPlan.
    */
   private def getComplementIndexPlan(
       spark: SparkSession,
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
-      indexPlan: LogicalPlan): LogicalPlan = {
+      indexPlan: LogicalPlan,
+      filesAppended: Seq[Path]): LogicalPlan = {
     // 1) Replace the location of LogicalRelation with appended files
     val complementIndexPlan = originalPlan transformDown {
       case baseRelation @ LogicalRelation(
@@ -295,12 +301,6 @@ object RuleUtils {
         // Set the same output schema with the index plan to merge them using BucketUnion
         val updatedOutput =
           baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
-
-        val filesAppended = (location.allFiles
-          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-          .toSet -- index.allSourceFileInfos).toSeq.map(f => new Path(f.name))
-
-        // TODO: Hybrid Scan delete support.
 
         if (filesAppended.nonEmpty) {
           val newLocation =
@@ -315,72 +315,69 @@ object RuleUtils {
           baseRelation
         }
     }
+    assert(!originalPlan.equals(complementIndexPlan))
 
-    if (!originalPlan.equals(complementIndexPlan)) {
-      // Extract top level plan including all required columns for shuffle in its output.
-      object ExtractTopLevelPlanForShuffle {
-        type returnType = (LogicalPlan, Seq[Option[Attribute]], Boolean)
-        def unapply(plan: LogicalPlan): Option[returnType] = plan match {
-          case project @ Project(
-                _,
-                Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _))) =>
-            val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
-            Some(project, indexedAttrs, true)
-          case project @ Project(
-                _,
-                LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
-            val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
-            Some(project, indexedAttrs, true)
-          case filter @ Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
-            val indexedAttrs = getIndexedAttrs(filter, index.indexedColumns)
-            Some(filter, indexedAttrs, false)
-          case relation @ LogicalRelation(_: HadoopFsRelation, _, _, _) =>
-            val indexedAttrs = getIndexedAttrs(relation, index.indexedColumns)
-            Some(relation, indexedAttrs, false)
-        }
-        def getIndexedAttrs(
-            plan: LogicalPlan,
-            indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
-          val attrMap = plan.output.attrs.map(attr => (attr.name, attr)).toMap
-          indexedColumns.map(colName => attrMap.get(colName))
-        }
+    // Extract top level plan including all required columns for shuffle in its output.
+    object ExtractTopLevelPlanForShuffle {
+      type returnType = (LogicalPlan, Seq[Option[Attribute]], Boolean)
+      def unapply(plan: LogicalPlan): Option[returnType] = plan match {
+        case project @ Project(
+              _,
+              Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _))) =>
+          val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
+          Some(project, indexedAttrs, true)
+        case project @ Project(
+              _,
+              LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
+          val indexedAttrs = getIndexedAttrs(project, index.indexedColumns)
+          Some(project, indexedAttrs, true)
+        case filter @ Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
+          val indexedAttrs = getIndexedAttrs(filter, index.indexedColumns)
+          Some(filter, indexedAttrs, false)
+        case relation @ LogicalRelation(_: HadoopFsRelation, _, _, _) =>
+          val indexedAttrs = getIndexedAttrs(relation, index.indexedColumns)
+          Some(relation, indexedAttrs, false)
       }
-
-      // Step 2) During merge of the index data with the newly appended data,
-      // perform on-the-fly shuffle of the appended-data with the same partition
-      // structure of index so that we could avoid incurring shuffle of the index
-      // data (which is assumed to be the larger sized dataset).
-      //
-      // To do this optimally, we would have to push-down filters/projects before
-      // shuffling the newly appended data to reduce the amount of data that gets
-      // shuffled. However, if project excludes any of the [[indexedColumns]], Spark
-      // handles the shuffle through [[RoundRobinPartitioning]], which can cause
-      // wrong results.
-      //
-      // Therefore, we do the following:
-      // if Project node excludes any of the [[indexedColumns]]:
-      //    Case 1: Shuffle should be located **before** Project but **after** Filter
-      //                Plan: Project => Shuffle => Filter => Relation
-      // else:
-      //    Case 2: Shuffle node should come **after** Project and/or Filter node
-      //                Plan: Shuffle => Project => Filter => Relation
-
-      var shuffleInjected = false
-      // Remove sort order because we cannot guarantee the ordering of source files.
-      val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
-      val shuffled = complementIndexPlan transformDown {
-        case p if shuffleInjected => p
-        case ExtractTopLevelPlanForShuffle(plan, indexedAttr, isProject)
-            if !isProject || indexedAttr.forall(_.isDefined) =>
-          shuffleInjected = true
-          RepartitionByExpression(indexedAttr.flatten, plan, index.numBuckets)
+      def getIndexedAttrs(
+          plan: LogicalPlan,
+          indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
+        val attrMap = plan.output.attrs.map(attr => (attr.name, attr)).toMap
+        indexedColumns.map(colName => attrMap.get(colName))
       }
-
-      // 3) Merge index plan & newly shuffled plan by using bucket-aware union.
-      // Currently, BucketUnion does not keep the sort order within a bucket.
-      BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
-    } else {
-      indexPlan
     }
+
+    // Step 2) During merge of the index data with the newly appended data,
+    // perform on-the-fly shuffle of the appended-data with the same partition
+    // structure of index so that we could avoid incurring shuffle of the index
+    // data (which is assumed to be the larger sized dataset).
+    //
+    // To do this optimally, we would have to push-down filters/projects before
+    // shuffling the newly appended data to reduce the amount of data that gets
+    // shuffled. However, if project excludes any of the [[indexedColumns]], Spark
+    // handles the shuffle through [[RoundRobinPartitioning]], which can cause
+    // wrong results.
+    //
+    // Therefore, we do the following:
+    // if Project node excludes any of the [[indexedColumns]]:
+    //    Case 1: Shuffle should be located **before** Project but **after** Filter
+    //                Plan: Project => Shuffle => Filter => Relation
+    // else:
+    //    Case 2: Shuffle node should come **after** Project and/or Filter node
+    //                Plan: Shuffle => Project => Filter => Relation
+
+    var shuffleInjected = false
+    // Remove sort order because we cannot guarantee the ordering of source files.
+    val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
+    val shuffled = complementIndexPlan transformDown {
+      case p if shuffleInjected => p
+      case ExtractTopLevelPlanForShuffle(plan, indexedAttr, isProject)
+          if !isProject || indexedAttr.forall(_.isDefined) =>
+        shuffleInjected = true
+        RepartitionByExpression(indexedAttr.flatten, plan, index.numBuckets)
+    }
+
+    // 3) Merge index plan & newly shuffled plan by using bucket-aware union.
+    // Currently, BucketUnion does not keep the sort order within a bucket.
+    BucketUnion(Seq(indexPlan, shuffled), bucketSpec)
   }
 }
