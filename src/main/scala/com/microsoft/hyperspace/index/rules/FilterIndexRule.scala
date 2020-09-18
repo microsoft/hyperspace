@@ -56,7 +56,11 @@ object FilterIndexRule
             case Some(index) =>
               // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
               val replacedPlan =
-                RuleUtils.transformPlanToUseIndex(spark, index, originalPlan, useBucketSpec = false)
+                RuleUtils.transformPlanToUseIndex(
+                  spark,
+                  index,
+                  originalPlan,
+                  useBucketSpec = false)
               logEvent(
                 HyperspaceIndexUsageEvent(
                   AppInfo(

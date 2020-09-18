@@ -86,6 +86,9 @@ object RuleUtils {
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
     if (hybridScanEnabled) {
+      // TODO: Duplicate listing files for the given relation as in
+      //  [[transformPlanToUseHybridIndexDataScan]]
+      //  See https://github.com/microsoft/hyperspace/issues/160
       val filesByRelations = plan
         .collect {
           case LogicalRelation(
@@ -120,15 +123,15 @@ object RuleUtils {
   }
 
   /**
-   * Transform the current plan to utilize index. The transformed plan reads data from indexes.
-   * If HybridScan is enabled, additional logical plans for the appended data would be
-   * generated and merged with index data plan. Refer [[transformPlanToUseHybridIndexDataScan]].
+   * Transform the current plan to utilize the given index.
+   *
+   * The transformed plan reads the given index data rather than original source files.
+   * If HybridScan is enabled, additional logical plans for the appended source files would be
+   * constructed and merged with the transformed plan with the index.
    *
    * Pre-requisites
    * - We know for sure the index which can be used to replace the plan.
    * - The plan should be linear and include 1 LogicalRelation.
-   *
-   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
    *
    * @param spark Spark session.
    * @param index Index used in replacement plan.
@@ -151,9 +154,11 @@ object RuleUtils {
   }
 
   /**
-   * Transform the current plan to utilize index.
+   * Transform the current plan to utilize index
    * The transformed plan reads data from indexes instead of the source relations.
    * Bucketing information of the index is retained if useBucketSpec is true.
+   *
+   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
    *
    * @param spark Spark session.
    * @param index Index used in replacement plan.
@@ -190,7 +195,8 @@ object RuleUtils {
   }
 
   /**
-   * Transform the current plan to utilize index even with newly appended source files.
+   * Transform the current plan to utilize the given index along with newly appended source files.
+   *
    * With HybridScan, indexes with newly appended files to its source relation are also
    * eligible and we reconstruct new plans for the appended files so as to merge with
    * bucketed index data correctly.
@@ -210,18 +216,16 @@ object RuleUtils {
     var filesAppended: Seq[Path] = Nil
 
     // Get replaced plan with index data and appended files if applicable.
-    val replacedPlan = plan transformDown {
+    val indexPlan = plan transformDown {
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
-        // TODO: Duplicate listing files for the given relation as in isHybridScanCandidate.
-        //  See https://github.com/microsoft/hyperspace/issues/160
         val curFileSet = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-          .toSet
-        filesAppended = (curFileSet -- index.allSourceFileInfos).map(f => new Path(f.name)).toSeq
+        filesAppended =
+          curFileSet.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name))
         // TODO: Hybrid Scan delete support.
 
         // If BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently),
@@ -238,7 +242,7 @@ object RuleUtils {
             index.content.files
           } else {
             val files = index.content.files ++ filesAppended
-            // Reset filesAppended as it's handled along with index data.
+            // Reset filesAppended as it's handled with index data.
             filesAppended = Nil
             files
           }
@@ -259,51 +263,52 @@ object RuleUtils {
     }
 
     if (filesAppended.nonEmpty) {
-      // If there are unhandled appended files, we need to create additional plans:
-      //   1) Read the appended files with the same push-down filters.
-      //   2) If Shuffle is required, perform shuffle for the plan.
-      //   3) Merge both index data plan and the additional plan for appended files
-      //      by using [[BucketUnion]] or [[Union]].
-      // For more details, please refer https://github.com/microsoft/hyperspace/issues/150.
+      // If there are unhandled appended files, we need to create additional plans
+      // by the following steps:
+      // Step 1) Generate a plan(planForAppended) from the current plan to read
+      //   the appended files similar to indexPlan.
+      // Step 2) If Shuffle is required, perform shuffle for the plan.
+      // Step 3) Merge both indexPlan and planForAppended by using [[BucketUnion]] or [[Union]].
+      // For more details, see https://github.com/microsoft/hyperspace/issues/150.
 
-      val planForAppended = transformPlanWithAppendedFiles(spark, index, plan, filesAppended)
+      val planForAppended =
+        transformPlanWithAppendedFiles(spark, index.schema, plan, filesAppended)
       if (useBucketSpec) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
 
-        // Reset sortColumnNames as BucketUnion does not keep the sort order within a bucket.
+        // Clear sortColumnNames as BucketUnion does not keep the sort order within a bucket.
         val bucketSpec = index.bucketSpec.copy(sortColumnNames = Seq())
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(
-          Seq(replacedPlan, shuffleUsingIndexSpec(bucketSpec, planForAppended)),
+          Seq(indexPlan, shuffleUsingIndexSpec(bucketSpec, planForAppended)),
           bucketSpec)
       } else {
         // If bucketing is not necessary (e.g. FilterIndexRule), we use [[Union]] to merge
         // the appended data without additional shuffle.
-        Union(replacedPlan, planForAppended)
+        Union(indexPlan, planForAppended)
       }
     } else {
-      replacedPlan
+      indexPlan
     }
   }
 
   /**
-   * Transform the current plan to utilize index. The transformed plan reads data from indexes.
-   * Transform tGet modified plan by replacing data location with appended files.
-   * The result plan will be merged with the plan with index by [[BucketUnion]] or [[Union]].
+   * Transform the current plan to read the given appended source files.
    *
-   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
+   * The result will be merged with the plan which is reading index data
+   * by using [[BucketUnion]] or [[Union]].
    *
    * @param spark Spark session.
-   * @param index Index used in replacement plan.
+   * @param indexSchema Index schema used for the output.
    * @param originalPlan Original plan.
    * @param filesAppended Appended files to the source relation.
    * @return Linear logical plan for appended files.
    */
   private def transformPlanWithAppendedFiles(
       spark: SparkSession,
-      index: IndexLogEntry,
+      indexSchema: StructType,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
     // Replace the location of LogicalRelation with appended files.
@@ -311,13 +316,13 @@ object RuleUtils {
       case baseRelation @ LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
         // Set the same output schema with the index plan to merge them using BucketUnion.
         val updatedOutput =
-          baseOutput.filter(attr => index.schema.fieldNames.contains(attr.name))
+          baseOutput.filter(attr => indexSchema.fieldNames.contains(attr.name))
         val newLocation =
           new InMemoryFileIndex(spark, filesAppended, Map(), None)
         val newRelation =
           fsRelation.copy(
             location = newLocation,
-            dataSchema = StructType(index.schema.filter(baseRelation.schema.contains(_))))(spark)
+            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))))(spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))
@@ -325,11 +330,14 @@ object RuleUtils {
   }
 
   /**
-   * Get modified plan performing on-the-fly shuffle the source data using the index specification.
+   * Transform the plan to perform on-the-fly Shuffle the data based on bucketSpec.
    *
-   * @param bucketSpec BucketSpec of the index used in the current replacement plan.
+   * Pre-requisites
+   * - The plan should be linear and include 1 LogicalRelation.
+   *
+   * @param bucketSpec Bucket specification used for Shuffle.
    * @param plan Plan to be shuffled.
-   * @return Modified plan by injecting on-the-fly shuffle with given index specification.
+   * @return Transformed plan by injecting on-the-fly shuffle with given bucket specification.
    */
   private[rules] def shuffleUsingIndexSpec(
       bucketSpec: BucketSpec,
@@ -381,7 +389,8 @@ object RuleUtils {
     //
     // Currently, we only perform on-the-fly shuffle when applying JoinIndexRule.
     // Therefore, it's always guaranteed that the children nodes have all indexed columns
-    // in their output; Case 1 won't be shown in use cases.
+    // in their output; Case 1 won't be shown in use cases. we keep the implementation
+    // for future use cases.
 
     var shuffleInjected = false
     // Remove sort order because we cannot guarantee the ordering of source files.

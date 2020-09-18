@@ -60,10 +60,13 @@ object JoinIndexRule
         getUsableIndexPair(l, r, condition)
           .map {
             case (lIndex, rIndex) =>
-              val updatedPlan = join
-                .copy(
-                  left = RuleUtils.transformPlanToUseIndex(spark, lIndex, l, useBucketSpec = true),
-                  right = RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
+              val updatedPlan =
+                join
+                  .copy(
+                    left =
+                      RuleUtils.transformPlanToUseIndex(spark, lIndex, l, useBucketSpec = true),
+                    right =
+                      RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
 
               logEvent(
                 HyperspaceIndexUsageEvent(
