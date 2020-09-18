@@ -110,7 +110,7 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data)" +
+    "Validate refresh index (to handle deletes from the source data) " +
       "fails as expected on an index without lineage.") {
     SampleData.save(
       spark,
@@ -127,14 +127,14 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
 
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
       assert(
-        ex.getMessage.contains(s"Index refresh (to handle deleted source data) is" +
-          " only supported on an index with lineage."))
+        ex.getMessage.contains(s"Index refresh (to handle deleted source data) is " +
+          "only supported on an index with lineage."))
     }
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data)" +
-      " is aborted if no source data file is deleted.") {
+    "Validate refresh index (to handle deletes from the source data) " +
+      "is aborted if no source data file is deleted.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -152,8 +152,8 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data)" +
-      " fails as expected when all source data files are deleted.") {
+    "Validate refresh index (to handle deletes from the source data) " +
+      "fails as expected when all source data files are deleted.") {
     Seq(true, false).foreach { deleteDataFolder =>
       withSQLConf(
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
@@ -190,8 +190,8 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data)" +
-      " fails as expected when file info for an existing source data file changes.") {
+    "Validate refresh index (to handle deletes from the source data) " +
+      "fails as expected when file info for an existing source data file changes.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -212,13 +212,13 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
 
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
       assert(
-        ex.getMessage.contains(s"Index refresh (to handle deleted source data) aborted;" +
-          " Existing source data file info is changed"))
+        ex.getMessage.contains("Index refresh (to handle deleted source data) aborted. " +
+          "Existing source data file info is changed"))
     }
   }
 
   /**
-   * Delete some source data file.
+   * Delete one file from a given path.
    *
    * @param path Path to the parent folder containing data files.
    * @param isPartitioned Is data folder partitioned or not.
@@ -226,7 +226,7 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
    */
   private def deleteDataFile(path: String, isPartitioned: Boolean = false): Path = {
     val dataPath = if (isPartitioned) {
-      new Path(path + "/Date=2018-09-03/Query=ibraco", "*parquet")
+      new Path(s"$path/Date=2018-09-03/Query=ibraco", "*parquet")
     } else {
       new Path(path, "*parquet")
     }
@@ -236,7 +236,7 @@ class RefreshIndexTests extends HyperspaceSuite with SQLHelper {
       .globStatus(dataPath)
       .map(_.getPath)
 
-    assert(dataFileNames.length > 0)
+    assert(dataFileNames.nonEmpty)
     val fileToDelete = dataFileNames.head
     FileUtils.delete(fileToDelete)
 

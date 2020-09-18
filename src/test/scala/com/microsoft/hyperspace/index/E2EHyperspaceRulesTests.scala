@@ -420,24 +420,36 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
       hyperspace.createIndex(df, indexConfig)
 
+      // Verify index usage for index version (v=0).
+      def query1(): DataFrame =
+        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+
+      verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
+
       // Delete some source data file.
       val dataFileNames = dataPath
         .getFileSystem(new Configuration)
         .globStatus(dataPath)
         .map(_.getPath)
 
-      assert(dataFileNames.length > 0)
+      assert(dataFileNames.nonEmpty)
       val fileToDelete = dataFileNames.head
       FileUtils.delete(fileToDelete)
+
+      def query2(): DataFrame =
+        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+
+      // Verify index is not used.
+      spark.enableHyperspace()
+      val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+      spark.disableHyperspace()
+      assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
 
       // Refresh the index to remove deleted source data file records from index.
       hyperspace.refreshIndex(indexConfig.indexName)
 
-      def query(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
-
       // Verify index usage on latest version of index (v=1) after refresh.
-      verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, 1))
+      verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, 1))
       FileUtils.delete(dataPath)
     }
   }

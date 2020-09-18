@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.collection.immutable.HashSet
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
@@ -61,7 +59,7 @@ class RefreshDeleteAction(
     super.validate()
     if (!previousIndexLogEntry.hasLineageColumn(spark)) {
       throw HyperspaceException(
-        s"Index refresh (to handle deleted source data) is" +
+        "Index refresh (to handle deleted source data) is" +
           " only supported on an index with lineage.")
     }
 
@@ -77,8 +75,8 @@ class RefreshDeleteAction(
    */
   final override def op(): Unit = {
     logInfo(
-      "Refresh index is updating index by removing index entries" +
-        s" corresponding to ${deletedFiles.length} deleted source data files.")
+      "Refresh index is updating index by removing index entries " +
+        s"corresponding to ${deletedFiles.length} deleted source data files.")
 
     val refreshDF =
       spark.read
@@ -112,11 +110,11 @@ class RefreshDeleteAction(
     var delFiles = Seq[String]()
     originalFiles.foreach { f =>
       currentFiles.get(f.name) match {
-        case Some(i) =>
-          if (!f.equals(i)) {
+        case Some(v) =>
+          if (!f.equals(v)) {
             throw HyperspaceException(
-              s"Index refresh (to handle deleted source data) aborted;" +
-                s" Existing source data file info is changed (file: ${f.name}).")
+              "Index refresh (to handle deleted source data) aborted. " +
+                s"Existing source data file info is changed (file: ${f.name}).")
           }
         case None => delFiles :+= f.name
       }
