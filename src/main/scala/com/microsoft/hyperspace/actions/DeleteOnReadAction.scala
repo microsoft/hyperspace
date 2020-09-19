@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.actions
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, DeleteOnReadActionEvent, HyperspaceEvent}
 
@@ -39,6 +40,16 @@ class DeleteOnReadAction(
   }
 
   final override def logEntry: LogEntry = {
+    // Compute index fingerprint using current source data file.
+    val signatureProvider = LogicalPlanSignatureProvider.create()
+    val newSignature = signatureProvider.signature(df.queryExecution.optimizedPlan) match {
+      case Some(s) =>
+        LogicalPlanFingerprint(
+          LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s))))
+
+      case None => throw HyperspaceException("Invalid source plan found during index refresh.")
+    }
+
     // Grab nested structures from previous IndexLogEntry.
     val source = previousIndexLogEntry.source
     val plan = source.plan
@@ -53,6 +64,7 @@ class DeleteOnReadAction(
       source = source.copy(
         plan = plan.copy(
           properties = planProps.copy(
+            fingerprint = newSignature,
             relations = Seq(
               relation.copy(
                 data = data.copy(

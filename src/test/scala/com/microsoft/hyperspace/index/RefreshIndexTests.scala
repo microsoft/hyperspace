@@ -232,6 +232,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         // Delete one source data file.
         val deletedFile = deleteDataFile(nonPartitionedDataPath)
 
+        // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex = ixManager.getIndexes()
         assert(refreshedIndex.length == 1)
@@ -239,6 +240,9 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           refreshedIndex.head.source.plan.properties.relations.head.data.properties.excluded
             .equals(Seq(deletedFile.toString)))
 
+        assert(
+          !originalIndex.head.source.plan.properties.fingerprint
+            .equals(refreshedIndex.head.source.plan.properties.fingerprint))
       }
     }
   }
