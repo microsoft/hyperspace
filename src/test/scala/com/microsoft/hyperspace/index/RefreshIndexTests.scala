@@ -208,6 +208,41 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test(
+    "Validate refresh index (to handle deletes from the source data) " +
+      "for enforce delete on read.") {
+    // Save test data non-partitioned.
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      withIndex(indexConfig.indexName) {
+        hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+        val ixManager = Hyperspace.getContext(spark).indexCollectionManager
+        val originalIndex = ixManager.getIndexes()
+        assert(originalIndex.length == 1)
+        assert(
+          originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
+
+        // Delete one source data file.
+        val deletedFile = deleteDataFile(nonPartitionedDataPath)
+
+        hyperspace.refreshIndex(indexConfig.indexName)
+        val refreshedIndex = ixManager.getIndexes()
+        assert(refreshedIndex.length == 1)
+        assert(
+          refreshedIndex.head.source.plan.properties.relations.head.data.properties.excluded
+            .equals(Seq(deletedFile.toString)))
+
+      }
+    }
+  }
+
   /**
    * Delete one file from a given path.
    *

@@ -116,6 +116,9 @@ case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
 case class RefreshDeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
     extends HyperspaceIndexCRUDEvent
 
+case class DeleteOnReadActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+    extends HyperspaceIndexCRUDEvent
+
 /**
  * Index usage event. This event is emitted when an index is picked instead of original data
  * source by one of the hyperspace rules.

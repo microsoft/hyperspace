@@ -324,7 +324,7 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: Content)
+  case class Properties(content: Content, excluded: Seq[String] = Seq[String]())
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.

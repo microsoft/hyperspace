@@ -38,4 +38,12 @@ object HyperspaceConf {
         IndexConstants.REFRESH_DELETE_ENABLED_DEFAULT)
       .toBoolean
   }
+
+  def enforceDeleteOnReadEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED,
+        IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED_DEFAULT)
+      .toBoolean
+  }
 }
