@@ -450,7 +450,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
       // Verify index usage on latest version of index (v=1) after refresh.
       verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, 1))
-      FileUtils.delete(dataPath)
+      FileUtils.delete(new Path(location))
     }
   }
 
@@ -507,7 +507,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
         queryPlanHasExpectedRootPaths(
           query2().queryExecution.optimizedPlan,
           getIndexFilesPath(indexConfig.indexName)))
-      FileUtils.delete(dataPath)
+      FileUtils.delete(new Path(location))
     }
   }
 
