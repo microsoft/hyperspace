@@ -54,4 +54,7 @@ object IndexConstants {
   private[hyperspace] val DATA_FILE_NAME_COLUMN = "_data_file_name"
   val INDEX_LINEAGE_ENABLED = "spark.hyperspace.index.lineage.enabled"
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
+
+  val REFRESH_DELETE_ENABLED = "spark.hyperspace.index.refresh.delete.enabled"
+  val REFRESH_DELETE_ENABLED_DEFAULT = "false"
 }

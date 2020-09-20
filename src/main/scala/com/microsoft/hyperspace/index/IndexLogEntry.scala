@@ -24,11 +24,13 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -95,7 +97,64 @@ object Content {
   def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
 }
 
-case class Directory(name: String, files: Seq[FileInfo] = Seq(), subDirs: Seq[Directory] = Seq())
+/**
+ * Directory is a representation of file system directory. It consists of a name (directory name),
+ * a list of files represented by sequence of [[FileInfo]], and a list of subdirectories.
+ *
+ * @param name Directory name.
+ * @param files List of leaf files in this directory.
+ * @param subDirs List of sub-directories in this directory.
+ */
+case class Directory(
+    name: String,
+    files: Seq[FileInfo] = Seq(),
+    subDirs: Seq[Directory] = Seq()) {
+
+  /**
+   * Merge two Directory objects. For e.g., merging the following directories
+   * /file:/C:/
+   *          a/
+   *            b/
+   *              f1, f2
+   * and
+   * /file:/C:/
+   *          a/
+   *            f3, f4
+   * will be
+   * /file:/C:/
+   *           a/
+   *             f3, f4
+   *             b/
+   *               f1, f2
+   *
+   * @param that The other directory to merge this with.
+   * @return Merged directory.
+   * @throws HyperspaceException If two directories to merge have different names.
+   */
+  def merge(that: Directory): Directory = {
+    if (name.equals(that.name)) {
+      val allFiles = files ++ that.files
+      val subDirMap = subDirs.map(dir => dir.name -> dir).toMap
+      val thatSubDirMap = that.subDirs.map(dir => dir.name -> dir).toMap
+      val mergedSubDirs = (subDirMap.keySet ++ thatSubDirMap.keySet).toSeq.map { dirName =>
+        if (subDirMap.contains(dirName) && thatSubDirMap.contains(dirName)) {
+          // If both directories contain a subDir with same name, merge corresponding subDirs
+          // recursively.
+          subDirMap(dirName).merge(thatSubDirMap(dirName))
+        } else {
+          // Pick the subDir from whoever contains it.
+          subDirMap.getOrElse(dirName, thatSubDirMap(dirName))
+        }
+      }
+
+      Directory(name, allFiles, subDirs = mergedSubDirs)
+    } else {
+      throw HyperspaceException(
+        s"Merging directories with names $name and ${that.name} failed. " +
+          "Directory names must be same for merging directories.")
+    }
+  }
+}
 
 object Directory {
 
@@ -349,6 +408,12 @@ case class IndexLogEntry(
     val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
     assert(sourcePlanSignatures.length == 1)
     sourcePlanSignatures.head
+  }
+
+  def hasLineageColumn(spark: SparkSession): Boolean = {
+    ResolverUtils
+      .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, schema.fieldNames)
+      .isDefined
   }
 
   override def hashCode(): Int = {

@@ -17,61 +17,24 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActionEvent}
 
-// TODO: This class depends directly on LogEntry. This should be updated such that
-//   it works with IndexLogEntry only. (for example, this class can take in
-//   derivedDataset specific logic for refreshing).
+/**
+ * The Index refresh action is used to perform a full rebuild of the index.
+ * Consequently, it ends up creating a new version of the index and involves
+ * a full scan of the underlying source data.
+ *
+ * @param spark SparkSession.
+ * @param logManager Index LogManager for index being refreshed.
+ * @param dataManager Index DataManager for index being refreshed.
+ */
 class RefreshAction(
     spark: SparkSession,
-    final override protected val logManager: IndexLogManager,
+    logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends CreateActionBase(dataManager)
-    with Action {
-  private lazy val previousLogEntry: LogEntry = {
-    logManager.getLog(baseId).getOrElse {
-      throw HyperspaceException("LogEntry must exist for refresh operation")
-    }
-  }
-
-  private lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
-
-  // Reconstruct a df from schema
-  private lazy val df = {
-    val rels = previousIndexLogEntry.relations
-    // Currently we only support to create an index on a LogicalRelation.
-    assert(rels.size == 1)
-    val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
-    spark.read
-      .schema(dataSchema)
-      .format(rels.head.fileFormat)
-      .options(rels.head.options)
-      .load(rels.head.rootPaths: _*)
-  }
-
-  private lazy val indexConfig: IndexConfig = {
-    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
-  }
-
-  final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
-
-  final override val transientState: String = REFRESHING
-
-  final override val finalState: String = ACTIVE
-
-  final override def validate(): Unit = {
-    if (!previousIndexLogEntry.state.equalsIgnoreCase(ACTIVE)) {
-      throw HyperspaceException(
-        s"Refresh is only supported in $ACTIVE state. " +
-          s"Current index state is ${previousIndexLogEntry.state}")
-    }
-  }
+    extends RefreshActionBase(spark, logManager, dataManager) {
 
   final override def op(): Unit = {
     // TODO: The current implementation picks the number of buckets from session config.
