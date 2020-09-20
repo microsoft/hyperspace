@@ -191,7 +191,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val df = spark.read.parquet(dataPath)
     val query = df.filter(df("id") >= 3).select("id", "name")
     val bucketSpec = BucketSpec(100, Seq("id"), Seq())
-    val shuffled = RuleUtils.shuffleUsingIndexSpec(bucketSpec, query.queryExecution.optimizedPlan)
+    val shuffled = RuleUtils.transformPlanToShuffleUsingIndexSpec(
+      bucketSpec,
+      query.queryExecution.optimizedPlan)
 
     assert((shuffled collect {
       case RepartitionByExpression(attrs: Seq[Expression], p: Project, numBuckets: Int) =>
@@ -206,7 +208,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
     val query2 = df.filter(df("id") <= 3).select("id", "name")
     val shuffled2 =
-      RuleUtils.shuffleUsingIndexSpec(bucketSpec2, query2.queryExecution.optimizedPlan)
+      RuleUtils.transformPlanToShuffleUsingIndexSpec(
+        bucketSpec2,
+        query2.queryExecution.optimizedPlan)
     assert((shuffled2 collect {
       case Project(
           _,

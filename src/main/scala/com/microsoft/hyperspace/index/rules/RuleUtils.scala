@@ -164,7 +164,7 @@ object RuleUtils {
    * @param index Index used in replacement plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
-   * @return Transformed logical plan.
+   * @return Transformed logical plan that leverages an index.
    */
   private def transformPlanToUsePureIndexScan(
       spark: SparkSession,
@@ -205,7 +205,7 @@ object RuleUtils {
    * @param index Index used in replacement plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
-   * @return Transformed logical plan.
+   * @return Transformed logical plan that leverages an index and merges appended data.
    */
   private def transformPlanToUseHybridIndexDataScan(
       spark: SparkSession,
@@ -272,7 +272,7 @@ object RuleUtils {
       // For more details, see https://github.com/microsoft/hyperspace/issues/150.
 
       val planForAppended =
-        transformPlanWithAppendedFiles(spark, index.schema, plan, filesAppended)
+        transformPlanToReadFromAppendedFiles(spark, index.schema, plan, filesAppended)
       if (useBucketSpec) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
@@ -282,7 +282,7 @@ object RuleUtils {
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(
-          Seq(indexPlan, shuffleUsingIndexSpec(bucketSpec, planForAppended)),
+          Seq(indexPlan, transformPlanToShuffleUsingIndexSpec(bucketSpec, planForAppended)),
           bucketSpec)
       } else {
         // If bucketing is not necessary (e.g. FilterIndexRule), we use [[Union]] to merge
@@ -304,9 +304,9 @@ object RuleUtils {
    * @param indexSchema Index schema used for the output.
    * @param originalPlan Original plan.
    * @param filesAppended Appended files to the source relation.
-   * @return Linear logical plan for appended files.
+   * @return Transformed linear logical plan for appended files.
    */
-  private def transformPlanWithAppendedFiles(
+  private def transformPlanToReadFromAppendedFiles(
       spark: SparkSession,
       indexSchema: StructType,
       originalPlan: LogicalPlan,
@@ -339,7 +339,7 @@ object RuleUtils {
    * @param plan Plan to be shuffled.
    * @return Transformed plan by injecting on-the-fly shuffle with given bucket specification.
    */
-  private[rules] def shuffleUsingIndexSpec(
+  private[rules] def transformPlanToShuffleUsingIndexSpec(
       bucketSpec: BucketSpec,
       plan: LogicalPlan): LogicalPlan = {
     // Extract top level plan including all required columns for shuffle in its output.
@@ -389,7 +389,7 @@ object RuleUtils {
     //
     // Currently, we only perform on-the-fly shuffle when applying JoinIndexRule.
     // Therefore, it's always guaranteed that the children nodes have all indexed columns
-    // in their output; Case 1 won't be shown in use cases. we keep the implementation
+    // in their output; Case 1 won't be shown in use cases. The implementation is kept
     // for future use cases.
 
     var shuffleInjected = false
