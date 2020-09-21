@@ -230,19 +230,37 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
 
         // Delete one source data file.
-        val deletedFile = deleteDataFile(nonPartitionedDataPath)
+        val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
 
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
-        val refreshedIndex = ixManager.getIndexes()
-        assert(refreshedIndex.length == 1)
+        val refreshedIndex1 = ixManager.getIndexes()
         assert(
-          refreshedIndex.head.source.plan.properties.relations.head.data.properties.excluded
-            .equals(Seq(deletedFile.toString)))
+          refreshedIndex1.head.source.plan.properties.relations.head.data.properties.excluded
+            .equals(Seq(deletedFile1.toString)))
 
+        // Make sure index fingerprint is changed.
         assert(
           !originalIndex.head.source.plan.properties.fingerprint
-            .equals(refreshedIndex.head.source.plan.properties.fingerprint))
+            .equals(refreshedIndex1.head.source.plan.properties.fingerprint))
+
+        // Delete another source data file.
+        val deletedFile2 = deleteDataFile(nonPartitionedDataPath)
+        // Refresh index and validate updated IndexLogEntry.
+        // `excluded` files should contain both deleted source data files.
+        hyperspace.refreshIndex(indexConfig.indexName)
+        val refreshedIndex2 = ixManager.getIndexes()
+        assert(
+          refreshedIndex2.head.source.plan.properties.relations.head.data.properties.excluded
+            .equals(Seq(deletedFile1.toString, deletedFile2.toString)))
+
+        // Make sure index fingerprint is changed.
+        assert(
+          !originalIndex.head.source.plan.properties.fingerprint
+            .equals(refreshedIndex2.head.source.plan.properties.fingerprint))
+        assert(
+          !refreshedIndex1.head.source.plan.properties.fingerprint
+            .equals(refreshedIndex2.head.source.plan.properties.fingerprint))
       }
     }
   }

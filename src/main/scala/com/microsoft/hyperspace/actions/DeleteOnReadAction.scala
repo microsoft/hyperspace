@@ -59,7 +59,7 @@ class DeleteOnReadAction(
     val dataProps = data.properties
     val excluded = dataProps.excluded
 
-    // Instantiate a new IndexLogEntry by appending deleted files to list of excluded files.
+    // Instantiate a new IndexLogEntry by updating excluded files and fingerprint.
     previousIndexLogEntry.copy(
       source = source.copy(
         plan = plan.copy(
@@ -68,6 +68,7 @@ class DeleteOnReadAction(
             relations = Seq(
               relation.copy(
                 data = data.copy(
-                  properties = dataProps.copy(excluded = excluded ++ deletedFiles))))))))
+                  properties = dataProps.copy(
+                    excluded = excluded ++ (deletedFiles diff excluded)))))))))
   }
 }
