@@ -21,14 +21,14 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, NamedExpression, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -37,17 +37,20 @@ object RuleUtils {
   /**
    * Get active indexes for the given logical plan by matching signatures.
    *
+   * @param spark Spark Session.
    * @param indexManager IndexManager.
    * @param plan Logical plan.
-   * @param hybridScanEnabled Flag that checks if hybrid scan is enabled or disabled.
    * @return Indexes built for this plan.
    */
   def getCandidateIndexes(
+      spark: SparkSession,
       indexManager: IndexManager,
-      plan: LogicalPlan,
-      hybridScanEnabled: Boolean): Seq[IndexLogEntry] = {
+      plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
+
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
+    val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
@@ -76,8 +79,12 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
       val deletedCnt = entry.allSourceFileInfos.size - commonCnt
 
-      // Currently, Hybrid Scan only support for append-only dataset.
-      deletedCnt == 0 && commonCnt > 0
+      if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
+        commonCnt > 0
+      } else {
+        // For append-only dataset.
+        deletedCnt == 0 && commonCnt > 0
+      }
     }
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
@@ -216,7 +223,10 @@ object RuleUtils {
     var unhandledAppendedFiles: Seq[Path] = Nil
 
     // Get transformed plan with index data and appended files if applicable.
-    val indexPlan = plan transformDown {
+    val indexPlan = plan transformUp {
+      // Use transformUp here since only 1 Logical Relation is pre-requisite condition.
+      // Otherwise, we need additional handling of injected Filter-Not-In condition for
+      // Hybrid Scan Delete support.
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
@@ -224,12 +234,25 @@ object RuleUtils {
             _) =>
         val curFileSet = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-        val filesAppended =
-          curFileSet.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name))
-        // TODO: Hybrid Scan delete support.
+
+        val (filesDeleted, filesAppended) =
+          if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
+            val (exist, nonExist) = curFileSet.partition(index.allSourceFileInfos.contains)
+            val filesAppended = nonExist.map(f => new Path(f.name))
+            if (exist.length < index.allSourceFileInfos.size) {
+              (index.allSourceFileInfos -- exist, filesAppended)
+            } else {
+              (Nil, filesAppended)
+            }
+          } else {
+            // Keep append-only implementation for efficiency.
+            (
+              Nil,
+              curFileSet.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name)))
+          }
 
         val filesToRead = {
-          if (useBucketSpec || !isParquetSourceFormat) {
+          if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using 1 FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -246,18 +269,33 @@ object RuleUtils {
           }
         }
 
+        val readSchema = if (filesDeleted.isEmpty) {
+          StructType(index.schema.filter(baseRelation.schema.contains(_)))
+        } else {
+          StructType(index.schema)
+        }
+
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = HadoopFsRelation(
           newLocation,
           new StructType(),
-          StructType(index.schema.filter(baseRelation.schema.contains(_))),
+          readSchema,
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map())(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-        baseRelation.copy(relation = relation, output = updatedOutput)
+
+        if (filesDeleted.isEmpty) {
+          baseRelation.copy(relation = relation, output = updatedOutput)
+        } else {
+          val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
+            NamedExpression.newExprId)
+          val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
+          val rel = baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lAttr))
+          Project(updatedOutput, Filter(Not(In(lAttr, deletedFileNames)), rel))
+        }
     }
 
     if (unhandledAppendedFiles.nonEmpty) {

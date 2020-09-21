@@ -109,11 +109,10 @@ object JoinIndexRule
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
-    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     val lIndexes =
       RuleUtils
         .getLogicalRelation(left)
-        .map(RuleUtils.getCandidateIndexes(indexManager, _, hybridScanEnabled))
+        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
     if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
@@ -121,7 +120,7 @@ object JoinIndexRule
     val rIndexes =
       RuleUtils
         .getLogicalRelation(right)
-        .map(RuleUtils.getCandidateIndexes(indexManager, _, hybridScanEnabled))
+        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
     if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }
