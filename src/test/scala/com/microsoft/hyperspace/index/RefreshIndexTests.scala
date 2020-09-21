@@ -265,6 +265,45 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test(
+    "Validate refresh index (to handle deletes from the source data) " +
+      "for enforce delete on read does not add duplicate excluded files.") {
+    // Save test data non-partitioned.
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      withIndex(indexConfig.indexName) {
+        hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+        val ixManager = Hyperspace.getContext(spark).indexCollectionManager
+        val originalIndex = ixManager.getIndexes()
+        assert(originalIndex.length == 1)
+        assert(
+          originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
+
+        // Delete one source data file.
+        val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
+
+        // Refresh index and validate updated IndexLogEntry.
+        hyperspace.refreshIndex(indexConfig.indexName)
+        val refreshedIndex1 = ixManager.getIndexes()
+        assert(
+          refreshedIndex1.head.source.plan.properties.relations.head.data.properties.excluded
+            .equals(Seq(deletedFile1.toString)))
+
+        // Refresh index again and validate it fails as expected.
+        val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+        assert(
+          ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+      }
+    }
+  }
+
   /**
    * Delete one file from a given path.
    *

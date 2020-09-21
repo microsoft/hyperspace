@@ -40,7 +40,9 @@ private[actions] abstract class RefreshDeleteActionBase(
           "only supported on an index with lineage.")
     }
 
-    if (deletedFiles.isEmpty) {
+    if (deletedFiles.isEmpty || deletedFiles.toSet.equals(
+          previousIndexLogEntry.source.plan.properties.
+            relations.head.data.properties.excluded.toSet)) {
       throw HyperspaceException("Refresh aborted as no deleted source data file found.")
     }
   }
