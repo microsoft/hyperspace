@@ -97,14 +97,13 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
-    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     RuleUtils.getLogicalRelation(filter) match {
       case Some(r) =>
+        val indexManager = Hyperspace
+          .getContext(spark)
+          .indexCollectionManager
         val candidateIndexes =
-          RuleUtils.getCandidateIndexes(indexManager, r, hybridScanEnabled)
+          RuleUtils.getCandidateIndexes(indexManager, r, HyperspaceConf.hybridScanEnabled(spark))
 
         candidateIndexes.filter { index =>
           indexCoversPlan(
