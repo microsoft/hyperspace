@@ -403,6 +403,11 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
+  def excludedFiles: Seq[String] = {
+    // Assumption: There is only one source relation.
+    source.plan.properties.relations.head.data.properties.excluded
+  }
+
   def hasLineageColumn(spark: SparkSession): Boolean = {
     ResolverUtils
       .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, schema.fieldNames)

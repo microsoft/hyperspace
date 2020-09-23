@@ -455,7 +455,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   test(
-    "Validate index usage for enforce delete on read " +
+    "Validate index usage with filter index rule for enforce delete on read " +
       "after some source data file is deleted.") {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
@@ -500,13 +500,79 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       // Refresh index to update its metadata.
       hyperspace.refreshIndex(indexConfig.indexName)
 
-      // Verify index is used after refresh fixes fingerprint in index metadata.
-      // TODO Replace check with verifyIndexUsage() once EnforceDeleteOnRead covers query path.
+      // Verify index usage and query results after refresh fixes index metadata.
+      verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName))
+      FileUtils.delete(new Path(location))
+    }
+  }
+
+  test(
+    "Validate index usage with join index rule for enforce delete on read " +
+      "after some source data files are deleted.") {
+    withSQLConf(
+      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+
+      // Save a copy of source data files.
+      val location = testDir + "ixRefreshTest"
+      val dataPath = new Path(location, "*parquet")
+      val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+      SampleData.save(spark, location, dataColumns)
+
+      // Create indexes on original source data files.
+      val leftDf1 = spark.read.parquet(location)
+      val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
+      hyperspace.createIndex(leftDf1, leftDfIndexConfig)
+
+      val rightDf1 = spark.read.parquet(location)
+      val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
+      hyperspace.createIndex(rightDf1, rightDfIndexConfig)
+
+      // Verify index usage.
+      def query1(): DataFrame = {
+        leftDf1
+          .join(rightDf1, leftDf1("c3") === rightDf1("C3"))
+          .select(leftDf1("C1"), rightDf1("c4"))
+      }
+
+      verifyIndexUsage(
+        query1,
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
+
+      // Delete one source data file.
+      val dataFileNames = dataPath
+        .getFileSystem(new Configuration)
+        .globStatus(dataPath)
+        .map(_.getPath)
+
+      assert(dataFileNames.nonEmpty)
+      val fileToDelete = dataFileNames.head
+      FileUtils.delete(fileToDelete)
+
+      // Verify index is not used after source data file is deleted.
+      val leftDf2 = spark.read.parquet(location)
+      val rightDf2 = spark.read.parquet(location)
+      def query2(): DataFrame = {
+        leftDf2
+          .join(rightDf2, leftDf2("c3") === rightDf2("C3"))
+          .select(leftDf2("C1"), rightDf2("c4"))
+      }
+
       spark.enableHyperspace()
-      assert(
-        queryPlanHasExpectedRootPaths(
-          query2().queryExecution.optimizedPlan,
-          getIndexFilesPath(indexConfig.indexName)))
+      val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+      spark.disableHyperspace()
+      planRootPaths.foreach(p => assert(p.equals(PathUtils.makeAbsolute(location))))
+
+      // Refresh index to update index metadata.
+      hyperspace.refreshIndex(leftDfIndexConfig.indexName)
+      hyperspace.refreshIndex(rightDfIndexConfig.indexName)
+
+      // Verify index usage and query results after refresh fixes index metadata.
+      verifyIndexUsage(
+        query2,
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
       FileUtils.delete(new Path(location))
     }
   }

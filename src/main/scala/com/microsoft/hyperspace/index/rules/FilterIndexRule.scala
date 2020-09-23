@@ -18,15 +18,15 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, In, Literal, NamedExpression, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructType}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
 
@@ -66,8 +66,13 @@ object FilterIndexRule
             fsRelation)
 
           originalPlan match {
-            case p @ Project(_, _) =>
-              p.copy(child = transformedPlan)
+            case p1 @ Project(_, _) =>
+              transformedPlan match {
+                case p2 @ Project(_, _) =>
+                  p1.copy(child = p2.child)
+                case _ =>
+                  p1.copy(child = transformedPlan)
+              }
             case _ =>
               transformedPlan
           }
@@ -96,27 +101,39 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       logicalRelation: LogicalRelation,
-      fsRelation: HadoopFsRelation): Filter = {
+      fsRelation: HadoopFsRelation): LogicalPlan = {
     val candidateIndexes =
       findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
     rank(candidateIndexes) match {
       case Some(index) =>
         val spark = fsRelation.sparkSession
+        val newSchema = if (index.excludedFiles.isEmpty) {
+          StructType(index.schema.filter(fsRelation.schema.contains))
+        } else {
+          // Include DATA_FILE_NAME_COLUMN column in schema.
+          index.schema
+        }
         val newLocation = new InMemoryFileIndex(spark, index.content.files, Map(), None)
+        val newOutput =
+          logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
 
         val newRelation = HadoopFsRelation(
           newLocation,
           new StructType(),
-          StructType(index.schema.filter(fsRelation.schema.contains)),
+          newSchema,
           None, // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
           new ParquetFileFormat,
           Map())(spark)
 
-        val newOutput =
-          logicalRelation.output.filter(attr => index.schema.fieldNames.contains(attr.name))
-
-        val updatedPlan =
+        val updatedPlan = if (index.excludedFiles.isEmpty) {
           filter.copy(child = logicalRelation.copy(relation = newRelation, output = newOutput))
+        } else {
+          val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
+            NamedExpression.newExprId)
+          val deletedFileNames = index.excludedFiles.map(Literal(_)).toArray
+          val rel = logicalRelation.copy(relation = newRelation, output = newOutput ++ Seq(lAttr))
+          Project(newOutput, Filter(Not(In(lAttr, deletedFileNames)), filter.copy(child = rel)))
+        }
 
         logEvent(
           HyperspaceIndexUsageEvent(

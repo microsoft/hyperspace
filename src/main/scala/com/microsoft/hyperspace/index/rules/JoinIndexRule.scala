@@ -22,12 +22,12 @@ import scala.util.Try
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression, In, Literal, NamedExpression, Not}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructType}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
@@ -139,25 +139,39 @@ object JoinIndexRule
     // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
     // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
     // lead to wrong results. So we only replace the base relation.
-    plan transform {
+    plan transformUp {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val bucketSpec = BucketSpec(
           numBuckets = index.numBuckets,
           bucketColumnNames = index.indexedColumns,
           sortColumnNames = index.indexedColumns)
-
         val location = new InMemoryFileIndex(spark, index.content.files, Map(), None)
+        val schema = if (index.excludedFiles.isEmpty) {
+          StructType(index.schema.filter(baseRelation.schema.contains))
+        } else {
+          index.schema
+        }
+
         val relation = HadoopFsRelation(
           location,
           new StructType(),
-          StructType(index.schema.filter(baseRelation.schema.contains(_))),
+          schema,
           Some(bucketSpec),
           new ParquetFileFormat,
           Map())(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-        baseRelation.copy(relation = relation, output = updatedOutput)
+
+        if (index.excludedFiles.isEmpty) {
+          baseRelation.copy(relation = relation, output = updatedOutput)
+        } else {
+          val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
+            NamedExpression.newExprId)
+          val deletedFileNames = index.excludedFiles.map(Literal(_)).toArray
+          val rel = baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lAttr))
+          Project(updatedOutput, Filter(Not(In(lAttr, deletedFileNames)), rel))
+        }
     }
   }
 
