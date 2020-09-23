@@ -154,11 +154,11 @@ object RuleUtils {
   }
 
   /**
-   * Transform the current plan to utilize index
+   * Transform the current plan to utilize index.
    * The transformed plan reads data from indexes instead of the source relations.
    * Bucketing information of the index is retained if useBucketSpec is true.
    *
-   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
+   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations.
    *
    * @param spark Spark session.
    * @param index Index used in replacement plan.
@@ -233,7 +233,7 @@ object RuleUtils {
         // along with the index data.
         val readPaths = {
           if (useBucketSpec || !isParquetSourceFormat) {
-            // FilterIndexRule: since the index data is in "parquet" format, we cannot read
+            // FilterIndexRule: Since the index data is in "parquet" format, we cannot read
             // source files in formats other than "parquet" using 1 FileScan node as the
             // operator requires files in one homogenous format. To address this, we need
             // to read the appended source files using another FileScan node injected into
@@ -332,7 +332,7 @@ object RuleUtils {
   /**
    * Transform the plan to perform on-the-fly Shuffle the data based on bucketSpec.
    *
-   * Pre-requisites
+   * Pre-requisite
    * - The plan should be linear and include 1 LogicalRelation.
    *
    * @param bucketSpec Bucket specification used for Shuffle.
@@ -343,7 +343,7 @@ object RuleUtils {
       bucketSpec: BucketSpec,
       plan: LogicalPlan): LogicalPlan = {
     // Extract top level plan including all required columns for shuffle in its output.
-    // This is located inside this function because of bucketSpec.bucketColumnNames
+    // This is located inside this function because of bucketSpec.bucketColumnNames.
     object ExtractTopLevelPlanForShuffle {
       type returnType = (LogicalPlan, Seq[Option[Attribute]], Boolean)
       def unapply(plan: LogicalPlan): Option[returnType] = plan match {

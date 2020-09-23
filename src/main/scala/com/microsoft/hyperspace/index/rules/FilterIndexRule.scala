@@ -54,7 +54,7 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
           rank(candidateIndexes) match {
             case Some(index) =>
-              // Do not set BucketSpec to avoid limiting Spark's degree of parallelism
+              // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
               val replacedPlan =
                 RuleUtils.transformPlanToUseIndex(
                   spark,
