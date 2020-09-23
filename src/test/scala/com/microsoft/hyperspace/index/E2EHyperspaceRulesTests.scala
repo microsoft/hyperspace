@@ -460,49 +460,64 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
       IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      Seq(true, false).foreach { addProject =>
+        withIndex("filterIndex") {
+          // Save a copy of source data files.
+          val location = testDir + "ixRefreshTest"
+          val dataPath = new Path(location, "*parquet")
+          val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+          SampleData.save(spark, location, dataColumns)
 
-      // Save a copy of source data files.
-      val location = testDir + "ixRefreshTest"
-      val dataPath = new Path(location, "*parquet")
-      val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
-      SampleData.save(spark, location, dataColumns)
+          // Create index on original source data files.
+          val df = spark.read.parquet(location)
+          val indexConfig = if (addProject) {
+            IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+          } else {
+            IndexConfig("filterIndex", Seq("c3"), Seq("c4", "c2", "c5", "c1"))
+          }
+          hyperspace.createIndex(df, indexConfig)
 
-      // Create index on original source data files.
-      val df = spark.read.parquet(location)
-      val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
-      hyperspace.createIndex(df, indexConfig)
+          // Verify index usage.
+          def query1(): DataFrame =
+            if (addProject) {
+              spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+            } else {
+              spark.read.parquet(location).filter("c3 == 'facebook'")
+            }
 
-      // Verify index usage.
-      def query1(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+          verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
 
-      verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
+          // Delete one source data file.
+          val dataFileNames = dataPath
+            .getFileSystem(new Configuration)
+            .globStatus(dataPath)
+            .map(_.getPath)
 
-      // Delete one source data file.
-      val dataFileNames = dataPath
-        .getFileSystem(new Configuration)
-        .globStatus(dataPath)
-        .map(_.getPath)
+          assert(dataFileNames.nonEmpty)
+          val fileToDelete = dataFileNames.head
+          FileUtils.delete(fileToDelete)
 
-      assert(dataFileNames.nonEmpty)
-      val fileToDelete = dataFileNames.head
-      FileUtils.delete(fileToDelete)
+          def query2(): DataFrame =
+            if (addProject) {
+              spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+            } else {
+              spark.read.parquet(location).filter("c3 == 'facebook'")
+            }
 
-      def query2(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+          // Verify index is not used after source data file is deleted.
+          spark.enableHyperspace()
+          val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+          spark.disableHyperspace()
+          assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
 
-      // Verify index is not used after source data file is deleted.
-      spark.enableHyperspace()
-      val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
-      spark.disableHyperspace()
-      assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
+          // Refresh index to update its metadata.
+          hyperspace.refreshIndex(indexConfig.indexName)
 
-      // Refresh index to update its metadata.
-      hyperspace.refreshIndex(indexConfig.indexName)
-
-      // Verify index usage and query results after refresh fixes index metadata.
-      verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName))
-      FileUtils.delete(new Path(location))
+          // Verify index usage and query results after refresh fixes index metadata.
+          verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName))
+          FileUtils.delete(new Path(location))
+        }
+      }
     }
   }
 

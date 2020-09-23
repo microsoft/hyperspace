@@ -66,13 +66,8 @@ object FilterIndexRule
             fsRelation)
 
           originalPlan match {
-            case p1 @ Project(_, _) =>
-              transformedPlan match {
-                case p2 @ Project(_, _) =>
-                  p1.copy(child = p2.child)
-                case _ =>
-                  p1.copy(child = transformedPlan)
-              }
+            case p @ Project(_, _) =>
+              p.copy(child = transformedPlan)
             case _ =>
               transformedPlan
           }
@@ -101,7 +96,7 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       logicalRelation: LogicalRelation,
-      fsRelation: HadoopFsRelation): LogicalPlan = {
+      fsRelation: HadoopFsRelation): Filter = {
     val candidateIndexes =
       findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
     rank(candidateIndexes) match {
@@ -132,7 +127,7 @@ object FilterIndexRule
             NamedExpression.newExprId)
           val deletedFileNames = index.excludedFiles.map(Literal(_)).toArray
           val rel = logicalRelation.copy(relation = newRelation, output = newOutput ++ Seq(lAttr))
-          Project(newOutput, Filter(Not(In(lAttr, deletedFileNames)), filter.copy(child = rel)))
+          filter.copy(child = Project(newOutput, Filter(Not(In(lAttr, deletedFileNames)), rel)))
         }
 
         logEvent(
