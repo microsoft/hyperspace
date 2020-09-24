@@ -41,8 +41,7 @@ private[actions] abstract class RefreshDeleteActionBase(
     }
 
     if (deletedFiles.isEmpty || deletedFiles.toSet.equals(
-          previousIndexLogEntry.source.plan.properties.
-            relations.head.data.properties.excluded.toSet)) {
+          previousIndexLogEntry.excludedFiles.toSet)) {
       throw HyperspaceException("Refresh aborted as no deleted source data file found.")
     }
   }

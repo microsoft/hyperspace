@@ -226,8 +226,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(
-          originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
+        assert(originalIndex.head.excludedFiles.isEmpty)
 
         // Delete one source data file.
         val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
@@ -235,9 +234,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex1 = ixManager.getIndexes()
-        assert(
-          refreshedIndex1.head.source.plan.properties.relations.head.data.properties.excluded
-            .equals(Seq(deletedFile1.toString)))
+        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile1.toString)))
 
         // Make sure index fingerprint is changed.
         assert(
@@ -251,7 +248,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex2 = ixManager.getIndexes()
         assert(
-          refreshedIndex2.head.source.plan.properties.relations.head.data.properties.excluded
+          refreshedIndex2.head.excludedFiles
             .equals(Seq(deletedFile1.toString, deletedFile2.toString)))
 
         // Make sure index fingerprint is changed.
@@ -283,8 +280,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(
-          originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
+        assert(originalIndex.head.excludedFiles.isEmpty)
 
         // Delete one source data file.
         val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
@@ -292,14 +288,11 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex1 = ixManager.getIndexes()
-        assert(
-          refreshedIndex1.head.source.plan.properties.relations.head.data.properties.excluded
-            .equals(Seq(deletedFile1.toString)))
+        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile1.toString)))
 
         // Refresh index again and validate it fails as expected.
         val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-        assert(
-          ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+        assert(ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
       }
     }
   }
