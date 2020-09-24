@@ -23,11 +23,28 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, DeleteOnReadActionEvent, HyperspaceEvent}
 
+/**
+ * Refresh index by updating list of excluded source data files and index signature
+ * in index metadata.
+ * Note this Refresh Action only fixes an index metadata w.r.t deleted source data files
+ * and does not consider new source data files (if any).
+ * If some original source data file(s) are removed between previous version of index and
+ * now, this Action refreshes index as follows:
+ * 1. Deleted source data files are identified.
+ * 2. New index fingerprint is computed w.r.t latest source data files.
+ * 3. IndexLogEntry is updated by modifying list of excluded source data files and
+ * index fingerprint, computed in above steps.
+ *
+ * @param spark SparkSession.
+ * @param logManager Index LogManager for index being refreshed.
+ * @param dataManager Index DataManager for index being refreshed.
+ */
 class DeleteOnReadAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshDeleteActionBase(spark, logManager, dataManager) with Logging {
+    extends RefreshDeleteActionBase(spark, logManager, dataManager)
+    with Logging {
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     DeleteOnReadActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
@@ -39,6 +56,13 @@ class DeleteOnReadAction(
         s"${deletedFiles.length} deleted files to list of excluded source data files.")
   }
 
+  /**
+   * Compute new index fingerprint using latest source data files and create
+   * new IndexLogEntry with updated list of excluded source data files and
+   * new index fingerprint.
+   *
+   * @return updated IndexLogEntry.
+   */
   final override def logEntry: LogEntry = {
     // Compute index fingerprint using current source data file.
     val signatureProvider = LogicalPlanSignatureProvider.create()
@@ -59,7 +83,7 @@ class DeleteOnReadAction(
     val dataProps = data.properties
     val excluded = dataProps.excluded
 
-    // Instantiate a new IndexLogEntry by updating excluded files and fingerprint.
+    // Create a new IndexLogEntry by updating excluded files and fingerprint.
     previousIndexLogEntry.copy(
       source = source.copy(
         plan = plan.copy(
