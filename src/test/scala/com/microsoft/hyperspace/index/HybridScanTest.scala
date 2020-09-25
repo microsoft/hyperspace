@@ -25,11 +25,11 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
-
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
+import org.apache.spark.sql.catalyst.expressions.Attribute
 
 class HybridScanTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
@@ -160,9 +160,11 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
             val childNodes = children collect {
               case r @ RepartitionByExpression(
-                    _,
+                    attrs,
                     Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
-                    numBucket: Int) =>
+                    numBucket) =>
+                assert(attrs.size == 1)
+                assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
                 // Check 1 appended file.
                 assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
                 assert(numBucket === 200)
