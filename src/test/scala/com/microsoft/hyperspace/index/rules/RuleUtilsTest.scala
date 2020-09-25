@@ -195,15 +195,29 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
       bucketSpec,
       query.queryExecution.optimizedPlan)
 
-    assert((shuffled collect {
-      case RepartitionByExpression(attrs: Seq[Expression], p: Project, numBuckets: Int) =>
+    // Plan: Project ("id", "name") -> Filter ("id") -> Relation
+    // should be transformed to:
+    //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
+    assert(shuffled.collect {
+      case RepartitionByExpression(attrs, p: Project, numBuckets) =>
         assert(numBuckets == 100)
         assert(attrs.size == 1)
         assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
-        assert(p.projectList.exists(a => a.name.equals("id")) && p.projectList.exists(a =>
-          a.name.equals("name")))
+        assert(
+          p.projectList.exists(_.name.equals("id")) && p.projectList.exists(
+            _.name.equals("name")))
         true
-    }).length == 1)
+    }.length == 1)
+
+    // Check if the shuffle node should be injected where all bucket columns
+    // are available as its input.
+    // For example,
+    // Plan: Project ("id", "name") -> Filter ("id") -> Relation
+    // should be transformed:
+    //   Project ("id", "name") -> Shuffle ("age") -> Filter ("id") -> Relation
+    // , NOT:
+    //   Shuffle ("age") -> Project("id", "name") -> Filter ("id") -> Relation
+    // since Project doesn't include "age" column; Shuffle will be RoundRobinPartitioning
 
     val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
     val query2 = df.filter(df("id") <= 3).select("id", "name")
@@ -211,15 +225,15 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
       RuleUtils.transformPlanToShuffleUsingIndexSpec(
         bucketSpec2,
         query2.queryExecution.optimizedPlan)
-    assert((shuffled2 collect {
+    assert(shuffled2.collect {
       case Project(
           _,
-          r @ RepartitionByExpression(attrs: Seq[Expression], _: Filter, numBuckets: Int)) =>
+          RepartitionByExpression(attrs: Seq[Expression], _: Filter, numBuckets: Int)) =>
         assert(numBuckets == 100)
         assert(attrs.size == 1)
         assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
         true
-    }).length == 1)
+    }.length == 1)
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {

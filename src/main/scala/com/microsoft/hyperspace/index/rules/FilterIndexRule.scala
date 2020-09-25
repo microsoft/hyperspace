@@ -55,7 +55,7 @@ object FilterIndexRule
           rank(candidateIndexes) match {
             case Some(index) =>
               // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
-              val replacedPlan =
+              val transformedPlan =
                 RuleUtils.transformPlanToUseIndex(
                   spark,
                   index,
@@ -69,9 +69,9 @@ object FilterIndexRule
                     sparkContext.appName),
                   Seq(index),
                   filter.toString,
-                  replacedPlan.toString,
+                  transformedPlan.toString,
                   "Filter index rule applied."))
-              replacedPlan
+              transformedPlan
             case None => originalPlan
           }
         } catch {
