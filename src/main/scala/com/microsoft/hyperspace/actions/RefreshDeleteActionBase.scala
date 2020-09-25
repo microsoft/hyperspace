@@ -29,8 +29,8 @@ private[actions] abstract class RefreshDeleteActionBase(
     extends RefreshActionBase(spark, logManager, dataManager) {
 
   /**
-   * Validate index has lineage column and it is in active state for refreshing and
-   * there are some deleted source data file(s).
+   * Validate index has lineage column, and it is in active state for refreshing,
+   * and there are some deleted source data file(s).
    */
   override def validate(): Unit = {
     super.validate()
@@ -40,8 +40,7 @@ private[actions] abstract class RefreshDeleteActionBase(
           "only supported on an index with lineage.")
     }
 
-    if (deletedFiles.isEmpty || deletedFiles.toSet.equals(
-          previousIndexLogEntry.excludedFiles.toSet)) {
+    if (deletedFiles.isEmpty) {
       throw HyperspaceException("Refresh aborted as no deleted source data file found.")
     }
   }

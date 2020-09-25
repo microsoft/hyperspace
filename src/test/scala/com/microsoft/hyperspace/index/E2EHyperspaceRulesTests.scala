@@ -410,7 +410,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
 
       // Save a copy of source data files.
-      val location = testDir + "ixRefreshTest"
+      val location = testDir + "refreshDeleteTest"
       val dataPath = new Path(location, "*parquet")
       val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
       SampleData.save(spark, location, dataColumns)
@@ -462,7 +462,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
 
       // Save a copy of source data files.
-      val location = testDir + "ixRefreshTest"
+      val location = testDir + "deleteOnReadTest"
       val dataPath = new Path(location, "*parquet")
       val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
       SampleData.save(spark, location, dataColumns)

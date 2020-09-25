@@ -50,6 +50,13 @@ class DeleteOnReadAction(
     DeleteOnReadActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
+  override def validate(): Unit = {
+    super.validate()
+    if (deletedFiles.toSet.equals(previousIndexLogEntry.excludedFiles.toSet)) {
+      throw HyperspaceException("Refresh aborted as no new deleted source data file found.")
+    }
+  }
+
   final override def op(): Unit = {
     logInfo(
       "Refresh index is updating index metadata by adding " +
@@ -61,7 +68,7 @@ class DeleteOnReadAction(
    * new IndexLogEntry with updated list of excluded source data files and
    * new index fingerprint.
    *
-   * @return updated IndexLogEntry.
+   * @return Updated IndexLogEntry.
    */
   final override def logEntry: LogEntry = {
     // Compute index fingerprint using current source data file.
