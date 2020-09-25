@@ -36,50 +36,50 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
 
   private val sampleData = SampleData.testData
-  private val sampleDataRoot = "src/test/resources/data/"
-  private val sampleParquetDataLocation = sampleDataRoot + "sampleparquet2"
-  private val sampleParquetDataLocation2 = sampleDataRoot + "sampleparquet3"
-  private val sampleJsonDataLocation = sampleDataRoot + "samplejson"
+  private val sampleDataLocationRoot = "src/test/resources/data/"
+  private val sampleParquetDataLocationAppend = sampleDataLocationRoot + "sampleparquet0"
+  private val sampleParquetDataLocationAppend2 = sampleDataLocationRoot + "sampleparquet1"
+  private val sampleJsonDataLocationAppend = sampleDataLocationRoot + "samplejson1"
   private var hyperspace: Hyperspace = _
-  private val indexConfig1 = IndexConfig("index1", Seq("clicks"), Seq("query"))
-  private val indexConfig2 = IndexConfig("index2", Seq("clicks"), Seq("query"))
-  private val indexConfig3 = IndexConfig("index3", Seq("clicks"), Seq("Date"))
 
-  private def copyFirstFile(df: DataFrame): Unit = {
-    val file = df.inputFiles.head
-    val sourcePath = new Path(file)
-    val destPath = new Path(file + ".copy")
-    systemPath.getFileSystem(new Configuration).copyToLocalFile(sourcePath, destPath)
+  def setupIndex(
+      df: DataFrame,
+      indexConfig: IndexConfig,
+      appendCnt: Int): Unit = {
+    hyperspace.createIndex(df, indexConfig)
+    val list = df.inputFiles
+    assert(appendCnt < list.length)
+    for (i <- 0 until appendCnt) {
+      val sourcePath = new Path(list(i))
+      val destPath = new Path(list(i) + ".copy")
+      systemPath.getFileSystem(new Configuration).copyToLocalFile(sourcePath, destPath)
+    }
   }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     import spark.implicits._
     hyperspace = new Hyperspace(spark)
-    FileUtils.delete(new Path(sampleParquetDataLocation))
-    FileUtils.delete(new Path(sampleJsonDataLocation))
+    FileUtils.delete(new Path(sampleDataLocationRoot))
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-    dfFromSample.write.parquet(sampleParquetDataLocation)
-    dfFromSample.write.parquet(sampleParquetDataLocation2)
-    dfFromSample.write.json(sampleJsonDataLocation)
+    dfFromSample.write.parquet(sampleParquetDataLocationAppend)
+    dfFromSample.write.parquet(sampleParquetDataLocationAppend2)
+    dfFromSample.write.json(sampleJsonDataLocationAppend)
 
-    {
-      val df = spark.read.parquet(sampleParquetDataLocation)
-      hyperspace.createIndex(df, indexConfig1)
-      copyFirstFile(df)
-    }
-
-    {
-      val df = spark.read.parquet(sampleParquetDataLocation2)
-      hyperspace.createIndex(df, indexConfig3)
-      copyFirstFile(df)
-    }
-
-    {
-      val df = spark.read.json(sampleJsonDataLocation)
-      hyperspace.createIndex(df, indexConfig2)
-      copyFirstFile(df)
-    }
+    val indexConfig1 = IndexConfig("index1", Seq("clicks"), Seq("query"))
+    val indexConfig2 = IndexConfig("index11", Seq("clicks"), Seq("Date"))
+    setupIndex(
+      spark.read.parquet(sampleParquetDataLocationAppend),
+      indexConfig1,
+      appendCnt = 1)
+    setupIndex(
+      spark.read.parquet(sampleParquetDataLocationAppend2),
+      indexConfig2,
+      appendCnt = 1)
+    setupIndex(
+      spark.read.json(sampleJsonDataLocationAppend),
+      indexConfig1.copy(indexName = "index4"),
+      appendCnt = 1)
   }
 
   before {
@@ -92,13 +92,13 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   override def afterAll(): Unit = {
     super.afterAll()
-    FileUtils.delete(new Path(sampleDataRoot))
+    FileUtils.delete(new Path(sampleDataLocationRoot))
   }
 
   test(
     "Append-only: filter index & parquet format, " +
       "index relation should include appended file paths") {
-    val df = spark.read.parquet(sampleParquetDataLocation)
+    val df = spark.read.parquet(sampleParquetDataLocationAppend)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
@@ -120,6 +120,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
           // Verify number of index data files.
           assert(fsRelation.location.inputFiles.count(_.contains("index1")) === 4)
+          assert(fsRelation.location.inputFiles.length === 5)
           p
       }
       // Filter Index and Parquet format source file can be handled with 1 LogicalRelation
@@ -131,8 +132,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: join index, appended data should be shuffled with indexed columns " +
       "and merged by BucketUnion") {
-    val df1 = spark.read.parquet(sampleParquetDataLocation)
-    val df2 = spark.read.parquet(sampleParquetDataLocation2)
+    val df1 = spark.read.parquet(sampleParquetDataLocationAppend)
+    val df2 = spark.read.parquet(sampleParquetDataLocationAppend2)
     def joinQuery(): DataFrame = {
       val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
       val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
@@ -167,14 +168,16 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 assert(attrs.size == 1)
                 assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
                 // Check 1 appended file.
-                assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
+                assert(fsRelation.location.inputFiles.forall(_.contains(".copy")))
+                assert(fsRelation.location.inputFiles.length === 1)
                 assert(numBucket === 200)
                 r
               case p @ Project(
                     _,
                     Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))) =>
                 // Check 4 of index data files.
-                assert(fsRelation.location.inputFiles.count(_.contains("index")) === 4)
+                assert(fsRelation.location.inputFiles.forall(_.contains("index")))
+                assert(fsRelation.location.inputFiles.length === 4)
                 p
             }
 
@@ -217,7 +220,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: filter rule & json format, " +
       "appended data should be shuffled and merged by Union") {
-    val df = spark.read.json(sampleJsonDataLocation)
+    val df = spark.read.json(sampleJsonDataLocationAppend)
     def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
 
@@ -243,10 +246,12 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               fileFormatName match {
                 case "parquet" =>
                   // Check 4 of index data files.
-                  assert(fsRelation.location.inputFiles.count(_.contains("index")) === 4)
+                  assert(fsRelation.location.inputFiles.forall(_.contains("index")))
+                  assert(fsRelation.location.inputFiles.length === 4)
                 case "json" =>
                   // Check 1 appended file.
-                  assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
+                  assert(fsRelation.location.inputFiles.forall(_.contains(".copy")))
+                  assert(fsRelation.location.inputFiles.length === 1)
                 case _ => fail("Unexpected file format")
               }
               fileFormatName
