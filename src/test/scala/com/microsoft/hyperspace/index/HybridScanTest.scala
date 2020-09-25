@@ -19,17 +19,18 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExec}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
+
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
-import org.apache.spark.sql.catalyst.expressions.Attribute
 
 class HybridScanTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
