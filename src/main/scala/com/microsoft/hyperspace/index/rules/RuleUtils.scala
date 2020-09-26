@@ -239,7 +239,7 @@ object RuleUtils {
             index.content.files
           } else {
             // If BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently)
-            // aud the source format is parquet, we could read the appended files along
+            // and the source format is parquet, we could read the appended files along
             // with the index data.
             val files = index.content.files ++ filesAppended
             files
@@ -275,7 +275,9 @@ object RuleUtils {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
 
-        // Clear sortColumnNames as BucketUnion does not keep the sort order within a bucket.
+        // Although only numBuckets of BucketSpec is used in BucketUnion*, bucketColumnNames
+        // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
+        // misunderstanding.
         val bucketSpec = index.bucketSpec.copy(sortColumnNames = Nil)
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.

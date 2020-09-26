@@ -228,7 +228,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     assert(shuffled2.collect {
       case Project(
           _,
-          RepartitionByExpression(attrs: Seq[Expression], _: Filter, numBuckets: Int)) =>
+          RepartitionByExpression(attrs, _: Filter, numBuckets)) =>
         assert(numBuckets == 100)
         assert(attrs.size == 1)
         assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
