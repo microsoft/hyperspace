@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileUtil, Path}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, IsNotNull, LessThanOrEqual}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache, PartitioningAwareFileIndex}
@@ -191,7 +191,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val df = spark.read.parquet(dataPath)
     val query = df.filter(df("id") >= 3).select("id", "name")
     val bucketSpec = BucketSpec(100, Seq("id"), Seq())
-    val shuffled = RuleUtils.transformPlanToShuffleUsingIndexSpec(
+    val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
       bucketSpec,
       query.queryExecution.optimizedPlan)
 
@@ -222,7 +222,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
     val query2 = df.filter(df("id") <= 3).select("id", "name")
     val shuffled2 =
-      RuleUtils.transformPlanToShuffleUsingIndexSpec(
+      RuleUtils.transformPlanToShuffleUsingBucketSpec(
         bucketSpec2,
         query2.queryExecution.optimizedPlan)
     assert(shuffled2.collect {
