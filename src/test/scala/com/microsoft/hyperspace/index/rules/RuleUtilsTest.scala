@@ -115,7 +115,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     withTempDir { tempDir =>
       val indexManager = IndexCollectionManager(spark)
       val df = spark.range(1, 5).toDF("id")
-      val dataPath = tempDir + "/hbtable"
+      val dataPath = tempDir.toString
       df.write.parquet(dataPath)
 
       withIndex("index1") {
@@ -180,7 +180,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
 
   test("Verify the location of injected shuffle for Hybrid Scan.") {
     withTempDir { tempDir =>
-      val dataPath = tempDir + "/hbtable"
+      val dataPath = tempDir.toString
       import spark.implicits._
       Seq((1, "name1", 12), (2, "name2", 10))
         .toDF("id", "name", "age")
