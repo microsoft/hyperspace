@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -68,20 +69,30 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
     val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
 
     assert(
       !spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      !spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
 
     spark.enableHyperspace()
     assert(
       spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
 
     spark.disableHyperspace()
     assert(
       !spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      !spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
   }
 
   test(
