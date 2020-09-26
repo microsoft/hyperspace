@@ -42,17 +42,18 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   private val sampleJsonDataLocationAppend = sampleDataLocationRoot + "samplejson1"
   private var hyperspace: Hyperspace = _
 
-  def setupIndex(
-      df: DataFrame,
-      indexConfig: IndexConfig,
-      appendCnt: Int): Unit = {
+  // Creates an index with given 'df' and 'indexConfig' and copies the first 'appendCnt'
+  // number of input files from 'df'.
+  def setupIndexAndAppendData(df: DataFrame, indexConfig: IndexConfig, appendCnt: Int): Unit = {
     hyperspace.createIndex(df, indexConfig)
-    val list = df.inputFiles
-    assert(appendCnt < list.length)
+    val inputFiles = df.inputFiles
+    assert(appendCnt < inputFiles.length)
+
+    val fs = systemPath.getFileSystem(new Configuration)
     for (i <- 0 until appendCnt) {
-      val sourcePath = new Path(list(i))
-      val destPath = new Path(list(i) + ".copy")
-      systemPath.getFileSystem(new Configuration).copyToLocalFile(sourcePath, destPath)
+      val sourcePath = new Path(inputFiles(i))
+      val destPath = new Path(inputFiles(i) + ".copy")
+      fs.copyToLocalFile(sourcePath, destPath)
     }
   }
 
@@ -68,15 +69,15 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
     val indexConfig1 = IndexConfig("index1", Seq("clicks"), Seq("query"))
     val indexConfig2 = IndexConfig("index11", Seq("clicks"), Seq("Date"))
-    setupIndex(
+    setupIndexAndAppendData(
       spark.read.parquet(sampleParquetDataLocationAppend),
       indexConfig1,
       appendCnt = 1)
-    setupIndex(
+    setupIndexAndAppendData(
       spark.read.parquet(sampleParquetDataLocationAppend2),
       indexConfig2,
       appendCnt = 1)
-    setupIndex(
+    setupIndexAndAppendData(
       spark.read.json(sampleJsonDataLocationAppend),
       indexConfig1.copy(indexName = "index4"),
       appendCnt = 1)
@@ -114,7 +115,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       assert(!baseQuery.queryExecution.optimizedPlan.equals(planWithHybridScan))
 
       // Check appended file is added to relation node or not.
-      val nodes = planWithHybridScan collect {
+      val nodes = planWithHybridScan.collect {
         case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           // Verify appended file is included or not.
           assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
@@ -153,14 +154,14 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         assert(!baseQuery.queryExecution.optimizedPlan.equals(planWithHybridScan))
 
         // Check appended file is added to relation node or not.
-        val nodes = planWithHybridScan collect {
+        val nodes = planWithHybridScan.collect {
           case b @ BucketUnion(children, bucketSpec) =>
             assert(bucketSpec.numBuckets === 200)
             assert(
               bucketSpec.bucketColumnNames.size == 1 && bucketSpec.bucketColumnNames.head
                 .equals("clicks"))
 
-            val childNodes = children collect {
+            val childNodes = children.collect {
               case r @ RepartitionByExpression(
                     attrs,
                     Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
@@ -192,7 +193,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
         withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
           val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-          val execNodes = execPlan collect {
+          val execNodes = execPlan.collect {
             case p @ BucketUnionExec(children, bucketSpec) =>
               assert(children.size === 2)
               // children.head is always the index plan.
@@ -235,9 +236,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       assert(!baseQuery.queryExecution.optimizedPlan.equals(planWithHybridScan))
 
       // Check appended file is added to relation node or not.
-      val nodes = planWithHybridScan collect {
+      val nodes = planWithHybridScan.collect {
         case u @ Union(children) =>
-          val formats = children collect {
+          val formats = children.collect {
             case Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))) =>
               val fileFormatName = fsRelation.fileFormat match {
                 case d: DataSourceRegister => d.shortName
@@ -269,7 +270,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
       withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
         val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-        val execNodes = execPlan collect {
+        val execNodes = execPlan.collect {
           case p @ UnionExec(children) =>
             assert(children.size === 2)
             assert(children.head.isInstanceOf[ProjectExec]) // index data

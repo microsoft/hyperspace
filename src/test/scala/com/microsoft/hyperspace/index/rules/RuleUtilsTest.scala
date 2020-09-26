@@ -16,17 +16,16 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileUtil, Path}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, IsNotNull}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project, RepartitionByExpression}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
@@ -113,127 +112,127 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify getCandidateIndex for hybrid scan") {
-    val indexManager = IndexCollectionManager(spark)
-    val df = spark.range(1, 5).toDF("id")
-    val dataPath = systemPath.toString + "/hbtable"
-    df.write.parquet(dataPath)
+    withTempDir { tempDir =>
+      val indexManager = IndexCollectionManager(spark)
+      val df = spark.range(1, 5).toDF("id")
+      val dataPath = tempDir + "/hbtable"
+      df.write.parquet(dataPath)
 
-    withIndex("index1") {
-      val readDf = spark.read.parquet(dataPath)
-      val indexFile = readDf.inputFiles.head
-      indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+      withIndex("index1") {
+        val readDf = spark.read.parquet(dataPath)
+        val indexFile = readDf.inputFiles.head
+        indexManager.create(readDf, IndexConfig("index1", Seq("id")))
 
-      def verify(
-          plan: LogicalPlan,
-          hybridScanEnabled: Boolean,
-          expectCandidateIndex: Boolean): Unit = {
-        val indexes = RuleUtils
-          .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
-        if (expectCandidateIndex) {
-          assert(indexes.length == 1)
-          assert(indexes.head.name == "index1")
-        } else {
-          assert(indexes.isEmpty)
+        def verify(
+            plan: LogicalPlan,
+            hybridScanEnabled: Boolean,
+            expectCandidateIndex: Boolean): Unit = {
+          val indexes = RuleUtils
+            .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
+          if (expectCandidateIndex) {
+            assert(indexes.length == 1)
+            assert(indexes.head.name == "index1")
+          } else {
+            assert(indexes.isEmpty)
+          }
         }
-      }
 
-      // Verify that a candidate index is returned with the unmodified data files whether
-      // hybrid scan is enabled or not.
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
-      }
+        // Verify that a candidate index is returned with the unmodified data files whether
+        // hybrid scan is enabled or not.
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
+          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+        }
 
-      // Scenario #1: Append new files.
-      df.write.mode("append").parquet(dataPath)
+        // Scenario #1: Append new files.
+        df.write.mode("append").parquet(dataPath)
 
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
-      }
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+        }
 
-      // Scenario #2: Delete 1 file.
-      {
-        systemPath
-          .getFileSystem(new Configuration)
-          .delete(new Path(indexFile), false)
-      }
+        // Scenario #2: Delete 1 file.
+        {
+          FileUtils.delete(new Path(indexFile), isRecursive = false)
+        }
 
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        // TODO: expectedCandidateIndex = true once delete dataset is supported.
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
-      }
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+          // TODO: expectedCandidateIndex = true once delete dataset is supported.
+          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+        }
 
-      // Scenario #3: Replace all files.
-      df.write.mode("overwrite").parquet(dataPath)
+        // Scenario #3: Replace all files.
+        df.write.mode("overwrite").parquet(dataPath)
 
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
+          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+        }
       }
     }
   }
 
   test("Verify the location of injected shuffle for Hybrid Scan.") {
-    val dataPath = systemPath.toString + "/hbtable"
-    import spark.implicits._
-    Seq((1, "name1", 12), (2, "name2", 10))
-      .toDF("id", "name", "age")
-      .write
-      .mode("overwrite")
-      .parquet(dataPath)
+    withTempDir { tempDir =>
+      val dataPath = tempDir + "/hbtable"
+      import spark.implicits._
+      Seq((1, "name1", 12), (2, "name2", 10))
+        .toDF("id", "name", "age")
+        .write
+        .mode("overwrite")
+        .parquet(dataPath)
 
-    val df = spark.read.parquet(dataPath)
-    val query = df.filter(df("id") >= 3).select("id", "name")
-    val bucketSpec = BucketSpec(100, Seq("id"), Seq())
-    val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
-      bucketSpec,
-      query.queryExecution.optimizedPlan)
+      val df = spark.read.parquet(dataPath)
+      val query = df.filter(df("id") >= 3).select("id", "name")
+      val bucketSpec = BucketSpec(100, Seq("id"), Seq())
+      val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
+        bucketSpec,
+        query.queryExecution.optimizedPlan)
 
-    // Plan: Project ("id", "name") -> Filter ("id") -> Relation
-    // should be transformed to:
-    //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
-    assert(shuffled.collect {
-      case RepartitionByExpression(attrs, p: Project, numBuckets) =>
-        assert(numBuckets == 100)
-        assert(attrs.size == 1)
-        assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
-        assert(
-          p.projectList.exists(_.name.equals("id")) && p.projectList.exists(
-            _.name.equals("name")))
-        true
-    }.length == 1)
+      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
+      // should be transformed to:
+      //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
+      assert(shuffled.collect {
+        case RepartitionByExpression(attrs, p: Project, numBuckets) =>
+          assert(numBuckets == 100)
+          assert(attrs.size == 1)
+          assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
+          assert(
+            p.projectList.exists(_.name.equals("id")) && p.projectList.exists(
+              _.name.equals("name")))
+          true
+      }.length == 1)
 
-    // Check if the shuffle node should be injected where all bucket columns
-    // are available as its input.
-    // For example,
-    // Plan: Project ("id", "name") -> Filter ("id") -> Relation
-    // should be transformed:
-    //   Project ("id", "name") -> Shuffle ("age") -> Filter ("id") -> Relation
-    // , NOT:
-    //   Shuffle ("age") -> Project("id", "name") -> Filter ("id") -> Relation
-    // since Project doesn't include "age" column; Shuffle will be RoundRobinPartitioning
+      // Check if the shuffle node should be injected where all bucket columns
+      // are available as its input.
+      // For example,
+      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
+      // should be transformed:
+      //   Project ("id", "name") -> Shuffle ("age") -> Filter ("id") -> Relation
+      // , NOT:
+      //   Shuffle ("age") -> Project("id", "name") -> Filter ("id") -> Relation
+      // since Project doesn't include "age" column; Shuffle will be RoundRobinPartitioning
 
-    val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
-    val query2 = df.filter(df("id") <= 3).select("id", "name")
-    val shuffled2 =
-      RuleUtils.transformPlanToShuffleUsingBucketSpec(
-        bucketSpec2,
-        query2.queryExecution.optimizedPlan)
-    assert(shuffled2.collect {
-      case Project(
-          _,
-          RepartitionByExpression(attrs, _: Filter, numBuckets)) =>
-        assert(numBuckets == 100)
-        assert(attrs.size == 1)
-        assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
-        true
-    }.length == 1)
+      val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
+      val query2 = df.filter(df("id") <= 3).select("id", "name")
+      val shuffled2 =
+        RuleUtils.transformPlanToShuffleUsingBucketSpec(
+          bucketSpec2,
+          query2.queryExecution.optimizedPlan)
+      assert(shuffled2.collect {
+        case Project(_, RepartitionByExpression(attrs, _: Filter, numBuckets)) =>
+          assert(numBuckets == 100)
+          assert(attrs.size == 1)
+          assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
+          true
+      }.length == 1)
+    }
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
