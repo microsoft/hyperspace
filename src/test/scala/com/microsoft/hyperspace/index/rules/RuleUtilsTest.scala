@@ -16,10 +16,10 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.{FileUtil, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
-import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project, RepartitionByExpression}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class RuleUtilsTest extends HyperspaceRuleTestSuite {
+class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -112,10 +112,10 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify getCandidateIndex for hybrid scan") {
-    withTempDir { tempDir =>
+    withTempPath { tempPath =>
       val indexManager = IndexCollectionManager(spark)
       val df = spark.range(1, 5).toDF("id")
-      val dataPath = tempDir.toString + "/table"
+      val dataPath = tempPath.getAbsolutePath
       df.write.parquet(dataPath)
 
       withIndex("index1") {
@@ -179,8 +179,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify the location of injected shuffle for Hybrid Scan.") {
-    withTempDir { tempDir =>
-      val dataPath = tempDir.toString + "/table"
+    withTempPath { tempPath =>
+      val dataPath = tempPath.getAbsolutePath
       import spark.implicits._
       Seq((1, "name1", 12), (2, "name2", 10))
         .toDF("id", "name", "age")
