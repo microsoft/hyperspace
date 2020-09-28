@@ -295,6 +295,9 @@ object JoinIndexRule
     val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
 
+    // Get candidate via file-level metadata validation. This is performed after pruning
+    // by column schema, as this might be expensive when there are numerous files in the
+    // relation or many indexes to be checked.
     val lIndexes = RuleUtils.getCandidateIndexes(
       lUsable,
       RuleUtils.getLogicalRelation(left).get,
