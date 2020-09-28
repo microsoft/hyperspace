@@ -149,33 +149,35 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       withSQLConf(
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
         IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
-        SampleData.save(
-          spark,
-          nonPartitionedDataPath,
-          Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-        val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+        withTempDir { inputDir =>
+          val inputDataPath = inputDir.toString
+          SampleData.save(
+            spark,
+            inputDataPath,
+            Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val nonPartitionedDataDF = spark.read.parquet(inputDataPath)
 
-        hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+          hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-        if (deleteDataFolder) {
-          FileUtils.delete(new Path(nonPartitionedDataPath))
+          if (deleteDataFolder) {
+            FileUtils.delete(new Path(inputDataPath))
 
-          val ex = intercept[AnalysisException](hyperspace.refreshIndex(indexConfig.indexName))
-          assert(ex.getMessage.contains("Path does not exist"))
+            val ex = intercept[AnalysisException](hyperspace.refreshIndex(indexConfig.indexName))
+            assert(ex.getMessage.contains("Path does not exist"))
 
-        } else {
-          val dataPath = new Path(nonPartitionedDataPath, "*parquet")
-          dataPath
-            .getFileSystem(new Configuration)
-            .globStatus(dataPath)
-            .foreach(p => FileUtils.delete(p.getPath))
+          } else {
+            val dataPath = new Path(inputDataPath, "*parquet")
+            dataPath
+              .getFileSystem(new Configuration)
+              .globStatus(dataPath)
+              .foreach(p => FileUtils.delete(p.getPath))
 
-          val ex =
-            intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-          assert(ex.getMessage.contains("Invalid plan for creating an index."))
+            val ex =
+              intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+            assert(ex.getMessage.contains("Invalid plan for creating an index."))
+          }
+          FileUtils.delete(systemPath)
         }
-        FileUtils.delete(new Path(nonPartitionedDataPath))
-        FileUtils.delete(systemPath)
       }
     }
   }
@@ -220,7 +222,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
@@ -270,7 +272,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
@@ -279,12 +281,12 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         assert(originalIndex.head.excludedFiles.isEmpty)
 
         // Delete one source data file.
-        val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
+        val deletedFile = deleteDataFile(nonPartitionedDataPath)
 
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
-        val refreshedIndex1 = ixManager.getIndexes()
-        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile1.toString)))
+        val refreshedIndex = ixManager.getIndexes()
+        assert(refreshedIndex.head.excludedFiles.equals(Seq(deletedFile.toString)))
 
         // Refresh index again and validate it fails as expected.
         val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
@@ -306,7 +308,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
-        spark.conf.set(IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED, "true")
+        spark.conf.set(IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED, "true")
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
@@ -329,7 +331,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile.toString)))
 
         // Change refresh configurations and refresh index to update index files.
-        spark.conf.set(IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED, "false")
+        spark.conf.set(IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED, "false")
         spark.conf.set(IndexConstants.REFRESH_DELETE_ENABLED, "true")
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex2 = ixManager.getIndexes()

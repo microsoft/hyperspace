@@ -43,9 +43,9 @@ object SampleData {
     val df = testData.toDF(columns: _*)
     partitionColumns match {
       case Some(pcs) =>
-        df.write.partitionBy(pcs: _*).parquet(path)
+        df.write.mode("overwrite").partitionBy(pcs: _*).parquet(path)
       case None =>
-        df.write.parquet(path)
+        df.write.mode("overwrite").parquet(path)
     }
   }
 }
