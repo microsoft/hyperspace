@@ -149,33 +149,35 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       withSQLConf(
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
         IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
-        SampleData.save(
-          spark,
-          nonPartitionedDataPath,
-          Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-        val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+        withTempDir { inputDir =>
+          val inputDataPath = inputDir.toString
+          SampleData.save(
+            spark,
+            inputDataPath,
+            Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val nonPartitionedDataDF = spark.read.parquet(inputDataPath)
 
-        hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+          hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-        if (deleteDataFolder) {
-          FileUtils.delete(new Path(nonPartitionedDataPath))
+          if (deleteDataFolder) {
+            FileUtils.delete(new Path(inputDataPath))
 
-          val ex = intercept[AnalysisException](hyperspace.refreshIndex(indexConfig.indexName))
-          assert(ex.getMessage.contains("Path does not exist"))
+            val ex = intercept[AnalysisException](hyperspace.refreshIndex(indexConfig.indexName))
+            assert(ex.getMessage.contains("Path does not exist"))
 
-        } else {
-          val dataPath = new Path(nonPartitionedDataPath, "*parquet")
-          dataPath
-            .getFileSystem(new Configuration)
-            .globStatus(dataPath)
-            .foreach(p => FileUtils.delete(p.getPath))
+          } else {
+            val dataPath = new Path(inputDataPath, "*parquet")
+            dataPath
+              .getFileSystem(new Configuration)
+              .globStatus(dataPath)
+              .foreach(p => FileUtils.delete(p.getPath))
 
-          val ex =
-            intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-          assert(ex.getMessage.contains("Invalid plan for creating an index."))
+            val ex =
+              intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+            assert(ex.getMessage.contains("Invalid plan for creating an index."))
+          }
+          FileUtils.delete(systemPath)
         }
-        FileUtils.delete(new Path(nonPartitionedDataPath))
-        FileUtils.delete(systemPath)
       }
     }
   }
@@ -220,14 +222,13 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(
-          originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
+        assert(originalIndex.head.excludedFiles.isEmpty)
 
         // Delete one source data file.
         val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
@@ -235,14 +236,11 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex1 = ixManager.getIndexes()
-        assert(
-          refreshedIndex1.head.source.plan.properties.relations.head.data.properties.excluded
-            .equals(Seq(deletedFile1.toString)))
+        assert(refreshedIndex1.length == 1)
+        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile1.toString)))
 
         // Make sure index fingerprint is changed.
-        assert(
-          !originalIndex.head.source.plan.properties.fingerprint
-            .equals(refreshedIndex1.head.source.plan.properties.fingerprint))
+        assert(!originalIndex.head.signature.equals(refreshedIndex1.head.signature))
 
         // Delete another source data file.
         val deletedFile2 = deleteDataFile(nonPartitionedDataPath)
@@ -250,17 +248,14 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         // `excluded` files should contain both deleted source data files.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex2 = ixManager.getIndexes()
+        assert(refreshedIndex2.length == 1)
         assert(
-          refreshedIndex2.head.source.plan.properties.relations.head.data.properties.excluded
+          refreshedIndex2.head.excludedFiles
             .equals(Seq(deletedFile1.toString, deletedFile2.toString)))
 
         // Make sure index fingerprint is changed.
-        assert(
-          !originalIndex.head.source.plan.properties.fingerprint
-            .equals(refreshedIndex2.head.source.plan.properties.fingerprint))
-        assert(
-          !refreshedIndex1.head.source.plan.properties.fingerprint
-            .equals(refreshedIndex2.head.source.plan.properties.fingerprint))
+        assert(!originalIndex.head.signature.equals(refreshedIndex2.head.signature))
+        assert(!refreshedIndex1.head.signature.equals(refreshedIndex2.head.signature))
       }
     }
   }
@@ -277,29 +272,89 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(
-          originalIndex.head.source.plan.properties.relations.head.data.properties.excluded.isEmpty)
+        assert(originalIndex.head.excludedFiles.isEmpty)
 
         // Delete one source data file.
-        val deletedFile1 = deleteDataFile(nonPartitionedDataPath)
+        val deletedFile = deleteDataFile(nonPartitionedDataPath)
 
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
-        val refreshedIndex1 = ixManager.getIndexes()
-        assert(
-          refreshedIndex1.head.source.plan.properties.relations.head.data.properties.excluded
-            .equals(Seq(deletedFile1.toString)))
+        val refreshedIndex = ixManager.getIndexes()
+        assert(refreshedIndex.head.excludedFiles.equals(Seq(deletedFile.toString)))
 
         // Refresh index again and validate it fails as expected.
         val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
         assert(
-          ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+          ex.getMessage.contains("Refresh aborted as no new deleted source data file found."))
+      }
+    }
+  }
+
+  test(
+    "Validate refresh index (to handle deletes from the source data) " +
+      "updates index files correctly when called on an index with excluded files.") {
+    // Save test data non-partitioned.
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      withIndex(indexConfig.indexName) {
+        spark.conf.set(IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED, "true")
+        hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+        val ixManager = Hyperspace.getContext(spark).indexCollectionManager
+        val originalIndex = ixManager.getIndexes()
+        assert(originalIndex.length == 1)
+        assert(originalIndex.head.excludedFiles.isEmpty)
+
+        // Delete one source data file.
+        val deletedFile = deleteDataFile(nonPartitionedDataPath)
+
+        val originalIndexDF = spark.read.parquet(
+          s"$systemPath/${indexConfig.indexName}/" +
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+        val originalIndexWithoutDeletedFile = originalIndexDF
+          .filter(s"""${IndexConstants.DATA_FILE_NAME_COLUMN} != "$deletedFile"""")
+
+        // Refresh index and validate updated IndexLogEntry.
+        hyperspace.refreshIndex(indexConfig.indexName)
+        val refreshedIndex1 = ixManager.getIndexes()
+        assert(refreshedIndex1.length == 1)
+        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile.toString)))
+
+        // Change refresh configurations and refresh index to update index files.
+        spark.conf.set(IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED, "false")
+        spark.conf.set(IndexConstants.REFRESH_DELETE_ENABLED, "true")
+        hyperspace.refreshIndex(indexConfig.indexName)
+        val refreshedIndex2 = ixManager.getIndexes()
+        assert(refreshedIndex2.length == 1)
+
+        // Now that index entries for deleted source data files are removed
+        // from index files, `excluded` files list should be reset and empty.
+        assert(refreshedIndex2.head.excludedFiles.isEmpty)
+
+        // Verify index signature in latest version is different from
+        // original version (before any source data file deletion).
+        assert(!refreshedIndex2.head.signature.equals(originalIndex.head.signature))
+
+        // Verify index signature in latest version is the same as previous version
+        // (created by refresh for enforce delete on read), as they both have same
+        // set of source data files.
+        assert(refreshedIndex2.head.signature.equals(refreshedIndex1.head.signature))
+
+        // Make sure only index entries from deleted files are removed from index files.
+        val refreshedIndexDF = spark.read.parquet(
+          s"$systemPath/${indexConfig.indexName}/" +
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+        checkAnswer(originalIndexWithoutDeletedFile, refreshedIndexDF)
       }
     }
   }

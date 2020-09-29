@@ -21,16 +21,42 @@ import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.telemetry.{AppInfo, DeleteOnReadActionEvent, HyperspaceEvent}
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshForDeleteOnReadActionEvent}
 
-class DeleteOnReadAction(
+/**
+ * Refresh index by updating list of excluded source data files and index signature
+ * in index metadata.
+ * If some original source data file(s) are removed between previous version of index and
+ * now, this Action refreshes index as follows:
+ * 1. Deleted source data files are identified.
+ * 2. New index fingerprint is computed w.r.t latest source data files. This captures
+ *    both deleted source data files and new source data files (if any).
+ * 3. IndexLogEntry is updated by modifying list of excluded source data files and
+ *    index fingerprint, computed in above steps.
+ *
+ * @param spark SparkSession.
+ * @param logManager Index LogManager for index being refreshed.
+ * @param dataManager Index DataManager for index being refreshed.
+ */
+class RefreshForDeleteOnReadAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshDeleteActionBase(spark, logManager, dataManager) with Logging {
+    extends RefreshDeleteActionBase(spark, logManager, dataManager)
+    with Logging {
+
+  private lazy val newExcludedFiles: Seq[String] =
+    deletedFiles diff previousIndexLogEntry.excludedFiles
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    DeleteOnReadActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
+    RefreshForDeleteOnReadActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
+  }
+
+  override def validate(): Unit = {
+    super.validate()
+    if (newExcludedFiles.isEmpty) {
+      throw HyperspaceException("Refresh aborted as no new deleted source data file found.")
+    }
   }
 
   final override def op(): Unit = {
@@ -39,6 +65,13 @@ class DeleteOnReadAction(
         s"${deletedFiles.length} deleted files to list of excluded source data files.")
   }
 
+  /**
+   * Compute new index fingerprint using latest source data files and create
+   * new IndexLogEntry with updated list of excluded source data files and
+   * new index fingerprint.
+   *
+   * @return Updated IndexLogEntry.
+   */
   final override def logEntry: LogEntry = {
     // Compute index fingerprint using current source data file.
     val signatureProvider = LogicalPlanSignatureProvider.create()
@@ -59,7 +92,7 @@ class DeleteOnReadAction(
     val dataProps = data.properties
     val excluded = dataProps.excluded
 
-    // Instantiate a new IndexLogEntry by updating excluded files and fingerprint.
+    // Create a new IndexLogEntry by updating excluded files and fingerprint.
     previousIndexLogEntry.copy(
       source = source.copy(
         plan = plan.copy(
@@ -69,6 +102,6 @@ class DeleteOnReadAction(
               relation.copy(
                 data = data.copy(
                   properties = dataProps.copy(
-                    excluded = excluded ++ (deletedFiles diff excluded)))))))))
+                    excluded = excluded ++ newExcludedFiles))))))))
   }
 }

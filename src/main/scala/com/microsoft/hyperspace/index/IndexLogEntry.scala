@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -324,7 +325,7 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: Content, excluded: Seq[String] = Seq[String]())
+  case class Properties(content: Content, excluded: Seq[String] = Nil)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -378,6 +379,12 @@ case class IndexLogEntry(
       .toSet
   }
 
+  def bucketSpec: BucketSpec =
+    BucketSpec(
+      numBuckets = numBuckets,
+      bucketColumnNames = indexedColumns,
+      sortColumnNames = indexedColumns)
+
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
       config.equals(that.config) &&
@@ -404,8 +411,7 @@ case class IndexLogEntry(
   }
 
   def excludedFiles: Seq[String] = {
-    // Assumption: There is only one source relation.
-    source.plan.properties.relations.head.data.properties.excluded
+    relations.head.data.properties.excluded
   }
 
   def hasLineageColumn(spark: SparkSession): Boolean = {

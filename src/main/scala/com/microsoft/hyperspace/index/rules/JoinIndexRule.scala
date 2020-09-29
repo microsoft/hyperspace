@@ -21,18 +21,16 @@ import scala.util.Try
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression, In, Literal, NamedExpression, Not}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
+import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -62,8 +60,13 @@ object JoinIndexRule
         getUsableIndexPair(l, r, condition)
           .map {
             case (lIndex, rIndex) =>
-              val updatedPlan = join
-                .copy(left = getReplacementPlan(lIndex, l), right = getReplacementPlan(rIndex, r))
+              val updatedPlan =
+                join
+                  .copy(
+                    left =
+                      RuleUtils.transformPlanToUseIndex(spark, lIndex, l, useBucketSpec = true),
+                    right =
+                      RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
 
               logEvent(
                 HyperspaceIndexUsageEvent(
@@ -106,73 +109,24 @@ object JoinIndexRule
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
-
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     val lIndexes =
-      RuleUtils.getLogicalRelation(left).map(RuleUtils.getCandidateIndexes(indexManager, _))
+      RuleUtils
+        .getLogicalRelation(left)
+        .map(RuleUtils.getCandidateIndexes(indexManager, _, hybridScanEnabled))
     if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
       return None
     }
 
     val rIndexes =
-      RuleUtils.getLogicalRelation(right).map(RuleUtils.getCandidateIndexes(indexManager, _))
+      RuleUtils
+        .getLogicalRelation(right)
+        .map(RuleUtils.getCandidateIndexes(indexManager, _, hybridScanEnabled))
     if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
       return None
     }
 
     getBestIndexPair(left, right, condition, lIndexes.get, rIndexes.get)
-  }
-
-  /**
-   * Get replacement plan for current plan. The replacement plan reads data from indexes
-   *
-   * Pre-requisites
-   * - We know for sure the index which can be used to replace the plan.
-   *
-   * NOTE: This method currently only supports replacement of Scan Nodes i.e. Logical relations
-   *
-   * @param index index used in replacement plan
-   * @param plan current plan
-   * @return replacement plan
-   */
-  private def getReplacementPlan(index: IndexLogEntry, plan: LogicalPlan): LogicalPlan = {
-    // Here we can't replace the plan completely with the index. This will create problems.
-    // For e.g. if Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
-    // if we replace this plan with index Scan (A,B,C), we lose the Filter(C=10) and it will
-    // lead to wrong results. So we only replace the base relation.
-    plan transformUp {
-      case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
-        val bucketSpec = BucketSpec(
-          numBuckets = index.numBuckets,
-          bucketColumnNames = index.indexedColumns,
-          sortColumnNames = index.indexedColumns)
-        val location = new InMemoryFileIndex(spark, index.content.files, Map(), None)
-        val schema = if (index.excludedFiles.isEmpty) {
-          StructType(index.schema.filter(baseRelation.schema.contains))
-        } else {
-          index.schema
-        }
-
-        val relation = HadoopFsRelation(
-          location,
-          new StructType(),
-          schema,
-          Some(bucketSpec),
-          new ParquetFileFormat,
-          Map())(spark)
-
-        val updatedOutput =
-          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-
-        if (index.excludedFiles.isEmpty) {
-          baseRelation.copy(relation = relation, output = updatedOutput)
-        } else {
-          val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
-            NamedExpression.newExprId)
-          val deletedFileNames = index.excludedFiles.map(Literal(_)).toArray
-          val rel = baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lAttr))
-          Project(updatedOutput, Filter(Not(In(lAttr, deletedFileNames)), rel))
-        }
-    }
   }
 
   /**
@@ -452,11 +406,13 @@ object JoinIndexRule
     extractConditions(condition).map {
       case EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
         Try {
-          (resolve(spark, attr1.name, leftBaseAttrs).get,
+          (
+            resolve(spark, attr1.name, leftBaseAttrs).get,
             resolve(spark, attr2.name, rightBaseAttrs).get)
         }.getOrElse {
           Try {
-            (resolve(spark, attr2.name, leftBaseAttrs).get,
+            (
+              resolve(spark, attr2.name, leftBaseAttrs).get,
               resolve(spark, attr1.name, rightBaseAttrs).get)
           }.getOrElse {
             throw new IllegalStateException("Unexpected exception while using join rule")

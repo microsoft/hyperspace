@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -68,20 +69,30 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
     val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
 
     assert(
       !spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      !spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
 
     spark.enableHyperspace()
     assert(
       spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
 
     spark.disableHyperspace()
     assert(
       !spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      !spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
   }
 
   test(
@@ -232,14 +243,14 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
       // Test: join query with alias columns in join condition is not optimized.
       def query1(): DataFrame = spark.sql("""SELECT alias, c4
-          |from t2, (select c3 as alias, c1 from t1)
-          |where t2.c3 = alias""".stripMargin)
+                                            |from t2, (select c3 as alias, c1 from t1)
+                                            |where t2.c3 = alias""".stripMargin)
       verifyNoChange(query1)
 
       // Test: join query with alias columns in project columns is not optimized.
       def query2(): DataFrame = spark.sql("""SELECT alias, c4
-          |from t2, (select c3, c1 as alias from t1) as newt
-          |where t2.c3 = newt.c3""".stripMargin)
+                                            |from t2, (select c3, c1 as alias from t1) as newt
+                                            |where t2.c3 = newt.c3""".stripMargin)
       verifyNoChange(query2)
     }
   }
@@ -272,16 +283,16 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     withTable("t1", "t2") {
       // save tables on hive metastore as external tables
       spark.sql(s"""
-          |CREATE EXTERNAL TABLE t1
-          |(c1 string, c3 string)
-          |STORED AS PARQUET
-          |LOCATION '$nonPartitionedDataPath'
+                   |CREATE EXTERNAL TABLE t1
+                   |(c1 string, c3 string)
+                   |STORED AS PARQUET
+                   |LOCATION '$nonPartitionedDataPath'
         """.stripMargin)
       spark.sql(s"""
-          |CREATE EXTERNAL TABLE t2
-          |(c3 string, c4 int)
-          |STORED AS PARQUET
-          |LOCATION '$nonPartitionedDataPath'
+                   |CREATE EXTERNAL TABLE t2
+                   |(c3 string, c4 int)
+                   |STORED AS PARQUET
+                   |LOCATION '$nonPartitionedDataPath'
         """.stripMargin)
 
       val leftDf = spark.table("t1")
@@ -408,187 +419,190 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+      withTempDir { inputDir =>
+        // Save a copy of source data files.
+        val location = inputDir.toString
+        val dataPath = new Path(location, "*parquet")
+        val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+        SampleData.save(spark, location, dataColumns)
 
-      // Save a copy of source data files.
-      val location = testDir + "ixRefreshTest"
-      val dataPath = new Path(location, "*parquet")
-      val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
-      SampleData.save(spark, location, dataColumns)
+        // Create index on original source data files.
+        val df = spark.read.parquet(location)
+        val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+        hyperspace.createIndex(df, indexConfig)
 
-      // Create index on original source data files.
-      val df = spark.read.parquet(location)
-      val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
-      hyperspace.createIndex(df, indexConfig)
+        // Verify index usage for index version (v=0).
+        def query1(): DataFrame =
+          spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
 
-      // Verify index usage for index version (v=0).
-      def query1(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+        verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
 
-      verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
+        // Delete some source data file.
+        val dataFileNames = dataPath
+          .getFileSystem(new Configuration)
+          .globStatus(dataPath)
+          .map(_.getPath)
 
-      // Delete some source data file.
-      val dataFileNames = dataPath
-        .getFileSystem(new Configuration)
-        .globStatus(dataPath)
-        .map(_.getPath)
+        assert(dataFileNames.nonEmpty)
+        val fileToDelete = dataFileNames.head
+        FileUtils.delete(fileToDelete)
 
-      assert(dataFileNames.nonEmpty)
-      val fileToDelete = dataFileNames.head
-      FileUtils.delete(fileToDelete)
+        def query2(): DataFrame =
+          spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
 
-      def query2(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+        // Verify index is not used.
+        spark.enableHyperspace()
+        val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+        spark.disableHyperspace()
+        assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
 
-      // Verify index is not used.
-      spark.enableHyperspace()
-      val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
-      spark.disableHyperspace()
-      assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
+        // Refresh the index to remove deleted source data file records from index.
+        hyperspace.refreshIndex(indexConfig.indexName)
 
-      // Refresh the index to remove deleted source data file records from index.
-      hyperspace.refreshIndex(indexConfig.indexName)
-
-      // Verify index usage on latest version of index (v=1) after refresh.
-      verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, 1))
-      FileUtils.delete(new Path(location))
+        // Verify index usage on latest version of index (v=1) after refresh.
+        verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, 1))
+      }
     }
   }
 
   test(
-    "Validate index usage with filter index rule for enforce delete on read " +
-      "after some source data file is deleted.") {
+    "Validate index usage with filter index rule " +
+      "for enforce delete on read after some source data file is deleted.") {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
       Seq(true, false).foreach { addProject =>
-        withIndex("filterIndex") {
-          // Save a copy of source data files.
-          val location = testDir + "ixRefreshTest"
-          val dataPath = new Path(location, "*parquet")
-          val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
-          SampleData.save(spark, location, dataColumns)
+        // (addProject == true) generates "Scan -> Filter -> Project" query plan.
+        // (addProject == false) generates "Scan -> Filter" query plan (i.e. SELECT *).
+        withTempDir { inputDir =>
+          withIndex("filterIndex") {
+            // Save a copy of source data files.
+            val location = inputDir.toString
+            val dataPath = new Path(location, "*parquet")
+            val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+            SampleData.save(spark, location, dataColumns)
 
-          // Create index on original source data files.
-          val df = spark.read.parquet(location)
-          val indexConfig = if (addProject) {
-            IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
-          } else {
-            IndexConfig("filterIndex", Seq("c3"), Seq("c4", "c2", "c5", "c1"))
+            // Create index on original source data files.
+            val df = spark.read.parquet(location)
+            val indexConfig = if (addProject) {
+              IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+            } else {
+              IndexConfig("filterIndex", Seq("c3"), Seq("c4", "c2", "c5", "c1"))
+            }
+            hyperspace.createIndex(df, indexConfig)
+
+            // Verify index usage.
+            def query1(): DataFrame =
+              if (addProject) {
+                spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+              } else {
+                spark.read.parquet(location).filter("c3 == 'facebook'")
+              }
+
+            verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
+
+            // Delete one source data file.
+            val dataFileNames = dataPath
+              .getFileSystem(new Configuration)
+              .globStatus(dataPath)
+              .map(_.getPath)
+
+            assert(dataFileNames.nonEmpty)
+            val fileToDelete = dataFileNames.head
+            FileUtils.delete(fileToDelete)
+
+            def query2(): DataFrame =
+              if (addProject) {
+                spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+              } else {
+                spark.read.parquet(location).filter("c3 == 'facebook'")
+              }
+
+            // Verify index is not used after source data file is deleted.
+            spark.enableHyperspace()
+            val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+            spark.disableHyperspace()
+            assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
+
+            // Refresh index to update its metadata.
+            hyperspace.refreshIndex(indexConfig.indexName)
+
+            // Verify index usage and query results after refresh fixes index metadata.
+            verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName))
           }
-          hyperspace.createIndex(df, indexConfig)
-
-          // Verify index usage.
-          def query1(): DataFrame =
-            if (addProject) {
-              spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
-            } else {
-              spark.read.parquet(location).filter("c3 == 'facebook'")
-            }
-
-          verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
-
-          // Delete one source data file.
-          val dataFileNames = dataPath
-            .getFileSystem(new Configuration)
-            .globStatus(dataPath)
-            .map(_.getPath)
-
-          assert(dataFileNames.nonEmpty)
-          val fileToDelete = dataFileNames.head
-          FileUtils.delete(fileToDelete)
-
-          def query2(): DataFrame =
-            if (addProject) {
-              spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
-            } else {
-              spark.read.parquet(location).filter("c3 == 'facebook'")
-            }
-
-          // Verify index is not used after source data file is deleted.
-          spark.enableHyperspace()
-          val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
-          spark.disableHyperspace()
-          assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
-
-          // Refresh index to update its metadata.
-          hyperspace.refreshIndex(indexConfig.indexName)
-
-          // Verify index usage and query results after refresh fixes index metadata.
-          verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName))
-          FileUtils.delete(new Path(location))
         }
       }
     }
   }
 
   test(
-    "Validate index usage with join index rule for enforce delete on read " +
-      "after some source data files are deleted.") {
+    "Validate index usage with join index rule " +
+      "for enforce delete on read after some source data file is deleted.") {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.ENFORCE_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
+      withTempDir { inputDir =>
+        // Save a copy of source data files.
+        val location = inputDir.toString
+        val dataPath = new Path(location, "*parquet")
+        val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+        SampleData.save(spark, location, dataColumns)
 
-      // Save a copy of source data files.
-      val location = testDir + "ixRefreshTest"
-      val dataPath = new Path(location, "*parquet")
-      val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
-      SampleData.save(spark, location, dataColumns)
+        // Create indexes on original source data files.
+        val leftDf1 = spark.read.parquet(location)
+        val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
+        hyperspace.createIndex(leftDf1, leftDfIndexConfig)
 
-      // Create indexes on original source data files.
-      val leftDf1 = spark.read.parquet(location)
-      val leftDfIndexConfig = IndexConfig("leftIndex", Seq("C3"), Seq("c1"))
-      hyperspace.createIndex(leftDf1, leftDfIndexConfig)
+        val rightDf1 = spark.read.parquet(location)
+        val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
+        hyperspace.createIndex(rightDf1, rightDfIndexConfig)
 
-      val rightDf1 = spark.read.parquet(location)
-      val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
-      hyperspace.createIndex(rightDf1, rightDfIndexConfig)
+        // Verify index usage.
+        def query1(): DataFrame = {
+          leftDf1
+            .join(rightDf1, leftDf1("c3") === rightDf1("C3"))
+            .select(leftDf1("C1"), rightDf1("c4"))
+        }
 
-      // Verify index usage.
-      def query1(): DataFrame = {
-        leftDf1
-          .join(rightDf1, leftDf1("c3") === rightDf1("C3"))
-          .select(leftDf1("C1"), rightDf1("c4"))
+        verifyIndexUsage(
+          query1,
+          getIndexFilesPath(leftDfIndexConfig.indexName) ++
+            getIndexFilesPath(rightDfIndexConfig.indexName))
+
+        // Delete one source data file.
+        val dataFileNames = dataPath
+          .getFileSystem(new Configuration)
+          .globStatus(dataPath)
+          .map(_.getPath)
+
+        assert(dataFileNames.nonEmpty)
+        val fileToDelete = dataFileNames.head
+        FileUtils.delete(fileToDelete)
+
+        // Verify index is not used after source data file is deleted.
+        val leftDf2 = spark.read.parquet(location)
+        val rightDf2 = spark.read.parquet(location)
+        def query2(): DataFrame = {
+          leftDf2
+            .join(rightDf2, leftDf2("c3") === rightDf2("C3"))
+            .select(leftDf2("C1"), rightDf2("c4"))
+        }
+
+        spark.enableHyperspace()
+        val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+        spark.disableHyperspace()
+        planRootPaths.foreach(p => assert(p.equals(PathUtils.makeAbsolute(location))))
+
+        // Refresh index to update index metadata.
+        hyperspace.refreshIndex(leftDfIndexConfig.indexName)
+        hyperspace.refreshIndex(rightDfIndexConfig.indexName)
+
+        // Verify index usage and query results after refresh fixes index metadata.
+        verifyIndexUsage(
+          query2,
+          getIndexFilesPath(leftDfIndexConfig.indexName) ++
+            getIndexFilesPath(rightDfIndexConfig.indexName))
       }
-
-      verifyIndexUsage(
-        query1,
-        getIndexFilesPath(leftDfIndexConfig.indexName) ++
-          getIndexFilesPath(rightDfIndexConfig.indexName))
-
-      // Delete one source data file.
-      val dataFileNames = dataPath
-        .getFileSystem(new Configuration)
-        .globStatus(dataPath)
-        .map(_.getPath)
-
-      assert(dataFileNames.nonEmpty)
-      val fileToDelete = dataFileNames.head
-      FileUtils.delete(fileToDelete)
-
-      // Verify index is not used after source data file is deleted.
-      val leftDf2 = spark.read.parquet(location)
-      val rightDf2 = spark.read.parquet(location)
-      def query2(): DataFrame = {
-        leftDf2
-          .join(rightDf2, leftDf2("c3") === rightDf2("C3"))
-          .select(leftDf2("C1"), rightDf2("c4"))
-      }
-
-      spark.enableHyperspace()
-      val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
-      spark.disableHyperspace()
-      planRootPaths.foreach(p => assert(p.equals(PathUtils.makeAbsolute(location))))
-
-      // Refresh index to update index metadata.
-      hyperspace.refreshIndex(leftDfIndexConfig.indexName)
-      hyperspace.refreshIndex(rightDfIndexConfig.indexName)
-
-      // Verify index usage and query results after refresh fixes index metadata.
-      verifyIndexUsage(
-        query2,
-        getIndexFilesPath(leftDfIndexConfig.indexName) ++
-          getIndexFilesPath(rightDfIndexConfig.indexName))
-      FileUtils.delete(new Path(location))
     }
   }
 
