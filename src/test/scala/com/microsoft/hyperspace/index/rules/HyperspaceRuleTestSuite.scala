@@ -88,8 +88,11 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def schemaFromAttributes(attributes: Attribute*): StructType =
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
 
-  def baseRelation(location: FileIndex, schema: StructType): HadoopFsRelation =
-    HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, Map.empty)(
+  def baseRelation(
+      location: FileIndex,
+      schema: StructType,
+      options: Map[String, String] = Map.empty): HadoopFsRelation =
+    HadoopFsRelation(location, new StructType(), schema, None, new ParquetFileFormat, options)(
       spark)
 
   def getIndexRootPath(indexName: String): Path =

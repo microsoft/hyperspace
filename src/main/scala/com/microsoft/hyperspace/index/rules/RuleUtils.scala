@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -186,7 +186,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map())(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -253,7 +253,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map())(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -322,7 +322,9 @@ object RuleUtils {
         val newRelation =
           fsRelation.copy(
             location = newLocation,
-            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))))(spark)
+            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
+            options = fsRelation.options ++ Map(
+              IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))(spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))

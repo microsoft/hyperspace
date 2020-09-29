@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
@@ -174,10 +174,10 @@ object ExtractFilterNode {
           filter @ Filter(
             condition: Expression,
             logicalRelation @ LogicalRelation(
-              fsRelation @ HadoopFsRelation(_, _, _, _, _, _),
+              fsRelation @ HadoopFsRelation(_, _, _, _, _, options),
               _,
               _,
-              _))) =>
+              _))) if !options.contains(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
@@ -190,10 +190,10 @@ object ExtractFilterNode {
     case filter @ Filter(
           condition: Expression,
           logicalRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(_, _, _, _, _, _),
+            fsRelation @ HadoopFsRelation(_, _, _, _, _, options),
             _,
             _,
-            _)) =>
+            _)) if !options.contains(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY) =>
       val relationColumnsName = logicalRelation.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 

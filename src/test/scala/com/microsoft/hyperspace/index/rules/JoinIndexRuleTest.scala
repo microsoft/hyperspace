@@ -398,6 +398,35 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
+  test("Join rule is not applied for modified plan.") {
+    {
+      // copied from test("Join rule works if indexes exist and configs are set correctly")
+      val joinCondition = EqualTo(t1c1, t2c1)
+      val originalPlan =
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val updatedPlan = JoinIndexRule(originalPlan)
+      assert(!updatedPlan.equals(originalPlan))
+    }
+
+    {
+      val t1Location =
+        new InMemoryFileIndex(spark, Seq(new Path("t1")), Map.empty, Some(t1Schema), NoopCache)
+      t1Relation = baseRelation(
+        t1Location,
+        t1Schema,
+        Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))
+      t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
+      t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
+      t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
+
+      val joinCondition = EqualTo(t1c1, t2c1)
+      val originalPlan =
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val updatedPlan = JoinIndexRule(originalPlan)
+      assert(updatedPlan.equals(originalPlan))
+    }
+  }
+
   private def verifyUpdatedIndex(
       originalPlan: Join,
       updatedPlan: LogicalPlan,
