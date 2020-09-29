@@ -524,12 +524,14 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           assert(fsRelation.location.inputFiles.length === 4)
           deletedFilesList = deletedFilesList :+ deleted
           p
-        case p @ Union(_) =>
+        case p: Union =>
           p
         case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           if (fsRelation.location.inputFiles.exists(_.contains(".copy"))) {
+            // Check input files for appended files.
             assert(fsRelation.location.inputFiles.length === 1)
           } else {
+            // Check input files for index data files.
             assert(fsRelation.location.inputFiles.forall(_.contains("index3")))
             assert(fsRelation.location.inputFiles.length === 4)
           }
@@ -554,6 +556,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(filterStr.contains(" <= 2000)"))
             if (filterStr.contains(IndexConstants.DATA_FILE_NAME_COLUMN)) {
               assert(deletedFilesList.flatten.forall(filterStr.contains(_)))
+              assert(!deletePushDownFilterFound)
               deletePushDownFilterFound = true
             }
             p
@@ -574,6 +577,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append+Delete: join index, appended data should be shuffled with indexed columns " +
       "and merged by BucketUnion and deleted files are handled with index data.") {
+    // One relation has both deleted & appended files and the other one has only deleted files.
     val df1 = spark.read.parquet(sampleParquetDataLocationBoth)
     val df2 = spark.read.parquet(sampleParquetDataLocationDelete3)
     def joinQuery(): DataFrame = {
@@ -623,10 +627,13 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               assert(fsRelation.location.inputFiles.length === 4)
             }
             p
-          case p @ BucketUnion(_, _) => p
+          case p: BucketUnion => p
         }
+        // 2 LogicalRelation for index with append+delete, 1 for index with delete.
         assert(nodes.count(_.isInstanceOf[LogicalRelation]) === 3)
+        // 1 BucketUnion for index with append+delete.
         assert(nodes.count(_.isInstanceOf[BucketUnion]) === 1)
+        // 2 Filter-Not-In nodes for index with delete.
         assert(nodes.count(_.isInstanceOf[Filter]) === 2)
         assert(deletedFilesList.length === 2)
         var deletedFiles = deletedFilesList.flatten
@@ -656,9 +663,10 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               }
               p
           }
+          // Check all deleted files are present in Push-down filter condition.
           assert(deletedFiles.isEmpty)
           assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === 1)
-          // 2 of index, 1 of appended file
+          // 2 of index data, 1 of appended file.
           assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 3)
           assert(deleteFilesPushDownFilterCnt == 2)
 

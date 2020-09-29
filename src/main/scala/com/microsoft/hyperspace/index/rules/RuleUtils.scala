@@ -224,9 +224,8 @@ object RuleUtils {
 
     // Get transformed plan with index data and appended files if applicable.
     val indexPlan = plan transformUp {
-      // Use transformUp here since only 1 Logical Relation is pre-requisite condition.
-      // Otherwise, we need additional handling of injected Filter-Not-In condition for
-      // Hybrid Scan Delete support.
+      // Use transformUp here as currently 1 Logical Relation is allowed (pre-requisite).
+      // Otherwise, we need additional check not to process newly injected Filter-Not-In nodes.
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
