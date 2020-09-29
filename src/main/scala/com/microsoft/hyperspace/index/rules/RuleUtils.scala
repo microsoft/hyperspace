@@ -206,10 +206,11 @@ object RuleUtils {
           baseRelation.copy(relation = relation, output = updatedOutput)
         } else {
           // Exclude deleted index entries coming from source data files listed as "excluded".
-          // This is done by transforming plan from a single Scan node to
-          // "Scan -> Filter -> Project" where Filter's condition uses lineage column in index
-          // to exclude deleted index entries and Project fixes the output schema by removing
-          // lineage column from index scan results.
+          // This is done by transforming plan from a single Scan node on index files to
+          // "Scan -> Filter -> Project" in which:
+          // - Scan's output schema lists all index columns which includes lineage column.
+          // - Filter's condition uses lineage column to exclude deleted index entries.
+          // - Project fixes output schema by removing lineage column from index scan results.
           val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
             NamedExpression.newExprId)
           val deletedFileNames = index.excludedFiles.map(Literal(_)).toArray
