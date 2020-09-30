@@ -117,18 +117,14 @@ case class RefreshDeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, mess
     extends HyperspaceIndexCRUDEvent
 
 /**
- * Index Refresh Event for deleted source files. Emitted when refresh is called on an index
- * with config flag set to update index metadata to enforce delete during read by excluding
- * deleted source data files when index is used at query time.
+ * Index Refresh Event for deleted and appended source files. Emitted when refresh is called
+ * on an index to update index metadata according to latest source data files.
  *
  * @param appInfo AppInfo for spark application.
  * @param index Related index.
  * @param message Message about event.
  */
-case class RefreshForDeleteOnReadActionEvent(
-    appInfo: AppInfo,
-    index: IndexLogEntry,
-    message: String)
+case class RefreshLogEntryActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
     extends HyperspaceIndexCRUDEvent
 
 /**

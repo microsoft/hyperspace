@@ -325,7 +325,7 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: Content, excluded: Seq[String] = Nil)
+  case class Properties(content: Content, excluded: Seq[String] = Nil, appended: Seq[String] = Nil)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -412,6 +412,10 @@ case class IndexLogEntry(
 
   def excludedFiles: Seq[String] = {
     relations.head.data.properties.excluded
+  }
+
+  def appendedFiles: Seq[String] = {
+    relations.head.data.properties.appended
   }
 
   def hasLineageColumn(spark: SparkSession): Boolean = {

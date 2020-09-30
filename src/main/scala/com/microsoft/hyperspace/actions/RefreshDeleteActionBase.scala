@@ -29,28 +29,23 @@ private[actions] abstract class RefreshDeleteActionBase(
     extends RefreshActionBase(spark, logManager, dataManager) {
 
   /**
-   * Validate index has lineage column, and it is in active state for refreshing,
-   * and there are some deleted source data file(s).
+   * Validate index has lineage column, and it is in active state for refreshing.
    */
   override def validate(): Unit = {
     super.validate()
     if (!previousIndexLogEntry.hasLineageColumn(spark)) {
       throw HyperspaceException(
-        "Index refresh (to handle deleted source data) is " +
+        "Index refresh (to handle deleted or appended source data) is " +
           "only supported on an index with lineage.")
-    }
-
-    if (deletedFiles.isEmpty) {
-      throw HyperspaceException("Refresh aborted as no deleted source data file found.")
     }
   }
 
   /**
    * Compare list of source data files from previous IndexLogEntry to list
    * of current source data files, validate fileInfo for existing files and
-   * identify deleted source data files.
+   * identify deleted and appended source data files.
    */
-  protected lazy val deletedFiles: Seq[String] = {
+  protected lazy val sourceFilesDiff: (Seq[String], Seq[String]) = {
     val rels = previousIndexLogEntry.relations
     val originalFiles = rels.head.data.properties.content.fileInfos
     val currentFiles = rels.head.rootPaths
@@ -68,13 +63,13 @@ private[actions] abstract class RefreshDeleteActionBase(
         case Some(v) =>
           if (!f.equals(v)) {
             throw HyperspaceException(
-              "Index refresh (to handle deleted source data) aborted. " +
+              "Index refresh (to handle deleted or appended source data) aborted. " +
                 s"Existing source data file info is changed (file: ${f.name}).")
           }
         case None => delFiles :+= f.name
       }
     }
 
-    delFiles
+    (delFiles, (currentFiles.keySet diff originalFiles.map(_.name)).toSeq)
   }
 }

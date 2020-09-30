@@ -20,6 +20,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshDeleteActionEvent}
@@ -49,6 +50,13 @@ class RefreshDeleteAction(
     RefreshDeleteActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
+  override def validate(): Unit = {
+    super.validate()
+    if (sourceFilesDiff._1.isEmpty) {
+      throw HyperspaceException("Refresh aborted as no deleted source data file found.")
+    }
+  }
+
   /**
    * For an index with lineage, find all the source data files which have been deleted,
    * and use index records' lineage to mark and remove index entries which belong to
@@ -57,12 +65,12 @@ class RefreshDeleteAction(
   final override def op(): Unit = {
     logInfo(
       "Refresh index is updating index by removing index entries " +
-        s"corresponding to ${deletedFiles.length} deleted source data files.")
+        s"corresponding to ${sourceFilesDiff._1.length} deleted source data files.")
 
     val refreshDF =
       spark.read
         .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-        .filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles: _*))
+        .filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(sourceFilesDiff._1: _*))
 
     refreshDF.write.saveWithBuckets(
       refreshDF,

@@ -468,7 +468,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   test("Validate index usage for enforce delete on read after some source data file is deleted.") {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED -> "true") {
+      IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED -> "true") {
       withTempDir { inputDir =>
         // Save a copy of source data files.
         val location = inputDir.toString

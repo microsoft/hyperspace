@@ -69,8 +69,8 @@ class IndexCollectionManager(
       val dataManager = indexDataManagerFactory.create(indexPath)
       if (HyperspaceConf.refreshDeleteEnabled(spark)) {
         new RefreshDeleteAction(spark, logManager, dataManager).run()
-      } else if (HyperspaceConf.refreshForDeleteOnReadEnabled(spark)) {
-        new RefreshForDeleteOnReadAction(spark, logManager, dataManager).run()
+      } else if (HyperspaceConf.refreshLogEntryEnabled(spark)) {
+        new RefreshLogEntryAction(spark, logManager, dataManager).run()
       } else {
         new RefreshAction(spark, logManager, dataManager).run()
       }

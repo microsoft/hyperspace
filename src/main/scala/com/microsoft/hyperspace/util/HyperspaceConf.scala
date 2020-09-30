@@ -39,11 +39,11 @@ object HyperspaceConf {
       .toBoolean
   }
 
-  def refreshForDeleteOnReadEnabled(spark: SparkSession): Boolean = {
+  def refreshLogEntryEnabled(spark: SparkSession): Boolean = {
     spark.conf
       .get(
-        IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED,
-        IndexConstants.REFRESH_FOR_DELETE_ON_READ_ENABLED_DEFAULT)
+        IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED,
+        IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED_DEFAULT)
       .toBoolean
   }
 }
