@@ -39,11 +39,11 @@ object HyperspaceConf {
       .toBoolean
   }
 
-  def refreshLogEntryEnabled(spark: SparkSession): Boolean = {
+  def refreshSourceContentEnabled(spark: SparkSession): Boolean = {
     spark.conf
       .get(
-        IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED,
-        IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED_DEFAULT)
+        IndexConstants.REFRESH_SOURCE_CONTENT_ENABLED,
+        IndexConstants.REFRESH_SOURCE_CONTENT_ENABLED_DEFAULT)
       .toBoolean
   }
 }

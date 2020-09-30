@@ -58,6 +58,6 @@ object IndexConstants {
   val REFRESH_DELETE_ENABLED = "spark.hyperspace.index.refresh.delete.enabled"
   val REFRESH_DELETE_ENABLED_DEFAULT = "false"
 
-  val REFRESH_LOGENTRY_ACTION_ENABLED = "spark.hyperspace.index.refresh.logentry.enabled"
-  val REFRESH_LOGENTRY_ACTION_ENABLED_DEFAULT = "false"
+  val REFRESH_SOURCE_CONTENT_ENABLED = "spark.hyperspace.index.refresh.source.content.enabled"
+  val REFRESH_SOURCE_CONTENT_ENABLED_DEFAULT = "false"
 }

@@ -325,7 +325,7 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: Content, excluded: Seq[String] = Nil, appended: Seq[String] = Nil)
+  case class Properties(content: Content, deleted: Seq[String] = Nil, appended: Seq[String] = Nil)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -410,8 +410,8 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
-  def excludedFiles: Seq[String] = {
-    relations.head.data.properties.excluded
+  def deletedFiles: Seq[String] = {
+    relations.head.data.properties.deleted
   }
 
   def appendedFiles: Seq[String] = {

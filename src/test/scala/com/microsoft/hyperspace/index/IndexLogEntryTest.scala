@@ -126,7 +126,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                  "properties" : { }
         |                }
         |              },
-        |              "excluded" : ["file:/rootpath/f1"],
+        |              "deleted" : ["file:/rootpath/f1"],
         |              "appended" : ["file:/rootpath/f3"]
         |            },
         |            "kind" : "HDFS"

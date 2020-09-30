@@ -35,7 +35,7 @@ private[actions] abstract class RefreshDeleteActionBase(
     super.validate()
     if (!previousIndexLogEntry.hasLineageColumn(spark)) {
       throw HyperspaceException(
-        "Index refresh (to handle deleted or appended source data) is " +
+        "Index refresh to update source content in index metadata is " +
           "only supported on an index with lineage.")
     }
   }

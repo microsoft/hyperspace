@@ -118,7 +118,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
       assert(
-        ex.getMessage.contains(s"Index refresh (to handle deleted or appended source data) is " +
+        ex.getMessage.contains(s"Index refresh to update source content in index metadata is " +
           "only supported on an index with lineage."))
     }
   }
@@ -218,13 +218,13 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED -> "true") {
+      IndexConstants.REFRESH_SOURCE_CONTENT_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(originalIndex.head.excludedFiles.isEmpty)
+        assert(originalIndex.head.deletedFiles.isEmpty)
         assert(originalIndex.head.appendedFiles.isEmpty)
 
         // Delete one source data file.
@@ -241,7 +241,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex1 = ixManager.getIndexes()
         assert(refreshedIndex1.length == 1)
-        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile1.toString)))
+        assert(refreshedIndex1.head.deletedFiles.equals(Seq(deletedFile1.toString)))
         assert(refreshedIndex1.head.appendedFiles.equals(Seq(appendedFile1.toString)))
 
         // Make sure index fingerprint is changed.
@@ -258,13 +258,13 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           "I am some random content for yet another new file :).")
 
         // Refresh index and validate updated IndexLogEntry.
-        // `excluded` files should contain both deleted source data files.
-        // `appened` files should contain both appended source data files.
+        // `deleted` files should contain both of the deleted source data files.
+        // `appended` files should contain both of the appended source data files.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex2 = ixManager.getIndexes()
         assert(refreshedIndex2.length == 1)
         assert(
-          refreshedIndex2.head.excludedFiles
+          refreshedIndex2.head.deletedFiles
             .equals(Seq(deletedFile1.toString, deletedFile2.toString)))
         assert(
           refreshedIndex2.head.appendedFiles
@@ -279,7 +279,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate refresh IndexLogEntry for deleted and appended source data files " +
-      "does not add duplicate excluded or appended files.") {
+      "does not add duplicate deleted or appended files.") {
     // Save test data non-partitioned.
     SampleData.save(
       spark,
@@ -289,13 +289,13 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED -> "true") {
+      IndexConstants.REFRESH_SOURCE_CONTENT_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(originalIndex.head.excludedFiles.isEmpty)
+        assert(originalIndex.head.deletedFiles.isEmpty)
         assert(originalIndex.head.appendedFiles.isEmpty)
 
         // Delete one source data file.
@@ -311,7 +311,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         // Refresh index and validate updated IndexLogEntry.
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex = ixManager.getIndexes()
-        assert(refreshedIndex.head.excludedFiles.equals(Seq(deletedFile.toString)))
+        assert(refreshedIndex.head.deletedFiles.equals(Seq(deletedFile.toString)))
 
         // Refresh index again and validate it fails as expected.
         val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
@@ -324,7 +324,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate refresh index (to handle deletes from the source data) " +
-      "updates index files correctly when called on an index with excluded files.") {
+      "updates index files correctly when called on an index with deleted files.") {
     // Save test data non-partitioned.
     SampleData.save(
       spark,
@@ -334,12 +334,12 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
-        spark.conf.set(IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED, "true")
+        spark.conf.set(IndexConstants.REFRESH_SOURCE_CONTENT_ENABLED, "true")
         hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
         val ixManager = Hyperspace.getContext(spark).indexCollectionManager
         val originalIndex = ixManager.getIndexes()
         assert(originalIndex.length == 1)
-        assert(originalIndex.head.excludedFiles.isEmpty)
+        assert(originalIndex.head.deletedFiles.isEmpty)
 
         // Delete one source data file.
         val deletedFile = deleteDataFile(nonPartitionedDataPath)
@@ -354,18 +354,18 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex1 = ixManager.getIndexes()
         assert(refreshedIndex1.length == 1)
-        assert(refreshedIndex1.head.excludedFiles.equals(Seq(deletedFile.toString)))
+        assert(refreshedIndex1.head.deletedFiles.equals(Seq(deletedFile.toString)))
 
         // Change refresh configurations and refresh index to update index files.
-        spark.conf.set(IndexConstants.REFRESH_LOGENTRY_ACTION_ENABLED, "false")
+        spark.conf.set(IndexConstants.REFRESH_SOURCE_CONTENT_ENABLED, "false")
         spark.conf.set(IndexConstants.REFRESH_DELETE_ENABLED, "true")
         hyperspace.refreshIndex(indexConfig.indexName)
         val refreshedIndex2 = ixManager.getIndexes()
         assert(refreshedIndex2.length == 1)
 
         // Now that index entries for deleted source data files are removed
-        // from index files, `excluded` files list should be reset and empty.
-        assert(refreshedIndex2.head.excludedFiles.isEmpty)
+        // from index files, `deleted` files list should be reset and empty.
+        assert(refreshedIndex2.head.deletedFiles.isEmpty)
 
         // Verify index signature in latest version is different from
         // original version (before any source data file deletion).

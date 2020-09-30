@@ -124,7 +124,7 @@ case class RefreshDeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, mess
  * @param index Related index.
  * @param message Message about event.
  */
-case class RefreshLogEntryActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+case class RefreshSourceContentActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
     extends HyperspaceIndexCRUDEvent
 
 /**
