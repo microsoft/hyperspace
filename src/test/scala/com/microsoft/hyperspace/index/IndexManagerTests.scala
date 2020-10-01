@@ -251,10 +251,11 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Verify refresh-incremental rebuild of index.") {
+  test("Verify refresh-incremental (append-only) should index only newly appended data.") {
     Seq(("csv", Map("header" -> "true")), ("parquet", Map()), ("json", Map())).foreach {
       case (format, option: Map[String, String]) =>
         spark.conf.set(IndexConstants.REFRESH_APPEND_ENABLED, true)
+        // Setup. Create sample data and index.
         val refreshTestLocation = sampleParquetDataLocation + "refresh_" + format
         FileUtils.delete(new Path(refreshTestLocation))
         val indexConfig = IndexConfig(s"index_$format", Seq("RGUID"), Seq("imprs"))
@@ -275,7 +276,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             .count()
         assert(indexCount == 10)
 
-        // Change Original Data
+        // Change original data.
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .limit(3)

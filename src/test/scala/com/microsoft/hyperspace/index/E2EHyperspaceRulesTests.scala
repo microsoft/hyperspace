@@ -438,7 +438,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     // Refresh Index.
     hyperspace.refreshIndex(indexConfig.indexName)
 
-    // Create a Join Query
+    // Create a Join Query.
     val leftDf = spark.read.parquet(refreshTestLocation)
     val rightDf = spark.read.parquet(refreshTestLocation)
     def query(): DataFrame = {
