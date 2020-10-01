@@ -36,7 +36,7 @@ class RefreshIncremental(
   }
 
   private lazy val indexableDf = {
-    // Currently we only support to create an index on a LogicalRelation.
+    // Currently we only support creating an index on a LogicalRelation.
     assert(previousIndexLogEntry.relations.size == 1)
     val relation = previousIndexLogEntry.relations.head
 
