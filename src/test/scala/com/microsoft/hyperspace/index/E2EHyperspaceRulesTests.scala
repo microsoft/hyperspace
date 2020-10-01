@@ -450,8 +450,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     // Verify Indexes are used, and all index files are picked.
     verifyIndexUsage(
       query,
-      getIndexFilesPath(indexConfig.indexName) ++
-        getIndexFilesPath(indexConfig.indexName))
+      getIndexFilesPath(indexConfig.indexName, Seq(0, 1)) ++
+        getIndexFilesPath(indexConfig.indexName, Seq(0, 1)))
 
     // Verify Bucketing works as expected. This is reflected in shuffle nodes being eliminated
     // when hyperspace is enabled.
