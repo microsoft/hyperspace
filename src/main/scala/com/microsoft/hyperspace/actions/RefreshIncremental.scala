@@ -16,16 +16,12 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
 
 class RefreshIncremental(
     spark: SparkSession,
@@ -47,18 +43,6 @@ class RefreshIncremental(
     // TODO: improve this to take last modified time of files into account.
     val indexedFiles = relation.data.properties.content.files.map(_.toString)
 
-    /*
-    // Option 1 to create indexable df:
-    // To remove pre-indexed files, add file name column, add file filter and remove file name
-    // column.
-    val predicate = indexedFiles.mkString("('", "','", "')")
-    val temporaryColumn = "_file_name"
-    return df.withColumn(temporaryColumn, input_file_name)
-      .where(s"$temporaryColumn not in $predicate")
-      .drop("_file_name")
-     */
-
-    // Option 2 to create indexableDf
     val allFiles = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
           HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
@@ -90,5 +74,9 @@ class RefreshIncremental(
       previousIndexLogEntry.content.root.merge(entry.content.root)
     )
     entry.copy(content = mergedContent)
+  }
+
+  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshAppendActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

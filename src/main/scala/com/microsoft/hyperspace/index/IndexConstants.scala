@@ -56,5 +56,8 @@ object IndexConstants {
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
 
   val REFRESH_DELETE_ENABLED = "spark.hyperspace.index.refresh.delete.enabled"
+  val REFRESH_DELETE_ENABLED_DEFAULT = "false"
+
   val REFRESH_APPEND_ENABLED = "spark.hyperspace.index.refresh.append.enabled"
+  val REFRESH_APPEND_ENABLED_DEFAULT = "false"
 }

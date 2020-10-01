@@ -16,8 +16,11 @@
 
 package com.microsoft.hyperspace.index
 
+import java.io.File
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.{Hyperspace, SparkInvolvedSuite}
 import com.microsoft.hyperspace.util.FileUtils
@@ -84,6 +87,19 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
         hs.deleteIndex(name)
         hs.vacuumIndex(name)
       }
+    }
+  }
+
+  /**
+   * Creates a temporary directory, which is then passed to `f` and will be deleted after `f`
+   * returns. This is copied from SparkFunSuite.scala in Spark 3.0.
+   *
+   * TODO: This can be removed when we support Spark 3.0.
+   */
+  protected def withTempDir(f: File => Unit): Unit = {
+    val dir = Utils.createTempDir()
+    try f(dir) finally {
+      Utils.deleteRecursively(dir)
     }
   }
 }

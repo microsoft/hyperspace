@@ -24,11 +24,13 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -377,6 +379,12 @@ case class IndexLogEntry(
       .toSet
   }
 
+  def bucketSpec: BucketSpec =
+    BucketSpec(
+      numBuckets = numBuckets,
+      bucketColumnNames = indexedColumns,
+      sortColumnNames = indexedColumns)
+
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
       config.equals(that.config) &&
@@ -400,6 +408,12 @@ case class IndexLogEntry(
     val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
     assert(sourcePlanSignatures.length == 1)
     sourcePlanSignatures.head
+  }
+
+  def hasLineageColumn(spark: SparkSession): Boolean = {
+    ResolverUtils
+      .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, schema.fieldNames)
+      .isDefined
   }
 
   override def hashCode(): Int = {

@@ -19,17 +19,31 @@ package com.microsoft.hyperspace.actions
 import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActionEvent}
 
+/**
+ * The Index refresh action is used to perform a full rebuild of the index.
+ * Consequently, it ends up creating a new version of the index and involves
+ * a full scan of the underlying source data.
+ *
+ * @param spark SparkSession.
+ * @param logManager Index LogManager for index being refreshed.
+ * @param dataManager Index DataManager for index being refreshed.
+ */
 class RefreshAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-  extends RefreshActionBase(spark, logManager, dataManager) {
+    extends RefreshActionBase(spark, logManager, dataManager) {
 
   final override def op(): Unit = {
     // TODO: The current implementation picks the number of buckets from session config.
     //   This should be user-configurable to allow maintain the existing bucket numbers
     //   in the index log entry.
     write(spark, df, indexConfig)
+  }
+
+  final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }
