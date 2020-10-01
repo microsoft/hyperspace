@@ -56,7 +56,10 @@ object IndexConstants {
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
 
   val REFRESH_DELETE_ENABLED = "spark.hyperspace.index.refresh.delete.enabled"
+  val REFRESH_DELETE_ENABLED_DEFAULT = "false"
+
   val REFRESH_APPEND_ENABLED = "spark.hyperspace.index.refresh.append.enabled"
+  val REFRESH_APPEND_ENABLED_DEFAULT = "false"
 
   val OPTIMIZE_THRESHOLD = "spark.hyperspace.index.optimize.threshold"
   val OPTIMIZE_THRESHOLD_SIZE = 100 * 1024 * 1024L // 100MB

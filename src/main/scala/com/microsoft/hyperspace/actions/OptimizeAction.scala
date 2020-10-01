@@ -22,6 +22,7 @@ import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, OptimizeActionEvent}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 class OptimizeAction(
@@ -75,5 +76,9 @@ class OptimizeAction(
     } else {
       entry
     }
+  }
+
+  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    OptimizeActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

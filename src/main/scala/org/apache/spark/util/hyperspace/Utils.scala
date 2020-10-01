@@ -16,11 +16,21 @@
 
 package org.apache.spark.util.hyperspace
 
+import java.io.File
+
 /**
  * This class is used to expose package private methods from org.apache.spark.util.Utils.
  */
 object Utils {
   def classForName(className: String): Class[_] = {
     org.apache.spark.util.Utils.classForName(className)
+  }
+
+  def createTempDir(): File = {
+    org.apache.spark.util.Utils.createTempDir()
+  }
+
+  def deleteRecursively(file: File): Unit = {
+    org.apache.spark.util.Utils.deleteRecursively(file)
   }
 }
