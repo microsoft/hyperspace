@@ -128,7 +128,9 @@ class RefreshIndexDeleteTests extends HyperspaceSuite with SQLHelper {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(ex.getMessage.contains("Refresh delete is only supported on an index with lineage."))
+      assert(
+        ex.getMessage.contains("Index refresh (to handle deleted source data) is only " +
+          "supported on an index with lineage."))
     }
   }
 }
