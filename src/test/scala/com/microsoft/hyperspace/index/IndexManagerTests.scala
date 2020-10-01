@@ -255,6 +255,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     Seq(("csv", Map("header" -> "true")), ("parquet", Map()), ("json", Map())).foreach {
       case (format, option: Map[String, String]) =>
         spark.conf.set(IndexConstants.REFRESH_APPEND_ENABLED, true)
+        // Setup. Create sample data and index.
         val refreshTestLocation = sampleParquetDataLocation + "refresh_" + format
         FileUtils.delete(new Path(refreshTestLocation))
         val indexConfig = IndexConfig(s"index_$format", Seq("RGUID"), Seq("imprs"))
