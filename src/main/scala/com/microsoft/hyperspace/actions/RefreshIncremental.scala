@@ -54,7 +54,7 @@ class RefreshIncremental(
 
     val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
 
-    // Create a df with only diff files from original list of files
+    // Create a df with only diff files from original list of files.
     spark.read
       .schema(dataSchema)
       .format(relation.fileFormat)
@@ -64,15 +64,22 @@ class RefreshIncremental(
 
   /**
    * Create a logEntry with all data files, and index content merged with previous index content.
-   * @return Merged index log entry. This contains ALL data files (files which were indexed
-   *         previously, and files which are being indexed in this operation). Also contains ALL
-   *         index files (index files for previously indexed data as well as newly created files).
+   * This contains ALL data files (files which were indexed previously, and files which are being
+   * indexed in this operation). It also contains ALL index files (index files for previously
+   * indexed data as well as newly created files).
+   *
+   * @return Merged index log entry.
    */
   override def logEntry: LogEntry = {
+    // Log entry with complete data and newly index files.
     val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+
+    // Merge new index files with old index files.
     val mergedContent = Content(
       previousIndexLogEntry.content.root.merge(entry.content.root)
     )
+
+    // New entry.
     entry.copy(content = mergedContent)
   }
 
