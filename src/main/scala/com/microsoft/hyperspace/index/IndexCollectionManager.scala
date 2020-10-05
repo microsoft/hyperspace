@@ -70,7 +70,7 @@ class IndexCollectionManager(
       if (HyperspaceConf.refreshDeleteEnabled(spark)) {
         new RefreshDeleteAction(spark, logManager, dataManager).run()
       } else if (HyperspaceConf.refreshAppendEnabled(spark)) {
-        new RefreshIncremental(spark, logManager, dataManager).run()
+        new RefreshIncrementalAction(spark, logManager, dataManager).run()
       } else {
         new RefreshAction(spark, logManager, dataManager).run()
       }

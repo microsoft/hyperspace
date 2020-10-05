@@ -23,7 +23,21 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
 
-class RefreshIncremental(
+/**
+ * Action to create indexes on newly arrived data. If the user appends new data to existing,
+ * pre-indexed data, they can use refresh api to generate indexes only on the additional data.
+ *
+ * Algorithm Outline:
+ * - Identify newly added data files.
+ * - Create new index version on these files.
+ * - Update metadata to reflect the latest snapshot of index. This snapshot includes all the old
+ *   and the newly created index files. The source content points to the latest data files.
+ *
+ * @param spark SparkSession
+ * @param logManager Index LogManager for index being refreshed
+ * @param dataManager Index DataManager for index being refreshed
+ */
+class RefreshIncrementalAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
@@ -36,8 +50,6 @@ class RefreshIncremental(
   }
 
   private lazy val indexableDf = {
-    // Currently we only support creating an index on a LogicalRelation.
-    assert(previousIndexLogEntry.relations.size == 1)
     val relation = previousIndexLogEntry.relations.head
 
     // TODO: improve this to take last modified time of files into account.
