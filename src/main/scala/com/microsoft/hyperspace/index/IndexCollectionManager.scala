@@ -22,6 +22,7 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 class IndexCollectionManager(
@@ -63,13 +64,12 @@ class IndexCollectionManager(
     }
   }
 
-  override def refresh(indexName: String): Unit = {
+  override def refresh(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
-      if (HyperspaceConf.refreshDeleteEnabled(spark)) {
+      if (mode.equals(REFRESH_MODE_INCREMENTAL)) {
         new RefreshDeleteAction(spark, logManager, dataManager).run()
-      } else if (HyperspaceConf.refreshAppendEnabled(spark)) {
         new RefreshIncremental(spark, logManager, dataManager).run()
       } else {
         new RefreshAction(spark, logManager, dataManager).run()

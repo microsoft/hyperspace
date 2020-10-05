@@ -60,4 +60,6 @@ object IndexConstants {
 
   val REFRESH_APPEND_ENABLED = "spark.hyperspace.index.refresh.append.enabled"
   val REFRESH_APPEND_ENABLED_DEFAULT = "false"
+
+  val REFRESH_MODE_INCREMENTAL = "incremental"
 }

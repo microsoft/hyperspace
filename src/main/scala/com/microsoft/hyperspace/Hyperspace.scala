@@ -18,6 +18,7 @@ package com.microsoft.hyperspace
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 
@@ -73,8 +74,8 @@ class Hyperspace(spark: SparkSession) {
    *
    * @param indexName Name of the index to refresh.
    */
-  def refreshIndex(indexName: String): Unit = {
-    indexManager.refresh(indexName)
+  def refreshIndex(indexName: String, mode: String = REFRESH_MODE_INCREMENTAL): Unit = {
+    indexManager.refresh(indexName, mode)
   }
 
   /**
