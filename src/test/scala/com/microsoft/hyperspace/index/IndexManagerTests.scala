@@ -252,26 +252,23 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Verify refresh-incremental (append-only) should index only newly appended data.") {
-    Seq(("csv", Map("header" -> "true")), ("parquet", Map()), ("json", Map())).foreach {
-      case (format, option: Map[String, String]) =>
-        spark.conf.set(IndexConstants.REFRESH_APPEND_ENABLED, true)
+    withTempDir { testDir =>
+      val refreshTestLocation = testDir + "/refresh"
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create sample data and index.
-        val refreshTestLocation = sampleParquetDataLocation + "refresh_" + format
         FileUtils.delete(new Path(refreshTestLocation))
-        val indexConfig = IndexConfig(s"index_$format", Seq("RGUID"), Seq("imprs"))
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .limit(10)
           .write
-          .options(option)
-          .format(format)
-          .save(refreshTestLocation)
-        val df = spark.read.format(format).options(option).load(refreshTestLocation)
+          .parquet(refreshTestLocation)
+        val df = spark.read.parquet(refreshTestLocation)
         hyperspace.createIndex(df, indexConfig)
         var indexCount =
           spark.read
-            .parquet(s"$systemPath/index_$format" +
+            .parquet(s"$systemPath/index" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
             .count()
         assert(indexCount == 10)
@@ -282,17 +279,15 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .limit(3)
           .write
           .mode("append")
-          .options(option)
-          .format(format)
-          .save(refreshTestLocation)
+          .parquet(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
-        val newIndexLocation = s"$systemPath/index_$format"
+        val newIndexLocation = s"$systemPath/index"
         indexCount = spark.read
           .parquet(newIndexLocation +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
-        // Check if index got updated
+        // Check if index got updated.
         assert(indexCount == 3)
 
         // Check if latest log file is updated with newly created index files
@@ -305,11 +300,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         assert(indexFiles.nonEmpty)
         assert(indexFiles.forall(_.getName.startsWith("part-0")))
         assert(indexLog.state.equals("ACTIVE"))
-        // Check there exist some files from v__=0 and some from v__=1
+        // Check there exist some files from v__=0 and some from v__=1.
         assert(indexFiles.map(_.getParent.getName).toSet.equals(Set("v__=0", "v__=1")))
-
-        FileUtils.delete(new Path(refreshTestLocation))
-      case _ => fail("invalid test")
+      }
     }
   }
 
