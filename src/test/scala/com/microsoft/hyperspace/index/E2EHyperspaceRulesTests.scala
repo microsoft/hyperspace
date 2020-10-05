@@ -414,10 +414,10 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       val refreshTestLocation = testDir + "/refresh"
       withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create Data.
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        val indexConfig = IndexConfig(s"index", Seq("c2"), Seq("c4"))
         import spark.implicits._
         SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .toDF("c1", "c2", "c3", "c4", "c5")
           .limit(10)
           .write
           .parquet(refreshTestLocation)
@@ -428,7 +428,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
         // Append to Original Data.
         SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .toDF("c1", "c2", "c3", "c4", "c5")
           .limit(3)
           .write
           .mode("append")
@@ -443,8 +443,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
         def query(): DataFrame = {
           leftDf
-            .join(rightDf, leftDf("RGUID") === rightDf("RGUID"))
-            .select(leftDf("RGUID"), rightDf("imprs"))
+            .join(rightDf, leftDf("c2") === rightDf("c2"))
+            .select(leftDf("c2"), rightDf("c4"))
         }
 
         // Verify Indexes are used, and all index files are picked.
@@ -454,7 +454,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
             getIndexFilesPath(indexConfig.indexName, Seq(0, 1)))
 
         // Verify Bucketing works as expected. This is reflected in shuffle nodes being eliminated
-        // when hyperspace is enabled.
+        // when hyperspace is enabled. Also verify that sort nodes are not removed.
+        // Without Hyperspace.
         spark.disableHyperspace()
         val dfWithHyperspaceDisabled = query()
         var shuffleNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
@@ -466,7 +467,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
         }
         assert(sortNodes.size == 2)
 
-        // Verify that sort nodes are not removed.
+        // With Hyperspace.
         spark.enableHyperspace()
         val dfWithHyperspaceEnabled = query()
         shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
