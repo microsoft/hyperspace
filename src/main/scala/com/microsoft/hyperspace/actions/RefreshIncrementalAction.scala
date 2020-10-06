@@ -66,6 +66,7 @@ class RefreshIncrementalAction(
     val relation = previousIndexLogEntry.relations.head
 
     // TODO: improve this to take last modified time of files into account.
+    // https://github.com/microsoft/hyperspace/issues/182
     val indexedFiles = relation.data.properties.content.files.map(_.toString)
 
     val allFiles = df.queryExecution.optimizedPlan.collect {
