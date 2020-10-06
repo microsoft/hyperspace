@@ -251,6 +251,29 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test("Verify refresh-incremental (append-only) throws exception if no new files found.") {
+    withTempDir { testDir =>
+      val refreshTestLocation = testDir + "/refresh"
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
+        // Setup. Create sample data and index.
+        FileUtils.delete(new Path(refreshTestLocation))
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .parquet(refreshTestLocation)
+        val df = spark.read.parquet(refreshTestLocation)
+        hyperspace.createIndex(df, indexConfig)
+        val ex = intercept[HyperspaceException] {
+          hyperspace.refreshIndex(indexConfig.indexName)
+        }
+        assert(ex.msg.equals("Refresh aborted as no appended source data files found."))
+      }
+    }
+  }
+
   test("Verify refresh-incremental (append-only) should index only newly appended data.") {
     withTempDir { testDir =>
       val refreshTestLocation = testDir + "/refresh"
