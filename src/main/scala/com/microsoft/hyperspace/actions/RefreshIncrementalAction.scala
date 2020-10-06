@@ -20,6 +20,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
 
@@ -49,7 +50,19 @@ class RefreshIncrementalAction(
     write(spark, indexableDf, indexConfig)
   }
 
-  private lazy val indexableDf = {
+  /**
+   * Validate index is in active state for refreshing and there are some appended
+   * source data file(s).
+   */
+  final override def validate(): Unit = {
+    super.validate()
+
+    if (appendedFiles.isEmpty) {
+      throw HyperspaceException("Refresh aborted as no appended source data files found.")
+    }
+  }
+
+  private lazy val appendedFiles = {
     val relation = previousIndexLogEntry.relations.head
 
     // TODO: improve this to take last modified time of files into account.
@@ -57,13 +70,18 @@ class RefreshIncrementalAction(
 
     val allFiles = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+      HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+      _,
+      _,
+      _) =>
         location.allFiles().map(_.getPath.toString)
     }.flatten
 
+    allFiles.diff(indexedFiles)
+  }
+
+  private lazy val indexableDf = {
+    val relation = previousIndexLogEntry.relations.head
     val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
 
     // Create a df with only diff files from original list of files.
@@ -71,7 +89,7 @@ class RefreshIncrementalAction(
       .schema(dataSchema)
       .format(relation.fileFormat)
       .options(relation.options)
-      .load(allFiles.diff(indexedFiles): _*)
+      .load(appendedFiles: _*)
   }
 
   /**
