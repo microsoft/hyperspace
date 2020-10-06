@@ -20,7 +20,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{HyperspaceException, NoChangesDetected}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
 
@@ -34,9 +34,9 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppe
  * - Update metadata to reflect the latest snapshot of index. This snapshot includes all the old
  *   and the newly created index files. The source content points to the latest data files.
  *
- * @param spark SparkSession
- * @param logManager Index LogManager for index being refreshed
- * @param dataManager Index DataManager for index being refreshed
+ * @param spark SparkSession.
+ * @param logManager Index LogManager for index being refreshed.
+ * @param dataManager Index DataManager for index being refreshed.
  */
 class RefreshIncrementalAction(
     spark: SparkSession,
@@ -55,25 +55,27 @@ class RefreshIncrementalAction(
    * [[RefreshDeleteAction]] before this.
    *
    * Verify index has lineage column and there are NO deleted source data files.
+   *
+   * Validate index is in active state for refreshing and there are some appended
+   * source data file(s).
    */
   final override def validate(): Unit = {
     super.validate()
-    if (!previousIndexLogEntry.hasLineageColumn(spark)) {
+    if (deletedFiles.nonEmpty) {
       throw HyperspaceException(
-        "Index refresh (to handle deleted source data) is " +
-          "only supported on an index with lineage.")
+        "Refresh-Incremental aborted as some source data files have been deleted.")
     }
 
-    if (deletedFiles.nonEmpty) {
-      throw HyperspaceException("Refresh-Incremental aborted as some source data files" +
-        "have been deleted.")
+    if (appendedFiles.isEmpty) {
+      throw NoChangesDetected("Refresh aborted as no appended source data files found.")
     }
   }
 
-  private lazy val indexableDf = {
+  private lazy val appendedFiles = {
     val relation = previousIndexLogEntry.relations.head
 
     // TODO: improve this to take last modified time of files into account.
+    // https://github.com/microsoft/hyperspace/issues/182
     val indexedFiles = relation.data.properties.content.files.map(_.toString)
 
     val allFiles = df.queryExecution.optimizedPlan.collect {
@@ -85,6 +87,11 @@ class RefreshIncrementalAction(
         location.allFiles().map(_.getPath.toString)
     }.flatten
 
+    allFiles.diff(indexedFiles)
+  }
+
+  private lazy val indexableDf = {
+    val relation = previousIndexLogEntry.relations.head
     val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
 
     // Create a df with only diff files from original list of files.
@@ -92,7 +99,7 @@ class RefreshIncrementalAction(
       .schema(dataSchema)
       .format(relation.fileFormat)
       .options(relation.options)
-      .load(allFiles.diff(indexedFiles): _*)
+      .load(appendedFiles: _*)
   }
 
   /**
@@ -108,9 +115,7 @@ class RefreshIncrementalAction(
     val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
     // Merge new index files with old index files.
-    val mergedContent = Content(
-      previousIndexLogEntry.content.root.merge(entry.content.root)
-    )
+    val mergedContent = Content(previousIndexLogEntry.content.root.merge(entry.content.root))
 
     // New entry.
     entry.copy(content = mergedContent)

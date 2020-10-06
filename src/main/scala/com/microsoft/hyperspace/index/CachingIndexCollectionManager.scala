@@ -18,6 +18,8 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
+
 /**
  * An IndexCollectionManager which leverages a cache to
  * accelerate fetching indexes, with below properties:
@@ -92,7 +94,7 @@ class CachingIndexCollectionManager(
     super.vacuum(indexName)
   }
 
-  override def refresh(indexName: String, mode: String): Unit = {
+  override def refresh(indexName: String, mode: String = REFRESH_MODE_INCREMENTAL): Unit = {
     clearCache()
     super.refresh(indexName, mode)
   }

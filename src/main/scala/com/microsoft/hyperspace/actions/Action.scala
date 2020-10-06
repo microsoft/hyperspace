@@ -18,9 +18,9 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.internal.Logging
 
-import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, HyperspaceEventLogging}
+import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException, NoChangesDetected}
 
 /**
  * This is a generic Index-Modifying Action interface. It provides APIs to begin and commit
@@ -94,6 +94,9 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
       end()
       logEvent(event(appInfo, message = "Operation Succeeded."))
     } catch {
+      case e: NoChangesDetected =>
+        logEvent(event(appInfo, message = s"No-op Operation Recorded: ${e.getMessage}."))
+        logWarning(e.msg)
       case e: Exception =>
         logEvent(event(appInfo, message = s"Operation Failed: ${e.getMessage}."))
         throw e

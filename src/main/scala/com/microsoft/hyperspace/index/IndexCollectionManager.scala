@@ -64,7 +64,7 @@ class IndexCollectionManager(
     }
   }
 
-  override def refresh(indexName: String, mode: String): Unit = {
+  override def refresh(indexName: String, mode: String = REFRESH_MODE_INCREMENTAL): Unit = {
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)

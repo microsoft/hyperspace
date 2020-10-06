@@ -20,7 +20,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{HyperspaceException, NoChangesDetected}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshDeleteActionEvent}
@@ -63,7 +63,7 @@ class RefreshDeleteAction(
     }
 
     if (deletedFiles.isEmpty) {
-      throw HyperspaceException("Refresh aborted as no deleted source data file found.")
+      throw NoChangesDetected("Refresh aborted as no deleted source data file found.")
     }
   }
 
