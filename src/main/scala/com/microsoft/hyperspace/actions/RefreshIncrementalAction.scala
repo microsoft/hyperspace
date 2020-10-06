@@ -20,6 +20,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
 
@@ -47,6 +48,26 @@ class RefreshIncrementalAction(
     //   This should be user-configurable to allow maintain the existing bucket numbers
     //   in the index log entry.
     write(spark, indexableDf, indexConfig)
+  }
+
+  /**
+   * Validate there are no deleted files. If there are deleted files, Please run
+   * [[RefreshDeleteAction]] before this.
+   *
+   * Verify index has lineage column and there are NO deleted source data files.
+   */
+  final override def validate(): Unit = {
+    super.validate()
+    if (!previousIndexLogEntry.hasLineageColumn(spark)) {
+      throw HyperspaceException(
+        "Index refresh (to handle deleted source data) is " +
+          "only supported on an index with lineage.")
+    }
+
+    if (deletedFiles.nonEmpty) {
+      throw HyperspaceException("Refresh-Incremental aborted as some source data files" +
+        "have been deleted.")
+    }
   }
 
   private lazy val indexableDf = {
