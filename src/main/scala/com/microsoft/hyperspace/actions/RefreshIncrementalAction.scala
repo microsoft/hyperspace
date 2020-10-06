@@ -33,9 +33,9 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppe
  * - Update metadata to reflect the latest snapshot of index. This snapshot includes all the old
  *   and the newly created index files. The source content points to the latest data files.
  *
- * @param spark SparkSession
- * @param logManager Index LogManager for index being refreshed
- * @param dataManager Index DataManager for index being refreshed
+ * @param spark SparkSession.
+ * @param logManager Index LogManager for index being refreshed.
+ * @param dataManager Index DataManager for index being refreshed.
  */
 class RefreshIncrementalAction(
     spark: SparkSession,

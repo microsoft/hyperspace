@@ -217,7 +217,4 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     assert(partitionSchemas.length == 1)
     partitionSchemas.head.map(_.name)
   }
-
-  private val absolutePath: UserDefinedFunction = udf(
-    (filePath: String) => PathUtils.makeAbsolute(filePath).toString)
 }

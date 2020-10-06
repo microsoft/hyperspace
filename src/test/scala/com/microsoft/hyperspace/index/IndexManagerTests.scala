@@ -272,6 +272,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
             .count()
         assert(indexCount == 10)
+        // Check if latest log file is updated with newly created index files.
+        validateMetadata("index", Set("v__=0"))
 
         // Change original data.
         SampleData.testData
@@ -281,29 +283,33 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .mode("append")
           .parquet(refreshTestLocation)
         hyperspace.refreshIndex(indexConfig.indexName)
-        val newIndexLocation = s"$systemPath/index"
         indexCount = spark.read
-          .parquet(newIndexLocation +
+          .parquet(s"$systemPath/index" +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
         // Check if index got updated.
         assert(indexCount == 3)
 
-        // Check if latest log file is updated with newly created index files
-        val indexPath = PathUtils.makeAbsolute(newIndexLocation)
-        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
-        val latestLog = logManager.getLatestLog()
-        assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
-        val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
-        val indexFiles = indexLog.content.files
-        assert(indexFiles.nonEmpty)
-        assert(indexFiles.forall(_.getName.startsWith("part-0")))
-        assert(indexLog.state.equals("ACTIVE"))
-        // Check there exist some files from v__=0 and some from v__=1.
-        assert(indexFiles.map(_.getParent.getName).toSet.equals(Set("v__=0", "v__=1")))
+        // Check if latest log file is updated with newly created index files.
+        validateMetadata("index", Set("v__=0", "v__=1"))
       }
     }
+  }
+
+  private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
+    val newIndexLocation = s"$systemPath/$indexName"
+    val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+    val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+    val latestLog = logManager.getLatestLog()
+    assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+    val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+    val indexFiles = indexLog.content.files
+    assert(indexFiles.nonEmpty)
+    assert(indexFiles.forall(_.getName.startsWith("part-0")))
+    assert(indexLog.state.equals("ACTIVE"))
+    // Check all files belong to v__=0.
+    assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
   }
 
   private def expectedIndex(
