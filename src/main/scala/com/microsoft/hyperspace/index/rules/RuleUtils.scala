@@ -138,7 +138,7 @@ object RuleUtils {
    *
    * Pre-requisites
    * - We know for sure the index which can be used to transform the plan.
-   * - The plan should be linear and include 1 LogicalRelation.
+   * - The plan should be linear and include one LogicalRelation.
    *
    * @param spark Spark session.
    * @param index Index used in transformation of plan.
@@ -151,6 +151,9 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
+    // Check pre-requisite.
+    assert(getLogicalRelation(plan).isDefined)
+
     val transformed = if (HyperspaceConf.hybridScanEnabled(spark)) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
     } else {
@@ -224,8 +227,9 @@ object RuleUtils {
 
     // Get transformed plan with index data and appended files if applicable.
     val indexPlan = plan transformUp {
-      // Use transformUp here as currently 1 Logical Relation is allowed (pre-requisite).
-      // Otherwise, we need additional check not to process newly injected Filter-Not-In nodes.
+      // Use transformUp here as currently one Logical Relation is allowed (pre-requisite).
+      // With transformDown, the transformed plan will be matched and transformed recursively
+      // which causes Stack overflow exception.
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
@@ -244,7 +248,9 @@ object RuleUtils {
               (Nil, filesAppended)
             }
           } else {
-            // Keep append-only implementation for efficiency.
+            // Append-only implementation of getting appended files for efficiency.
+            // It is guaranteed that there is no deleted files via the condition
+            // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
             (
               Nil,
               curFileSet.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name)))
@@ -253,10 +259,13 @@ object RuleUtils {
         val filesToRead = {
           if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
-            // in formats other than "parquet" using 1 FileScan node as the operator requires
+            // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
             // source files using another FileScan node injected into the plan and subsequently
             // merge the data into the index data. Please refer below [[Union]] operation.
+            // In case there are both deleted and appended files, we cannot handle the appended
+            // files along with deleted files as source files do not have the lineage column which
+            // requires for excluding the index data from deleted files.
             unhandledAppendedFiles = filesAppended
             index.content.files
           } else {
@@ -268,17 +277,19 @@ object RuleUtils {
           }
         }
 
-        val readSchema = if (filesDeleted.isEmpty) {
-          StructType(index.schema.filter(baseRelation.schema.contains(_)))
-        } else {
-          StructType(index.schema)
-        }
+        // In order to handle deleted files, read index data with the lineage column so that
+        // we could inject Filter-Not-In conditions on the lineage column to exclude the indexed
+        // rows from the deleted files.
+        val newSchema = StructType(
+          index.schema.filter(s =>
+            baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
+              IndexConstants.DATA_FILE_NAME_COLUMN))))
 
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = HadoopFsRelation(
           newLocation,
           new StructType(),
-          readSchema,
+          newSchema,
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map())(spark)
@@ -289,11 +300,11 @@ object RuleUtils {
         if (filesDeleted.isEmpty) {
           baseRelation.copy(relation = relation, output = updatedOutput)
         } else {
-          val lAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)(
-            NamedExpression.newExprId)
+          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)()
           val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
-          val rel = baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lAttr))
-          Project(updatedOutput, Filter(Not(In(lAttr, deletedFileNames)), rel))
+          val rel =
+            baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
+          Project(updatedOutput, Filter(Not(In(lineageAttr, deletedFileNames)), rel))
         }
     }
 
@@ -370,7 +381,7 @@ object RuleUtils {
    * Transform the plan to perform on-the-fly Shuffle the data based on bucketSpec.
    *
    * Pre-requisite
-   * - The plan should be linear and include 1 LogicalRelation.
+   * - The plan should be linear and include one LogicalRelation.
    *
    * @param bucketSpec Bucket specification used for Shuffle.
    * @param plan Plan to be shuffled.

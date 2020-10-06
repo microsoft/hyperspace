@@ -121,7 +121,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
       withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
         val sourceFile = readDf.inputFiles.head
-        indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        }
 
         def verify(
             plan: LogicalPlan,
@@ -191,6 +193,11 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = true)
         }
 
         // Scenario #3: Replace all files.

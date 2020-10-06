@@ -47,8 +47,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   private val sampleJsonDataLocationDelete = sampleDataLocationRoot + "samplejson2"
   private var hyperspace: Hyperspace = _
 
-  // Creates an index with given 'df' and 'indexConfig' and copies the first 'appendCnt'
-  // number of input files from 'df'.
+  // Creates an index with given 'df' and 'indexConfig'. Then copies the first 'appendCnt'
+  // number of input files from 'df' and deletes the last 'deleteCnt' of the input files.
   def setupIndexAndChangeData(
       df: DataFrame,
       indexConfig: IndexConfig,
@@ -65,7 +65,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       fs.copyToLocalFile(sourcePath, destPath)
     }
     for (i <- 1 to deleteCnt) {
-      fs.delete(new Path(inputFiles(inputFiles.length - i)))
+      fs.delete(new Path(inputFiles(inputFiles.length - i)), false)
     }
   }
 
@@ -84,50 +84,50 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     dfFromSample.write.json(sampleJsonDataLocationAppend)
     dfFromSample.write.json(sampleJsonDataLocationDelete)
 
-    val indexConfig1 = IndexConfig("index1", Seq("clicks"), Seq("query"))
-    val indexConfig2 = IndexConfig("index11", Seq("clicks"), Seq("Date"))
+    val indexConfig1 = IndexConfig("indexType1", Seq("clicks"), Seq("query"))
+    val indexConfig2 = IndexConfig("indexType2", Seq("clicks"), Seq("Date"))
 
     setupIndexAndChangeData(
       spark.read.parquet(sampleParquetDataLocationAppend),
-      indexConfig1,
+      indexConfig1.copy(indexName = "index_ParquetAppend"),
       appendCnt = 1,
       deleteCnt = 0)
     setupIndexAndChangeData(
       spark.read.parquet(sampleParquetDataLocationAppend2),
-      indexConfig2,
+      indexConfig2.copy(indexName = "indexType2_ParquetAppend2"),
       appendCnt = 1,
       deleteCnt = 0)
     setupIndexAndChangeData(
       spark.read.json(sampleJsonDataLocationAppend),
-      indexConfig1.copy(indexName = "index4"),
+      indexConfig1.copy(indexName = "index_JsonAppend"),
       appendCnt = 1,
       deleteCnt = 0)
 
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       setupIndexAndChangeData(
         spark.read.parquet(sampleParquetDataLocationDelete),
-        indexConfig1.copy(indexName = "index2"),
+        indexConfig1.copy(indexName = "index_ParquetDelete"),
         appendCnt = 0,
         deleteCnt = 2)
       setupIndexAndChangeData(
         spark.read.parquet(sampleParquetDataLocationDelete3),
-        indexConfig2.copy(indexName = "index6"),
+        indexConfig2.copy(indexName = "indexType2_ParquetDelete3"),
         appendCnt = 0,
         deleteCnt = 2)
       setupIndexAndChangeData(
         spark.read.parquet(sampleParquetDataLocationBoth),
-        indexConfig1.copy(indexName = "index3"),
+        indexConfig1.copy(indexName = "index_ParquetBoth"),
         appendCnt = 1,
         deleteCnt = 1)
       setupIndexAndChangeData(
         spark.read.json(sampleJsonDataLocationDelete),
-        indexConfig1.copy(indexName = "index5"),
+        indexConfig1.copy(indexName = "index_JsonDelete"),
         appendCnt = 0,
         deleteCnt = 2)
     }
     setupIndexAndChangeData(
       spark.read.parquet(sampleParquetDataLocationDelete2),
-      indexConfig1.copy(indexName = "index22"),
+      indexConfig1.copy(indexName = "index_ParquetDelete2"),
       appendCnt = 0,
       deleteCnt = 2)
   }
@@ -169,7 +169,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           // Verify appended file is included or not.
           assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
           // Verify number of index data files.
-          assert(fsRelation.location.inputFiles.count(_.contains("index1")) === 4)
+          assert(fsRelation.location.inputFiles.count(_.contains("index_ParquetAppend")) === 4)
           assert(fsRelation.location.inputFiles.length === 5)
           p
       }
@@ -226,7 +226,10 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                     _,
                     Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))) =>
                 // Check 4 of index data files.
-                assert(fsRelation.location.inputFiles.forall(_.contains("index")))
+                assert(
+                  fsRelation.location.inputFiles.forall(_.contains("index_ParquetAppend"))
+                    || fsRelation.location.inputFiles
+                      .forall(_.contains("indexType2_ParquetAppend2")))
                 assert(fsRelation.location.inputFiles.length === 4)
                 p
             }
@@ -296,7 +299,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               fileFormatName match {
                 case "parquet" =>
                   // Check 4 of index data files.
-                  assert(fsRelation.location.inputFiles.forall(_.contains("index")))
+                  assert(fsRelation.location.inputFiles.forall(_.contains("index_JsonAppend")))
                   assert(fsRelation.location.inputFiles.length === 4)
                 case "json" =>
                   // Check 1 appended file.
@@ -369,8 +372,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       "index relation should have additional filter for deleted files") {
 
     Seq(
-      (sampleParquetDataLocationDelete, "index2", "parquet"),
-      (sampleJsonDataLocationDelete, "index5", "json")) foreach {
+      (sampleParquetDataLocationDelete, "index_ParquetDelete", "parquet"),
+      (sampleJsonDataLocationDelete, "index_JsonDelete", "json")) foreach {
       case (dataPath, indexName, dataFormat) =>
         val df = spark.read.format(dataFormat).load(dataPath)
         def filterQuery: DataFrame =
@@ -462,7 +465,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(deleted.distinct.length == deleted.length)
             assert(deleted.forall(f => !df1.inputFiles.contains(f)))
             assert(deleted.forall(f => !df2.inputFiles.contains(f)))
-            assert(fsRelation.location.inputFiles.forall(_.contains("index")))
+            assert(
+              fsRelation.location.inputFiles.forall(_.contains("index_ParquetDelete")) ||
+                fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
             assert(fsRelation.location.inputFiles.length === 4)
             deleted
         }
@@ -520,7 +525,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           assert(deleted.length == 1)
           assert(deleted.distinct.length == deleted.length)
           assert(deleted.forall(f => !df.inputFiles.contains(f)))
-          assert(fsRelation.location.inputFiles.forall(_.contains("index3")))
+          assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
           assert(fsRelation.location.inputFiles.length === 4)
           deletedFilesList = deletedFilesList :+ deleted
           p
@@ -532,7 +537,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(fsRelation.location.inputFiles.length === 1)
           } else {
             // Check input files for index data files.
-            assert(fsRelation.location.inputFiles.forall(_.contains("index3")))
+            assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
             assert(fsRelation.location.inputFiles.length === 4)
           }
           p
@@ -612,7 +617,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(deleted.distinct.length == deleted.length)
             assert(deleted.forall(f => !df1.inputFiles.contains(f)))
             assert(deleted.forall(f => !df2.inputFiles.contains(f)))
-            assert(fsRelation.location.inputFiles.forall(_.contains("index")))
+            assert(
+              fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")) ||
+                fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
             assert(fsRelation.location.inputFiles.length === 4)
             deletedFilesList = deletedFilesList :+ deleted
             p
@@ -623,6 +630,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               assert(appendedFileCnt === 1)
               assert(fsRelation.location.inputFiles.length === 1)
             } else {
+              assert(
+                fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")) ||
+                  fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
               assert(indexFileCnt === 4)
               assert(fsRelation.location.inputFiles.length === 4)
             }
