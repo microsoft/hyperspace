@@ -22,6 +22,7 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -66,7 +67,13 @@ class IndexCollectionManager(
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
-      new RefreshAction(spark, logManager, dataManager).run()
+      if (HyperspaceConf.refreshDeleteEnabled(spark)) {
+        new RefreshDeleteAction(spark, logManager, dataManager).run()
+      } else if (HyperspaceConf.refreshAppendEnabled(spark)) {
+        new RefreshAppendAction(spark, logManager, dataManager).run()
+      } else {
+        new RefreshAction(spark, logManager, dataManager).run()
+      }
     }
   }
 

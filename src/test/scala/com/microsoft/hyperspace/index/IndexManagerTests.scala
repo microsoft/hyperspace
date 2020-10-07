@@ -66,8 +66,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
           if (enableLineage) {
-            expectedSchema = expectedSchema.add(
-              StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType, false))
+            expectedSchema =
+              expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
           }
           val expected = new IndexSummary(
             indexConfig1.indexName,
@@ -249,6 +249,86 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
     }
+  }
+
+  test("Verify refresh-incremental (append-only) throws exception if no new files found.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
+        // Setup. Create sample data and index.
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
+        hyperspace.createIndex(df, indexConfig)
+        val ex = intercept[HyperspaceException] {
+          hyperspace.refreshIndex(indexConfig.indexName)
+        }
+        assert(ex.msg.equals("Refresh aborted as no appended source data files found."))
+      }
+    }
+  }
+
+  test("Verify refresh-incremental (append-only) should index only newly appended data.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
+        // Setup. Create sample data and index.
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
+        hyperspace.createIndex(df, indexConfig)
+        var indexCount =
+          spark.read
+            .parquet(s"$systemPath/index" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+            .count()
+        assert(indexCount == 10)
+        // Check if latest log file is updated with newly created index files.
+        validateMetadata("index", Set("v__=0"))
+
+        // Change original data.
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(3)
+          .write
+          .mode("append")
+          .parquet(testPath)
+        hyperspace.refreshIndex(indexConfig.indexName)
+        indexCount = spark.read
+          .parquet(s"$systemPath/index" +
+            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+          .count()
+
+        // Check if index got updated.
+        assert(indexCount == 3)
+
+        // Check if latest log file is updated with newly created index files.
+        validateMetadata("index", Set("v__=0", "v__=1"))
+      }
+    }
+  }
+
+  private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
+    val newIndexLocation = s"$systemPath/$indexName"
+    val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+    val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+    val latestLog = logManager.getLatestLog()
+    assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+    val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+    val indexFiles = indexLog.content.files
+    assert(indexFiles.nonEmpty)
+    assert(indexFiles.forall(_.getName.startsWith("part-0")))
+    assert(indexLog.state.equals("ACTIVE"))
+    // Check all files belong to the provided index versions only.
+    assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
   }
 
   private def expectedIndex(

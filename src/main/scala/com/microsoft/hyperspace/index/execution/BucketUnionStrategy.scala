@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-package org.apache.spark.util.hyperspace
+package com.microsoft.hyperspace.index.execution
 
-import java.io.File
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.{SparkPlan, SparkStrategy}
+
+import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 
 /**
- * This class is used to expose package private methods from org.apache.spark.util.Utils.
+ * [[BucketUnionStrategy]] is SparkStrategy for converting [[BucketUnion]] (Logical Plan)
+ * to [[BucketUnionExec]] (Spark Plan)
  */
-object Utils {
-  def classForName(className: String): Class[_] = {
-    org.apache.spark.util.Utils.classForName(className)
-  }
-
-  def createTempDir(): File = {
-    org.apache.spark.util.Utils.createTempDir()
-  }
-
-  def deleteRecursively(file: File): Unit = {
-    org.apache.spark.util.Utils.deleteRecursively(file)
+private[hyperspace] object BucketUnionStrategy extends SparkStrategy {
+  override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+    case p: BucketUnion =>
+      BucketUnionExec(p.children.map(planLater), p.bucketSpec) :: Nil
+    case _ => Nil
   }
 }

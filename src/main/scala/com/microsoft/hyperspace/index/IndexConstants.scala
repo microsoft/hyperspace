@@ -27,6 +27,15 @@ object IndexConstants {
   val INDEX_SEARCH_PATHS = "spark.hyperspace.index.search.paths"
   val INDEX_NUM_BUCKETS = "spark.hyperspace.index.num.buckets"
 
+  val INDEX_HYBRID_SCAN_ENABLED = "spark.hyperspace.index.hybridscan.enabled"
+  val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = "false"
+
+  // Identifier injected to HadoopFsRelation as an option if an index is applied.
+  // Currently, the identifier is added to options field of HadoopFsRelation.
+  // In Spark 3.0, we could utilize TreeNodeTag to mark the identifier for each plan.
+  // See https://github.com/microsoft/hyperspace/issues/185
+  val INDEX_RELATION_IDENTIFIER: (String, String) = ("indexRelation" -> "true")
+
   // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
   val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
 
@@ -51,4 +60,17 @@ object IndexConstants {
   private[hyperspace] val DATA_FILE_NAME_COLUMN = "_data_file_name"
   val INDEX_LINEAGE_ENABLED = "spark.hyperspace.index.lineage.enabled"
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
+
+  val REFRESH_DELETE_ENABLED = "spark.hyperspace.index.refresh.delete.enabled"
+  val REFRESH_DELETE_ENABLED_DEFAULT = "false"
+
+  /**
+   * This flag enables refreshing index if additional data files are appended to the source. When
+   * set to false, the refresh call will not run RefreshAppendAction. It will instead go for full
+   * refresh.
+   * This flag is temporary, and will be removed when both Append and Delete actions are merged
+   * for refreshing indexes.
+   */
+  val REFRESH_APPEND_ENABLED = "spark.hyperspace.index.refresh.append.enabled"
+  val REFRESH_APPEND_ENABLED_DEFAULT = "false"
 }

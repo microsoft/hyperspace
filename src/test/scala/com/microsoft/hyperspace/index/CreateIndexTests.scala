@@ -43,8 +43,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val sparkSession = spark
-    hyperspace = new Hyperspace(sparkSession)
+    hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir), true)
 
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
