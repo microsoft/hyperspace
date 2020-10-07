@@ -58,6 +58,13 @@ object IndexConstants {
   val REFRESH_DELETE_ENABLED = "spark.hyperspace.index.refresh.delete.enabled"
   val REFRESH_DELETE_ENABLED_DEFAULT = "false"
 
+  /**
+   * This flag enables refreshing index if additional data files are appended to the source. When
+   * set to false, the refresh call will not run RefreshAppendAction. It will instead go for full
+   * refresh.
+   * This flag is temporary, and will be removed when both Append and Delete actions are merged
+   * for refreshing indexes.
+   */
   val REFRESH_APPEND_ENABLED = "spark.hyperspace.index.refresh.append.enabled"
   val REFRESH_APPEND_ENABLED_DEFAULT = "false"
 }

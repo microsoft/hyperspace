@@ -98,8 +98,20 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
    */
   protected def withTempDir(f: File => Unit): Unit = {
     val dir = Utils.createTempDir()
-    try f(dir) finally {
+    try f(dir)
+    finally {
       Utils.deleteRecursively(dir)
     }
+  }
+
+  protected def withTempPathAsString(f: String => Unit): Unit = {
+    // The following is from SQLHelper.withTempPath with a modification to pass
+    // String instead of File to "f". The reason this is copied instead of extending
+    // SQLHelper is that some of the existing suites extend QueryTest and it causes
+    // "inheriting conflicting members" issue.
+    val path = Utils.createTempDir()
+    path.delete()
+    try f(path.toString)
+    finally Utils.deleteRecursively(path)
   }
 }

@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
@@ -38,7 +37,7 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppe
  * @param logManager Index LogManager for index being refreshed.
  * @param dataManager Index DataManager for index being refreshed.
  */
-class RefreshIncrementalAction(
+class RefreshAppendAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
@@ -47,7 +46,7 @@ class RefreshIncrementalAction(
     // TODO: The current implementation picks the number of buckets from session config.
     //   This should be user-configurable to allow maintain the existing bucket numbers
     //   in the index log entry.
-    write(spark, indexableDf, indexConfig)
+    write(spark, dfWithAppendedFiles, indexConfig)
   }
 
   /**
@@ -66,35 +65,33 @@ class RefreshIncrementalAction(
     val relation = previousIndexLogEntry.relations.head
 
     // TODO: improve this to take last modified time of files into account.
-    // https://github.com/microsoft/hyperspace/issues/182
+    //   https://github.com/microsoft/hyperspace/issues/182
     val indexedFiles = relation.data.properties.content.files.map(_.toString)
 
     val allFiles = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(
-      HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-      _,
-      _,
-      _) =>
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
         location.allFiles().map(_.getPath.toString)
     }.flatten
 
     allFiles.diff(indexedFiles)
   }
 
-  private lazy val indexableDf = {
+  private lazy val dfWithAppendedFiles = {
     val relation = previousIndexLogEntry.relations.head
-    val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
-
     // Create a df with only diff files from original list of files.
     spark.read
-      .schema(dataSchema)
+      .schema(df.schema)
       .format(relation.fileFormat)
       .options(relation.options)
       .load(appendedFiles: _*)
   }
 
   /**
-   * Create a logEntry with all data files, and index content merged with previous index content.
+   * Create a log entry with all data files, and index content merged with previous index content.
    * This contains ALL data files (files which were indexed previously, and files which are being
    * indexed in this operation). It also contains ALL index files (index files for previously
    * indexed data as well as newly created files).
@@ -106,9 +103,7 @@ class RefreshIncrementalAction(
     val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
     // Merge new index files with old index files.
-    val mergedContent = Content(
-      previousIndexLogEntry.content.root.merge(entry.content.root)
-    )
+    val mergedContent = Content(previousIndexLogEntry.content.root.merge(entry.content.root))
 
     // New entry.
     entry.copy(content = mergedContent)

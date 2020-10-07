@@ -118,7 +118,7 @@ case class RefreshDeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, mess
 
 /**
  * Index Refresh Event for appended source files. Emitted when refresh is called on an index
- * with config flag set to remove index entries for appended source data files.
+ * with config flag set to create index for appended source data files.
  *
  * @param appInfo AppInfo for spark application.
  * @param index Related index.

@@ -66,8 +66,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
           if (enableLineage) {
-            expectedSchema = expectedSchema.add(
-              StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
+            expectedSchema =
+              expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
           }
           val expected = new IndexSummary(
             indexConfig1.indexName,
@@ -252,19 +252,17 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Verify refresh-incremental (append-only) throws exception if no new files found.") {
-    withTempDir { testDir =>
-      val refreshTestLocation = testDir + "/refresh"
+    withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create sample data and index.
-        FileUtils.delete(new Path(refreshTestLocation))
         val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .limit(10)
           .write
-          .parquet(refreshTestLocation)
-        val df = spark.read.parquet(refreshTestLocation)
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
         hyperspace.createIndex(df, indexConfig)
         val ex = intercept[HyperspaceException] {
           hyperspace.refreshIndex(indexConfig.indexName)
@@ -275,19 +273,17 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Verify refresh-incremental (append-only) should index only newly appended data.") {
-    withTempDir { testDir =>
-      val refreshTestLocation = testDir + "/refresh"
+    withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create sample data and index.
-        FileUtils.delete(new Path(refreshTestLocation))
         val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .limit(10)
           .write
-          .parquet(refreshTestLocation)
-        val df = spark.read.parquet(refreshTestLocation)
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
         hyperspace.createIndex(df, indexConfig)
         var indexCount =
           spark.read
@@ -304,7 +300,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .limit(3)
           .write
           .mode("append")
-          .parquet(refreshTestLocation)
+          .parquet(testPath)
         hyperspace.refreshIndex(indexConfig.indexName)
         indexCount = spark.read
           .parquet(s"$systemPath/index" +
@@ -331,7 +327,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     assert(indexFiles.nonEmpty)
     assert(indexFiles.forall(_.getName.startsWith("part-0")))
     assert(indexLog.state.equals("ACTIVE"))
-    // Check all files belong to v__=0.
+    // Check all files belong to the provided index versions only.
     assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
   }
 
