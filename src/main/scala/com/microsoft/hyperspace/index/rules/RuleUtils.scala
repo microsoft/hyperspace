@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -123,6 +123,17 @@ object RuleUtils {
   }
 
   /**
+   * Check if an index was applied the given relation or not.
+   * This can be determined by an identifier in options field of HadoopFsRelation.
+   *
+   * @param relation HadoopFsRelation to check if an index is applied.
+   * @return true if the relation has index plan identifier. Otherwise false.
+   */
+  def isIndexApplied(relation: HadoopFsRelation): Boolean = {
+    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
+  }
+
+  /**
    * Transform the current plan to utilize the given index.
    *
    * The transformed plan reads the given index data rather than original source files.
@@ -186,7 +197,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map())(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -253,7 +264,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map())(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -322,7 +333,10 @@ object RuleUtils {
         val newRelation =
           fsRelation.copy(
             location = newLocation,
-            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))))(spark)
+            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
+            options =
+              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(
+            spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))

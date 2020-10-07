@@ -125,6 +125,22 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
     verifyTransformedPlanWithIndex(transformedPlan, indexName2)
   }
 
+  test("Verify FilterIndex rule is not applied for modified plan.") {
+    val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
+    val plan = Filter(filterCondition, scanNode)
+    // Verify index rule updates the plan.
+    assert(!FilterIndexRule(plan).equals(plan))
+
+    // Mark the relation that the rule is applied and verify the plan does not change.
+    val newPlan = plan transform {
+      case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
+        r.copy(
+          relation =
+            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
+    }
+    assert(FilterIndexRule(newPlan).equals(newPlan))
+  }
+
   private def verifyTransformedPlanWithIndex(
       logicalPlan: LogicalPlan,
       indexName: String): Unit = {

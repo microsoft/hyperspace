@@ -70,7 +70,7 @@ class IndexCollectionManager(
       val dataManager = indexDataManagerFactory.create(indexPath)
       if (mode.equals(REFRESH_MODE_INCREMENTAL)) {
         new RefreshDeleteAction(spark, logManager, dataManager).run()
-        new RefreshIncrementalAction(spark, logManager, dataManager).run()
+        new RefreshAppendAction(spark, logManager, dataManager).run()
       } else {
         new RefreshAction(spark, logManager, dataManager).run()
       }
