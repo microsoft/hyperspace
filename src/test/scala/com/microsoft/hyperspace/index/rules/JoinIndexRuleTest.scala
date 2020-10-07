@@ -399,7 +399,6 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
   }
 
   test("Join rule is not applied for modified plan.") {
-    // Copied from test("Join rule works if indexes exist and configs are set correctly")
     val joinCondition = EqualTo(t1c1, t2c1)
     val plan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
     assert(!JoinIndexRule(plan).equals(plan))

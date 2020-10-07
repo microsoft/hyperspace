@@ -126,7 +126,6 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify FilterIndex rule is not applied for modified plan.") {
-    // Copied from test("Verify FilterIndex rule is applied when all columns are selected.")
     val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
     val plan = Filter(filterCondition, scanNode)
     // Verify index rule updates the plan.
