@@ -34,12 +34,16 @@ import com.microsoft.hyperspace.util.HyperspaceConf
 object RuleUtils {
 
   /**
-   * Get active indexes for the given logical plan by matching signatures.
+   * Filter the given candidate indexes by matching signatures and index status.
+   * If Hybrid Scan is enabled, it compares the file metadata directly, and does not
+   * match signatures. By doing that, we could perform file-level comparison between
+   * index source files and the input files of the given plan. If there are some common
+   * files, the index is considered as a candidate.
    *
    * @param indexes List of available indexes.
    * @param plan Logical plan.
    * @param hybridScanEnabled Flag that checks if hybrid scan is enabled or disabled.
-   * @return Indexes built for this plan.
+   * @return Active indexes built for this plan.
    */
   def getCandidateIndexes(
       indexes: Seq[IndexLogEntry],
