@@ -105,6 +105,9 @@ class RefreshAppendAction(
     // Merge new index files with old index files.
     val mergedContent = Content(previousIndexLogEntry.content.root.merge(entry.content.root))
 
+    // TODO: update "appended" and "deleted" list in log entry.
+    //   https://github.com/microsoft/hyperspace/issues/183
+
     // New entry.
     entry.copy(content = mergedContent)
   }
