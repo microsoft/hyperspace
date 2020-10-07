@@ -21,7 +21,6 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_FULL
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
@@ -90,7 +89,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val originalIndexWithoutDeletedFile = originalIndexDF
             .filter(s"""${IndexConstants.DATA_FILE_NAME_COLUMN} != "$deletedFile"""")
 
-          hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_FULL)
+          hyperspace.refreshIndex(indexConfig.indexName)
 
           val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
             s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
@@ -124,9 +123,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test(
-    "Validate refresh index (to handle deletes from the source data) " +
-      "is a no-op if no source data file is deleted or appended.") {
+  test("Validate refresh index is a no-op if no source data file is deleted or appended.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -208,6 +205,49 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(
         ex.getMessage.contains("Index refresh (to handle deleted source data) aborted. " +
           "Existing source data file info is changed"))
+    }
+  }
+
+  test("Validate refresh index when some file gets deleted and some appended to source data.") {
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      withIndex(indexConfig.indexName) {
+        // Save test data non-partitioned.
+        SampleData.save(
+          spark,
+          nonPartitionedDataPath,
+          Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+        var df = spark.read.parquet(nonPartitionedDataPath)
+        hyperspace.createIndex(df, indexConfig)
+        val countOriginal = df.count()
+
+        // Delete one source data file.
+        deleteDataFile(nonPartitionedDataPath)
+        val countAfterDelete = spark.read.parquet(nonPartitionedDataPath).count()
+        assert(countAfterDelete < countOriginal)
+
+        // Add some new data to source.
+        import spark.implicits._
+        SampleData.testData
+          .take(3)
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .write
+          .mode("append")
+          .parquet(nonPartitionedDataPath)
+
+        val countAfterAppend = spark.read.parquet(nonPartitionedDataPath).count()
+        assert(countAfterDelete + 3 == countAfterAppend)
+
+        hyperspace.refreshIndex(indexConfig.indexName)
+
+        // Check if refreshed index is updated appropriately.
+        val indexDf = spark.read
+          .parquet(s"$systemPath/${indexConfig.indexName}/" +
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+          .union(spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=2"))
+
+        assert(indexDf.count() == countAfterAppend)
+      }
     }
   }
 
