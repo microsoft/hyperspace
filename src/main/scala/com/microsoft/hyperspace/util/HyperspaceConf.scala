@@ -38,4 +38,11 @@ object HyperspaceConf {
         IndexConstants.REFRESH_DELETE_ENABLED_DEFAULT)
       .toBoolean
   }
+
+  def refreshAppendEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(IndexConstants.REFRESH_APPEND_ENABLED,
+        IndexConstants.REFRESH_APPEND_ENABLED_DEFAULT)
+      .toBoolean
+  }
 }
