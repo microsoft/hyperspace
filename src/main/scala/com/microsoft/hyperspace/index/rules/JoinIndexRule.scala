@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index._
@@ -137,8 +137,8 @@ object JoinIndexRule
    * @return true if supported. False if not.
    */
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
-    isJoinConditionSupported(condition) && isPlanLinear(l) &&
-    isPlanLinear(r) && ensureAttributeRequirements(l, r, condition)
+    isJoinConditionSupported(condition) && isPlanLinear(l) && isPlanLinear(r) &&
+    !isPlanModified(l) && !isPlanModified(r) && ensureAttributeRequirements(l, r, condition)
   }
 
   /**
@@ -185,6 +185,21 @@ object JoinIndexRule
    */
   private def isPlanLinear(plan: LogicalPlan): Boolean =
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
+
+  /**
+   * Check if the candidate plan is already modified by Hyperspace or not.
+   * This can be determined by an identifier in options field of HadoopFsRelation.
+   *
+   * @param plan Logical plan.
+   * @return true if the relation in the plan is modified by Hyperspace.
+   */
+  private def isPlanModified(plan: LogicalPlan): Boolean = {
+    plan.find {
+      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+        RuleUtils.isIndexApplied(fsRelation)
+      case _ => false
+    }.isDefined
+  }
 
   /**
    * Requirements to support join optimizations using join indexes are as follows:
