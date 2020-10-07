@@ -18,9 +18,9 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.internal.Logging
 
+import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException, NoChangesDetected}
 import com.microsoft.hyperspace.index.{IndexLogManager, LogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, HyperspaceEventLogging}
-import com.microsoft.hyperspace.{ActiveSparkSession, HyperspaceException, NoChangesDetected}
 
 /**
  * This is a generic Index-Modifying Action interface. It provides APIs to begin and commit

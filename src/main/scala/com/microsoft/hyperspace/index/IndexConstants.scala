@@ -75,4 +75,5 @@ object IndexConstants {
   val REFRESH_APPEND_ENABLED_DEFAULT = "false"
 
   val REFRESH_MODE_INCREMENTAL = "incremental"
+  val REFRESH_MODE_FULL = "full"
 }

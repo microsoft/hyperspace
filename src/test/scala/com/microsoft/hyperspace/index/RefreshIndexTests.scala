@@ -21,7 +21,8 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_FULL
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
  * Unit E2E test cases for RefreshIndex.
@@ -89,7 +90,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val originalIndexWithoutDeletedFile = originalIndexDF
             .filter(s"""${IndexConstants.DATA_FILE_NAME_COLUMN} != "$deletedFile"""")
 
-          hyperspace.refreshIndex(indexConfig.indexName)
+          hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_FULL)
 
           val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
             s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
@@ -125,20 +126,22 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate refresh index (to handle deletes from the source data) " +
-      "is aborted if no source data file is deleted.") {
+      "is a no-op if no source data file is deleted or appended.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
       Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
 
-    withSQLConf(
-      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+      val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+      val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+      val latestId = logManager.getLatestId().get
 
-      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+      hyperspace.refreshIndex(indexConfig.indexName)
+      // Check that no new log files were created in this operation.
+      assert(latestId == logManager.getLatestId().get)
     }
   }
 

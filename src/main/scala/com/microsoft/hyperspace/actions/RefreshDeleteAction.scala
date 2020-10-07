@@ -56,14 +56,14 @@ class RefreshDeleteAction(
    */
   final override def validate(): Unit = {
     super.validate()
+    if (deletedFiles.isEmpty) {
+      throw NoChangesDetected("Refresh aborted as no deleted source data file found.")
+    }
+
     if (!previousIndexLogEntry.hasLineageColumn(spark)) {
       throw HyperspaceException(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
-    }
-
-    if (deletedFiles.isEmpty) {
-      throw NoChangesDetected("Refresh aborted as no deleted source data file found.")
     }
   }
 

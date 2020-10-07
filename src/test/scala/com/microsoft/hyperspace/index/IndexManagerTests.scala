@@ -26,6 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_FULL
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
@@ -225,7 +226,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .options(option)
           .format(format)
           .save(refreshTestLocation)
-        hyperspace.refreshIndex(indexConfig.indexName)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_FULL)
         val newIndexLocation = s"$systemPath/index_$format"
         indexCount = spark.read
           .parquet(newIndexLocation +
@@ -248,27 +249,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
-    }
-  }
-
-  test("Verify refresh-incremental (append-only) throws exception if no new files found.") {
-    withTempPathAsString { testPath =>
-      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
-        // Setup. Create sample data and index.
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
-        import spark.implicits._
-        SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .limit(10)
-          .write
-          .parquet(testPath)
-        val df = spark.read.parquet(testPath)
-        hyperspace.createIndex(df, indexConfig)
-        val ex = intercept[HyperspaceException] {
-          hyperspace.refreshIndex(indexConfig.indexName)
-        }
-        assert(ex.msg.equals("Refresh aborted as no appended source data files found."))
-      }
     }
   }
 
