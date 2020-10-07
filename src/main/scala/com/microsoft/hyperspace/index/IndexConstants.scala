@@ -27,8 +27,18 @@ object IndexConstants {
   val INDEX_SEARCH_PATHS = "spark.hyperspace.index.search.paths"
   val INDEX_NUM_BUCKETS = "spark.hyperspace.index.num.buckets"
 
+  // This config enables Hybrid scan on mutable dataset at query time.
+  // Currently, this config allows to perform Hybrid scan on append-only dataset.
+  // For delete dataset, "spark.hyperspace.index.hybridscan.delete.enabled" is
+  // also needed to be set.
   val INDEX_HYBRID_SCAN_ENABLED = "spark.hyperspace.index.hybridscan.enabled"
   val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = "false"
+
+  // This is a temporary config to support Hybrid scan on both append & delete dataset.
+  // The config does not work without the Hybrid scan config
+  // "spark.hyperspace.index.hybridscan.enabled"
+  // and will be removed after performance validation and optimization.
+  // See https://github.com/microsoft/hyperspace/issues/184
   val INDEX_HYBRID_SCAN_DELETE_ENABLED = "spark.hyperspace.index.hybridscan.delete.enabled"
   val INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT = "false"
 

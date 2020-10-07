@@ -74,15 +74,14 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      // Find the number of common files and deleted files between the source relations
-      // & index source files.
+      // Find the number of common files between the source relations & index source files.
       val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
-      val deletedCnt = entry.allSourceFileInfos.size - commonCnt
 
       if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
         commonCnt > 0
       } else {
-        // For append-only dataset.
+        // For append-only Hybrid Scan, deleted files are not allowed.
+        val deletedCnt = entry.allSourceFileInfos.size - commonCnt
         deletedCnt == 0 && commonCnt > 0
       }
     }
