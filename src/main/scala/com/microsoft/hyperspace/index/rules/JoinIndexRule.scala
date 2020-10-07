@@ -189,17 +189,17 @@ object JoinIndexRule
 
   /**
    * Check if the candidate plan is already modified by Hyperspace or not.
-   * This can be determined by a specific key in options of HadoopFsRelation.
+   * This can be determined by an identifier in options field of HadoopFsRelation.
    *
    * @param plan Logical plan.
    * @return true if the relation in the plan is modified by Hyperspace.
    */
   private def isPlanModified(plan: LogicalPlan): Boolean = {
-    plan.collect {
-      case LogicalRelation(HadoopFsRelation(_, _, _, _, _, options), _, _, _)
-          if (options.contains(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY)) =>
-        true
-    }.nonEmpty
+    plan.find {
+      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+        RuleUtils.isIndexApplied(fsRelation)
+      case _ => false
+    }.isDefined
   }
 
   /**

@@ -126,31 +126,20 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify FilterIndex rule is not applied for modified plan.") {
-    {
-      // copied from test("Verify FilterIndex rule is applied when all columns are selected.")
-      val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
-      val originalPlan = Filter(filterCondition, scanNode)
+    // Copied from test("Verify FilterIndex rule is applied when all columns are selected.")
+    val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
+    val plan = Filter(filterCondition, scanNode)
+    // Verify index rule updates the plan.
+    assert(!FilterIndexRule(plan).equals(plan))
 
-      val transformedPlan = FilterIndexRule(originalPlan)
-      assert(!transformedPlan.equals(originalPlan), "No plan ")
+    // Mark the relation that the rule is applied and verify the plan does not change.
+    val newPlan = plan transform {
+      case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
+        r.copy(
+          relation =
+            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
-
-    {
-      val originalLocation = new Path("baseTableLocation")
-      val tableLocation =
-        new InMemoryFileIndex(spark, Seq(originalLocation), Map.empty, Some(tableSchema), NoopCache)
-      val relation = baseRelation(
-        tableLocation,
-        tableSchema,
-        Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))
-      scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
-
-      val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
-      val originalPlan = Filter(filterCondition, scanNode)
-
-      val transformedPlan = FilterIndexRule(originalPlan)
-      assert(transformedPlan.equals(originalPlan))
-    }
+    assert(FilterIndexRule(newPlan).equals(newPlan))
   }
 
   private def verifyTransformedPlanWithIndex(

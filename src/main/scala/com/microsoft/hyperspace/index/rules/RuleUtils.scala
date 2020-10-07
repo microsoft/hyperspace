@@ -123,6 +123,18 @@ object RuleUtils {
   }
 
   /**
+   * Check if an index was applied the given relation or not.
+   * This can be determined by an identifier in options field of HadoopFsRelation.
+   *
+   * @param relation HadoopFsRelation to check if an index is applied.
+   * @return true if the relation has index plan identifier. Otherwise false.
+   */
+  def isIndexApplied(relation: HadoopFsRelation): Boolean = {
+    val identifier = relation.options.get(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY)
+    identifier.isDefined && identifier.get.equals("true")
+  }
+
+  /**
    * Transform the current plan to utilize the given index.
    *
    * The transformed plan reads the given index data rather than original source files.
@@ -186,7 +198,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -253,7 +265,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -323,8 +335,9 @@ object RuleUtils {
           fsRelation.copy(
             location = newLocation,
             dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
-            options = fsRelation.options ++ Map(
-              IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))(spark)
+            options =
+              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(
+            spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))

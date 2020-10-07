@@ -30,7 +30,9 @@ object IndexConstants {
   val INDEX_HYBRID_SCAN_ENABLED = "spark.hyperspace.index.hybridscan.enabled"
   val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = "false"
 
-  var INDEX_RELATION_IDENTIFIER_KEY: String = "indexRelation"
+  // Identifier injected to HadoopFsRelation as an option if an index is applied.
+  val INDEX_RELATION_IDENTIFIER_KEY: String = "indexRelation"
+  val INDEX_RELATION_IDENTIFIER: (String, String) = ("indexRelation" -> "true")
 
   // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
   val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get

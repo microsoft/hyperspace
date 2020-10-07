@@ -399,32 +399,19 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
   }
 
   test("Join rule is not applied for modified plan.") {
-    {
-      // copied from test("Join rule works if indexes exist and configs are set correctly")
-      val joinCondition = EqualTo(t1c1, t2c1)
-      val originalPlan =
-        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-      val updatedPlan = JoinIndexRule(originalPlan)
-      assert(!updatedPlan.equals(originalPlan))
-    }
+    // Copied from test("Join rule works if indexes exist and configs are set correctly")
+    val joinCondition = EqualTo(t1c1, t2c1)
+    val plan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    assert(!JoinIndexRule(plan).equals(plan))
 
-    {
-      val t1Location =
-        new InMemoryFileIndex(spark, Seq(new Path("t1")), Map.empty, Some(t1Schema), NoopCache)
-      t1Relation = baseRelation(
-        t1Location,
-        t1Schema,
-        Map(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY -> "true"))
-      t1ScanNode = LogicalRelation(t1Relation, Seq(t1c1, t1c2, t1c3, t1c4), None, false)
-      t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
-      t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
-
-      val joinCondition = EqualTo(t1c1, t2c1)
-      val originalPlan =
-        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-      val updatedPlan = JoinIndexRule(originalPlan)
-      assert(updatedPlan.equals(originalPlan))
+    // Mark the relation that the rule is applied and verify the plan does not change.
+    val newPlan = plan transform {
+      case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
+        r.copy(
+          relation =
+            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
+    assert(JoinIndexRule(newPlan).equals(newPlan))
   }
 
   private def verifyUpdatedIndex(
