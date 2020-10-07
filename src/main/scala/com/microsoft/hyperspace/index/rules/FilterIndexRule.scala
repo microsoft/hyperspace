@@ -173,11 +173,8 @@ object ExtractFilterNode {
           _,
           filter @ Filter(
             condition: Expression,
-            logicalRelation @ LogicalRelation(
-              fsRelation @ HadoopFsRelation(_, _, _, _, _, _),
-              _,
-              _,
-              _))) =>
+            logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)))
+        if !RuleUtils.isIndexApplied(fsRelation) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
@@ -189,11 +186,8 @@ object ExtractFilterNode {
 
     case filter @ Filter(
           condition: Expression,
-          logicalRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(_, _, _, _, _, _),
-            _,
-            _,
-            _)) =>
+          logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))
+        if !RuleUtils.isIndexApplied(fsRelation) =>
       val relationColumnsName = logicalRelation.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
