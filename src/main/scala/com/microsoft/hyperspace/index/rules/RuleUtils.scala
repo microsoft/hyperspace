@@ -130,8 +130,7 @@ object RuleUtils {
    * @return true if the relation has index plan identifier. Otherwise false.
    */
   def isIndexApplied(relation: HadoopFsRelation): Boolean = {
-    val identifier = relation.options.get(IndexConstants.INDEX_RELATION_IDENTIFIER_KEY)
-    identifier.isDefined && identifier.get.equals("true")
+    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
 
   /**
