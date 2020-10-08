@@ -22,7 +22,7 @@ package com.microsoft.hyperspace.actions
  * For example, if the data source has not changed since the last time an index was created on it,
  * we don't need to do anything when user calls a `refreshIndex()`.
  *
- * Hyperspace actions silently catch this exception and do not fail the application.
+ * [[Action.run]] will silently catch this exception and will not fail the application.
  *
  * @param msg Error message.
  */

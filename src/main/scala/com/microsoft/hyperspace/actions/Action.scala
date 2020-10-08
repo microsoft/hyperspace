@@ -95,10 +95,10 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
       logEvent(event(appInfo, message = "Operation succeeded."))
     } catch {
       case e: NoChangesException =>
-        logEvent(event(appInfo, message = s"No-op operation recorded: ${e.getMessage}."))
+        logEvent(event(appInfo, message = s"No-op operation recorded: ${e.getMessage}"))
         logWarning(e.msg)
       case e: Exception =>
-        logEvent(event(appInfo, message = s"Operation failed: ${e.getMessage}."))
+        logEvent(event(appInfo, message = s"Operation failed: ${e.getMessage}"))
         throw e
     }
   }
