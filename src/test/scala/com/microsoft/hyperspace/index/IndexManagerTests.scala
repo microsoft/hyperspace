@@ -40,6 +40,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    spark.conf.set(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
 
     FileUtils.delete(new Path(sampleParquetDataLocation))
     SampleData.save(
@@ -255,9 +256,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify refresh-incremental (append-only) is a no-op if no new files found.") {
     withTempPathAsString { testPath =>
-      withSQLConf(
-        IndexConstants.REFRESH_APPEND_ENABLED -> "true",
-        HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.MockEventLogger") {
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create sample data and index.
         val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
