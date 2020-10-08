@@ -417,15 +417,14 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
 
   test("Join rule is not applied for modified plan.") {
     val joinCondition = EqualTo(t1c1, t2c1)
-    val plan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+    val plan =
+      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition), JoinHint.NONE)
     assert(!JoinIndexRule(plan).equals(plan))
 
     // Mark the relation that the rule is applied and verify the plan does not change.
     val newPlan = plan transform {
       case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
-        r.copy(
-          relation =
-            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
+        r.copy(relation = h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
     assert(JoinIndexRule(newPlan).equals(newPlan))
   }

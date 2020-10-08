@@ -90,20 +90,6 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
     }
   }
 
-  /**
-   * Creates a temporary directory, which is then passed to `f` and will be deleted after `f`
-   * returns. This is copied from SparkFunSuite.scala in Spark 3.0.
-   *
-   * TODO: This can be removed when we support Spark 3.0.
-   */
-  protected def withTempDir(f: File => Unit): Unit = {
-    val dir = Utils.createTempDir()
-    try f(dir)
-    finally {
-      Utils.deleteRecursively(dir)
-    }
-  }
-
   protected def withTempPathAsString(f: String => Unit): Unit = {
     // The following is from SQLHelper.withTempPath with a modification to pass
     // String instead of File to "f". The reason this is copied instead of extending
