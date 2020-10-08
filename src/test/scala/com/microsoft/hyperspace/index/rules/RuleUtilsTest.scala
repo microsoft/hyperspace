@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, P
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -87,14 +88,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
   test("Verify indexes are matched by signature correctly.") {
     val indexManager = IndexCollectionManager(spark)
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t1ProjectNode).length === 3)
-    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t2ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2ProjectNode).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
+    val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(spark, indexManager, t1ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1ProjectNode).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -124,6 +127,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
           indexManager.create(readDf, IndexConfig("index1", Seq("id")))
         }
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
         def verify(
             plan: LogicalPlan,
@@ -135,7 +139,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             "spark.hyperspace.index.hybridscan.delete.enabled" ->
               hybridScanDeleteEnabled.toString) {
             val indexes = RuleUtils
-              .getCandidateIndexes(spark, indexManager, plan)
+              .getCandidateIndexes(spark, allIndexes, plan)
             if (expectCandidateIndex) {
               assert(indexes.length == 1)
               assert(indexes.head.name == "index1")

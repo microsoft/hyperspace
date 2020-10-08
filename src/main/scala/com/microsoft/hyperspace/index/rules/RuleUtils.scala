@@ -27,24 +27,27 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
 
   /**
-   * Get active indexes for the given logical plan by matching signatures.
+   * Filter the given candidate indexes by matching signatures and index status.
+   * If Hybrid Scan is enabled, it compares the file metadata directly, and does not
+   * match signatures. By doing that, we could perform file-level comparison between
+   * index source files and the input files of the given plan. If there are some common
+   * files, the index is considered as a candidate.
    *
    * @param spark Spark Session.
-   * @param indexManager IndexManager.
+   * @param indexes List of available indexes.
    * @param plan Logical plan.
-   * @return Indexes built for this plan.
+   * @return Active indexes built for this plan.
    */
   def getCandidateIndexes(
       spark: SparkSession,
-      indexManager: IndexManager,
+      indexes: Seq[IndexLogEntry],
       plan: LogicalPlan): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
@@ -86,11 +89,6 @@ object RuleUtils {
       }
     }
 
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    //  See https://github.com/microsoft/hyperspace/issues/65
-    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-
     if (hybridScanEnabled) {
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
@@ -106,10 +104,10 @@ object RuleUtils {
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
       assert(filesByRelations.length == 1)
-      allIndexes.filter(index =>
+      indexes.filter(index =>
         index.created && isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
-      allIndexes.filter(index => index.created && signatureValid(index))
+      indexes.filter(index => index.created && signatureValid(index))
     }
   }
 
@@ -382,8 +380,7 @@ object RuleUtils {
             location = newLocation,
             dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
             options =
-              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(
-            spark)
+              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))

@@ -27,6 +27,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
@@ -57,7 +58,7 @@ object JoinIndexRule
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
     case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
       try {
-        getUsableIndexPair(l, r, condition)
+        getBestIndexPair(l, r, condition)
           .map {
             case (lIndex, rIndex) =>
               val updatedPlan =
@@ -90,45 +91,6 @@ object JoinIndexRule
   }
 
   /**
-   * Get a usable index pair for left and right subplans. The first element of the pair is for
-   * left subplan, and the second is for the right subplan.
-   *
-   * Pre-requisites:
-   * 1. the plan is supported for join index optimizations
-   *
-   * @param left left subplan
-   * @param right right subplan
-   * @param condition join condition
-   * @return IndexLogEntry pair where the first element represents index for left subplan.
-   *         Second for right.
-   */
-  private def getUsableIndexPair(
-      left: LogicalPlan,
-      right: LogicalPlan,
-      condition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
-    val lIndexes =
-      RuleUtils
-        .getLogicalRelation(left)
-        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
-    if (lIndexes.isEmpty || lIndexes.get.isEmpty) {
-      return None
-    }
-
-    val rIndexes =
-      RuleUtils
-        .getLogicalRelation(right)
-        .map(RuleUtils.getCandidateIndexes(spark, indexManager, _))
-    if (rIndexes.isEmpty || rIndexes.get.isEmpty) {
-      return None
-    }
-
-    getBestIndexPair(left, right, condition, lIndexes.get, rIndexes.get)
-  }
-
-  /**
    * Checks whether this join rule is applicable for the current node
    *
    * @param l left logical plan
@@ -137,8 +99,10 @@ object JoinIndexRule
    * @return true if supported. False if not.
    */
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
-    isJoinConditionSupported(condition) && isPlanLinear(l) && isPlanLinear(r) &&
-    !isPlanModified(l) && !isPlanModified(r) && ensureAttributeRequirements(l, r, condition)
+    isJoinConditionSupported(condition) &&
+    RuleUtils.getLogicalRelation(l).isDefined && RuleUtils.getLogicalRelation(r).isDefined &&
+    isPlanLinear(l) && isPlanLinear(r) && !isPlanModified(l) && !isPlanModified(r) &&
+    ensureAttributeRequirements(l, r, condition)
   }
 
   /**
@@ -310,19 +274,24 @@ object JoinIndexRule
   /**
    * Get best ranked index pair from available indexes of both sides.
    *
-   * @param left left subplan
-   * @param right right subplan
-   * @param joinCondition join condition
-   * @param lIndexes ALl available indexes on left subplan
-   * @param rIndexes All available indexes on right subplan
+   * @param left Left subplan.
+   * @param right Right subplan.
+   * @param joinCondition Join condition.
    * @return The best index pair, where the first element is for left subplan, second for right.
    */
   private def getBestIndexPair(
       left: LogicalPlan,
       right: LogicalPlan,
-      joinCondition: Expression,
-      lIndexes: Seq[IndexLogEntry],
-      rIndexes: Seq[IndexLogEntry]): Option[(IndexLogEntry, IndexLogEntry)] = {
+      joinCondition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
+    val indexManager = Hyperspace
+      .getContext(spark)
+      .indexCollectionManager
+
+    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
+    //  the code to support indexes in transitioning states as well.
+    //  See https://github.com/microsoft/hyperspace/issues/65
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+
     val lBaseAttrs = relationOutputs(left).map(_.name)
     val rBaseAttrs = relationOutputs(right).map(_.name)
 
@@ -340,9 +309,22 @@ object JoinIndexRule
     require(resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined)
     require(resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined)
 
-    val lUsable = getUsableIndexes(lIndexes, lRequiredIndexedCols, lRequiredAllCols)
-    val rUsable = getUsableIndexes(rIndexes, rRequiredIndexedCols, rRequiredAllCols)
-    val compatibleIndexPairs = getCompatibleIndexPairs(lUsable, rUsable, lRMap)
+    val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
+    val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
+
+    // Get candidate via file-level metadata validation. This is performed after pruning
+    // by column schema, as this might be expensive when there are numerous files in the
+    // relation or many indexes to be checked.
+    val lIndexes = RuleUtils.getCandidateIndexes(
+      spark,
+      lUsable,
+      RuleUtils.getLogicalRelation(left).get)
+    val rIndexes = RuleUtils.getCandidateIndexes(
+      spark,
+      rUsable,
+      RuleUtils.getLogicalRelation(right).get)
+
+    val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
     compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
   }
