@@ -397,6 +397,54 @@ case class IndexLogEntry(
     relations.head.data.properties.appendedFiles
   }
 
+  def withAdditionalAppendedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    appendedFiles = relations.head.data.properties.appendedFiles ++ files))))))))
+  }
+
+  def withAdditionalDeletedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+    source = source.copy(
+      plan = source.plan.copy(
+        properties = source.plan.properties.copy(
+          relations = Seq(
+            relations.head.copy(
+              data = relations.head.data.copy(
+                properties = relations.head.data.properties.copy(
+                  deletedFiles = relations.head.data.properties.deletedFiles ++ files))))))))
+  }
+
+  def withNewAppendedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    appendedFiles = files))))))))
+  }
+
+  def withNewDeletedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    deletedFiles = files))))))))
+  }
+
   def bucketSpec: BucketSpec =
     BucketSpec(
       numBuckets = numBuckets,

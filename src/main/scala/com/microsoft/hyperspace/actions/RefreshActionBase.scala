@@ -16,7 +16,9 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -75,5 +77,57 @@ private[actions] abstract class RefreshActionBase(
         s"Refresh is only supported in $ACTIVE state. " +
           s"Current index state is ${previousIndexLogEntry.state}")
     }
+  }
+
+  /**
+   * Compare list of source data files from previous IndexLogEntry to list
+   * of current source data files, validate fileInfo for existing files and
+   * identify deleted source data files.
+   */
+  protected lazy val deletedFiles: Seq[String] = {
+    val rels = previousIndexLogEntry.relations
+    val originalFiles = rels.head.data.properties.content.fileInfos
+    val currentFiles = rels.head.rootPaths
+      .flatMap { p =>
+        Content
+          .fromDirectory(path = new Path(p), throwIfNotExists = true)
+          .fileInfos
+      }
+      .map(f => f.name -> f)
+      .toMap
+
+    var delFiles = Seq[String]()
+    originalFiles.foreach { f =>
+      currentFiles.get(f.name) match {
+        case Some(v) =>
+          if (!f.equals(v)) {
+            throw HyperspaceException(
+              "Index refresh (to handle deleted source data) aborted. " +
+                s"Existing source data file info is changed (file: ${f.name}).")
+          }
+        case None => delFiles :+= f.name
+      }
+    }
+
+    delFiles ++ previousIndexLogEntry.deletedFiles
+  }
+
+  protected lazy val appendedFiles = {
+    val relation = previousIndexLogEntry.relations.head
+
+    // TODO: improve this to take last modified time of files into account.
+    //   https://github.com/microsoft/hyperspace/issues/182
+    val originalFiles = relation.data.properties.content.files.map(_.toString)
+
+    val allFiles = df.queryExecution.optimizedPlan.collect {
+      case LogicalRelation(
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
+        location.allFiles().map(_.getPath.toString)
+    }.flatten
+
+    allFiles.diff(originalFiles) ++ previousIndexLogEntry.appendedFiles
   }
 }

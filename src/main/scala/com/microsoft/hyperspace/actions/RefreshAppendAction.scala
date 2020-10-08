@@ -17,7 +17,6 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
 import com.microsoft.hyperspace.NoChangesDetected
 import com.microsoft.hyperspace.index._
@@ -61,25 +60,6 @@ class RefreshAppendAction(
     }
   }
 
-  private lazy val appendedFiles = {
-    val relation = previousIndexLogEntry.relations.head
-
-    // TODO: improve this to take last modified time of files into account.
-    //   https://github.com/microsoft/hyperspace/issues/182
-    val indexedFiles = relation.data.properties.content.files.map(_.toString)
-
-    val allFiles = df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        location.allFiles().map(_.getPath.toString)
-    }.flatten
-
-    allFiles.diff(indexedFiles)
-  }
-
   private lazy val dfWithAppendedFiles = {
     val relation = previousIndexLogEntry.relations.head
     // Create a df with only diff files from original list of files.
@@ -109,7 +89,10 @@ class RefreshAppendAction(
     //   https://github.com/microsoft/hyperspace/issues/183
 
     // New entry.
-    entry.copy(content = mergedContent)
+    entry
+      .copy(content = mergedContent)
+      .withNewDeletedFiles(deletedFiles)
+      .withAdditionalAppendedFiles(Seq())
   }
 
   override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
