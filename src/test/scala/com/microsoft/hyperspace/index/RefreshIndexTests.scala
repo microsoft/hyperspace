@@ -20,7 +20,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.telemetry.{CreateActionEvent, RefreshDeleteActionEvent}
+import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
@@ -134,7 +136,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+      IndexConstants.REFRESH_DELETE_ENABLED -> "true",
+      HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.index.MockEventLogger") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
@@ -144,6 +147,16 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       hyperspace.refreshIndex(indexConfig.indexName)
       // Check that no new log files were created in this operation.
       assert(latestId == logManager.getLatestId().get)
+
+      // Check emitted events.
+      MockEventLogger.emittedEvents match {
+        case Seq(
+            _: CreateActionEvent,
+            _: CreateActionEvent,
+            _: RefreshDeleteActionEvent,
+            _: RefreshDeleteActionEvent) => // pass
+        case _ => fail()
+      }
     }
   }
 

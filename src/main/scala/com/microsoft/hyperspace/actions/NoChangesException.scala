@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace
+package com.microsoft.hyperspace.actions
 
-case class HyperspaceException(msg: String) extends Exception(msg)
+private[actions] case class NoChangesException(msg: String) extends Exception(msg)

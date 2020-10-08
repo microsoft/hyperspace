@@ -19,6 +19,7 @@ package com.microsoft.hyperspace
 import org.apache.hadoop.fs.Path
 
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
 
 object TestUtils {
   def copyWithState(index: IndexLogEntry, state: String): IndexLogEntry = {
@@ -44,4 +45,20 @@ object TestUtils {
       path.getName +: splitPath(path.getParent)
     }
   }
+}
+
+/**
+ * This class can be used to test emitted events from Hyperspace actions.
+ */
+private[index] class MockEventLogger extends EventLogger {
+  import com.microsoft.hyperspace.MockEventLogger.emittedEvents
+  // Reset events for `this` action.
+  emittedEvents = Seq()
+
+  override def logEvent(event: HyperspaceEvent): Unit = {
+    emittedEvents :+= event
+  }
+}
+private[index] object MockEventLogger {
+  var emittedEvents: Seq[HyperspaceEvent] = Seq()
 }
