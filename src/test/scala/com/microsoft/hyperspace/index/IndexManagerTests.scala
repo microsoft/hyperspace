@@ -251,7 +251,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Verify refresh-incremental (append-only) throws exception if no new files found.") {
+  test("Verify refresh-incremental (append-only) is a no-op if no new files found.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create sample data and index.
