@@ -50,7 +50,7 @@ object TestUtils {
 /**
  * This class can be used to test emitted events from Hyperspace actions.
  */
-private[index] class MockEventLogger extends EventLogger {
+class MockEventLogger extends EventLogger {
   import com.microsoft.hyperspace.MockEventLogger.emittedEvents
   // Reset events for `this` action.
   emittedEvents = Seq()
@@ -59,6 +59,7 @@ private[index] class MockEventLogger extends EventLogger {
     emittedEvents :+= event
   }
 }
-private[index] object MockEventLogger {
+
+object MockEventLogger {
   var emittedEvents: Seq[HyperspaceEvent] = Seq()
 }
