@@ -18,6 +18,7 @@ package com.microsoft.hyperspace
 
 import org.apache.hadoop.fs.Path
 
+import com.microsoft.hyperspace.MockEventLogger.reset
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
 
@@ -53,7 +54,7 @@ object TestUtils {
 class MockEventLogger extends EventLogger {
   import com.microsoft.hyperspace.MockEventLogger.emittedEvents
   // Reset events for `this` action.
-  emittedEvents = Seq()
+  reset()
 
   override def logEvent(event: HyperspaceEvent): Unit = {
     emittedEvents :+= event
@@ -61,5 +62,8 @@ class MockEventLogger extends EventLogger {
 }
 
 object MockEventLogger {
+  def reset(): Unit = {
+    emittedEvents = Seq()
+  }
   var emittedEvents: Seq[HyperspaceEvent] = Seq()
 }

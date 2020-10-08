@@ -26,8 +26,8 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.telemetry.{CreateActionEvent, RefreshAppendActionEvent}
 import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
+import com.microsoft.hyperspace.telemetry.RefreshAppendActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
@@ -257,7 +257,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     withTempPathAsString { testPath =>
       withSQLConf(
         IndexConstants.REFRESH_APPEND_ENABLED -> "true",
-        HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.index.MockEventLogger") {
+        HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.MockEventLogger") {
         // Setup. Create sample data and index.
         val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
@@ -272,6 +272,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         val logManager = IndexLogManagerFactoryImpl.create(indexPath)
         val latestId = logManager.getLatestId().get
 
+        MockEventLogger.reset()
         hyperspace.refreshIndex(indexConfig.indexName)
         // Check that no new log files were created in this operation.
         assert(latestId == logManager.getLatestId().get)
@@ -279,10 +280,10 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         // Check emitted events.
         MockEventLogger.emittedEvents match {
           case Seq(
-              _: CreateActionEvent,
-              _: CreateActionEvent,
-              _: RefreshAppendActionEvent,
-              _: RefreshAppendActionEvent) => // pass
+              RefreshAppendActionEvent(_, _, "Operation started."),
+              RefreshAppendActionEvent(_, _, msg))
+              if msg.equals("No-op operation recorded: Refresh append aborted as" +
+                " no appended source data files found.") => // pass
           case _ => fail()
         }
       }
