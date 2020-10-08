@@ -38,7 +38,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
+    spark.conf.set(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
@@ -136,8 +136,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_DELETE_ENABLED -> "true",
-      HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.MockEventLogger") {
+      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
