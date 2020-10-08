@@ -88,4 +88,9 @@ class RefreshDeleteAction(
       previousIndexLogEntry.numBuckets,
       indexConfig.indexedColumns)
   }
+
+  override def logEntry: LogEntry = {
+    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    entry.withNewDeletedFiles(Seq()).withAdditionalAppendedFiles(appendedFiles)
+  }
 }

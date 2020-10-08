@@ -379,6 +379,62 @@ case class IndexLogEntry(
       .toSet
   }
 
+  def deletedFiles: Seq[String] = {
+    relations.head.data.properties.deleted
+  }
+
+  def appendedFiles: Seq[String] = {
+    relations.head.data.properties.appended
+  }
+
+  def withAdditionalAppendedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    appended = relations.head.data.properties.appended ++ files))))))))
+  }
+
+  def withAdditionalDeletedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+    source = source.copy(
+      plan = source.plan.copy(
+        properties = source.plan.properties.copy(
+          relations = Seq(
+            relations.head.copy(
+              data = relations.head.data.copy(
+                properties = relations.head.data.properties.copy(
+                  deleted = relations.head.data.properties.deleted ++ files))))))))
+  }
+
+  def withNewAppendedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    appended = files))))))))
+  }
+
+  def withNewDeletedFiles(files: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    deleted = files))))))))
+  }
+
   def bucketSpec: BucketSpec =
     BucketSpec(
       numBuckets = numBuckets,
