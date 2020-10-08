@@ -125,7 +125,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate refresh index (to handle deletes from the source data) " +
-      "is aborted if no source data file is deleted.") {
+      "is a no-op if no source data file is deleted.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
