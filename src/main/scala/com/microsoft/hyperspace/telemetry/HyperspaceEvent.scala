@@ -117,6 +117,17 @@ case class RefreshDeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, mess
     extends HyperspaceIndexCRUDEvent
 
 /**
+ * Index Refresh Event for appended source files. Emitted when refresh is called on an index
+ * with config flag set to create index for appended source data files.
+ *
+ * @param appInfo AppInfo for spark application.
+ * @param index Related index.
+ * @param message Message about event.
+ */
+case class RefreshAppendActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+  extends HyperspaceIndexCRUDEvent
+
+/**
  * Index usage event. This event is emitted when an index is picked instead of original data
  * source by one of the hyperspace rules.
  *

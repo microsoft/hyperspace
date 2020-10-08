@@ -27,23 +27,26 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexLogEntry, IndexManager, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
 
   /**
-   * Get active indexes for the given logical plan by matching signatures.
+   * Filter the given candidate indexes by matching signatures and index status.
+   * If Hybrid Scan is enabled, it compares the file metadata directly, and does not
+   * match signatures. By doing that, we could perform file-level comparison between
+   * index source files and the input files of the given plan. If there are some common
+   * files, the index is considered as a candidate.
    *
-   * @param indexManager IndexManager.
+   * @param indexes List of available indexes.
    * @param plan Logical plan.
    * @param hybridScanEnabled Flag that checks if hybrid scan is enabled or disabled.
-   * @return Indexes built for this plan.
+   * @return Active indexes built for this plan.
    */
   def getCandidateIndexes(
-      indexManager: IndexManager,
+      indexes: Seq[IndexLogEntry],
       plan: LogicalPlan,
       hybridScanEnabled: Boolean): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
@@ -80,11 +83,6 @@ object RuleUtils {
       deletedCnt == 0 && commonCnt > 0
     }
 
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    //  See https://github.com/microsoft/hyperspace/issues/65
-    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-
     if (hybridScanEnabled) {
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
@@ -100,10 +98,10 @@ object RuleUtils {
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
       assert(filesByRelations.length == 1)
-      allIndexes.filter(index =>
+      indexes.filter(index =>
         index.created && isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
-      allIndexes.filter(index => index.created && signatureValid(index))
+      indexes.filter(index => index.created && signatureValid(index))
     }
   }
 
@@ -120,6 +118,17 @@ object RuleUtils {
     } else {
       None // logicalPlan is non-linear or it has no LogicalRelation.
     }
+  }
+
+  /**
+   * Check if an index was applied the given relation or not.
+   * This can be determined by an identifier in options field of HadoopFsRelation.
+   *
+   * @param relation HadoopFsRelation to check if an index is applied.
+   * @return true if the relation has index plan identifier. Otherwise false.
+   */
+  def isIndexApplied(relation: HadoopFsRelation): Boolean = {
+    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
 
   /**
@@ -186,7 +195,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map())(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -253,7 +262,7 @@ object RuleUtils {
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map())(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -322,7 +331,10 @@ object RuleUtils {
         val newRelation =
           fsRelation.copy(
             location = newLocation,
-            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))))(spark)
+            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
+            options =
+              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(
+            spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))
