@@ -264,10 +264,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .parquet(testPath)
         val df = spark.read.parquet(testPath)
         hyperspace.createIndex(df, indexConfig)
-        val ex = intercept[HyperspaceException] {
-          hyperspace.refreshIndex(indexConfig.indexName)
-        }
-        assert(ex.msg.equals("Refresh aborted as no appended source data files found."))
+        val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+        val latestId = logManager.getLatestId().get
+
+        hyperspace.refreshIndex(indexConfig.indexName)
+        // Check that no new log files were created in this operation.
+        assert(latestId == logManager.getLatestId().get)
       }
     }
   }

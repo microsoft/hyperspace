@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
  * Unit E2E test cases for RefreshIndex.
@@ -137,8 +137,13 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+      val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+      val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+      val latestId = logManager.getLatestId().get
+
+      hyperspace.refreshIndex(indexConfig.indexName)
+      // Check that no new log files were created in this operation.
+      assert(latestId == logManager.getLatestId().get)
     }
   }
 

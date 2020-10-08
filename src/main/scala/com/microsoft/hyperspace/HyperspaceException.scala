@@ -17,3 +17,5 @@
 package com.microsoft.hyperspace
 
 case class HyperspaceException(msg: String) extends Exception(msg)
+
+case class NoChangesDetected(msg: String) extends Exception(msg)
