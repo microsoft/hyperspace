@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
@@ -102,10 +103,13 @@ object FilterIndexRule
         val indexManager = Hyperspace
           .getContext(spark)
           .indexCollectionManager
-        val candidateIndexes =
-          RuleUtils.getCandidateIndexes(indexManager, r, HyperspaceConf.hybridScanEnabled(spark))
 
-        candidateIndexes.filter { index =>
+        // TODO: the following check only considers indexes in ACTIVE state for usage. Update
+        //  the code to support indexes in transitioning states as well.
+        //  See https://github.com/microsoft/hyperspace/issues/65
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+
+        val candidateIndexes = allIndexes.filter { index =>
           indexCoversPlan(
             outputColumns,
             filterColumns,
@@ -113,6 +117,11 @@ object FilterIndexRule
             index.includedColumns,
             fsRelation.fileFormat)
         }
+
+        // Get candidate via file-level metadata validation. This is performed after pruning
+        // by column schema, as this might be expensive when there are numerous files in the
+        // relation or many indexes to be checked.
+        RuleUtils.getCandidateIndexes(candidateIndexes, r, HyperspaceConf.hybridScanEnabled(spark))
 
       case None => Nil // There is zero or more than one LogicalRelation nodes in Filter's subplan
     }
