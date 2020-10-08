@@ -99,8 +99,10 @@ object JoinIndexRule
    * @return true if supported. False if not.
    */
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
-    isJoinConditionSupported(condition) && isPlanLinear(l) && isPlanLinear(r) &&
-    !isPlanModified(l) && !isPlanModified(r) && ensureAttributeRequirements(l, r, condition)
+    isJoinConditionSupported(condition) &&
+    RuleUtils.getLogicalRelation(l).isDefined && RuleUtils.getLogicalRelation(r).isDefined &&
+    isPlanLinear(l) && isPlanLinear(r) && !isPlanModified(l) && !isPlanModified(r) &&
+    ensureAttributeRequirements(l, r, condition)
   }
 
   /**
