@@ -346,7 +346,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Delete-only: filter index & parquet format, " +
-      "Hybrid Scan for delete support doesn't work without linage column") {
+      "Hybrid Scan for delete support doesn't work without lineage column") {
     val df = spark.read.parquet(sampleParquetDataLocationDelete2)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
@@ -399,7 +399,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             case Filter(
                 Not(In(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-              // Check new filter condition on linage column.
+              // Check new filter condition on lineage column.
               assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
               val deleted = deletedFileNames.map(_.toString)
               assert(deleted.length == 2)
@@ -458,7 +458,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           case Filter(
               Not(In(attr, deletedFileNames)),
               LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-            // Check new filter condition on linage column.
+            // Check new filter condition on lineage column.
             assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
             val deleted = deletedFileNames.map(_.toString)
             assert(deleted.length == 2)
@@ -519,7 +519,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         case p @ Filter(
               Not(In(attr, deletedFileNames)),
               LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-          // Check new filter condition on linage column.
+          // Check new filter condition on lineage column.
           assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
           val deleted = deletedFileNames.map(_.toString)
           assert(deleted.length == 1)
@@ -610,7 +610,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           case p @ Filter(
                 Not(In(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-            // Check new filter condition on linage column.
+            // Check new filter condition on lineage column.
             assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
             assert(deletedFileNames.length == 1 || deletedFileNames.length == 2)
             val deleted = deletedFileNames.map(_.toString)
