@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, P
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -87,14 +88,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
   test("Verify indexes are matched by signature correctly.") {
     val indexManager = IndexCollectionManager(spark)
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, false).length === 3)
-    assert(RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(allIndexes, t1ProjectNode, false).length === 3)
+    assert(RuleUtils.getCandidateIndexes(allIndexes, t2ProjectNode, false).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
+    val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(allIndexes2, t1ProjectNode, false).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -122,13 +125,14 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         val readDf = spark.read.parquet(dataPath)
         val indexFile = readDf.inputFiles.head
         indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
         def verify(
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
             expectCandidateIndex: Boolean): Unit = {
           val indexes = RuleUtils
-            .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
+            .getCandidateIndexes(allIndexes, plan, hybridScanEnabled)
           if (expectCandidateIndex) {
             assert(indexes.length == 1)
             assert(indexes.head.name == "index1")
