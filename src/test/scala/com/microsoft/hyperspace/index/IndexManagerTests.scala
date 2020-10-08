@@ -257,7 +257,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     withTempPathAsString { testPath =>
       withSQLConf(
         IndexConstants.REFRESH_APPEND_ENABLED -> "true",
-        HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.index.MockEventLogger") {
+        HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.MockEventLogger") {
         // Setup. Create sample data and index.
         val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._

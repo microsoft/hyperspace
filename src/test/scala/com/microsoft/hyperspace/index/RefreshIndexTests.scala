@@ -137,7 +137,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
       IndexConstants.REFRESH_DELETE_ENABLED -> "true",
-      HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.index.MockEventLogger") {
+      HYPERSPACE_EVENT_LOGGER_CLASS_KEY -> "com.microsoft.hyperspace.MockEventLogger") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
