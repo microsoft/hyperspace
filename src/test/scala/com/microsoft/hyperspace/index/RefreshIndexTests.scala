@@ -216,7 +216,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           spark,
           nonPartitionedDataPath,
           Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-        var df = spark.read.parquet(nonPartitionedDataPath)
+        val df = spark.read.parquet(nonPartitionedDataPath)
         hyperspace.createIndex(df, indexConfig)
         val countOriginal = df.count()
 
