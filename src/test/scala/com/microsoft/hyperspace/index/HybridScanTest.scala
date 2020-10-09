@@ -125,11 +125,6 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         appendCnt = 0,
         deleteCnt = 2)
     }
-    setupIndexAndChangeData(
-      spark.read.parquet(sampleParquetDataLocationDelete2),
-      indexConfig1.copy(indexName = "index_ParquetDelete2"),
-      appendCnt = 0,
-      deleteCnt = 2)
   }
 
   before {
@@ -207,7 +202,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           case b @ BucketUnion(children, bucketSpec) =>
             assert(bucketSpec.numBuckets === 200)
             assert(
-              bucketSpec.bucketColumnNames.size == 1 && bucketSpec.bucketColumnNames.head
+              bucketSpec.bucketColumnNames.size === 1 && bucketSpec.bucketColumnNames.head
                 .equals("clicks"))
 
             val childNodes = children.collect {
@@ -215,7 +210,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                     attrs,
                     Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
                     numBucket) =>
-                assert(attrs.size == 1)
+                assert(attrs.size === 1)
                 assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
                 // Check 1 appended file.
                 assert(fsRelation.location.inputFiles.forall(_.contains(".copy")))
@@ -236,8 +231,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
             // BucketUnion has 2 children.
             assert(childNodes.size === 2)
-            assert(childNodes.count(_.isInstanceOf[Project]) == 1)
-            assert(childNodes.count(_.isInstanceOf[RepartitionByExpression]) == 1)
+            assert(childNodes.count(_.isInstanceOf[Project]) === 1)
+            assert(childNodes.count(_.isInstanceOf[RepartitionByExpression]) === 1)
             b
         }
         // 2 BucketUnion in Join Rule v1.
@@ -347,30 +342,46 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Delete-only: filter index & parquet format, " +
       "Hybrid Scan for delete support doesn't work without lineage column") {
-    val df = spark.read.parquet(sampleParquetDataLocationDelete2)
-    def filterQuery: DataFrame =
-      df.filter(df("clicks") <= 2000).select(df("query"))
-    val baseQuery = filterQuery
+    // Setup index without lineage column.
+    val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
+    Seq(
+      ("indexNameWithoutLineage", "false", false),
+      ("indexNameWithLineage", "true", true)) foreach {
+      case (indexName, lineageColumnConfig, transformationExpected) =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> lineageColumnConfig) {
+          setupIndexAndChangeData(
+            spark.read.parquet(sampleParquetDataLocationDelete2),
+            indexConfig.copy(indexName = indexName),
+            appendCnt = 0,
+            deleteCnt = 1)
 
-    withSQLConf(
-      "spark.hyperspace.index.hybridscan.enabled" -> "true",
-      "spark.hyperspace.index.hybridscan.delete.enabled" -> "false") {
-      val filter = filterQuery
-      assert(baseQuery.queryExecution.optimizedPlan.equals(filter.queryExecution.optimizedPlan))
-    }
-
-    withSQLConf(
-      "spark.hyperspace.index.hybridscan.enabled" -> "true",
-      "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
-      val filter = filterQuery
-      assert(baseQuery.queryExecution.optimizedPlan.equals(filter.queryExecution.optimizedPlan))
+          val df = spark.read.parquet(sampleParquetDataLocationDelete2)
+          def filterQuery: DataFrame =
+            df.filter(df("clicks") <= 2000).select(df("query"))
+          val baseQuery = filterQuery
+          withSQLConf(
+            "spark.hyperspace.index.hybridscan.enabled" -> "true",
+            "spark.hyperspace.index.hybridscan.delete.enabled" -> "false") {
+            val filter = filterQuery
+            assert(
+              baseQuery.queryExecution.optimizedPlan.equals(filter.queryExecution.optimizedPlan))
+          }
+          withSQLConf(
+            "spark.hyperspace.index.hybridscan.enabled" -> "true",
+            "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+            val filter = filterQuery
+            assert(
+              baseQuery.queryExecution.optimizedPlan
+                .equals(filter.queryExecution.optimizedPlan)
+                .equals(!transformationExpected))
+          }
+        }
     }
   }
 
   test(
     "Delete-only: filter index & parquet, json format, " +
       "index relation should have additional filter for deleted files") {
-
     Seq(
       (sampleParquetDataLocationDelete, "index_ParquetDelete", "parquet"),
       (sampleJsonDataLocationDelete, "index_JsonDelete", "json")) foreach {
@@ -402,8 +413,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               // Check new filter condition on lineage column.
               assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
               val deleted = deletedFileNames.map(_.toString)
-              assert(deleted.length == 2)
-              assert(deleted.distinct.length == deleted.length)
+              assert(deleted.length === 2)
+              assert(deleted.distinct.length === deleted.length)
               assert(deleted.forall(f => !df.inputFiles.contains(f)))
               // Check the location is replaced with index data files properly.
               assert(fsRelation.location.inputFiles.forall(_.contains(indexName)))
@@ -424,7 +435,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               assert(deletedFiles.forall(filterStr.contains))
               p
           }
-          assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 1)
+          assert(execNodes.length === 1)
 
           checkAnswer(baseQuery, filter)
         }
@@ -461,8 +472,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             // Check new filter condition on lineage column.
             assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
             val deleted = deletedFileNames.map(_.toString)
-            assert(deleted.length == 2)
-            assert(deleted.distinct.length == deleted.length)
+            assert(deleted.length === 2)
+            assert(deleted.distinct.length === deleted.length)
             assert(deleted.forall(f => !df1.inputFiles.contains(f)))
             assert(deleted.forall(f => !df2.inputFiles.contains(f)))
             assert(
@@ -472,9 +483,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             deleted
         }
         assert(deletedFilesList.length === 2)
-        assert(deletedFilesList.flatten.length === 4)
-
         var deletedFiles = deletedFilesList.flatten
+        assert(deletedFiles.length === 4)
 
         val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
         val execNodes = execPlan collect {
@@ -522,8 +532,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           // Check new filter condition on lineage column.
           assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
           val deleted = deletedFileNames.map(_.toString)
-          assert(deleted.length == 1)
-          assert(deleted.distinct.length == deleted.length)
+          assert(deleted.length === 1)
+          assert(deleted.distinct.length === deleted.length)
           assert(deleted.forall(f => !df.inputFiles.contains(f)))
           assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
           assert(fsRelation.location.inputFiles.length === 4)
@@ -565,10 +575,11 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               deletePushDownFilterFound = true
             }
             p
+          case _: ShuffleExchangeExec =>
+            // Make sure there is no shuffle.
+            fail("ShuffleExchangeExec node found")
         }
 
-        // Make sure there is no shuffle.
-        execPlan.foreach(p => assert(!p.isInstanceOf[ShuffleExchangeExec]))
         assert(execNodes.count(_.isInstanceOf[UnionExec]) === 1)
         // 1 of index, 1 of appended file
         assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 2)
@@ -612,9 +623,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
             assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
-            assert(deletedFileNames.length == 1 || deletedFileNames.length == 2)
+            assert(deletedFileNames.length === 1 || deletedFileNames.length === 2)
             val deleted = deletedFileNames.map(_.toString)
-            assert(deleted.distinct.length == deleted.length)
+            assert(deleted.distinct.length === deleted.length)
             assert(deleted.forall(f => !df1.inputFiles.contains(f)))
             assert(deleted.forall(f => !df2.inputFiles.contains(f)))
             assert(
@@ -678,7 +689,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === 1)
           // 2 of index data, 1 of appended file.
           assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 3)
-          assert(deleteFilesPushDownFilterCnt == 2)
+          assert(deleteFilesPushDownFilterCnt === 2)
 
           checkAnswer(baseQuery, join)
         }

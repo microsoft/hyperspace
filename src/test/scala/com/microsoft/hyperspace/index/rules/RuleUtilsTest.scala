@@ -123,7 +123,6 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
       withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
-        val sourceFile = readDf.inputFiles.head
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
           indexManager.create(readDf, IndexConfig("index1", Seq("id")))
         }
@@ -183,7 +182,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         }
 
         // Scenario #2: Delete 1 file.
-        FileUtils.delete(new Path(sourceFile))
+        FileUtils.delete(new Path(readDf.inputFiles.head))
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan

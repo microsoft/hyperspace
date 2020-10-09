@@ -236,8 +236,9 @@ object RuleUtils {
     // Get transformed plan with index data and appended files if applicable.
     val indexPlan = plan transformUp {
       // Use transformUp here as currently one Logical Relation is allowed (pre-requisite).
-      // With transformDown, the transformed plan will be matched and transformed recursively
-      // which causes Stack overflow exception.
+      // The transformed plan will have LogicalRelation as a child; for example, LogicalRelation
+      // can be transformed to 'Project -> Filter -> Logical Relation'. Thus, with transformDown,
+      // it will be matched again and transformed recursively which causes stack overflow exception.
       case baseRelation @ LogicalRelation(
             _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
@@ -273,7 +274,7 @@ object RuleUtils {
             // merge the data into the index data. Please refer below [[Union]] operation.
             // In case there are both deleted and appended files, we cannot handle the appended
             // files along with deleted files as source files do not have the lineage column which
-            // requires for excluding the index data from deleted files.
+            // is required for excluding the index data from deleted files.
             unhandledAppendedFiles = filesAppended
             index.content.files
           } else {
