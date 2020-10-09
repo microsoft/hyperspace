@@ -325,7 +325,17 @@ case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
 }
 object Hdfs {
-  case class Properties(content: Content)
+
+  /**
+   * Hdfs file properties.
+   * @param content Content object representing Hdfs file based data source.
+   * @param appendedFiles Appended files since the last time derived dataset was updated.
+   * @param deletedFiles Deleted files since the last time derived dataset was updated.
+   */
+  case class Properties(
+      content: Content,
+      appendedFiles: Seq[String] = Nil,
+      deletedFiles: Seq[String] = Nil)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -377,6 +387,14 @@ case class IndexLogEntry(
     relations
       .flatMap(_.data.properties.content.fileInfos)
       .toSet
+  }
+
+  def deletedFiles: Seq[String] = {
+    relations.head.data.properties.deletedFiles
+  }
+
+  def appendedFiles: Seq[String] = {
+    relations.head.data.properties.appendedFiles
   }
 
   def bucketSpec: BucketSpec =
