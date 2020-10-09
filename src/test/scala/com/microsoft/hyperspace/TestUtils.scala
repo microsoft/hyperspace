@@ -62,8 +62,9 @@ class MockEventLogger extends EventLogger {
 }
 
 object MockEventLogger {
+  var emittedEvents: Seq[HyperspaceEvent] = Seq()
+    
   def reset(): Unit = {
     emittedEvents = Seq()
   }
-  var emittedEvents: Seq[HyperspaceEvent] = Seq()
 }
