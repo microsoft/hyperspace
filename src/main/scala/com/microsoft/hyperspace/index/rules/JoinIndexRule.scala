@@ -316,13 +316,13 @@ object JoinIndexRule
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
     val lIndexes = RuleUtils.getCandidateIndexes(
+      spark,
       lUsable,
-      RuleUtils.getLogicalRelation(left).get,
-      HyperspaceConf.hybridScanEnabled(spark))
+      RuleUtils.getLogicalRelation(left).get)
     val rIndexes = RuleUtils.getCandidateIndexes(
+      spark,
       rUsable,
-      RuleUtils.getLogicalRelation(right).get,
-      HyperspaceConf.hybridScanEnabled(spark))
+      RuleUtils.getLogicalRelation(right).get)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
