@@ -21,6 +21,8 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
 
+import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
+
 trait SparkInvolvedSuite extends BeforeAndAfterAll with BeforeAndAfter {
   self: SparkFunSuite =>
 
@@ -31,6 +33,7 @@ trait SparkInvolvedSuite extends BeforeAndAfterAll with BeforeAndAfter {
   protected lazy val spark: SparkSession = SparkSession
     .builder()
     .master(s"local[$numParallelism]")
+    .config(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
     .appName(suiteName)
     .getOrCreate()
 

@@ -20,8 +20,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.telemetry.RefreshDeleteActionEvent
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
  * Unit E2E test cases for RefreshIndex.
@@ -36,7 +37,6 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
@@ -125,7 +125,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate refresh index (to handle deletes from the source data) " +
-      "is aborted if no source data file is deleted.") {
+      "is a no-op if no source data file is deleted.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -137,8 +137,23 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+      val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+      val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+      val latestId = logManager.getLatestId().get
+
+      MockEventLogger.reset()
+      hyperspace.refreshIndex(indexConfig.indexName)
+      // Check that no new log files were created in this operation.
+      assert(latestId == logManager.getLatestId().get)
+
+      // Check emitted events.
+      MockEventLogger.emittedEvents match {
+        case Seq(
+            RefreshDeleteActionEvent(_, _, "Operation started."),
+            RefreshDeleteActionEvent(_, _, msg)) =>
+          assert(msg.contains("Refresh delete aborted as no deleted source data file found."))
+        case _ => fail()
+      }
     }
   }
 
