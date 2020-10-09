@@ -20,7 +20,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
-import com.microsoft.hyperspace.{HyperspaceException, NoChangesDetected}
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshDeleteActionEvent}
@@ -56,7 +56,6 @@ class RefreshDeleteAction(
    */
   final override def validate(): Unit = {
     super.validate()
-
     if (deletedFiles.isEmpty) {
       throw NoChangesException("Refresh delete aborted as no deleted source data file found.")
     }
@@ -92,6 +91,6 @@ class RefreshDeleteAction(
 
   override def logEntry: LogEntry = {
     val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
-    entry.withNewDeletedFiles(Seq()).withAdditionalAppendedFiles(appendedFiles)
+    entry.withAppendedAndDeletedFiles(appendedFiles, Seq())
   }
 }

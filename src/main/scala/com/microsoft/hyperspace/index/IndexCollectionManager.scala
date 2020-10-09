@@ -23,7 +23,6 @@ import org.apache.spark.sql.internal.SQLConf
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
-import com.microsoft.hyperspace.util.HyperspaceConf
 
 class IndexCollectionManager(
     spark: SparkSession,
