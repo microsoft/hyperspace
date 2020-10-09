@@ -53,7 +53,7 @@ object TestUtils {
  */
 class MockEventLogger extends EventLogger {
   import com.microsoft.hyperspace.MockEventLogger.emittedEvents
-  // Reset events for `this` action.
+  // Reset events.
   reset()
 
   override def logEvent(event: HyperspaceEvent): Unit = {
@@ -62,8 +62,9 @@ class MockEventLogger extends EventLogger {
 }
 
 object MockEventLogger {
+  var emittedEvents: Seq[HyperspaceEvent] = Seq()
+    
   def reset(): Unit = {
     emittedEvents = Seq()
   }
-  var emittedEvents: Seq[HyperspaceEvent] = Seq()
 }

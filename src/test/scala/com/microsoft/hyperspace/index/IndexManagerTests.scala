@@ -26,7 +26,6 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
 import com.microsoft.hyperspace.telemetry.RefreshAppendActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -40,7 +39,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
 
     FileUtils.delete(new Path(sampleParquetDataLocation))
     SampleData.save(
@@ -280,9 +278,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         MockEventLogger.emittedEvents match {
           case Seq(
               RefreshAppendActionEvent(_, _, "Operation started."),
-              RefreshAppendActionEvent(_, _, msg))
-              if msg.equals("No-op operation recorded: Refresh append aborted as" +
-                " no appended source data files found.") => // pass
+              RefreshAppendActionEvent(_, _, msg)) =>
+            assert(msg.contains("Refresh append aborted as no appended source data files found."))
           case _ => fail()
         }
       }

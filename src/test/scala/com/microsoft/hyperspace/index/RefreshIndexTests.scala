@@ -21,7 +21,6 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
 import com.microsoft.hyperspace.telemetry.RefreshDeleteActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -38,7 +37,6 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
@@ -150,9 +148,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       MockEventLogger.emittedEvents match {
         case Seq(
             RefreshDeleteActionEvent(_, _, "Operation started."),
-            RefreshDeleteActionEvent(_, _, msg))
-            if msg.equals("No-op operation recorded: Refresh delete aborted as " +
-              "no deleted source data file found.") => // pass
+            RefreshDeleteActionEvent(_, _, msg)) =>
+          assert(msg.contains("Refresh delete aborted as no deleted source data file found."))
         case _ => fail()
       }
     }
