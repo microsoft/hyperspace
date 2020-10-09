@@ -82,12 +82,13 @@ private[actions] abstract class RefreshActionBase(
   /**
    * Compare list of source data files from previous IndexLogEntry to list
    * of current source data files, validate fileInfo for existing files and
-   * identify deleted source data files.
+   * identify deleted source data files. Finally, append the previously known
+   * deleted files to the result.
    */
   protected lazy val deletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
-    val originalFiles = rels.head.data.properties.content.fileInfos
-    val currentFiles = rels.head.rootPaths
+    val originalFiles: Set[FileInfo] = rels.head.data.properties.content.fileInfos
+    val currentFiles: Map[String, FileInfo] = rels.head.rootPaths
       .flatMap { p =>
         Content
           .fromDirectory(path = new Path(p), throwIfNotExists = true)
@@ -112,22 +113,30 @@ private[actions] abstract class RefreshActionBase(
     delFiles ++ previousIndexLogEntry.deletedFiles
   }
 
-  protected lazy val appendedFiles = {
+  /**
+   * Compare list of source data files from previous IndexLogEntry to list
+   * of current source data files, validate fileInfo for existing files and
+   * identify newly appended source data files. Finally, append the previously known
+   * appended files to the result.
+   */
+  protected lazy val appendedFiles: Seq[String] = {
     val relation = previousIndexLogEntry.relations.head
+    val originalFiles = relation.data.properties.content.fileInfos
 
-    // TODO: improve this to take last modified time of files into account.
-    //   https://github.com/microsoft/hyperspace/issues/182
-    val originalFiles = relation.data.properties.content.files.map(_.toString)
+    val currentFiles = df.queryExecution.optimizedPlan
+      .collect {
+        case LogicalRelation(
+            HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
+          location
+            .allFiles()
+            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+      }
+      .flatten
+      .toSet
 
-    val allFiles = df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        location.allFiles().map(_.getPath.toString)
-    }.flatten
-
-    allFiles.diff(originalFiles) ++ previousIndexLogEntry.appendedFiles
+    currentFiles.diff(originalFiles).toSeq.map(_.name) ++ previousIndexLogEntry.appendedFiles
   }
 }
