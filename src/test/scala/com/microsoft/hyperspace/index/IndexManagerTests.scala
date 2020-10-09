@@ -40,7 +40,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
 
     FileUtils.delete(new Path(sampleParquetDataLocation))
     SampleData.save(

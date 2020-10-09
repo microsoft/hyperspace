@@ -38,7 +38,6 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
