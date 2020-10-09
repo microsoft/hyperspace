@@ -222,8 +222,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Validate refresh delete action updates appended files as expected," +
-      "when some file gets deleted and some appended to source data.") {
+    "Validate refresh delete action updates appended and deleted files in metadata as" +
+      "expected, when some file gets deleted and some appended to source data.") {
     withSQLConf(
       IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
@@ -260,6 +260,46 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
         val newFileList = fileList(nonPartitionedDataPath).toSet
         assert(indexLogEntry.appendedFiles.toSet.equals(newFileList -- oldFileList))
+      }
+    }
+  }
+
+  test(
+    "Validate refresh append action updates appended and deleted files in metadata as" +
+      "expected, when some file gets deleted and some appended to source data.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val df = spark.read.parquet(testPath)
+          hyperspace.createIndex(df, indexConfig)
+
+          val oldFileList = fileList(testPath).toSet
+
+          // Delete one source data file.
+          deleteDataFile(testPath)
+
+          // Add some new data to source.
+          import spark.implicits._
+          SampleData.testData
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+            .write
+            .mode("append")
+            .parquet(testPath)
+
+          hyperspace.refreshIndex(indexConfig.indexName)
+
+          // Check if refreshed index metadata has "appendedFiles" and "deletedFiles" updated.
+          val entry = logManager(indexConfig.indexName).getLatestStableLog()
+          assert(entry.isDefined)
+          assert(entry.get.isInstanceOf[IndexLogEntry])
+          val indexLogEntry = entry.get.asInstanceOf[IndexLogEntry]
+          assert(indexLogEntry.appendedFiles.isEmpty)
+
+          val newFileList = fileList(testPath).toSet
+          assert(indexLogEntry.deletedFiles.toSet.equals(oldFileList -- newFileList))
+        }
       }
     }
   }
