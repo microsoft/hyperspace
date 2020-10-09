@@ -121,7 +121,7 @@ object FilterIndexRule
         // Get candidate via file-level metadata validation. This is performed after pruning
         // by column schema, as this might be expensive when there are numerous files in the
         // relation or many indexes to be checked.
-        RuleUtils.getCandidateIndexes(candidateIndexes, r, HyperspaceConf.hybridScanEnabled(spark))
+        RuleUtils.getCandidateIndexes(spark, candidateIndexes, r)
 
       case None => Nil // There is zero or more than one LogicalRelation nodes in Filter's subplan
     }
