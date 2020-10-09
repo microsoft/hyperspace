@@ -151,9 +151,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       MockEventLogger.emittedEvents match {
         case Seq(
             RefreshDeleteActionEvent(_, _, "Operation started."),
-            RefreshDeleteActionEvent(_, _, msg))
-            if msg.equals("No-op operation recorded: Refresh delete aborted as " +
-              "no deleted source data file found.") => // pass
+            RefreshDeleteActionEvent(_, _, msg)) =>
+          assert(msg.contains("Refresh delete aborted as no deleted source data file found."))
         case _ => fail()
       }
     }
