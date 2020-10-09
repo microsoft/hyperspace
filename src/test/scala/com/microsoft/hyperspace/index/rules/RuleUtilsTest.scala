@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
@@ -90,14 +90,14 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     val indexManager = IndexCollectionManager(spark)
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(allIndexes, t1ProjectNode, false).length === 3)
-    assert(RuleUtils.getCandidateIndexes(allIndexes, t2ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2ProjectNode).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
     val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(allIndexes2, t1ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1ProjectNode).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -123,21 +123,28 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
       withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
-        val indexFile = readDf.inputFiles.head
-        indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        }
         val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
         def verify(
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
+            hybridScanDeleteEnabled: Boolean,
             expectCandidateIndex: Boolean): Unit = {
-          val indexes = RuleUtils
-            .getCandidateIndexes(allIndexes, plan, hybridScanEnabled)
-          if (expectCandidateIndex) {
-            assert(indexes.length == 1)
-            assert(indexes.head.name == "index1")
-          } else {
-            assert(indexes.isEmpty)
+          withSQLConf(
+            "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
+            "spark.hyperspace.index.hybridscan.delete.enabled" ->
+              hybridScanDeleteEnabled.toString) {
+            val indexes = RuleUtils
+              .getCandidateIndexes(spark, allIndexes, plan)
+            if (expectCandidateIndex) {
+              assert(indexes.length == 1)
+              assert(indexes.head.name == "index1")
+            } else {
+              assert(indexes.isEmpty)
+            }
           }
         }
 
@@ -145,8 +152,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         // hybrid scan is enabled or not.
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
         }
 
         // Scenario #1: Append new files.
@@ -154,20 +169,38 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
         }
 
         // Scenario #2: Delete 1 file.
-        {
-          FileUtils.delete(new Path(indexFile), isRecursive = false)
-        }
+        FileUtils.delete(new Path(readDf.inputFiles.head))
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          // TODO: expectedCandidateIndex = true once delete dataset is supported.
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = true)
         }
 
         // Scenario #3: Replace all files.
@@ -175,8 +208,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = false)
         }
       }
     }
