@@ -21,7 +21,6 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
 import com.microsoft.hyperspace.telemetry.RefreshDeleteActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 

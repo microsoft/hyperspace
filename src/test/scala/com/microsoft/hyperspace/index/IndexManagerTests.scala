@@ -26,7 +26,6 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.telemetry.Constants.HYPERSPACE_EVENT_LOGGER_CLASS_KEY
 import com.microsoft.hyperspace.telemetry.RefreshAppendActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -278,9 +277,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         // Check emitted events.
         MockEventLogger.emittedEvents match {
           case Seq(
-              RefreshDeleteActionEvent(_, _, "Operation started."),
-              RefreshDeleteActionEvent(_, _, msg)) =>
-            assert(msg.contains("Refresh delete aborted as no deleted source data file found"))
+              RefreshAppendActionEvent(_, _, "Operation started."),
+              RefreshAppendActionEvent(_, _, msg)) =>
+            assert(msg.contains("Refresh append aborted as no appended source data files found."))
           case _ => fail()
         }
       }
