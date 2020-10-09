@@ -278,10 +278,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         // Check emitted events.
         MockEventLogger.emittedEvents match {
           case Seq(
-              RefreshAppendActionEvent(_, _, "Operation started."),
-              RefreshAppendActionEvent(_, _, msg))
-              if msg.equals("No-op operation recorded: Refresh append aborted as" +
-                " no appended source data files found.") => // pass
+              RefreshDeleteActionEvent(_, _, "Operation started."),
+              RefreshDeleteActionEvent(_, _, msg)) =>
+            assert(msg.contains("Refresh delete aborted as no deleted source data file found"))
           case _ => fail()
         }
       }
