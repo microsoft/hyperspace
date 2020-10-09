@@ -20,9 +20,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
-import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.telemetry.{CreateActionEvent, RefreshAppendActionEvent, RefreshDeleteActionEvent}
+import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
+import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
