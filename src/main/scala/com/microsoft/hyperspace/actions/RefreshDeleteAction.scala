@@ -56,8 +56,9 @@ class RefreshDeleteAction(
    */
   final override def validate(): Unit = {
     super.validate()
+
     if (deletedFiles.isEmpty) {
-      throw NoChangesDetected("Refresh aborted as no deleted source data file found.")
+      throw NoChangesException("Refresh delete aborted as no deleted source data file found.")
     }
 
     if (!previousIndexLogEntry.hasLineageColumn(spark)) {

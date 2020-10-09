@@ -20,7 +20,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.telemetry.{CreateActionEvent, RefreshAppendActionEvent, RefreshDeleteActionEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
@@ -36,7 +37,6 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
@@ -136,9 +136,22 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       val logManager = IndexLogManagerFactoryImpl.create(indexPath)
       val latestId = logManager.getLatestId().get
 
+      MockEventLogger.reset()
       hyperspace.refreshIndex(indexConfig.indexName)
       // Check that no new log files were created in this operation.
       assert(latestId == logManager.getLatestId().get)
+
+      // Check emitted events.
+      MockEventLogger.emittedEvents match {
+        case Seq(
+            RefreshDeleteActionEvent(_, _, "Operation started."),
+            RefreshDeleteActionEvent(_, _, msg1),
+            RefreshAppendActionEvent(_, _, "Operation started."),
+            RefreshAppendActionEvent(_, _, msg2)) =>
+          assert(msg1.contains("Refresh delete aborted as no deleted source data file found."))
+          assert(msg2.contains("Refresh append aborted as no appended source data files found."))
+        case _ => fail()
+      }
     }
   }
 

@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.NoChangesDetected
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
 
@@ -56,7 +55,7 @@ class RefreshAppendAction(
     super.validate()
 
     if (appendedFiles.isEmpty) {
-      throw NoChangesDetected("Refresh aborted as no appended source data files found.")
+      throw NoChangesException("Refresh append aborted as no appended source data files found.")
     }
   }
 
