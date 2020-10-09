@@ -88,10 +88,7 @@ class RefreshAppendAction(
     //   https://github.com/microsoft/hyperspace/issues/183
 
     // New entry.
-    entry
-      .copy(content = mergedContent)
-      .withNewDeletedFiles(deletedFiles)
-      .withAdditionalAppendedFiles(Seq())
+    entry.copy(content = mergedContent).withAppendedAndDeletedFiles(Seq(), deletedFiles)
   }
 
   override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
