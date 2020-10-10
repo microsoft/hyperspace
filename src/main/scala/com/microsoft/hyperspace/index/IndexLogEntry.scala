@@ -397,6 +397,18 @@ case class IndexLogEntry(
     relations.head.data.properties.appendedFiles
   }
 
+  def withAppendedAndDeletedFiles(appended: Seq[String], deleted: Seq[String]): IndexLogEntry = {
+    copy(
+      source = source.copy(
+        plan = source.plan.copy(
+          properties = source.plan.properties.copy(
+            relations = Seq(
+              relations.head.copy(
+                data = relations.head.data.copy(
+                  properties = relations.head.data.properties.copy(
+                    appendedFiles = appended, deletedFiles = deleted))))))))
+  }
+
   def bucketSpec: BucketSpec =
     BucketSpec(
       numBuckets = numBuckets,

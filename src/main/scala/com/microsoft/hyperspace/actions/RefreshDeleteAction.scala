@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
@@ -57,7 +56,6 @@ class RefreshDeleteAction(
    */
   final override def validate(): Unit = {
     super.validate()
-
     if (deletedFiles.isEmpty) {
       throw NoChangesException("Refresh delete aborted as no deleted source data file found.")
     }
@@ -91,36 +89,8 @@ class RefreshDeleteAction(
       indexConfig.indexedColumns)
   }
 
-  /**
-   * Compare list of source data files from previous IndexLogEntry to list
-   * of current source data files, validate fileInfo for existing files and
-   * identify deleted source data files.
-   */
-  private lazy val deletedFiles: Seq[String] = {
-    val rels = previousIndexLogEntry.relations
-    val originalFiles = rels.head.data.properties.content.fileInfos
-    val currentFiles = rels.head.rootPaths
-      .flatMap { p =>
-        Content
-          .fromDirectory(path = new Path(p), throwIfNotExists = true)
-          .fileInfos
-      }
-      .map(f => f.name -> f)
-      .toMap
-
-    var delFiles = Seq[String]()
-    originalFiles.foreach { f =>
-      currentFiles.get(f.name) match {
-        case Some(v) =>
-          if (!f.equals(v)) {
-            throw HyperspaceException(
-              "Index refresh (to handle deleted source data) aborted. " +
-                s"Existing source data file info is changed (file: ${f.name}).")
-          }
-        case None => delFiles :+= f.name
-      }
-    }
-
-    delFiles
+  override def logEntry: LogEntry = {
+    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    entry.withAppendedAndDeletedFiles(appendedFiles, Seq())
   }
 }
