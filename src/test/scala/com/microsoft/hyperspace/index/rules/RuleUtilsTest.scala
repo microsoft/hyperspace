@@ -281,8 +281,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   }
 
   test(
-    "RuleUtils.getCandidateIndexes: Verify no indexes are matched even if signature matches but " +
-      "hybrid scan is disabled and 'deletedFiles' is non-empty.") {
+    "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
+      "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
     assert(!HyperspaceConf.hybridScanEnabled(spark))
 
     val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
