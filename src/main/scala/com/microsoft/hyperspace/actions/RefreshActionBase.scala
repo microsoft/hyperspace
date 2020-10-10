@@ -83,6 +83,8 @@ private[actions] abstract class RefreshActionBase(
    * Compare list of source data files from previous IndexLogEntry to list
    * of current source data files, validate fileInfo for existing files and
    * identify deleted source data files.
+   * Finally, append the previously known deleted files to the result. These
+   * are the files for which the index was never updated in the past.
    */
   protected lazy val deletedFiles: Seq[String] = {
     val rels = previousIndexLogEntry.relations
@@ -109,9 +111,18 @@ private[actions] abstract class RefreshActionBase(
       }
     }
 
+    // TODO: Add test for the scenario where existing deletedFiles and newly deleted
+    //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
     delFiles ++ previousIndexLogEntry.deletedFiles
   }
 
+  /**
+   * Compare list of source data files from previous IndexLogEntry to list
+   * of current source data files, validate fileInfo for existing files and
+   * identify newly appended source data files.
+   * Finally, append the previously known appended files to the result. These
+   * are the files for which index was never updated in the past.
+   */
   protected lazy val appendedFiles = {
     val relation = previousIndexLogEntry.relations.head
 
@@ -128,6 +139,8 @@ private[actions] abstract class RefreshActionBase(
         location.allFiles().map(_.getPath.toString)
     }.flatten
 
+    // TODO: Add test for the scenario where existing appendedFiles and newly appended
+    //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
     allFiles.diff(originalFiles) ++ previousIndexLogEntry.appendedFiles
   }
 }
