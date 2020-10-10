@@ -18,9 +18,9 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{AnalysisException, QueryTest}
+import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, Implicits, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
@@ -306,44 +306,43 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   test(
     "Validate incremental refresh index when some file gets deleted and some appended to " +
       "source data.") {
-    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      withIndex(indexConfig.indexName) {
-        // Save test data non-partitioned.
-        SampleData.save(
-          spark,
-          nonPartitionedDataPath,
-          Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-        val df = spark.read.parquet(nonPartitionedDataPath)
-        hyperspace.createIndex(df, indexConfig)
-        val countOriginal = df.count()
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          // Save test data non-partitioned.
+          SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val df = spark.read.parquet(testPath)
+          hyperspace.createIndex(df, indexConfig)
+          val countOriginal = df.count()
 
-        // Delete one source data file.
-        deleteDataFile(nonPartitionedDataPath)
-        val countAfterDelete = spark.read.parquet(nonPartitionedDataPath).count()
-        assert(countAfterDelete < countOriginal)
+          // Delete one source data file.
+          deleteDataFile(testPath)
+          val countAfterDelete = spark.read.parquet(testPath).count()
+          assert(countAfterDelete < countOriginal)
 
-        // Add some new data to source.
-        import spark.implicits._
-        SampleData.testData
-          .take(3)
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .write
-          .mode("append")
-          .parquet(nonPartitionedDataPath)
+          // Add some new data to source.
+          import spark.implicits._
+          SampleData.testData
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+            .write
+            .mode("append")
+            .parquet(testPath)
 
-        val countAfterAppend = spark.read.parquet(nonPartitionedDataPath).count()
-        assert(countAfterDelete + 3 == countAfterAppend)
+          val countAfterAppend = spark.read.parquet(testPath).count()
+          assert(countAfterDelete + 3 == countAfterAppend)
 
-        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+          hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
-        // Check if refreshed index is updated appropriately.
-        val indexDf = spark.read
-          .parquet(s"$systemPath/${indexConfig.indexName}/" +
-            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
-          .union(spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
-            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=2"))
+          // Check if refreshed index is updated appropriately.
+          val indexDf = spark.read
+            .parquet(s"$systemPath/${indexConfig.indexName}/" +
+              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+            .union(spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
+              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=2"))
 
-        assert(indexDf.count() == countAfterAppend)
+          assert(indexDf.count() == countAfterAppend)
+        }
       }
     }
   }

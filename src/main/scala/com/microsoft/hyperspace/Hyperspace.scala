@@ -79,7 +79,8 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
-   * Update indexes for the latest version of the data. This api provides a few
+   * Update indexes for the latest version of the data. This api provides a few supported
+   * refresh modes as listed below.
    *
    * @param indexName Name of the index to refresh.
    * @param mode Refresh mode. Currently supported modes are [[REFRESH_MODE_INCREMENTAL]] and
