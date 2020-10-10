@@ -20,12 +20,12 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.{FileUtils, HyperspaceConf, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
@@ -79,11 +79,11 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   test("Verify indexes are matched by signature correctly.") {
@@ -284,56 +284,13 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     "RuleUtils.getCandidateIndexes: Verify no indexes are matched even if signature matches but " +
       "hybrid scan is disabled and 'deletedFiles' is non-empty.") {
     assert(!HyperspaceConf.hybridScanEnabled(spark))
-    // Here's an index where the singature is in sync with the latest data, but "deletedFiles"
-    // list is non-empty.
-    val entry =
-      createIndex("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode, deletedFiles = Seq("f1"))
 
-    // Assert that signature of this new index matches with the latest data.
-    // Below is the logic for signature calculation is picked from RuleUtils class.
-    assert(
-      entry.signature.value.equals(
-        LogicalPlanSignatureProvider
-          .create(entry.signature.provider)
-          .signature(t1ProjectNode)
-          .get))
-
-    val indexManager = IndexCollectionManager(spark)
-    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-    assert(allIndexes.exists(_.name.equals("t1iTest")))
-
-    val usableIndexes = RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode)
-    // Verify that even if signature matched, this index is not picked because of non-empty
-    // "deleted" files.
-    assert(!usableIndexes.exists(_.name.equals("t1iTest")))
-  }
-
-  test(
-    "RuleUtils.getCandidateIndexes: Verify no indexes are matched even if signature matches but " +
-      "hybrid scan is disabled and 'appendedFiles' is non-empty.") {
-    assert(!HyperspaceConf.hybridScanEnabled(spark))
-    // Here's an index where the singature is in sync with the latest data, but "deletedFiles"
-    // list is non-empty.
-    val entry =
-    createIndex("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode, appendedFiles = Seq("f1"))
-
-    // Assert that signature of this new index matches with the latest data.
-    // Below is the logic for signature calculation is picked from RuleUtils class.
-    assert(
-      entry.signature.value.equals(
-        LogicalPlanSignatureProvider
-          .create(entry.signature.provider)
-          .signature(t1ProjectNode)
-          .get))
-
-    val indexManager = IndexCollectionManager(spark)
-    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-    assert(allIndexes.exists(_.name.equals("t1iTest")))
-
-    val usableIndexes = RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode)
-    // Verify that even if signature matched, this index is not picked because of non-empty
-    // "deleted" files.
-    assert(!usableIndexes.exists(_.name.equals("t1iTest")))
+    val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq("f1"))
+    val entry3 = entry1.withAppendedAndDeletedFiles(Seq("f2"), Seq())
+    val usableIndexes =
+      RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
+    assert(usableIndexes.equals(Seq(entry1)))
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {

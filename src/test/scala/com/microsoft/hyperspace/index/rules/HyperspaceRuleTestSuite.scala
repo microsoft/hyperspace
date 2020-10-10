@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.index.Hdfs.Properties
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   private val filenames = Seq("f1.parquet", "f2.parquet")
-  def createIndex(
+  def createIndexLogEntry(
       name: String,
       indexCols: Seq[AttributeReference],
       includedCols: Seq[AttributeReference],

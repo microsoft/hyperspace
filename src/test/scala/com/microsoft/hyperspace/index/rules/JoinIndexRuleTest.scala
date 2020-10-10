@@ -90,11 +90,11 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   before {
@@ -208,8 +208,10 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
 
     {
       // Test: should update plan if index exists to cover all implicit columns
-      val t1TestIndex = createIndex("t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
-      val t2TestIndex = createIndex("t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
+      val t1TestIndex =
+        createIndexLogEntry("t1Idx", Seq(t1c1), Seq(t1c2, t1c3, t1c4), t1FilterNode)
+      val t2TestIndex =
+        createIndexLogEntry("t2Idx", Seq(t2c1), Seq(t2c2, t2c3, t2c4), t2FilterNode)
 
       // clear cache so the new indexes gets added to it
       clearCache()
@@ -406,9 +408,7 @@ class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
     // Mark the relation that the rule is applied and verify the plan does not change.
     val newPlan = plan transform {
       case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
-        r.copy(
-          relation =
-            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
+        r.copy(relation = h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
     assert(JoinIndexRule(newPlan).equals(newPlan))
   }
