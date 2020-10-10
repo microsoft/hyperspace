@@ -107,7 +107,10 @@ object RuleUtils {
       indexes.filter(index =>
         index.created && isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
-      indexes.filter(index => index.created && signatureValid(index))
+      indexes.filter(
+        index =>
+          index.created && signatureValid(index) &&
+            index.deletedFiles.isEmpty && index.appendedFiles.isEmpty)
     }
   }
 
