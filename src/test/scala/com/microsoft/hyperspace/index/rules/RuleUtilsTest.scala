@@ -281,8 +281,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   }
 
   test(
-    "Verify no indexes are matched if signature matches but hybrid scan is disabled and" +
-      " 'deletedFiles' is non-empty.") {
+    "RuleUtils.getCandidateIndexes: Verify no indexes are matched even if signature matches but " +
+      "hybrid scan is disabled and 'deletedFiles' is non-empty.") {
     assert(!HyperspaceConf.hybridScanEnabled(spark))
     // Here's an index where the singature is in sync with the latest data, but "deletedFiles"
     // list is non-empty.
@@ -300,9 +300,37 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
     val indexManager = IndexCollectionManager(spark)
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+    assert(allIndexes.exists(_.name.equals("t1iTest")))
 
     val usableIndexes = RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode)
-    assert(usableIndexes.length === 3)
+    // Verify that even if signature matched, this index is not picked because of non-empty
+    // "deleted" files.
+    assert(!usableIndexes.exists(_.name.equals("t1iTest")))
+  }
+
+  test(
+    "RuleUtils.getCandidateIndexes: Verify no indexes are matched even if signature matches but " +
+      "hybrid scan is disabled and 'appendedFiles' is non-empty.") {
+    assert(!HyperspaceConf.hybridScanEnabled(spark))
+    // Here's an index where the singature is in sync with the latest data, but "deletedFiles"
+    // list is non-empty.
+    val entry =
+    createIndex("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode, appendedFiles = Seq("f1"))
+
+    // Assert that signature of this new index matches with the latest data.
+    // Below is the logic for signature calculation is picked from RuleUtils class.
+    assert(
+      entry.signature.value.equals(
+        LogicalPlanSignatureProvider
+          .create(entry.signature.provider)
+          .signature(t1ProjectNode)
+          .get))
+
+    val indexManager = IndexCollectionManager(spark)
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+    assert(allIndexes.exists(_.name.equals("t1iTest")))
+
+    val usableIndexes = RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode)
     // Verify that even if signature matched, this index is not picked because of non-empty
     // "deleted" files.
     assert(!usableIndexes.exists(_.name.equals("t1iTest")))
