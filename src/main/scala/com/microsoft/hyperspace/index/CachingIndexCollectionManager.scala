@@ -94,7 +94,7 @@ class CachingIndexCollectionManager(
     super.vacuum(indexName)
   }
 
-  override def refresh(indexName: String, mode: String = REFRESH_MODE_INCREMENTAL): Unit = {
+  override def refresh(indexName: String, mode: String): Unit = {
     clearCache()
     super.refresh(indexName, mode)
   }
