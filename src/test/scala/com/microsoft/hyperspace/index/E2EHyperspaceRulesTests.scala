@@ -536,7 +536,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Verify JoinIndexRule utilizes indexes correctly after incremental refresh when some file" +
+    "Verify JoinIndexRule utilizes indexes correctly after incremental refresh when some file " +
       "gets deleted and some appended to source data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
