@@ -26,7 +26,8 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
-import com.microsoft.hyperspace.util.{FileUtils, HyperspaceConf, PathUtils}
+import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
@@ -283,14 +284,14 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   test(
     "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
       "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
-    assert(!HyperspaceConf.hybridScanEnabled(spark))
-
-    val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq("f1"))
-    val entry3 = entry1.withAppendedAndDeletedFiles(Seq("f2"), Seq())
-    val usableIndexes =
-      RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
-    assert(usableIndexes.equals(Seq(entry1)))
+    withSQLConf(INDEX_HYBRID_SCAN_ENABLED -> "false") {
+      val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+      val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq("f1"))
+      val entry3 = entry1.withAppendedAndDeletedFiles(Seq("f2"), Seq())
+      val usableIndexes =
+        RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
+      assert(usableIndexes.equals(Seq(entry1)))
+    }
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {

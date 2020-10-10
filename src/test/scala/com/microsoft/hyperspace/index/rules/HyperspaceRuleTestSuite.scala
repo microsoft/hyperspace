@@ -71,7 +71,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
         indexLogEntry.state = Constants.States.ACTIVE
-        logManager.writeLog(0, indexLogEntry)
+        assert(logManager.writeLog(0, indexLogEntry))
         indexLogEntry
 
       case None => throw HyperspaceException("Invalid plan for index dataFrame.")
