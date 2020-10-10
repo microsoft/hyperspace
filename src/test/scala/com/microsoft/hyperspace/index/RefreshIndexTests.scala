@@ -20,7 +20,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, Implicits, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
