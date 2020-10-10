@@ -254,45 +254,43 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify incremental refresh (append-only) should index only newly appended data.") {
     withTempPathAsString { testPath =>
-      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
-        // Setup. Create sample data and index.
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
-        import spark.implicits._
-        SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .limit(10)
-          .write
-          .parquet(testPath)
-        val df = spark.read.parquet(testPath)
-        hyperspace.createIndex(df, indexConfig)
-        var indexCount =
-          spark.read
-            .parquet(s"$systemPath/index" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-            .count()
-        assert(indexCount == 10)
-        // Check if latest log file is updated with newly created index files.
-        validateMetadata("index", Set("v__=0"))
-
-        // Change original data.
-        SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .limit(3)
-          .write
-          .mode("append")
-          .parquet(testPath)
-        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
-        indexCount = spark.read
+      // Setup. Create sample data and index.
+      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+      var indexCount =
+        spark.read
           .parquet(s"$systemPath/index" +
-            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
           .count()
+      assert(indexCount == 10)
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=0"))
 
-        // Check if index got updated.
-        assert(indexCount == 3)
+      // Change original data.
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+      indexCount = spark.read
+        .parquet(s"$systemPath/index" +
+          s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+        .count()
 
-        // Check if latest log file is updated with newly created index files.
-        validateMetadata("index", Set("v__=0", "v__=1"))
-      }
+      // Check if index got updated.
+      assert(indexCount == 3)
+
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=0", "v__=1"))
     }
   }
 
