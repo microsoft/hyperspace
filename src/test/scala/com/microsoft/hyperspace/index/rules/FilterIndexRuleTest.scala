@@ -134,9 +134,7 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
     // Mark the relation that the rule is applied and verify the plan does not change.
     val newPlan = plan transform {
       case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
-        r.copy(
-          relation =
-            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
+        r.copy(relation = h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
     assert(FilterIndexRule(newPlan).equals(newPlan))
   }
