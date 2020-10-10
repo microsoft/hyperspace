@@ -34,7 +34,9 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
       name: String,
       indexCols: Seq[AttributeReference],
       includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry = {
+      plan: LogicalPlan,
+      appendedFiles: Seq[String] = Seq(),
+      deletedFiles: Seq[String] = Seq()): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
@@ -43,7 +45,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           Seq(
             Relation(
               Seq("dummy"),
-              Hdfs(Properties(Content(Directory("/")))),
+              Hdfs(Properties(Content(Directory("/")), appendedFiles, deletedFiles)),
               "schema",
               "format",
               Map())),
