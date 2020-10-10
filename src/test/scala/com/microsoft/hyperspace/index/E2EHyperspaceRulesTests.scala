@@ -26,6 +26,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
@@ -409,7 +410,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfAfterHyperspaceDisabled)))
   }
 
-  test("Verify Join Index Rule utilizes indexes correctly after incremental refresh.") {
+  test("Verify JoinIndexRule utilizes indexes correctly after incremental refresh.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create data.
@@ -434,7 +435,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
           .parquet(testPath)
 
         // Refresh index.
-        hyperspace.refreshIndex(indexConfig.indexName)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
         // Create a join query.
         val leftDf = spark.read.parquet(testPath)
@@ -490,11 +491,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     assert(!spark.isHyperspaceEnabled())
   }
 
-  test("Validate index usage after refresh with some source data file deleted.") {
-    withSQLConf(
-      IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
-      IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
-
+  test("Validate index usage after incremental refresh with some source data file deleted.") {
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       // Save a copy of source data files.
       val location = testDir + "ixRefreshTest"
       val dataPath = new Path(location, "*parquet")
@@ -532,7 +530,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
 
       // Refresh the index to remove deleted source data file records from index.
-      hyperspace.refreshIndex(indexConfig.indexName)
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
       // Verify index usage on latest version of index (v=1) after refresh.
       verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, Seq(1)))

@@ -22,6 +22,7 @@ import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -52,7 +53,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     FileUtils.delete(systemPath)
   }
 
-  test("Validate refresh index when some file gets deleted from the source data.") {
+  test("Validate incremental refresh index when some file gets deleted from the source data.") {
     // Save test data non-partitioned.
     SampleData.save(
       spark,
@@ -90,7 +91,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val originalIndexWithoutDeletedFile = originalIndexDF
             .filter(s"""${IndexConstants.DATA_FILE_NAME_COLUMN} != "$deletedFile"""")
 
-          hyperspace.refreshIndex(indexConfig.indexName)
+          hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
           val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
             s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
@@ -102,7 +103,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data) " +
+    "Validate incremental refresh index (to handle deletes from the source data) " +
       "fails as expected on an index without lineage.") {
     SampleData.save(
       spark,
@@ -117,14 +118,17 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
       deleteDataFile(nonPartitionedDataPath)
 
-      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+      val ex = intercept[HyperspaceException](
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
       assert(
         ex.getMessage.contains(s"Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage."))
     }
   }
 
-  test("Validate refresh index is a no-op if no source data file is deleted or appended.") {
+  test(
+    "Validate incremental refresh index is a no-op if no source data file is deleted or " +
+      "appended.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -137,7 +141,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       val latestId = logManager(indexConfig.indexName).getLatestId().get
 
       MockEventLogger.reset()
-      hyperspace.refreshIndex(indexConfig.indexName)
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
       // Check that no new log files were created in this operation.
       assert(latestId == logManager(indexConfig.indexName).getLatestId().get)
 
@@ -156,7 +160,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data) " +
+    "Validate incremental refresh index (to handle deletes from the source data) " +
       "fails as expected when all source data files are deleted.") {
     Seq(true, false).foreach { deleteDataFolder =>
       withSQLConf(
@@ -173,7 +177,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         if (deleteDataFolder) {
           FileUtils.delete(new Path(nonPartitionedDataPath))
 
-          val ex = intercept[AnalysisException](hyperspace.refreshIndex(indexConfig.indexName))
+          val ex = intercept[AnalysisException](
+            hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
           assert(ex.getMessage.contains("Path does not exist"))
 
         } else {
@@ -184,7 +189,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             .foreach(p => FileUtils.delete(p.getPath))
 
           val ex =
-            intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+            intercept[HyperspaceException](
+              hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
           assert(ex.getMessage.contains("Invalid plan for creating an index."))
         }
         FileUtils.delete(new Path(nonPartitionedDataPath))
@@ -194,7 +200,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Validate refresh index (to handle deletes from the source data) " +
+    "Validate incremental refresh index (to handle deletes from the source data) " +
       "fails as expected when file info for an existing source data file changes.") {
     SampleData.save(
       spark,
@@ -214,7 +220,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         deletedFile,
         "I am some random content :).")
 
-      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
+      val ex = intercept[HyperspaceException](
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
       assert(
         ex.getMessage.contains("Index refresh (to handle deleted source data) aborted. " +
           "Existing source data file info is changed"))
@@ -229,10 +236,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
         IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
-          SampleData.save(
-            spark,
-            testPath,
-            Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
           val df = spark.read.parquet(testPath)
           hyperspace.createIndex(df, indexConfig)
 
@@ -250,12 +254,12 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             .mode("append")
             .parquet(testPath)
 
-        val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
-        new RefreshDeleteAction(
-          spark,
-          IndexLogManagerFactoryImpl.create(indexPath),
-          IndexDataManagerFactoryImpl.create(indexPath))
-          .run()
+          val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+          new RefreshDeleteAction(
+            spark,
+            IndexLogManagerFactoryImpl.create(indexPath),
+            IndexDataManagerFactoryImpl.create(indexPath))
+            .run()
 
           // Verify "deletedFiles" is cleared and "appendedFiles" is updated after refresh.
           val indexLogEntry = getLatestStableLog(indexConfig.indexName)
@@ -311,7 +315,9 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Validate refresh index when some file gets deleted and some appended to source data.") {
+  test(
+    "Validate incremental refresh index when some file gets deleted and some appended to " +
+      "source data.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       withIndex(indexConfig.indexName) {
         // Save test data non-partitioned.
@@ -340,7 +346,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         val countAfterAppend = spark.read.parquet(nonPartitionedDataPath).count()
         assert(countAfterDelete + 3 == countAfterAppend)
 
-        hyperspace.refreshIndex(indexConfig.indexName)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
         // Check if refreshed index is updated appropriately.
         val indexDf = spark.read

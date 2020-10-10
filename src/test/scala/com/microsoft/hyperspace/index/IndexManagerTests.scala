@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_FULL
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
@@ -252,7 +252,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Verify refresh-incremental (append-only) should index only newly appended data.") {
+  test("Verify incremental refresh (append-only) should index only newly appended data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
         // Setup. Create sample data and index.
@@ -281,7 +281,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .write
           .mode("append")
           .parquet(testPath)
-        hyperspace.refreshIndex(indexConfig.indexName)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
         indexCount = spark.read
           .parquet(s"$systemPath/index" +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
