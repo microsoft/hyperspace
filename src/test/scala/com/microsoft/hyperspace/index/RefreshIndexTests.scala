@@ -20,8 +20,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.TestUtils.deleteDataFiles
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
 import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
@@ -79,9 +78,9 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
           // Delete one source data file.
           val deletedFile = if (loc.equals(nonPartitionedDataPath)) {
-            deleteDataFiles(nonPartitionedDataPath).head
+            deleteOneDataFile(nonPartitionedDataPath)
           } else {
-            deleteDataFiles(partitionedDataPath, true).head
+            deleteOneDataFile(partitionedDataPath, true)
           }
 
           // Validate only index records whose lineage is the deleted file are removed.
@@ -113,7 +112,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "false") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-      deleteDataFiles(nonPartitionedDataPath)
+      deleteOneDataFile(nonPartitionedDataPath)
 
       val ex = intercept[HyperspaceException](
         hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
@@ -207,7 +206,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
       // Replace a source data file with a new file with same name but different properties.
-      val deletedFile = deleteDataFiles(nonPartitionedDataPath).head
+      val deletedFile = deleteOneDataFile(nonPartitionedDataPath)
       FileUtils.createFile(
         deletedFile.getFileSystem(new Configuration),
         deletedFile,
@@ -232,7 +231,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           hyperspace.createIndex(df, indexConfig)
 
           // Delete one source data file.
-          deleteDataFiles(testPath)
+          deleteOneDataFile(testPath)
 
           val oldFiles = listFiles(testPath).toSet
 
@@ -276,7 +275,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         val oldFiles = listFiles(testPath).toSet
 
         // Delete one source data file.
-        deleteDataFiles(testPath)
+        deleteOneDataFile(testPath)
 
         // Add some new data to source.
         import spark.implicits._
@@ -317,7 +316,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val countOriginal = df.count()
 
           // Delete one source data file.
-          deleteDataFiles(testPath)
+          deleteOneDataFile(testPath)
           val countAfterDelete = spark.read.parquet(testPath).count()
           assert(countAfterDelete < countOriginal)
 
@@ -346,6 +345,18 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         }
       }
     }
+  }
+
+  /**
+   * Delete one file from a given path.
+   *
+   * @param path Path to the parent folder containing data files.
+   * @param isPartitioned Is data folder partitioned or not.
+   * @return Path to the deleted file.
+   */
+  private def deleteOneDataFile(path: String, isPartitioned: Boolean = false): Path = {
+    val dataPath = if (isPartitioned) s"$path/*/*" else path
+    TestUtils.deleteFiles(dataPath, "*parquet", 1).head
   }
 
   private def logManager(indexName: String): IndexLogManager = {

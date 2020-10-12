@@ -50,32 +50,22 @@ object TestUtils {
   }
 
   /**
-   * Delete some files from a given path.
+   * Delete files from a given path.
    *
-   * @param path Path to the parent folder containing data files.
-   * @param isPartitioned Is data folder partitioned or not.
+   * @param path Path to the folder containing files.
    * @param pattern File name pattern to delete.
-   * @param numFilesToDelete Num files to delete.
+   * @param numFilesToDelete Number of files to delete.
    * @return Paths to the deleted file.
    */
-  def deleteDataFiles(
-      path: String,
-      isPartitioned: Boolean = false,
-      pattern: String = "*parquet",
-      numFilesToDelete: Int = 1): Seq[Path] = {
-    val dataPath = if (isPartitioned) {
-      new Path(s"$path/*/*", pattern)
-    } else {
-      new Path(path, pattern)
-    }
-
-    val dataFileNames = dataPath
+  def deleteFiles(path: String, pattern: String, numFilesToDelete: Int): Seq[Path] = {
+    val pathToDelete = new Path(path, pattern)
+    val fileNames = pathToDelete
       .getFileSystem(new Configuration)
-      .globStatus(dataPath)
+      .globStatus(pathToDelete)
       .map(_.getPath)
 
-    assert(dataFileNames.length >= numFilesToDelete)
-    val filesToDelete = dataFileNames.take(numFilesToDelete)
+    assert(fileNames.length >= numFilesToDelete)
+    val filesToDelete = fileNames.take(numFilesToDelete)
     filesToDelete.foreach(FileUtils.delete(_))
 
     filesToDelete

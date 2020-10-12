@@ -24,12 +24,11 @@ import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
-import com.microsoft.hyperspace.TestUtils.deleteDataFiles
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   private val testDir = "src/test/resources/e2eTests/"
@@ -490,42 +489,41 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   }
 
   test("Validate index usage after incremental refresh with some source data file deleted.") {
-    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      // Save a copy of source data files.
-      val location = testDir + "ixRefreshTest"
-      val dataPath = new Path(location, "*parquet")
-      val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
-      SampleData.save(spark, location, dataColumns)
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        // Save a copy of source data files.
+        val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+        SampleData.save(spark, testPath, dataColumns)
 
-      // Create index on original source data files.
-      val df = spark.read.parquet(location)
-      val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
-      hyperspace.createIndex(df, indexConfig)
+        // Create index on original source data files.
+        val df = spark.read.parquet(testPath)
+        val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+        hyperspace.createIndex(df, indexConfig)
 
-      // Verify index usage for index version (v=0).
-      def query1(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+        // Verify index usage for index version (v=0).
+        def query1(): DataFrame =
+          spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c1")
 
-      verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
+        verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
 
-      // Delete some source data file.
-      deleteDataFiles(location)
+        // Delete some source data file.
+        TestUtils.deleteFiles(testPath, "*parquet", 1)
 
-      def query2(): DataFrame =
-        spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
+        def query2(): DataFrame =
+          spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c1")
 
-      // Verify index is not used.
-      spark.enableHyperspace()
-      val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
-      spark.disableHyperspace()
-      assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(location))))
+        // Verify index is not used.
+        spark.enableHyperspace()
+        val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+        spark.disableHyperspace()
+        assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(testPath))))
 
-      // Refresh the index to remove deleted source data file records from index.
-      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+        // Refresh the index to remove deleted source data file records from index.
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
-      // Verify index usage on latest version of index (v=1) after refresh.
-      verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, Seq(1)))
-      FileUtils.delete(dataPath)
+        // Verify index usage on latest version of index (v=1) after refresh.
+        verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, Seq(1)))
+      }
     }
   }
 
@@ -548,7 +546,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         hyperspace.createIndex(df, indexConfig)
 
         // Delete some source data file.
-        deleteDataFiles(testPath)
+        TestUtils.deleteFiles(testPath, "*parquet", 1)
 
         // Append to original data.
         SampleData.testData
