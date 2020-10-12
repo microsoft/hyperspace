@@ -73,7 +73,7 @@ class IndexCollectionManager(
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager).run()
       } else {
-        throw HyperspaceException(s"Unsupported refresh mode $mode found.")
+        throw HyperspaceException(s"Unsupported refresh mode '$mode' found.")
       }
     }
   }
