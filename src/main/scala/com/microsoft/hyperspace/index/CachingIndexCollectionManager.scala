@@ -18,8 +18,6 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
-
 /**
  * An IndexCollectionManager which leverages a cache to
  * accelerate fetching indexes, with below properties:

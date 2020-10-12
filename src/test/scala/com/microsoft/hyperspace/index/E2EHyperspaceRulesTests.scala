@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
+import com.microsoft.hyperspace.TestUtils.deleteDataFiles
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
@@ -508,14 +509,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
       verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
 
       // Delete some source data file.
-      val dataFileNames = dataPath
-        .getFileSystem(new Configuration)
-        .globStatus(dataPath)
-        .map(_.getPath)
-
-      assert(dataFileNames.nonEmpty)
-      val fileToDelete = dataFileNames.head
-      FileUtils.delete(fileToDelete)
+      deleteDataFiles(location)
 
       def query2(): DataFrame =
         spark.read.parquet(location).filter("c3 == 'facebook'").select("c3", "c1")
@@ -554,15 +548,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         hyperspace.createIndex(df, indexConfig)
 
         // Delete some source data file.
-        val dataPath = new Path(testPath, "*parquet")
-        val dataFileNames = dataPath
-          .getFileSystem(new Configuration)
-          .globStatus(dataPath)
-          .map(_.getPath)
-
-        assert(dataFileNames.nonEmpty)
-        val fileToDelete = dataFileNames.head
-        FileUtils.delete(fileToDelete)
+        deleteDataFiles(testPath)
 
         // Append to original data.
         SampleData.testData

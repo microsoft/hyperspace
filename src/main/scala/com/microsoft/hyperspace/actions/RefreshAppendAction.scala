@@ -41,9 +41,10 @@ class RefreshAppendAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
   final override def op(): Unit = {
-    // TODO: The current implementation picks the number of buckets INDEX_LINEAGE_ENABLED from
-    //  session config. This should be user-configurable to allow maintain the existing bucket
-    //  numbers in the index log entry. https://github.com/microsoft/hyperspace/issues/196.
+    // TODO: The current implementation picks the number of buckets and
+    //  "spark.hyperspace.index.lineage.enabled" from session config. This should be
+    //  user-configurable to allow maintain the existing bucket numbers in the index log entry.
+    //  https://github.com/microsoft/hyperspace/issues/196.
     write(spark, dfWithAppendedFiles, indexConfig)
   }
 

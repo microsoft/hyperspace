@@ -16,11 +16,13 @@
 
 package com.microsoft.hyperspace
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import com.microsoft.hyperspace.MockEventLogger.reset
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
+import com.microsoft.hyperspace.util.FileUtils
 
 object TestUtils {
   def copyWithState(index: IndexLogEntry, state: String): IndexLogEntry = {
@@ -45,6 +47,38 @@ object TestUtils {
     } else {
       path.getName +: splitPath(path.getParent)
     }
+  }
+
+  /**
+   * Delete some files from a given path.
+   *
+   * @param path Path to the parent folder containing data files.
+   * @param isPartitioned Is data folder partitioned or not.
+   * @param pattern File name pattern to delete.
+   * @param numFilesToDelete Num files to delete.
+   * @return Paths to the deleted file.
+   */
+  def deleteDataFiles(
+      path: String,
+      isPartitioned: Boolean = false,
+      pattern: String = "*parquet",
+      numFilesToDelete: Int = 1): Seq[Path] = {
+    val dataPath = if (isPartitioned) {
+      new Path(s"$path/*/*", pattern)
+    } else {
+      new Path(path, pattern)
+    }
+
+    val dataFileNames = dataPath
+      .getFileSystem(new Configuration)
+      .globStatus(dataPath)
+      .map(_.getPath)
+
+    assert(dataFileNames.length >= numFilesToDelete)
+    val filesToDelete = dataFileNames.take(numFilesToDelete)
+    filesToDelete.foreach(FileUtils.delete(_))
+
+    filesToDelete
   }
 }
 
