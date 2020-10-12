@@ -23,7 +23,7 @@ import org.apache.spark.sql.SparkSession
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, OptimizeActionEvent}
-import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
 /**
  * Optimize Action provides an optimize support for indexes where small index files
@@ -87,11 +87,9 @@ class OptimizeAction(
   }
 
   override def logEntry: LogEntry = {
-    // 1. Create an  entry with full data and newly created index files
-    // 2. Create a Directory object using just largeFiles
-    // 3. Merge them
-
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    // 1. Create an entry from previous entry.
+    val absolutePath = PathUtils.makeAbsolute(indexDataPath)
+    val newContent = Content.fromDirectory(absolutePath)
     if (largeFiles.nonEmpty) {
       val largeFilesDirectory: Directory = {
         val fs = new Path(previousIndexLogEntry.content.fileInfos.head.name)
@@ -101,10 +99,10 @@ class OptimizeAction(
 
         Directory.fromLeafFiles(largeFileStatuses)
       }
-      val mergedContent = Content(entry.content.root.merge(largeFilesDirectory))
-      entry.copy(content = mergedContent)
+      val mergedContent = Content(newContent.root.merge(largeFilesDirectory))
+      previousIndexLogEntry.copy(content = mergedContent)
     } else {
-      entry
+      previousIndexLogEntry.copy(content = newContent)
     }
   }
 
