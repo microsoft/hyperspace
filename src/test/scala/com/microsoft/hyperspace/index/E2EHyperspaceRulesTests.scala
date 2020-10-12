@@ -501,20 +501,17 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         hyperspace.createIndex(df, indexConfig)
 
         // Verify index usage for index version (v=0).
-        def query1(): DataFrame =
+        def query(): DataFrame =
           spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c1")
 
-        verifyIndexUsage(query1, getIndexFilesPath(indexConfig.indexName))
+        verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
 
         // Delete some source data file.
         TestUtils.deleteFiles(testPath, "*parquet", 1)
 
-        def query2(): DataFrame =
-          spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c1")
-
         // Verify index is not used.
         spark.enableHyperspace()
-        val planRootPaths = getAllRootPaths(query2().queryExecution.optimizedPlan)
+        val planRootPaths = getAllRootPaths(query().queryExecution.optimizedPlan)
         spark.disableHyperspace()
         assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(testPath))))
 
@@ -522,7 +519,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
         // Verify index usage on latest version of index (v=1) after refresh.
-        verifyIndexUsage(query2, getIndexFilesPath(indexConfig.indexName, Seq(1)))
+        verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, Seq(1)))
       }
     }
   }
