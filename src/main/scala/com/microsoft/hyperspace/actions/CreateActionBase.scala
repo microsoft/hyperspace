@@ -16,8 +16,9 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{input_file_name, udf}
@@ -115,6 +116,36 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val opts = options - "path"
         Relation(
           location.rootPaths.map(_.toString),
+          Hdfs(sourceDataProperties),
+          dataSchema.json,
+          fileFormatName,
+          opts)
+      case LogicalRelation(
+          HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, fileFormat, options),
+          _,
+          _,
+          _) =>
+        val files = location
+          .getSnapshot(false)
+          .filesForScan(Seq(), Seq(), false)
+          .files
+          .map { f =>
+            new FileStatus(
+              /* length */ f.size,
+              /* isDir */ false,
+              /* blockReplication */ 0,
+              /* blockSize */ 1,
+              /* modificationTime */ f.modificationTime,
+              PathUtils.makeAbsolute(f.path))
+          }
+        // Note that source files are currently fingerprinted when the optimized plan is
+        // fingerprinted by LogicalPlanFingerprint.
+        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+        val fileFormatName = "delta"
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts = options - "path"
+        Relation(
+          Seq(PathUtils.makeAbsolute(location.path).toString),
           Hdfs(sourceDataProperties),
           dataSchema.json,
           fileFormatName,

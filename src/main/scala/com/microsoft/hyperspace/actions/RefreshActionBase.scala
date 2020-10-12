@@ -66,11 +66,19 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val df = {
     val rels = previousIndexLogEntry.relations
     val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
-    spark.read
-      .schema(dataSchema)
-      .format(rels.head.fileFormat)
-      .options(rels.head.options)
-      .load(rels.head.rootPaths: _*)
+    if (rels.head.fileFormat.equals("delta")) {
+      spark.read
+        .schema(dataSchema)
+        .format(rels.head.fileFormat)
+        .options(rels.head.options - "versionAsOf")
+        .load(rels.head.rootPaths.head)
+    } else {
+      spark.read
+        .schema(dataSchema)
+        .format(rels.head.fileFormat)
+        .options(rels.head.options)
+        .load(rels.head.rootPaths: _*)
+    }
   }
 
   protected lazy val indexConfig: IndexConfig = {

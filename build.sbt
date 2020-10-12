@@ -27,6 +27,7 @@ scalaVersion := scala212
 crossScalaVersions := supportedScalaVersions
 
 libraryDependencies ++= Seq(
+  "io.delta" %% "delta-core" % "0.6.1",
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources(),
@@ -39,6 +40,14 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
   "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
 )
+
+/*
+assemblyMergeStrategy in assembly := {
+  case PathList("python", xs @ _*) => MergeStrategy.first
+  case x => (assemblyMergeStrategy in assembly).value(x)
+}
+assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+ */
 
 scalacOptions ++= Seq(
   "-target:jvm-1.8"

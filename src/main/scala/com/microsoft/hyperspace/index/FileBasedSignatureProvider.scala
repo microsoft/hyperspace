@@ -18,9 +18,10 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
-import com.microsoft.hyperspace.util.HashingUtils
+import com.microsoft.hyperspace.util.{HashingUtils, PathUtils}
 
 /**
  * [[FileBasedSignatureProvider]] provides the logical plan signature based on files in the
@@ -58,6 +59,12 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
         fingerprint ++= location.allFiles.foldLeft("")(
           (accumulate: String, fileStatus: FileStatus) =>
             HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus)))
+      case LogicalRelation(
+          HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
+        fingerprint ++= location.tableVersion + PathUtils.makeAbsolute(location.path).toString
       case _ =>
     }
 
