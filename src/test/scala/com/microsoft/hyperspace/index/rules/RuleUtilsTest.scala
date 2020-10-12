@@ -20,11 +20,13 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
+import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
@@ -78,23 +80,25 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   test("Verify indexes are matched by signature correctly.") {
     val indexManager = IndexCollectionManager(spark)
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, false).length === 3)
-    assert(RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2ProjectNode).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
+    val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1ProjectNode).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -120,20 +124,28 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
       withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
-        val indexFile = readDf.inputFiles.head
-        indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        }
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
         def verify(
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
+            hybridScanDeleteEnabled: Boolean,
             expectCandidateIndex: Boolean): Unit = {
-          val indexes = RuleUtils
-            .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
-          if (expectCandidateIndex) {
-            assert(indexes.length == 1)
-            assert(indexes.head.name == "index1")
-          } else {
-            assert(indexes.isEmpty)
+          withSQLConf(
+            "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
+            "spark.hyperspace.index.hybridscan.delete.enabled" ->
+              hybridScanDeleteEnabled.toString) {
+            val indexes = RuleUtils
+              .getCandidateIndexes(spark, allIndexes, plan)
+            if (expectCandidateIndex) {
+              assert(indexes.length == 1)
+              assert(indexes.head.name == "index1")
+            } else {
+              assert(indexes.isEmpty)
+            }
           }
         }
 
@@ -141,8 +153,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         // hybrid scan is enabled or not.
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
         }
 
         // Scenario #1: Append new files.
@@ -150,20 +170,38 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
         }
 
         // Scenario #2: Delete 1 file.
-        {
-          FileUtils.delete(new Path(indexFile), isRecursive = false)
-        }
+        FileUtils.delete(new Path(readDf.inputFiles.head))
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          // TODO: expectedCandidateIndex = true once delete dataset is supported.
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = true)
         }
 
         // Scenario #3: Replace all files.
@@ -171,8 +209,16 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = false)
         }
       }
     }
@@ -232,6 +278,19 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
           assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
           true
       }.length == 1)
+    }
+  }
+
+  test(
+    "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
+      "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
+    withSQLConf(INDEX_HYBRID_SCAN_ENABLED -> "false") {
+      val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+      val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq("f1"))
+      val entry3 = entry1.withAppendedAndDeletedFiles(Seq("f2"), Seq())
+      val usableIndexes =
+        RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
+      assert(usableIndexes.equals(Seq(entry1)))
     }
   }
 

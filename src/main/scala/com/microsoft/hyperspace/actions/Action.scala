@@ -84,7 +84,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
     val appInfo =
       AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName)
     try {
-      logEvent(event(appInfo, "Operation Started."))
+      logEvent(event(appInfo, "Operation started."))
       validate()
 
       begin()
@@ -92,10 +92,13 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
       op()
 
       end()
-      logEvent(event(appInfo, message = "Operation Succeeded."))
+      logEvent(event(appInfo, message = "Operation succeeded."))
     } catch {
+      case e: NoChangesException =>
+        logEvent(event(appInfo, message = s"No-op operation recorded: ${e.getMessage}"))
+        logWarning(e.msg)
       case e: Exception =>
-        logEvent(event(appInfo, message = s"Operation Failed: ${e.getMessage}."))
+        logEvent(event(appInfo, message = s"Operation failed: ${e.getMessage}"))
         throw e
     }
   }
