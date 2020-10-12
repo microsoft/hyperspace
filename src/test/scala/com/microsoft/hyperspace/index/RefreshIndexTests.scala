@@ -20,8 +20,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.telemetry.RefreshDeleteActionEvent
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 /**
  * Unit E2E test cases for RefreshIndex.
@@ -36,7 +37,6 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
@@ -125,7 +125,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate refresh index (to handle deletes from the source data) " +
-      "is aborted if no source data file is deleted.") {
+      "is a no-op if no source data file is deleted.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -137,8 +137,21 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-      val ex = intercept[HyperspaceException](hyperspace.refreshIndex(indexConfig.indexName))
-      assert(ex.getMessage.contains("Refresh aborted as no deleted source data file found."))
+      val latestId = logManager(indexConfig.indexName).getLatestId().get
+
+      MockEventLogger.reset()
+      hyperspace.refreshIndex(indexConfig.indexName)
+      // Check that no new log files were created in this operation.
+      assert(latestId == logManager(indexConfig.indexName).getLatestId().get)
+
+      // Check emitted events.
+      MockEventLogger.emittedEvents match {
+        case Seq(
+            RefreshDeleteActionEvent(_, _, "Operation started."),
+            RefreshDeleteActionEvent(_, _, msg)) =>
+          assert(msg.contains("Refresh delete aborted as no deleted source data file found."))
+        case _ => fail()
+      }
     }
   }
 
@@ -208,6 +221,86 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test(
+    "Validate refresh delete action updates appended and deleted files in metadata as " +
+      "expected, when some file gets deleted and some appended to source data.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(
+        IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+        IndexConstants.REFRESH_DELETE_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          SampleData.save(
+            spark,
+            testPath,
+            Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val df = spark.read.parquet(testPath)
+          hyperspace.createIndex(df, indexConfig)
+
+          // Delete one source data file.
+          deleteDataFile(testPath)
+
+          val oldFiles = listFiles(testPath).toSet
+
+          // Add some new data to source.
+          import spark.implicits._
+          SampleData.testData
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+            .write
+            .mode("append")
+            .parquet(testPath)
+
+          hyperspace.refreshIndex(indexConfig.indexName)
+
+          // Verify "deletedFiles" is cleared and "appendedFiles" is updated after refresh.
+          val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+          val latestFiles = listFiles(testPath).toSet
+
+          assert(indexLogEntry.deletedFiles.isEmpty)
+          assert((oldFiles -- latestFiles).isEmpty)
+          assert(indexLogEntry.appendedFiles.toSet.equals(latestFiles -- oldFiles))
+        }
+      }
+    }
+  }
+
+  test(
+    "Validate refresh append action updates appended and deleted files in metadata as" +
+      "expected, when some file gets deleted and some appended to source data.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val df = spark.read.parquet(testPath)
+          hyperspace.createIndex(df, indexConfig)
+
+          val oldFiles = listFiles(testPath).toSet
+
+          // Delete one source data file.
+          deleteDataFile(testPath)
+
+          // Add some new data to source.
+          import spark.implicits._
+          SampleData.testData
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+            .write
+            .mode("append")
+            .parquet(testPath)
+
+          hyperspace.refreshIndex(indexConfig.indexName)
+
+          // Verify "appendedFiles" is cleared and "deletedFiles" is updated after refresh.
+          val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+          assert(indexLogEntry.appendedFiles.isEmpty)
+
+          val latestFiles = listFiles(testPath).toSet
+          assert(indexLogEntry.deletedFiles.toSet.equals(oldFiles -- latestFiles))
+        }
+      }
+    }
+  }
+
   /**
    * Delete one file from a given path.
    *
@@ -232,5 +325,23 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     FileUtils.delete(fileToDelete)
 
     fileToDelete
+  }
+
+  private def logManager(indexName: String): IndexLogManager = {
+    val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
+    IndexLogManagerFactoryImpl.create(indexPath)
+  }
+
+  private def listFiles(path: String): Seq[String] = {
+    val absolutePath = PathUtils.makeAbsolute(path)
+    val fs = absolutePath.getFileSystem(new Configuration)
+    fs.listStatus(absolutePath).toSeq.map(_.getPath.toString)
+  }
+
+  private def getLatestStableLog(indexName: String): IndexLogEntry = {
+    val entry = logManager(indexName).getLatestStableLog()
+    assert(entry.isDefined)
+    assert(entry.get.isInstanceOf[IndexLogEntry])
+    entry.get.asInstanceOf[IndexLogEntry]
   }
 }
