@@ -65,7 +65,7 @@ trait IndexManager {
    *
    * @param indexName Name of the index to refresh.
    */
-  def refresh(indexName: String): Unit
+  def refresh(indexName: String, mode: String): Unit
 
   /**
    * Optmizes index files by merging smaller files into larger files.

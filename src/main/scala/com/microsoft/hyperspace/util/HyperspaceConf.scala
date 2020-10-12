@@ -40,20 +40,6 @@ object HyperspaceConf {
       .toBoolean
   }
 
-  def refreshDeleteEnabled(spark: SparkSession): Boolean = {
-    spark.conf
-      .get(IndexConstants.REFRESH_DELETE_ENABLED,
-        IndexConstants.REFRESH_DELETE_ENABLED_DEFAULT)
-      .toBoolean
-  }
-
-  def refreshAppendEnabled(spark: SparkSession): Boolean = {
-    spark.conf
-      .get(IndexConstants.REFRESH_APPEND_ENABLED,
-        IndexConstants.REFRESH_APPEND_ENABLED_DEFAULT)
-      .toBoolean
-  }
-
   def optimizeThreshold(spark: SparkSession): Long = {
     spark.conf
       .get(
