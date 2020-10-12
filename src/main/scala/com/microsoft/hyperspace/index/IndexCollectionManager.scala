@@ -67,10 +67,10 @@ class IndexCollectionManager(
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
-      if (mode.equals(REFRESH_MODE_INCREMENTAL)) {
+      if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
         new RefreshDeleteAction(spark, logManager, dataManager).run()
         new RefreshAppendAction(spark, logManager, dataManager).run()
-      } else if (mode.equals(REFRESH_MODE_FULL)) {
+      } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager).run()
       } else {
         throw HyperspaceException(s"Unsupported refresh mode $mode found.")
