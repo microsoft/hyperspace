@@ -26,6 +26,7 @@ import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteActio
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+
 /**
  * Unit E2E test cases for RefreshIndex.
  */
