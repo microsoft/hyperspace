@@ -192,9 +192,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // value of DATA_FILE_NAME_COLUMN column is read.
       // Here is an example of normalization:
       // - Original raw path (output of input_file_name() udf, before normalization):
-      //    + file:///C:/myGit/hyperspace-1/src/test/part-00003.snappy.parquet
+      //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet
       // - Normalized path to be stored in DATA_FILE_NAME_COLUMN column:
-      //    + file:/C:/myGit/hyperspace-1/src/test/part-00003.snappy.parquet
+      //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       val absolutePath: UserDefinedFunction = udf(
         (filePath: String) => filePath.replace("file:///", "file:/"))
 
