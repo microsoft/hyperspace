@@ -53,13 +53,13 @@ private[actions] abstract class RefreshActionBase(
   // throughout all index versions. For "full" refresh mode, we could allow to change configs
   // like num buckets or lineage column as it is newly building the index data. This might
   // be done with a different refresh mode if necessary.
-  override protected final def getNumBucketsConfig(spark: SparkSession): Int = {
+  override protected final def numBucketsForIndex(spark: SparkSession): Int = {
     previousIndexLogEntry.numBuckets
   }
 
   // Refresh maintains the same lineage column config as the existing index.
   // See above getNumBucketsConfig for more detail.
-  override protected final def getLineageColumnConfig(spark: SparkSession): Boolean = {
+  override protected final def indexLineageEnabled(spark: SparkSession): Boolean = {
     previousIndexLogEntry.hasLineageColumn(spark)
   }
 

@@ -39,11 +39,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
-  protected def getNumBucketsConfig(spark: SparkSession): Int = {
+  protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
   }
 
-  protected def getLineageColumnConfig(spark: SparkSession): Boolean = {
+  protected def indexLineageEnabled(spark: SparkSession): Boolean = {
     HyperspaceConf.indexLineageEnabled(spark)
   }
 
@@ -53,7 +53,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig,
       path: Path): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path)
-    val numBuckets = getNumBucketsConfig(spark)
+    val numBuckets = numBucketsForIndex(spark)
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
@@ -122,7 +122,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
-    val numBuckets = getNumBucketsConfig(spark)
+    val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
@@ -168,7 +168,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val addLineage = getLineageColumnConfig(spark)
+    val addLineage = indexLineageEnabled(spark)
 
     val indexDF = if (addLineage) {
       // Lineage is captured using two sets of columns:
