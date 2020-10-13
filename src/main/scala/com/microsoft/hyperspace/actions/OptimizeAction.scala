@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, OPTIMIZING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.IndexConstants.OPTIMIZE_MODES
@@ -59,10 +60,28 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  */
 class OptimizeAction(
     spark: SparkSession,
-    logManager: IndexLogManager,
+    final override protected val logManager: IndexLogManager,
     dataManager: IndexDataManager,
     mode: String)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    extends CreateActionBase(dataManager)
+    with Action {
+  private lazy val previousLogEntry: LogEntry = {
+    logManager.getLog(baseId).getOrElse {
+      throw HyperspaceException("LogEntry must exist for optimize operation")
+    }
+  }
+
+  protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
+
+  protected lazy val indexConfig: IndexConfig = {
+    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
+    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+  }
+
+  final override val transientState: String = OPTIMIZING
+
+  final override val finalState: String = ACTIVE
+
   final override def op(): Unit = {
     // Rewrite index from small files.
     val numBuckets = previousIndexLogEntry.numBuckets
@@ -87,7 +106,7 @@ class OptimizeAction(
 
     if (filesToOptimize.isEmpty) {
       throw NoChangesException(
-        s"Optimize aborted as no index files smaller than " +
+        "Optimize aborted as no index files smaller than " +
           s"${HyperspaceConf.optimizeFileSizeThreshold(spark)} found.")
     }
   }
@@ -97,6 +116,8 @@ class OptimizeAction(
       val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
       previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
     } else {
+      // For 'full' mode, put all the existing index files into 'smallFiles' partition so
+      // that one file is created per bucket.
       (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
     }
   }
