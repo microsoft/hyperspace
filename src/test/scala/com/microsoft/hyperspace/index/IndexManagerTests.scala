@@ -359,7 +359,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .parquet(testPath)
         hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
-        // Check if latest log file is updated with newly created index files
+        // Check if latest log file is updated with newly created index files.
         val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
 
         MockEventLogger.reset()
