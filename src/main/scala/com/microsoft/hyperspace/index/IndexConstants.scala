@@ -42,11 +42,19 @@ object IndexConstants {
   val INDEX_HYBRID_SCAN_DELETE_ENABLED = "spark.hyperspace.index.hybridscan.delete.enabled"
   val INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT = "false"
 
+  // With the current performance limitation of Hybrid scan for delete files, we limit
+  // the number of deleted files to avoid regression from Hybrid scan.
+  // If the number of deleted files is larger than this config, the index is disabled and
+  // cannot be a candidate for Hybrid Scan.
+  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES =
+    "spark.hyperspace.index.hybridscan.delete.maxNumDeletedFiles"
+  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT = "10"
+
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.
   // In Spark 3.0, we could utilize TreeNodeTag to mark the identifier for each plan.
   // See https://github.com/microsoft/hyperspace/issues/185
-  val INDEX_RELATION_IDENTIFIER: (String, String) = ("indexRelation" -> "true")
+  val INDEX_RELATION_IDENTIFIER: (String, String) = "indexRelation" -> "true"
 
   // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
   val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
