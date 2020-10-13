@@ -23,6 +23,7 @@ import org.mockito.Mockito.{mock, when}
 
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 
 class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   private val indexSystemPath = "src/test/resources/indexLocation"
@@ -52,8 +53,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
                   .Columns(Seq("RGUID"), Seq("Date")),
                 "",
                 10)),
-            Content(
-              Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
+            Content(Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
             Source(SparkPlan(sourcePlanProperties)),
             Map())
           entry.state = Constants.States.ACTIVE
@@ -132,8 +132,14 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
     intercept[HyperspaceException](indexCollectionManager.restore("idx4"))
   }
 
-  test("refresh() throws exception if index is not found") {
+  test("refresh() with mode = 'full' throws exception if index is not found") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
-    intercept[HyperspaceException](indexCollectionManager.refresh("idx4"))
+    intercept[HyperspaceException](indexCollectionManager.refresh("idx4", REFRESH_MODE_FULL))
+  }
+
+  test("refresh() with mode = 'incremental' throws exception if index is not found") {
+    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    intercept[HyperspaceException](
+      indexCollectionManager.refresh("idx4", REFRESH_MODE_INCREMENTAL))
   }
 }

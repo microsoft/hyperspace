@@ -19,6 +19,7 @@ package com.microsoft.hyperspace
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_FULL
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 
 class Hyperspace(spark: SparkSession) {
@@ -74,7 +75,18 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to refresh.
    */
   def refreshIndex(indexName: String): Unit = {
-    indexManager.refresh(indexName)
+    refreshIndex(indexName, REFRESH_MODE_FULL)
+  }
+
+  /**
+   * Update indexes for the latest version of the data. This api provides a few supported
+   * refresh modes as listed below.
+   *
+   * @param indexName Name of the index to refresh.
+   * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
+   */
+  def refreshIndex(indexName: String, mode: String): Unit = {
+    indexManager.refresh(indexName, mode)
   }
 
   /**

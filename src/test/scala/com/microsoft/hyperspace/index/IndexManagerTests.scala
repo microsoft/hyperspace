@@ -23,10 +23,10 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.TestUtils.copyWithState
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.telemetry.RefreshAppendActionEvent
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
@@ -226,7 +226,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .options(option)
           .format(format)
           .save(refreshTestLocation)
-        hyperspace.refreshIndex(indexConfig.indexName)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_FULL)
         val newIndexLocation = s"$systemPath/index_$format"
         indexCount = spark.read
           .parquet(newIndexLocation +
@@ -252,81 +252,45 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Verify refresh-incremental (append-only) is a no-op if no new files found.") {
+  test("Verify incremental refresh (append-only) should index only newly appended data.") {
     withTempPathAsString { testPath =>
-      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
-        // Setup. Create sample data and index.
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
-        import spark.implicits._
-        SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .limit(10)
-          .write
-          .parquet(testPath)
-        val df = spark.read.parquet(testPath)
-        hyperspace.createIndex(df, indexConfig)
-        val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
-        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
-        val latestId = logManager.getLatestId().get
-
-        MockEventLogger.reset()
-        hyperspace.refreshIndex(indexConfig.indexName)
-        // Check that no new log files were created in this operation.
-        assert(latestId == logManager.getLatestId().get)
-
-        // Check emitted events.
-        MockEventLogger.emittedEvents match {
-          case Seq(
-              RefreshAppendActionEvent(_, _, "Operation started."),
-              RefreshAppendActionEvent(_, _, msg)) =>
-            assert(msg.contains("Refresh append aborted as no appended source data files found."))
-          case _ => fail()
-        }
-      }
-    }
-  }
-
-  test("Verify refresh-incremental (append-only) should index only newly appended data.") {
-    withTempPathAsString { testPath =>
-      withSQLConf(IndexConstants.REFRESH_APPEND_ENABLED -> "true") {
-        // Setup. Create sample data and index.
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
-        import spark.implicits._
-        SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .limit(10)
-          .write
-          .parquet(testPath)
-        val df = spark.read.parquet(testPath)
-        hyperspace.createIndex(df, indexConfig)
-        var indexCount =
-          spark.read
-            .parquet(s"$systemPath/index" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-            .count()
-        assert(indexCount == 10)
-        // Check if latest log file is updated with newly created index files.
-        validateMetadata("index", Set("v__=0"))
-
-        // Change original data.
-        SampleData.testData
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
-          .limit(3)
-          .write
-          .mode("append")
-          .parquet(testPath)
-        hyperspace.refreshIndex(indexConfig.indexName)
-        indexCount = spark.read
+      // Setup. Create sample data and index.
+      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+      var indexCount =
+        spark.read
           .parquet(s"$systemPath/index" +
-            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
           .count()
+      assert(indexCount == 10)
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=0"))
 
-        // Check if index got updated.
-        assert(indexCount == 3)
+      // Change original data.
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+      indexCount = spark.read
+        .parquet(s"$systemPath/index" +
+          s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+        .count()
 
-        // Check if latest log file is updated with newly created index files.
-        validateMetadata("index", Set("v__=0", "v__=1"))
-      }
+      // Check if index got updated.
+      assert(indexCount == 3)
+
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=0", "v__=1"))
     }
   }
 

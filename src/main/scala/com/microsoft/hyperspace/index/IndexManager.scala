@@ -65,7 +65,7 @@ trait IndexManager {
    *
    * @param indexName Name of the index to refresh.
    */
-  def refresh(indexName: String): Unit
+  def refresh(indexName: String, mode: String): Unit
 
   /**
    * Cancel api to bring back index from an inconsistent state to the last known stable state.
