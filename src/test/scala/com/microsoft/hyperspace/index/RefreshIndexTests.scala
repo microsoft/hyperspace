@@ -347,6 +347,37 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Validate the configs for incremental index data is consistent with" +
+    "the previous version.") {
+    withTempPathAsString { testPath =>
+      SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+      val df = spark.read.parquet(testPath)
+
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "false",
+        IndexConstants.INDEX_NUM_BUCKETS -> "20") {
+        hyperspace.createIndex(df, indexConfig)
+      }
+
+      // Add some new data to source.
+      import spark.implicits._
+      SampleData.testData
+        .take(3)
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .mode("append")
+        .parquet(testPath)
+
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+        IndexConstants.INDEX_NUM_BUCKETS -> "10") {
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+      }
+
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(!indexLogEntry.hasLineageColumn(spark))
+      assert(indexLogEntry.numBuckets === 20)
+    }
+  }
+
   /**
    * Delete one file from a given path.
    *
