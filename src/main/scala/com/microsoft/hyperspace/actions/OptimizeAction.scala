@@ -107,7 +107,7 @@ class OptimizeAction(
     val absolutePath = PathUtils.makeAbsolute(indexDataPath)
     val newContent = Content.fromDirectory(absolutePath)
     if (largeFiles.nonEmpty) {
-      val largeFilesDirectory: Directory = {
+      val largeFilesDirectory = {
         val fs = new Path(largeFiles.head.name).getFileSystem(new Configuration)
         val largeFileStatuses =
           largeFiles.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
