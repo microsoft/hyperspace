@@ -68,7 +68,7 @@ trait IndexManager {
   def refresh(indexName: String, mode: String): Unit
 
   /**
-   * Optmizes index files by merging smaller files into larger files.
+   * Optimize index by changing the underlying index data layout (e.g., compaction).
    *
    * @param indexName Name of the index to optimize.
    * @param mode Optimize mode. "quick" mode refers to optimizing only small index files. "full"

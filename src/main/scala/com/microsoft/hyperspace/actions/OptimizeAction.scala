@@ -116,7 +116,7 @@ class OptimizeAction(
       val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
       previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
     } else {
-      // For 'full' mode, put all the existing index files into 'smallFiles' partition so
+      // For 'full' mode, put all the existing index files into 'filesToOptimize' partition so
       // that one file is created per bucket.
       (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
     }
@@ -128,14 +128,14 @@ class OptimizeAction(
     val absolutePath = PathUtils.makeAbsolute(indexDataPath)
     val newContent = Content.fromDirectory(absolutePath)
     if (filesToIgnore.nonEmpty) {
-      val largeFilesDirectory: Directory = {
+      val filesToIgnoreDirectory = {
         val fs = new Path(filesToIgnore.head.name).getFileSystem(new Configuration)
-        val largeFileStatuses =
+        val filesToIgnoreStatuses =
           filesToIgnore.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
 
-        Directory.fromLeafFiles(largeFileStatuses)
+        Directory.fromLeafFiles(filesToIgnoreStatuses)
       }
-      val mergedContent = Content(newContent.root.merge(largeFilesDirectory))
+      val mergedContent = Content(newContent.root.merge(filesToIgnoreDirectory))
       previousIndexLogEntry.copy(content = mergedContent)
     } else {
       previousIndexLogEntry.copy(content = newContent)

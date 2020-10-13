@@ -123,7 +123,7 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Index optimization mode. "quick" refers to optimization of only small index
    *             files, based on a threshold. "full" refers to recreation of index.
    */
-  def optimizeIndex(indexName: String, mode: String = OPTIMIZE_MODE_QUICK): Unit = {
+  def optimizeIndex(indexName: String, mode: String): Unit = {
     indexManager.optimize(indexName, mode)
   }
 
