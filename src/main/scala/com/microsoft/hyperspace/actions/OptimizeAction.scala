@@ -53,7 +53,7 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  *  https://github.com/microsoft/hyperspace/issues/204.
  *
  * @param spark SparkSession
- * @param logManager Index LogManager for index being refreshed
+ * @param logManager IndexLogManager for index being refreshed
  * @param dataManager Index DataManager for index being refreshed
  * @param mode Acceptable optimize modes are `quick` and `full`.
  */
@@ -64,7 +64,7 @@ class OptimizeAction(
     mode: String)
     extends RefreshActionBase(spark, logManager, dataManager) {
   final override def op(): Unit = {
-    // Rewrite index from small files
+    // Rewrite index from small files.
     val numBuckets = previousIndexLogEntry.numBuckets
     val indexDF = spark.read.parquet(smallFiles.map(_.name): _*)
 

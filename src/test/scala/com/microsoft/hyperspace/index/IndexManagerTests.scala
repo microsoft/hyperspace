@@ -313,7 +313,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .count()
       assert(indexCount == 10)
 
-      // Change Original Data
+      // Change original data.
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
         .limit(3)
@@ -327,12 +327,12 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
         .count()
 
-      // Check if index got updated
+      // Check if index got updated.
       assert(indexCount == 3)
 
       hyperspace.optimizeIndex(indexConfig.indexName)
 
-      // Check if latest log file is updated with newly created index files
+      // Check if latest log file is updated with newly created index files.
       validateMetadata("index", Set("v__=2"))
     }
   }
@@ -350,7 +350,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         val df = spark.read.parquet(testPath)
         hyperspace.createIndex(df, indexConfig)
 
-        // Change Original Data
+        // Change original data.
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .limit(3)
@@ -359,7 +359,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .parquet(testPath)
         hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
-        // Check if latest log file is updated with newly created index files
+        // Check if latest log file is updated with newly created index files.
         val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
 
         MockEventLogger.reset()
