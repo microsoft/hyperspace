@@ -332,7 +332,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
       hyperspace.optimizeIndex(indexConfig.indexName)
 
-      // Check if latest log file is updated with newly created index files
+      // Check if latest log file is updated with newly created index files.
       validateMetadata("index", Set("v__=2"))
     }
   }
