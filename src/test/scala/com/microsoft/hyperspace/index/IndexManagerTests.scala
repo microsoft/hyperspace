@@ -313,7 +313,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .count()
       assert(indexCount == 10)
 
-      // Change Original Data
+      // Change original data.
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
         .limit(3)
