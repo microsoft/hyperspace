@@ -46,8 +46,8 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  * predefined threshold "spark.hyperspace.index.optimize.fileSizeThreshold" will be picked
  * for compaction.
  *
- * `Full` mode: This allows for slow but complete optimization. ALL files are
- * eligible for compaction. Compaction threshold is inifinity.
+ * `Full` mode: This allows for slow but complete optimization. ALL index files are
+ * picked for compaction.
  *
  * TODO: Optimize can be a no-op if there is only one small file per bucket.
  *  https://github.com/microsoft/hyperspace/issues/204.
@@ -66,7 +66,7 @@ class OptimizeAction(
   final override def op(): Unit = {
     // Rewrite index from small files.
     val numBuckets = previousIndexLogEntry.numBuckets
-    val indexDF = spark.read.parquet(smallFiles.map(_.name): _*)
+    val indexDF = spark.read.parquet(filesToOptimize.map(_.name): _*)
 
     val repartitionedDf =
       indexDF.repartition(numBuckets, indexConfig.indexedColumns.map(indexDF(_)): _*)
@@ -85,14 +85,14 @@ class OptimizeAction(
       throw HyperspaceException(s"Unsupported optimize mode '$mode' found.")
     }
 
-    if (smallFiles.isEmpty) {
+    if (filesToOptimize.isEmpty) {
       throw NoChangesException(
         s"Optimize aborted as no index files smaller than " +
           s"${HyperspaceConf.optimizeFileSizeThreshold(spark)} found.")
     }
   }
 
-  private lazy val (smallFiles, largeFiles): (Seq[FileInfo], Seq[FileInfo]) = {
+  private lazy val (filesToOptimize, filesToIgnore): (Seq[FileInfo], Seq[FileInfo]) = {
     if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
       val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
       previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
@@ -102,15 +102,15 @@ class OptimizeAction(
   }
 
   override def logEntry: LogEntry = {
-    // Use the `previousLogEntry`. Update content of index files replacing `smallFiles` with newly
-    // created files.
+    // Update `previousIndexLogEntry` to keep `filesToIngore` files and append to it
+    // the list of newly created index files.
     val absolutePath = PathUtils.makeAbsolute(indexDataPath)
     val newContent = Content.fromDirectory(absolutePath)
-    if (largeFiles.nonEmpty) {
+    if (filesToIgnore.nonEmpty) {
       val largeFilesDirectory: Directory = {
-        val fs = new Path(largeFiles.head.name).getFileSystem(new Configuration)
+        val fs = new Path(filesToIgnore.head.name).getFileSystem(new Configuration)
         val largeFileStatuses =
-          largeFiles.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
+          filesToIgnore.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
 
         Directory.fromLeafFiles(largeFileStatuses)
       }
