@@ -306,11 +306,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         .parquet(testPath)
       val df = spark.read.parquet(testPath)
       hyperspace.createIndex(df, indexConfig)
-      var indexCount =
-        spark.read
-          .parquet(s"$systemPath/index" +
-            s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-          .count()
+      var indexCount = spark.read
+        .parquet(s"$systemPath/index/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+        .count()
       assert(indexCount == 10)
 
       // Change original data.
