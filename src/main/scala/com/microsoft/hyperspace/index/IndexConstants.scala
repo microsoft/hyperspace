@@ -76,6 +76,8 @@ object IndexConstants {
   val REFRESH_MODE_INCREMENTAL = "incremental"
   val REFRESH_MODE_FULL = "full"
 
+  val OPTIMIZE_MODE_QUICK = "quick"
+  val OPTIMIZE_MODE_FULL = "full"
   val OPTIMIZE_THRESHOLD = "spark.hyperspace.index.optimize.threshold"
   val OPTIMIZE_THRESHOLD_SIZE = 100 * 1024 * 1024L // 100MB
 }

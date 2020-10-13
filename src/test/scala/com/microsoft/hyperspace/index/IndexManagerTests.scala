@@ -23,10 +23,11 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.TestUtils.copyWithState
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.TestUtils.{copyWithState, logManager}
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
@@ -333,6 +334,49 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
       // Check if latest log file is updated with newly created index files
       validateMetadata("index", Set("v__=2"))
+    }
+  }
+
+  test("Verify optimize is a no-op if no small files found.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(OPTIMIZE_THRESHOLD -> "1") {
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
+        hyperspace.createIndex(df, indexConfig)
+
+        // Change Original Data
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(3)
+          .write
+          .mode("append")
+          .parquet(testPath)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+        // Check if latest log file is updated with newly created index files
+        val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
+
+        MockEventLogger.reset()
+        hyperspace.optimizeIndex(indexConfig.indexName)
+
+        // Check that no new log files were created in this operation.
+        assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
+
+        // Check emitted events.
+        MockEventLogger.emittedEvents match {
+          case Seq(
+              OptimizeActionEvent(_, _, "Operation started."),
+              OptimizeActionEvent(_, _, msg)) =>
+            assert(msg.contains("Optimize aborted as no index files smaller than 1 found."))
+          case _ => fail()
+        }
+      }
     }
   }
 

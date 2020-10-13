@@ -20,9 +20,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import com.microsoft.hyperspace.MockEventLogger.reset
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
 import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 object TestUtils {
   def copyWithState(index: IndexLogEntry, state: String): IndexLogEntry = {
@@ -69,6 +69,16 @@ object TestUtils {
     filesToDelete.foreach(FileUtils.delete(_))
 
     filesToDelete
+  }
+
+  /**
+   * @param systemPath
+   * @param indexName
+   * @return
+   */
+  def logManager(systemPath: Path, indexName: String): IndexLogManager = {
+    val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
+    IndexLogManagerFactoryImpl.create(indexPath)
   }
 }
 

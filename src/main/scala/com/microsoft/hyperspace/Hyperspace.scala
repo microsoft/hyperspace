@@ -19,7 +19,7 @@ package com.microsoft.hyperspace
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_FULL
+import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 
 class Hyperspace(spark: SparkSession) {
@@ -99,7 +99,7 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Index optimization mode. "quick" refers to optimization of only small index
    *             files, based on a threshold. "full" refers to recreation of index.
    */
-  def optimizeIndex(indexName: String, mode: String = "quick"): Unit = {
+  def optimizeIndex(indexName: String, mode: String = OPTIMIZE_MODE_QUICK): Unit = {
     indexManager.optimize(indexName, mode)
   }
 

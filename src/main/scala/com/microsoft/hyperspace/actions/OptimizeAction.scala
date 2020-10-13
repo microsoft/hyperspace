@@ -20,8 +20,10 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_FULL, OPTIMIZE_MODE_QUICK}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, OptimizeActionEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
@@ -61,7 +63,6 @@ class OptimizeAction(
     dataManager: IndexDataManager,
     mode: String)
     extends RefreshActionBase(spark, logManager, dataManager) {
-
   final override def op(): Unit = {
     // Rewrite index from small files
     val numBuckets = previousIndexLogEntry.numBuckets
@@ -77,8 +78,22 @@ class OptimizeAction(
       indexConfig.indexedColumns)
   }
 
+  override def validate(): Unit = {
+    super.validate()
+
+    if (!Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL).exists(_.equalsIgnoreCase(mode))) {
+      throw HyperspaceException(s"Unsupported optimize mode '$mode' found.")
+    }
+
+    if (smallFiles.isEmpty) {
+      throw NoChangesException(
+        s"Optimize aborted as no index files smaller than " +
+          s"${HyperspaceConf.optimizeThreshold(spark)} found.")
+    }
+  }
+
   private lazy val (smallFiles, largeFiles): (Seq[FileInfo], Seq[FileInfo]) = {
-    if (mode.equals("quick")) {
+    if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
       val threshold = HyperspaceConf.optimizeThreshold(spark)
       previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
     } else {
