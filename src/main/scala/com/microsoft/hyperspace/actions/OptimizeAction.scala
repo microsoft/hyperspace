@@ -54,7 +54,7 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  *
  * @param spark SparkSession
  * @param logManager IndexLogManager for index being refreshed
- * @param dataManager Index DataManager for index being refreshed
+ * @param dataManager IndexDataManager for index being refreshed
  * @param mode Acceptable optimize modes are `quick` and `full`.
  */
 class OptimizeAction(
