@@ -327,7 +327,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
         .count()
 
-      // Check if index got updated
+      // Check if index got updated.
       assert(indexCount == 3)
 
       hyperspace.optimizeIndex(indexConfig.indexName)
