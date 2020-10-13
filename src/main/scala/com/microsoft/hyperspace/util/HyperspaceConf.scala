@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.index.IndexConstants
+import com.microsoft.hyperspace.index.{Content, CoveringIndex, IndexConstants, IndexLogEntry, LogEntry, Source}
 
 /**
  * Helper class to extract Hyperspace-related configs from SparkSession.
@@ -54,5 +54,21 @@ object HyperspaceConf {
         IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES,
         IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT)
       .toInt
+  }
+
+  def numBucketsForIndex(spark: SparkSession): Int = {
+    spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_NUM_BUCKETS,
+        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
+      .toInt
+  }
+
+  def indexLineageEnabled(spark: SparkSession): Boolean = {
+    spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_LINEAGE_ENABLED,
+        IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      .toBoolean
   }
 }

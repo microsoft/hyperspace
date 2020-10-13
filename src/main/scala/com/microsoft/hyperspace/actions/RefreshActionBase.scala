@@ -49,6 +49,20 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
 
+  // Refresh maintains the same number of buckets as the existing index to be consistent
+  // throughout all index versions. For "full" refresh mode, we could allow to change configs
+  // like num buckets or lineage column as it is newly building the index data. This might
+  // be done with a different refresh mode if necessary.
+  override protected final def numBucketsForIndex(spark: SparkSession): Int = {
+    previousIndexLogEntry.numBuckets
+  }
+
+  // Refresh maintains the same lineage column config as the existing index.
+  // See above getNumBucketsConfig for more detail.
+  override protected final def indexLineageEnabled(spark: SparkSession): Boolean = {
+    previousIndexLogEntry.hasLineageColumn(spark)
+  }
+
   // Reconstruct a df from schema
   protected lazy val df = {
     val rels = previousIndexLogEntry.relations

@@ -26,7 +26,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -39,17 +39,21 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
+  protected def numBucketsForIndex(spark: SparkSession): Int = {
+    HyperspaceConf.numBucketsForIndex(spark)
+  }
+
+  protected def indexLineageEnabled(spark: SparkSession): Boolean = {
+    HyperspaceConf.indexLineageEnabled(spark)
+  }
+
   protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
       path: Path): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path)
-    val numBuckets = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_NUM_BUCKETS,
-        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-      .toInt
+    val numBuckets = numBucketsForIndex(spark)
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
@@ -118,11 +122,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
-    val numBuckets = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_NUM_BUCKETS,
-        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-      .toInt
+    val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
@@ -168,11 +168,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val addLineage = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_LINEAGE_ENABLED,
-        IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
-      .toBoolean
+    val addLineage = indexLineageEnabled(spark)
 
     val indexDF = if (addLineage) {
       // Lineage is captured using two sets of columns:
