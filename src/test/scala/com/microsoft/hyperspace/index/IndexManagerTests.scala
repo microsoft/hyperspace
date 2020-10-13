@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.TestUtils.{copyWithState, logManager}
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -339,7 +339,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify optimize is a no-op if no small files found.") {
     withTempPathAsString { testPath =>
-      withSQLConf(OPTIMIZE_THRESHOLD -> "1") {
+      withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "1") {
         val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         SampleData.testData

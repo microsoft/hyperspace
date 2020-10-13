@@ -23,7 +23,7 @@ import org.apache.spark.sql.SparkSession
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_FULL, OPTIMIZE_MODE_QUICK}
+import com.microsoft.hyperspace.index.IndexConstants.OPTIMIZE_MODES
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, OptimizeActionEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
@@ -43,7 +43,7 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  *
  * Available modes:
  * `Quick` mode: This mode allows for fast optimization. Files smaller than a
- * predefined threshold "spark.hyperspace.index.optimize.threshold" will be picked
+ * predefined threshold "spark.hyperspace.index.optimize.fileSizeThreshold" will be picked
  * for compaction.
  *
  * `Full` mode: This allows for slow but complete optimization. ALL files are
@@ -81,20 +81,20 @@ class OptimizeAction(
   override def validate(): Unit = {
     super.validate()
 
-    if (!Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL).exists(_.equalsIgnoreCase(mode))) {
+    if (!OPTIMIZE_MODES.exists(_.equalsIgnoreCase(mode))) {
       throw HyperspaceException(s"Unsupported optimize mode '$mode' found.")
     }
 
     if (smallFiles.isEmpty) {
       throw NoChangesException(
         s"Optimize aborted as no index files smaller than " +
-          s"${HyperspaceConf.optimizeThreshold(spark)} found.")
+          s"${HyperspaceConf.optimizeFileSizeThreshold(spark)} found.")
     }
   }
 
   private lazy val (smallFiles, largeFiles): (Seq[FileInfo], Seq[FileInfo]) = {
     if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
-      val threshold = HyperspaceConf.optimizeThreshold(spark)
+      val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
       previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
     } else {
       (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
@@ -102,13 +102,13 @@ class OptimizeAction(
   }
 
   override def logEntry: LogEntry = {
-    // Use the previous log entry. Update index contents to reflect latest changes.
+    // Use the `previousLogEntry`. Update content of index files replacing `smallFiles` with newly
+    // created files.
     val absolutePath = PathUtils.makeAbsolute(indexDataPath)
     val newContent = Content.fromDirectory(absolutePath)
     if (largeFiles.nonEmpty) {
       val largeFilesDirectory: Directory = {
-        val fs = new Path(previousIndexLogEntry.content.fileInfos.head.name)
-          .getFileSystem(new Configuration)
+        val fs = new Path(largeFiles.head.name).getFileSystem(new Configuration)
         val largeFileStatuses =
           largeFiles.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
 

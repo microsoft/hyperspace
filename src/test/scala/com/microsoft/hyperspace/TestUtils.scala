@@ -71,11 +71,6 @@ object TestUtils {
     filesToDelete
   }
 
-  /**
-   * @param systemPath
-   * @param indexName
-   * @return
-   */
   def logManager(systemPath: Path, indexName: String): IndexLogManager = {
     val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
     IndexLogManagerFactoryImpl.create(indexPath)

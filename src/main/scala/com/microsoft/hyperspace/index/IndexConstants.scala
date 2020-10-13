@@ -88,8 +88,9 @@ object IndexConstants {
    * Optimize threshold. It is a threshold of size of index files in bytes. Files with size
    * below this threshold are eligible for index optimization.
    */
-  val OPTIMIZE_THRESHOLD = "spark.hyperspace.index.optimize.threshold"
-  val OPTIMIZE_THRESHOLD_DEFAULT = 256 * 1024 * 1024L // 256MB
+  val OPTIMIZE_FILE_SIZE_THRESHOLD = "spark.hyperspace.index.optimize.fileSizeThreshold"
+  val OPTIMIZE_FILE_SIZE_THRESHOLD_DEFAULT = 256 * 1024 * 1024L // 256MB
   val OPTIMIZE_MODE_QUICK = "quick"
   val OPTIMIZE_MODE_FULL = "full"
+  val OPTIMIZE_MODES = Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL)
 }

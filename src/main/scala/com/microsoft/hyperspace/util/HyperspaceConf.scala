@@ -40,11 +40,11 @@ object HyperspaceConf {
       .toBoolean
   }
 
-  def optimizeThreshold(spark: SparkSession): Long = {
+  def optimizeFileSizeThreshold(spark: SparkSession): Long = {
     spark.conf
       .get(
-        IndexConstants.OPTIMIZE_THRESHOLD,
-        IndexConstants.OPTIMIZE_THRESHOLD_DEFAULT.toString)
+        IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD,
+        IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD_DEFAULT.toString)
       .toLong
   }
 
