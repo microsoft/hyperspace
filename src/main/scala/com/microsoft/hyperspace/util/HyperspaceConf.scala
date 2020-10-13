@@ -44,7 +44,7 @@ object HyperspaceConf {
     spark.conf
       .get(
         IndexConstants.OPTIMIZE_THRESHOLD,
-        IndexConstants.OPTIMIZE_THRESHOLD_SIZE.toString)
+        IndexConstants.OPTIMIZE_THRESHOLD_DEFAULT.toString)
       .toLong
   }
 }
