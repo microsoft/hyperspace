@@ -83,7 +83,7 @@ class OptimizeAction(
   final override val finalState: String = ACTIVE
 
   final override def op(): Unit = {
-    // Rewrite index from small files.
+    // Rewrite index using the eligible files to optimize.
     val numBuckets = previousIndexLogEntry.numBuckets
     val indexDF = spark.read.parquet(filesToOptimize.map(_.name): _*)
 
