@@ -26,7 +26,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -40,19 +40,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   }
 
   protected def getNumBucketsConfig(spark: SparkSession): Int = {
-    spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_NUM_BUCKETS,
-        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-      .toInt
+    HyperspaceConf.numBucketsForIndex(spark)
   }
 
   protected def getLineageColumnConfig(spark: SparkSession): Boolean = {
-    spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_LINEAGE_ENABLED,
-        IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
-      .toBoolean
+    HyperspaceConf.indexLineageEnabled(spark)
   }
 
   protected def getIndexLogEntry(
