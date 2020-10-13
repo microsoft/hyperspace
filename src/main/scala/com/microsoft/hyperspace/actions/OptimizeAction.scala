@@ -102,7 +102,7 @@ class OptimizeAction(
   }
 
   override def logEntry: LogEntry = {
-    // 1. Create an entry from previous entry.
+    // Use the previous log entry. Update index contents to reflect latest changes.
     val absolutePath = PathUtils.makeAbsolute(indexDataPath)
     val newContent = Content.fromDirectory(absolutePath)
     if (largeFiles.nonEmpty) {
