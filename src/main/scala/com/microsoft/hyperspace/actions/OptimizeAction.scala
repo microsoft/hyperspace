@@ -64,7 +64,7 @@ class OptimizeAction(
     mode: String)
     extends RefreshActionBase(spark, logManager, dataManager) {
   final override def op(): Unit = {
-    // Rewrite index from small files
+    // Rewrite index from small files.
     val numBuckets = previousIndexLogEntry.numBuckets
     val indexDF = spark.read.parquet(smallFiles.map(_.name): _*)
 
