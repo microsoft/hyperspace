@@ -104,6 +104,10 @@ object RuleUtils {
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
       assert(filesByRelations.length == 1)
+      // index.deletedFiles and index.appendedFiles should be non-empty until Hybrid Scan
+      // handles the lists properly. Otherwise, as the source file list of each index entry
+      // (entry.allSourceFileInfo) also contains the appended and deleted files, we cannot
+      // get the actual appended files and deleted files correctly.
       indexes.filter(index =>
         index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
           isHybridScanCandidate(index, filesByRelations.flatten))
