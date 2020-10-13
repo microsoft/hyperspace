@@ -320,7 +320,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         .parquet(testPath)
       hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
       val newIndexCount = spark.read
-        .parquet(s"$systemPath/index" +
         .parquet(s"$systemPath/index/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
         .count()
 
