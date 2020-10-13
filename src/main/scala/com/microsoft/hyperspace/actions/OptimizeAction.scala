@@ -50,7 +50,7 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  * `Full` mode: This allows for slow but complete optimization. ALL index files are
  * picked for compaction.
  *
- * TODO: Optimize can be a no-op if there is only one optimizable file per bucket.
+ * TODO: Optimize can be a no-op if there is at most one optimizable file per bucket.
  *  https://github.com/microsoft/hyperspace/issues/204.
  *
  * @param spark SparkSession.
@@ -65,15 +65,15 @@ class OptimizeAction(
     mode: String)
     extends CreateActionBase(dataManager)
     with Action {
-  private lazy val previousLogEntry: LogEntry = {
-    logManager.getLog(baseId).getOrElse {
-      throw HyperspaceException("LogEntry must exist for optimize operation")
+  private lazy val previousIndexLogEntry = {
+    logManager.getLog(baseId) match {
+      case Some(e: IndexLogEntry) => e
+      case _ =>
+        throw HyperspaceException("LogEntry must exist for optimize operation")
     }
   }
 
-  protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
-
-  protected lazy val indexConfig: IndexConfig = {
+  private lazy val indexConfig: IndexConfig = {
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
     IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
   }
