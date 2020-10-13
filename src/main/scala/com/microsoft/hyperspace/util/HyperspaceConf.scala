@@ -39,4 +39,12 @@ object HyperspaceConf {
         IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT)
       .toBoolean
   }
+
+  def hybridScanDeleteMaxNumFiles(spark: SparkSession): Int = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES,
+        IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT)
+      .toInt
+  }
 }

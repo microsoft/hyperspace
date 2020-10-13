@@ -79,12 +79,12 @@ object RuleUtils {
 
       // Find the number of common files between the source relations & index source files.
       val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
+      val deletedCnt = entry.allSourceFileInfos.size - commonCnt
 
       if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
-        commonCnt > 0
+        commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
       } else {
         // For append-only Hybrid Scan, deleted files are not allowed.
-        val deletedCnt = entry.allSourceFileInfos.size - commonCnt
         deletedCnt == 0 && commonCnt > 0
       }
     }
@@ -104,13 +104,18 @@ object RuleUtils {
               FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
         }
       assert(filesByRelations.length == 1)
+      // index.deletedFiles and index.appendedFiles should be non-empty until Hybrid Scan
+      // handles the lists properly. Otherwise, as the source file list of each index entry
+      // (entry.allSourceFileInfo) also contains the appended and deleted files, we cannot
+      // get the actual appended files and deleted files correctly.
       indexes.filter(index =>
-        index.created && isHybridScanCandidate(index, filesByRelations.flatten))
+        index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
+          isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
       indexes.filter(
         index =>
-          index.created && signatureValid(index) &&
-            index.deletedFiles.isEmpty && index.appendedFiles.isEmpty)
+          index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
+            signatureValid(index))
     }
   }
 
