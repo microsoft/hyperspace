@@ -81,7 +81,7 @@ object IndexConstants {
    * below this threshold are eligible for index optimization.
    */
   val OPTIMIZE_THRESHOLD = "spark.hyperspace.index.optimize.threshold"
-  val OPTIMIZE_THRESHOLD_DEFAULT = 256 * 1024 * 1024L // 100MB
+  val OPTIMIZE_THRESHOLD_DEFAULT = 256 * 1024 * 1024L // 256MB
   val OPTIMIZE_MODE_QUICK = "quick"
   val OPTIMIZE_MODE_FULL = "full"
 }
