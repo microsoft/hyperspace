@@ -347,7 +347,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Validate incremental index data is consistent with the current") {
+  test("Validate the configs for incremental index data is consistent with" +
+    "the previous version.") {
     withTempPathAsString { testPath =>
       SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
       val df = spark.read.parquet(testPath)
