@@ -49,6 +49,14 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
 
+  override protected final def getNumBucketsConfig(spark: SparkSession): Int = {
+    previousIndexLogEntry.numBuckets
+  }
+
+  override protected final def getLineageColumnConfig(spark: SparkSession): Boolean = {
+    previousIndexLogEntry.hasLineageColumn(spark)
+  }
+
   // Reconstruct a df from schema
   protected lazy val df = {
     val rels = previousIndexLogEntry.relations
