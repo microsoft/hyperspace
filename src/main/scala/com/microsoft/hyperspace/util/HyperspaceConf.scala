@@ -39,18 +39,4 @@ object HyperspaceConf {
         IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT)
       .toBoolean
   }
-
-  def refreshDeleteEnabled(spark: SparkSession): Boolean = {
-    spark.conf
-      .get(IndexConstants.REFRESH_DELETE_ENABLED,
-        IndexConstants.REFRESH_DELETE_ENABLED_DEFAULT)
-      .toBoolean
-  }
-
-  def refreshAppendEnabled(spark: SparkSession): Boolean = {
-    spark.conf
-      .get(IndexConstants.REFRESH_APPEND_ENABLED,
-        IndexConstants.REFRESH_APPEND_ENABLED_DEFAULT)
-      .toBoolean
-  }
 }
