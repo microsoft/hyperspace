@@ -50,12 +50,12 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  * `Full` mode: This allows for slow but complete optimization. ALL index files are
  * picked for compaction.
  *
- * TODO: Optimize can be a no-op if there is only one small file per bucket.
+ * TODO: Optimize can be a no-op if there is only one optimizable file per bucket.
  *  https://github.com/microsoft/hyperspace/issues/204.
  *
- * @param spark SparkSession
- * @param logManager IndexLogManager for index being refreshed
- * @param dataManager IndexDataManager for index being refreshed
+ * @param spark SparkSession.
+ * @param logManager IndexLogManager for index being refreshed.
+ * @param dataManager IndexDataManager for index being refreshed.
  * @param mode Acceptable optimize modes are `quick` and `full`.
  */
 class OptimizeAction(
