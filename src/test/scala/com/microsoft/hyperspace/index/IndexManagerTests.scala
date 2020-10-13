@@ -350,7 +350,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         val df = spark.read.parquet(testPath)
         hyperspace.createIndex(df, indexConfig)
 
-        // Change Original Data
+        // Change original data.
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .limit(3)
