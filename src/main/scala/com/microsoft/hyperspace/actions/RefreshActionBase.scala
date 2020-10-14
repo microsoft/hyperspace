@@ -118,10 +118,10 @@ private[actions] abstract class RefreshActionBase(
     df.queryExecution.optimizedPlan
       .collect {
         case LogicalRelation(
-        HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-        _,
-        _,
-        _) =>
+            HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
           location
             .allFiles()
             .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
