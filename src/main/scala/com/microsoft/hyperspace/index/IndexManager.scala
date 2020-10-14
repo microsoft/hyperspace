@@ -65,7 +65,16 @@ trait IndexManager {
    *
    * @param indexName Name of the index to refresh.
    */
-  def refresh(indexName: String): Unit
+  def refresh(indexName: String, mode: String): Unit
+
+  /**
+   * Optimize index by changing the underlying index data layout (e.g., compaction).
+   *
+   * @param indexName Name of the index to optimize.
+   * @param mode Optimize mode. "quick" mode refers to optimizing only small index files. "full"
+   *             mode represents optimizing all index files.
+   */
+  def optimize(indexName: String, mode: String): Unit
 
   /**
    * Cancel api to bring back index from an inconsistent state to the last known stable state.
