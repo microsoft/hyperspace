@@ -40,6 +40,14 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  def optimizeFileSizeThreshold(spark: SparkSession): Long = {
+    spark.conf
+      .get(
+        IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD,
+        IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD_DEFAULT.toString)
+      .toLong
+  }
+
   def hybridScanDeleteMaxNumFiles(spark: SparkSession): Int = {
     spark.conf
       .get(
