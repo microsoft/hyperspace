@@ -121,7 +121,7 @@ class Hyperspace:
         :param mode: optimize mode 'quick' or 'full'
 
         >>> hyperspace = Hyperspace(spark)
-        >>> hyperspace.optimizeIndex("indexname", "quick/full")
+        >>> hyperspace.optimizeIndex("indexname", "quick")
         """
         self.hyperspace.optimizeIndex(indexName, mode)
 
