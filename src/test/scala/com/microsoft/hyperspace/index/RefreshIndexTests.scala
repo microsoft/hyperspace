@@ -212,7 +212,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       val fs = deletedFile.getFileSystem(new Configuration)
       fs.copyToLocalFile(sourcePath, deletedFile)
       val prevIndexLogEntry = getLatestStableLog(indexConfig.indexName)
-      assert(logManager(indexConfig.indexName).getLatestId().get == 1)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 1)
       assert(prevIndexLogEntry.content.fileInfos.forall(f =>
         f.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")))
 
@@ -224,7 +224,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         .run()
 
       val indexLogEntryAfterDeleteRefresh = getLatestStableLog(indexConfig.indexName)
-      assert(logManager(indexConfig.indexName).getLatestId().get == 3)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
       assert(indexLogEntryAfterDeleteRefresh.deletedFiles.isEmpty)
       assert(indexLogEntryAfterDeleteRefresh.appendedFiles.size == 1)
       assert(indexLogEntryAfterDeleteRefresh.appendedFiles.head.contains(deletedFile.getName))
@@ -237,7 +237,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
       assert(indexLogEntry.deletedFiles.isEmpty)
       assert(indexLogEntry.appendedFiles.isEmpty)
-      assert(logManager(indexConfig.indexName).getLatestId().get == 5)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
       val files = indexLogEntry.relations.head.data.properties.content.files
       assert(files.exists(_.equals(deletedFile)))
       val v1 = indexLogEntry.content.fileInfos
