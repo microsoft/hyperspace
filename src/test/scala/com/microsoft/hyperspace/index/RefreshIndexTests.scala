@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
+import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
@@ -134,12 +135,12 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
-      val latestId = logManager(indexConfig.indexName).getLatestId().get
+      val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
 
       MockEventLogger.reset()
       hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
       // Check that no new log files were created in this operation.
-      assert(latestId == logManager(indexConfig.indexName).getLatestId().get)
+      assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
 
       // Check emitted events.
       MockEventLogger.emittedEvents match {
@@ -422,11 +423,6 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     TestUtils.deleteFiles(dataPath, "*parquet", 1).head
   }
 
-  private def logManager(indexName: String): IndexLogManager = {
-    val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
-    IndexLogManagerFactoryImpl.create(indexPath)
-  }
-
   private def listFiles(path: String): Seq[String] = {
     val absolutePath = PathUtils.makeAbsolute(path)
     val fs = absolutePath.getFileSystem(new Configuration)
@@ -434,7 +430,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   private def getLatestStableLog(indexName: String): IndexLogEntry = {
-    val entry = logManager(indexName).getLatestStableLog()
+    val entry = logManager(systemPath, indexName).getLatestStableLog()
     assert(entry.isDefined)
     assert(entry.get.isInstanceOf[IndexLogEntry])
     entry.get.asInstanceOf[IndexLogEntry]

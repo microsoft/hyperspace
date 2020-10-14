@@ -78,6 +78,14 @@ class IndexCollectionManager(
     }
   }
 
+  override def optimize(indexName: String, mode: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
+      val dataManager = indexDataManagerFactory.create(indexPath)
+      new OptimizeAction(spark, logManager, dataManager, mode).run()
+    }
+  }
+
   override def cancel(indexName: String): Unit = {
     withLogManager(indexName) { logManager =>
       new CancelAction(logManager).run()
