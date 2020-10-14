@@ -71,17 +71,17 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
     def test_index_refresh(self):
         idx_config = IndexConfig('idx1', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
-        df.write.mode("append").parquet(self.data_file)
+        self.df.write.mode("append").parquet(self.data_file)
         self.hyperspace.refreshIndex('idx1')
-        df.write.mode("append").parquet(self.data_file)
+        self.df.write.mode("append").parquet(self.data_file)
         self.hyperspace.refreshIndex('idx1', 'incremental')
 
     def test_index_refresh(self):
         idx_config = IndexConfig('idx1', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
-        df.write.mode("append").parquet(self.data_file)
+        self.df.write.mode("append").parquet(self.data_file)
         self.hyperspace.refreshIndex('idx1', 'incremental')
-        df.write.mode("append").parquet(self.data_file)
+        self.df.write.mode("append").parquet(self.data_file)
         self.hyperspace.refreshIndex('idx1', 'incremental')
         self.hyperspace.optimizeIndex('idx1', 'quick')
 
