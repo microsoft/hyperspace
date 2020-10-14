@@ -110,6 +110,10 @@ private[actions] abstract class RefreshActionBase(
     delFiles ++ previousIndexLogEntry.deletedFiles
   }
 
+  /**
+   * Retrieve the source file list from reconstructed "df" for refresh.
+   * Build Set[FileInfo] to compare the source file list with the previous index version.
+   */
   protected lazy val currentFiles: Set[FileInfo] = {
     df.queryExecution.optimizedPlan
       .collect {
