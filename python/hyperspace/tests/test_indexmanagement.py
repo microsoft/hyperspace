@@ -68,6 +68,20 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         self.hyperspace.vacuumIndex("idx4")
         self.assertEqual(self.hyperspace.indexes().filter("""name = "idx4" """).count(), 0)
 
+    def test_index_refresh(self):
+        idx_config = IndexConfig('idx1', ['name'], ['age'])
+        self.hyperspace.createIndex(self.df, idx_config)
+        # Test the inter-op works fine for refreshIndex.
+        self.hyperspace.refreshIndex('idx1')
+        self.hyperspace.refreshIndex('idx1', 'incremental')
+
+    def test_index_refresh(self):
+        idx_config = IndexConfig('idx1', ['name'], ['age'])
+        self.hyperspace.createIndex(self.df, idx_config)
+        # Test the inter-op works fine for optimizeIndex.
+        self.hyperspace.optimizeIndex('idx1')
+        self.hyperspace.optimizeIndex('idx1', 'full')
+
 hyperspace_test = unittest.TestLoader().loadTestsFromTestCase(HyperspaceIndexManagementTests)
 result = unittest.TextTestRunner(verbosity=3).run(hyperspace_test)
 sys.exit(not result.wasSuccessful())

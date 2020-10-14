@@ -35,8 +35,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   private val nonPartitionedDataPath = testDir + "sampleparquet"
   private val partitionedDataPath = testDir + "samplepartitionedparquet"
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
-  private val fileSystem =
-    new Path(nonPartitionedDataPath).getFileSystem(new Configuration)
+  private val fileSystem = new Path(nonPartitionedDataPath).getFileSystem(new Configuration)
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {

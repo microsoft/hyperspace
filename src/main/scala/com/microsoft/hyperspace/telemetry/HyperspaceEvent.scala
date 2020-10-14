@@ -128,6 +128,16 @@ case class RefreshAppendActionEvent(appInfo: AppInfo, index: IndexLogEntry, mess
   extends HyperspaceIndexCRUDEvent
 
 /**
+ * Index Optimize Event for index files.
+ *
+ * @param appInfo AppInfo for spark application.
+ * @param index Related index.
+ * @param message Message about event.
+ */
+case class OptimizeActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+  extends HyperspaceIndexCRUDEvent
+
+/**
  * Index usage event. This event is emitted when an index is picked instead of original data
  * source by one of the hyperspace rules.
  *

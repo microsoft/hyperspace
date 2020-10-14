@@ -96,6 +96,11 @@ class CachingIndexCollectionManager(
     clearCache()
     super.refresh(indexName, mode)
   }
+
+  override def optimize(indexName: String, mode: String): Unit = {
+    clearCache()
+    super.optimize(indexName, mode)
+  }
 }
 
 object CachingIndexCollectionManager {
