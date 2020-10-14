@@ -1,6 +1,6 @@
 ---
-name: Design template
-about: This template is for making a design proposal.
+name: Design Proposal template
+about: This template is for making a design proposal. Please use this template when you want to work on implementing it and/or are proposing a design on how to solve the problem.
 title: "[PROPOSAL]: "
 labels: untriaged, proposal
 assignees: ''

@@ -19,6 +19,7 @@ package com.microsoft.hyperspace
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 
 class Hyperspace(spark: SparkSession) {
@@ -74,11 +75,60 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to refresh.
    */
   def refreshIndex(indexName: String): Unit = {
-    indexManager.refresh(indexName)
+    refreshIndex(indexName, REFRESH_MODE_FULL)
   }
 
   /**
-   * Cancel api to bring back index from an inconsistent state to the last known stable state.
+   * Update indexes for the latest version of the data. This API provides a few supported
+   * refresh modes as listed below.
+   *
+   * @param indexName Name of the index to refresh.
+   * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
+   */
+  def refreshIndex(indexName: String, mode: String): Unit = {
+    indexManager.refresh(indexName, mode)
+  }
+
+  /**
+   * Optimize index by changing the underlying index data layout (e.g., compaction).
+   *
+   * Note: This API does NOT refresh (i.e. update) the index if the underlying data changes. It
+   * only rearranges the index data into a better layout, by compacting small index files. The
+   * index files larger than a threshold remain untouched to avoid rewriting large contents.
+   *
+   * `Quick` optimize mode is used by default.
+   *
+   * @param indexName Name of the index to optimize.
+   */
+  def optimizeIndex(indexName: String): Unit = {
+    indexManager.optimize(indexName, OPTIMIZE_MODE_QUICK)
+  }
+
+  /**
+   * Optimize index by changing the underlying index data layout (e.g., compaction).
+   *
+   * Note: This API does NOT refresh (i.e. update) the index if the underlying data changes. It
+   * only rearranges the index data into a better layout, by compacting small index files. The
+   * index files larger than a threshold remain untouched to avoid rewriting large contents.
+   *
+   * Available modes:
+   * `Quick` mode: This mode allows for fast optimization. Files smaller than a
+   * predefined threshold "spark.hyperspace.index.optimize.fileSizeThreshold" will be picked
+   * for compaction.
+   *
+   * `Full` mode: This allows for slow but complete optimization. ALL index files are
+   * picked for compaction.
+   *
+   * @param indexName Name of the index to optimize.
+   * @param mode Index optimization mode. "quick" refers to optimization of only small index
+   *             files, based on a threshold. "full" refers to recreation of index.
+   */
+  def optimizeIndex(indexName: String, mode: String): Unit = {
+    indexManager.optimize(indexName, mode)
+  }
+
+  /**
+   * Cancel API to bring back index from an inconsistent state to the last known stable state.
    * E.g. if index fails during creation, in "CREATING" state.
    * The index will not allow any index modifying operations unless a cancel is called.
    *

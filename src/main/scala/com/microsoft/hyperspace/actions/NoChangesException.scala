@@ -16,19 +16,14 @@
 
 package com.microsoft.hyperspace.actions
 
-object Constants {
-  object States {
-    val ACTIVE = "ACTIVE"
-    val CREATING = "CREATING"
-    val DELETING = "DELETING"
-    val DELETED = "DELETED"
-    val REFRESHING = "REFRESHING"
-    val VACUUMING = "VACUUMING"
-    val RESTORING = "RESTORING"
-    val OPTIMIZING = "OPTIMIZING"
-    val DOESNOTEXIST = "DOESNOTEXIST"
-    val CANCELLING = "CANCELLING"
-  }
-
-  val STABLE_STATES: Set[String] = Set(States.ACTIVE, States.DELETED, States.DOESNOTEXIST)
-}
+/**
+ * This exception represents a No-op required from Hyperspace. Use this exception when a
+ * hyperspace action is not necessary for index maintenance.
+ * For example, if the data source has not changed since the last time an index was created on it,
+ * we don't need to do anything when user calls a `refreshIndex()`.
+ *
+ * [[Action.run]] will silently catch this exception and will not fail the application.
+ *
+ * @param msg Error message.
+ */
+private[actions] case class NoChangesException(msg: String) extends Exception(msg)

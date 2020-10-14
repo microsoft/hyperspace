@@ -112,6 +112,10 @@ private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketS
   override def outputPartitioning: Partitioning = {
     assert(children.map(_.outputPartitioning).toSet.size == 1)
     assert(children.head.outputPartitioning.isInstanceOf[HashPartitioning])
+    assert(
+      children.head.outputPartitioning
+        .asInstanceOf[HashPartitioning]
+        .numPartitions == bucketSpec.numBuckets)
     children.head.outputPartitioning
   }
 }
