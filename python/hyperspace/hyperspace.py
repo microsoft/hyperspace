@@ -110,7 +110,7 @@ class Hyperspace:
         :param mode: refresh mode 'incremental' or 'full'
 
         >>> hyperspace = Hyperspace(spark)
-        >>> hyperspace.refreshIndex("indexname", "incremental/full")
+        >>> hyperspace.refreshIndex("indexname", "incremental")
         """
         self.hyperspace.refreshIndex(indexName, mode)
 
