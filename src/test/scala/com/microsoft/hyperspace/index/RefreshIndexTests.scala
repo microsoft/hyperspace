@@ -213,8 +213,9 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       fs.copyToLocalFile(sourcePath, deletedFile)
       val prevIndexLogEntry = getLatestStableLog(indexConfig.indexName)
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 1)
-      assert(prevIndexLogEntry.content.fileInfos.forall(f =>
-        f.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")))
+      assert(
+        prevIndexLogEntry.content.fileInfos
+          .forall(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")))
 
       val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
       new RefreshDeleteAction(
