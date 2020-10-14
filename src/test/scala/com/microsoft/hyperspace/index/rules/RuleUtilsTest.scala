@@ -16,18 +16,20 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileUtil, Path}
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
-import org.apache.spark.sql.catalyst.plans.JoinType
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, Project}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache, PartitioningAwareFileIndex}
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
+import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
+import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class RuleUtilsTest extends HyperspaceRuleTestSuite {
+class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -78,23 +80,25 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   test("Verify indexes are matched by signature correctly.") {
     val indexManager = IndexCollectionManager(spark)
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode).length === 3)
-    assert(RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2ProjectNode).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
+    val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1ProjectNode).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -112,76 +116,181 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite {
   }
 
   test("Verify getCandidateIndex for hybrid scan") {
-    val indexManager = IndexCollectionManager(spark)
-    val df = spark.range(1, 5).toDF("id")
-    val dataPath = systemPath.toString + "/hbtable"
-    df.write.parquet(dataPath)
+    withTempPath { tempPath =>
+      val indexManager = IndexCollectionManager(spark)
+      val df = spark.range(1, 5).toDF("id")
+      val dataPath = tempPath.getAbsolutePath
+      df.write.parquet(dataPath)
 
-    withIndex("index1") {
-      val readDf = spark.read.parquet(dataPath)
-      indexManager.create(readDf, IndexConfig("index1", Seq("id")))
-
-      def verify(
-          plan: LogicalPlan,
-          hybridScanEnabled: Boolean,
-          expectCandidateIndex: Boolean): Unit = {
-        val indexes = RuleUtils
-          .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
-        if (expectCandidateIndex) {
-          assert(indexes.length == 1)
-          assert(indexes.head.name == "index1")
-        } else {
-          assert(indexes.isEmpty)
-        }
-      }
-
-      // Verify that a candidate index is returned with the unmodified data files whether
-      // hybrid scan is enabled or not.
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
-      }
-
-      // Scenario #1: Append new files.
-      df.write.mode("append").parquet(dataPath)
-
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
-      }
-
-      // Scenario #2: Delete 1 file.
-      {
+      withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
-        readDf.queryExecution.optimizedPlan foreach {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-              _,
-              _,
-              _) =>
-            systemPath
-              .getFileSystem(new Configuration)
-              .delete(location.allFiles.head.getPath, false)
-          case _ =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        }
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+
+        def verify(
+            plan: LogicalPlan,
+            hybridScanEnabled: Boolean,
+            hybridScanDeleteEnabled: Boolean,
+            expectCandidateIndex: Boolean): Unit = {
+          withSQLConf(
+            "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
+            "spark.hyperspace.index.hybridscan.delete.enabled" ->
+              hybridScanDeleteEnabled.toString) {
+            val indexes = RuleUtils
+              .getCandidateIndexes(spark, allIndexes, plan)
+            if (expectCandidateIndex) {
+              assert(indexes.length == 1)
+              assert(indexes.head.name == "index1")
+            } else {
+              assert(indexes.isEmpty)
+            }
+          }
+        }
+
+        // Verify that a candidate index is returned with the unmodified data files whether
+        // hybrid scan is enabled or not.
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
+        }
+
+        // Scenario #1: Append new files.
+        df.write.mode("append").parquet(dataPath)
+
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = true)
+        }
+
+        // Scenario #2: Delete 1 file.
+        FileUtils.delete(new Path(readDf.inputFiles.head))
+
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = true)
+        }
+
+        // Scenario #3: Replace all files.
+        df.write.mode("overwrite").parquet(dataPath)
+
+        {
+          val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectCandidateIndex = false)
         }
       }
+    }
+  }
 
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
-      }
+  test("Verify the location of injected shuffle for Hybrid Scan.") {
+    withTempPath { tempPath =>
+      val dataPath = tempPath.getAbsolutePath
+      import spark.implicits._
+      Seq((1, "name1", 12), (2, "name2", 10))
+        .toDF("id", "name", "age")
+        .write
+        .mode("overwrite")
+        .parquet(dataPath)
 
-      // Scenario #3: Replace all files.
-      df.write.mode("overwrite").parquet(dataPath)
+      val df = spark.read.parquet(dataPath)
+      val query = df.filter(df("id") >= 3).select("id", "name")
+      val bucketSpec = BucketSpec(100, Seq("id"), Seq())
+      val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
+        bucketSpec,
+        query.queryExecution.optimizedPlan)
 
-      {
-        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-        verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
-      }
+      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
+      // should be transformed to:
+      //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
+      assert(shuffled.collect {
+        case RepartitionByExpression(attrs, p: Project, numBuckets) =>
+          assert(numBuckets == 100)
+          assert(attrs.size == 1)
+          assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
+          assert(
+            p.projectList.exists(_.name.equals("id")) && p.projectList.exists(
+              _.name.equals("name")))
+          true
+      }.length == 1)
+
+      // Check if the shuffle node should be injected where all bucket columns
+      // are available as its input.
+      // For example,
+      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
+      // should be transformed:
+      //   Project ("id", "name") -> Shuffle ("age") -> Filter ("id") -> Relation
+      // , NOT:
+      //   Shuffle ("age") -> Project("id", "name") -> Filter ("id") -> Relation
+      // since Project doesn't include "age" column; Shuffle will be RoundRobinPartitioning
+
+      val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
+      val query2 = df.filter(df("id") <= 3).select("id", "name")
+      val shuffled2 =
+        RuleUtils.transformPlanToShuffleUsingBucketSpec(
+          bucketSpec2,
+          query2.queryExecution.optimizedPlan)
+      assert(shuffled2.collect {
+        case Project(_, RepartitionByExpression(attrs, _: Filter, numBuckets)) =>
+          assert(numBuckets == 100)
+          assert(attrs.size == 1)
+          assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
+          true
+      }.length == 1)
+    }
+  }
+
+  test(
+    "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
+      "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
+    withSQLConf(INDEX_HYBRID_SCAN_ENABLED -> "false") {
+      val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+      val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq("f1"))
+      val entry3 = entry1.withAppendedAndDeletedFiles(Seq("f2"), Seq())
+      val usableIndexes =
+        RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
+      assert(usableIndexes.equals(Seq(entry1)))
     }
   }
 

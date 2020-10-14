@@ -30,11 +30,13 @@ import com.microsoft.hyperspace.index.Hdfs.Properties
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   private val filenames = Seq("f1.parquet", "f2.parquet")
-  def createIndex(
+  def createIndexLogEntry(
       name: String,
       indexCols: Seq[AttributeReference],
       includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry = {
+      plan: LogicalPlan,
+      appendedFiles: Seq[String] = Seq(),
+      deletedFiles: Seq[String] = Seq()): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
@@ -43,7 +45,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           Seq(
             Relation(
               Seq("dummy"),
-              Hdfs(Properties(Content(Directory("/")))),
+              Hdfs(Properties(Content(Directory("/")), appendedFiles, deletedFiles)),
               "schema",
               "format",
               Map())),
@@ -69,7 +71,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
         indexLogEntry.state = Constants.States.ACTIVE
-        logManager.writeLog(0, indexLogEntry)
+        assert(logManager.writeLog(0, indexLogEntry))
         indexLogEntry
 
       case None => throw HyperspaceException("Invalid plan for index dataFrame.")

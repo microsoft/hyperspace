@@ -19,13 +19,14 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.{input_file_name, udf}
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -38,17 +39,21 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
+  protected def numBucketsForIndex(spark: SparkSession): Int = {
+    HyperspaceConf.numBucketsForIndex(spark)
+  }
+
+  protected def indexLineageEnabled(spark: SparkSession): Boolean = {
+    HyperspaceConf.indexLineageEnabled(spark)
+  }
+
   protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
       path: Path): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path)
-    val numBuckets = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_NUM_BUCKETS,
-        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-      .toInt
+    val numBuckets = numBucketsForIndex(spark)
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
 
@@ -117,11 +122,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
-    val numBuckets = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_NUM_BUCKETS,
-        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-      .toInt
+    val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
@@ -167,11 +168,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val addLineage = spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_LINEAGE_ENABLED,
-        IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
-      .toBoolean
+    val addLineage = indexLineageEnabled(spark)
 
     val indexDF = if (addLineage) {
       // Lineage is captured using two sets of columns:
@@ -181,8 +178,24 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val missingPartitionColumns = getPartitionColumns(df).filter(
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
+
+      // File path value in DATA_FILE_NAME_COLUMN column is stored as String. We normalize
+      // path values in this column by removing extra preceding `/` characters in the path
+      // and store it the same way paths are stored in Content in an IndexLogEntry instance.
+      // Normalizing path values in DATA_FILE_NAME_COLUMN column keeps path representation
+      // unified in Hyperspace (between index lineage and index metadata) and helps performance
+      // by avoiding the need to fix paths (i.e. removing extra `/` characters) each time
+      // value of DATA_FILE_NAME_COLUMN column is read.
+      // Here is an example of normalization:
+      // - Original raw path (output of input_file_name() udf, before normalization):
+      //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet
+      // - Normalized path to be stored in DATA_FILE_NAME_COLUMN column:
+      //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
+      val absolutePath: UserDefinedFunction = udf(
+        (filePath: String) => filePath.replace("file:///", "file:/"))
+
       df.select(allIndexColumns.head, allIndexColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, input_file_name())
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, absolutePath(input_file_name()))
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }
