@@ -412,6 +412,88 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Validate incremental refresh deduplicate appended and deleted file names.") {
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+    }
+
+    // Replace a source data file with a new file with same name but different properties.
+    val deletedFile = deleteOneDataFile(nonPartitionedDataPath)
+    val sourcePath = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.head)
+    val sourcePath2 = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.last)
+    val fs = sourcePath.getFileSystem(new Configuration)
+    fs.copyToLocalFile(sourcePath, deletedFile)
+
+    val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+    new RefreshDeleteAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
+      assert(indexLogEntry.deletedFiles.isEmpty)
+      assert(indexLogEntry.appendedFiles.size == 1)
+      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+    }
+
+    // Update the appended file again.
+    fs.copyToLocalFile(sourcePath2, deletedFile)
+    new RefreshDeleteAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
+      assert(indexLogEntry.deletedFiles.isEmpty)
+      assert(indexLogEntry.appendedFiles.size == 1)
+      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+    }
+
+    // Update the appended file again.
+    fs.copyToLocalFile(sourcePath, deletedFile)
+    new RefreshAppendAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 7)
+      assert(indexLogEntry.appendedFiles.isEmpty)
+      assert(indexLogEntry.deletedFiles.size == 1)
+      assert(indexLogEntry.deletedFiles.head.contains(deletedFile.getName))
+    }
+
+    // Update the appended file again.
+    fs.copyToLocalFile(sourcePath2, deletedFile)
+    new RefreshAppendAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 9)
+      assert(indexLogEntry.appendedFiles.isEmpty)
+      assert(indexLogEntry.deletedFiles.size == 1)
+      assert(indexLogEntry.deletedFiles.head.contains(deletedFile.getName))
+    }
+  }
+
   /**
    * Delete one file from a given path.
    *
