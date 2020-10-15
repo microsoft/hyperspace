@@ -20,7 +20,7 @@ a costly operation due to shuffling and repartitioning all records in the latest
 
 Now, we offer several options to handle appended and deleted files more efficiently.
 
-## Choices of using index when your dataset changes
+## Options of using index when your dataset changes
 
 ### Refresh Index
 
