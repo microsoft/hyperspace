@@ -212,11 +212,13 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     val sourcePath = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.head)
     val fs = deletedFile.getFileSystem(new Configuration)
     fs.copyToLocalFile(sourcePath, deletedFile)
-    val prevIndexLogEntry = getLatestStableLog(indexConfig.indexName)
-    assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 1)
-    assert(
-      prevIndexLogEntry.content.fileInfos
-        .forall(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")))
+
+    {
+      // Check the index log entry before refresh.
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 1)
+      assert(getIndexFilesCount(indexLogEntry, version = 0) == indexLogEntry.content.files.size)
+    }
 
     val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
     new RefreshDeleteAction(
@@ -248,13 +250,10 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
       val files = indexLogEntry.relations.head.data.properties.content.files
       assert(files.exists(_.equals(deletedFile)))
-      val v1 = indexLogEntry.content.fileInfos
-        .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1"))
-      val v2 = indexLogEntry.content.fileInfos
-        .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=2"))
-      assert(v1 > 0)
-      assert(v2 > 0)
-      assert(v1 + v2 == indexLogEntry.content.fileInfos.size)
+      assert(
+        getIndexFilesCount(indexLogEntry, version = 1) +
+          getIndexFilesCount(indexLogEntry, version = 2)
+          == indexLogEntry.content.fileInfos.size)
     }
 
     // Modify the file again.
@@ -275,16 +274,10 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 7)
       val files = indexLogEntry.relations.head.data.properties.content.files
       assert(files.exists(_.equals(deletedFile)))
-      val v1 = indexLogEntry.content.fileInfos
-        .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1"))
-      val v2 = indexLogEntry.content.fileInfos
-        .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=2"))
-      val v3 = indexLogEntry.content.fileInfos
-        .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=3"))
-      assert(v1 > 0)
-      assert(v2 > 0)
-      assert(v3 > 0)
-      assert(v1 + v2 + v3 == indexLogEntry.content.fileInfos.size)
+      assert(
+        getIndexFilesCount(indexLogEntry, version = 1) +
+          getIndexFilesCount(indexLogEntry, version = 2) +
+          getIndexFilesCount(indexLogEntry, version = 3) == indexLogEntry.content.fileInfos.size)
     }
   }
 
@@ -472,5 +465,15 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     assert(entry.isDefined)
     assert(entry.get.isInstanceOf[IndexLogEntry])
     entry.get.asInstanceOf[IndexLogEntry]
+  }
+
+  private def getIndexFilesCount(
+      entry: IndexLogEntry,
+      version: Int,
+      allowEmpty: Boolean = false) = {
+    val cnt = entry.content.fileInfos
+      .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version"))
+    assert(allowEmpty || cnt > 0)
+    cnt
   }
 }
