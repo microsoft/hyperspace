@@ -21,6 +21,13 @@ Now, we offer several options to handle above scenario more efficiently.
 
 ## Options of using index when your dataset changes
 
+1. [Refresh Index](#refresh-index)
+  - [Full Mode](#refresh-index---full-mode)
+  - [Incremental Mode](#refresh-index---full-mode)
+2. [Hybrid Scan](#hybrid-scan)
+  - [Append-only](#append-only-dataset)
+  - [Append and Delete](#append-and-delete-dataset)
+
 ### Refresh Index
 You can refresh an index according to its latest source data files by running the `refreshIndex` command.
 Hyperspace provide several modes to refresh an index. These modes differ in terms of the way they update the index and the amount of data scans and shuffle each does.
@@ -90,4 +97,135 @@ hs.refreshIndex("empIndex", "incremental")
 TODO
 
 ### Hybrid Scan
-TODO
+
+Hybrid Scan enables to utilize existing index data along with newly appended source files or
+deleted existing files, without explicit refresh operation. For appended files, Hybrid Scan works
+by changing the query plan to perform on-the-fly shuffle of newly appended data and merge with
+the index data. For deleted files, Hyperspace also modify the plan to exclude the rows from deleted files
+in the index data and for this, you need to set the lineage column config at index creation.
+
+This feature is disabled by default.
+
+In the current version (0.3), Hybrid Scan with deleted files needs further optimization when
+there are many deleted files in source dataset. Therefore, we provide 2 different configurations
+for Hybrid Scan, so that you could enable it on demand.
+
+#### Append-only dataset
+
+If your dataset is append-only dataset, you can use Hybrid Scan for appended files only.
+In this case, Hyperspace does not perform Hybrid Scan for those indexes which have one or more
+deleted files in their source dataset.
+
+###### Configuration
+
+The following configurations turn on Hybrid Scan append-only. You need to call `spark.enableHyperspace`
+after setting the configuration to load additional modules for Hybrid Scan.
+
+Scala:
+```scala
+import com.microsoft.hyperspace._
+
+spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
+spark.enableHyperspace
+```
+
+Python:
+```python
+from hyperspace import Hyperspace
+
+spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
+Hyperspace.enable(spark)
+```
+
+###### Example
+
+This is a simple example in Scala from [Quick-Start Guide](https://microsoft.github.io/hyperspace/docs/ug-quick-start-guide/).
+Of course, you can try this in Python accordingly.
+
+```scala
+// Setup source data.
+import org.apache.spark.sql._
+import spark.implicits._
+
+Seq((1, "name1"), (2, "name2")).toDF("id", "name").write.mode("overwrite").parquet("table")
+val df = spark.read.parquet("table")
+
+// Setup Hyperspace.
+import com.microsoft.hyperspace._
+val hs = new Hyperspace(spark)
+
+// Create an index.
+import com.microsoft.hyperspace.index._
+hs.createIndex(df, IndexConfig("index", indexedColumns = Seq("id"), includedColumns = Seq("name")))
+
+// Create a query and check if the index is applied or not.
+val query = df.filter(df("id") === 1).select("name")
+hs.explain(query, verbose = true)
+
+// Run query with the index.
+spark.enableHyperspace
+query.show
+```
+
+Now, the following example shows how Hybrid Scan works with appended files.
+
+```scala
+// Append new data to source dataset.
+Seq((3, "name3"), (4, "name4")).toDF("id", "name").write.mode("append").parquet("table")
+
+// Check if the index is applied for the dataset with appended files.
+val df = spark.read.parquet("table")
+val query = df.filter(df("id") === 1).select("name")
+hs.explain(query, verbose = true)
+
+// Turn on Hybrid Scan and check if the index is applied.
+spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
+hs.explain(query, verbose = true)
+
+// Query execution with Hybrid Scan.
+spark.enableHyperspace
+query.show
+```
+
+#### Append and Delete dataset
+
+Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
+by scanning all indexed rows and confirming if it is from deleted source files or not.
+In order to trace which source file each row is from, you need to enable linage column config before creating an index.
+Check the [configuration](02-ug-configuration.md) page to see how lineage is enabled when creating an index.
+
+Because of this nature of processing deleted rows, Hybrid Scan with deleted files is more expensive than appended files.
+Therefore, you need to be aware of possible regression from it.
+
+We will provide several threshold configs after some experiments and optimizations.
+
+###### Configuration
+
+The following configurations turn on Hybrid Scan for both appended and deleted files. You need to call `spark.enableHyperspace`
+after setting the configuration to load additional modules for Hybrid Scan.
+
+We currently provide one threshold config:
+`spark.hyperspace.index.hybridscan.delete.maxNumDeleted`. If there are more deleted files than the config value,
+we do not perform Hybrid Scan for the index.
+
+Scala:
+```scala
+import com.microsoft.hyperspace._
+spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
+// spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted",  30) // 30 by default
+spark.enableHyperspace
+```
+
+Python:
+```python
+from hyperspace import Hyperspace
+
+spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
+// spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted",  30) // 30 by default
+Hyperspace.enable(spark)
+```
+
