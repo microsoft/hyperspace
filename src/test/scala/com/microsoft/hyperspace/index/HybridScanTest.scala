@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, InSet, Literal, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.{FileSourceScanExec, InputAdapter, ProjectExec, UnionExec, WholeStageCodegenExec}
 import org.apache.spark.sql.execution.datasources._
@@ -565,17 +565,16 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       var deletedFilesList: Seq[Seq[String]] = Nil
       val nodes = planWithHybridScan collect {
         case p @ Filter(
-              Not(In(attr, deletedFileNames)),
+              Not(expr),
               LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
           // Check new filter condition on lineage column.
+          val attr = expr.children.head.asInstanceOf[Attribute]
+          val deletedFile = expr.children.last.asInstanceOf[Literal].toString
           assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
-          val deleted = deletedFileNames.map(_.toString)
-          assert(deleted.length === 1)
-          assert(deleted.distinct.length === deleted.length)
-          assert(deleted.forall(f => !df.inputFiles.contains(f)))
+          assert(!df.inputFiles.contains(deletedFile))
           assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
           assert(fsRelation.location.inputFiles.length === 4)
-          deletedFilesList = deletedFilesList :+ deleted
+          deletedFilesList = deletedFilesList :+ Seq(deletedFile)
           p
         case p: Union =>
           p
@@ -650,7 +649,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
       withSQLConf(
         "spark.hyperspace.index.hybridscan.enabled" -> "true",
-        "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+        "spark.hyperspace.index.hybridscan.delete.enabled" -> "true",
+        "spark.sql.optimizer.inSetConversionThreshold" -> "1") {
+        // Changed inSetConversionThreshould to cheeck InSet optimization.
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -658,20 +659,32 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         var deletedFilesList: Seq[Seq[String]] = Nil
         val nodes = planWithHybridScan collect {
           case p @ Filter(
-                Not(In(attr, deletedFileNames)),
+                Not(InSet(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
             assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
-            assert(deletedFileNames.length === 1 || deletedFileNames.length === 2)
-            val deleted = deletedFileNames.map(_.toString)
-            assert(deleted.distinct.length === deleted.length)
-            assert(deleted.forall(f => !df1.inputFiles.contains(f)))
+            // This node should be df2 - Filter-Not-InSet with 2 deleted files.
+            assert(deletedFileNames.size === 2)
+            val deleted = deletedFileNames.map(_.toString).toSeq
             assert(deleted.forall(f => !df2.inputFiles.contains(f)))
             assert(
               fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")) ||
                 fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
             assert(fsRelation.location.inputFiles.length === 4)
             deletedFilesList = deletedFilesList :+ deleted
+            p
+          case p @ Filter(
+          Not(expr),
+          LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+            // Check new filter condition on lineage column.
+            val attr = expr.children.head.asInstanceOf[Attribute]
+            val deletedFile = expr.children.last.asInstanceOf[Literal].toString
+            // This node should be df1 - Filter-Not with 1 deleted files.
+            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(!df1.inputFiles.contains(deletedFile))
+            assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
+            assert(fsRelation.location.inputFiles.length === 4)
+            deletedFilesList = deletedFilesList :+ Seq(deletedFile)
             p
           case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
             val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
@@ -735,4 +748,5 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       }
     }
   }
+
 }
