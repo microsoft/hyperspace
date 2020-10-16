@@ -102,11 +102,14 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val deletedFiles: Seq[String] = {
     val relation = previousIndexLogEntry.relations.head
     val originalFiles = relation.data.properties.content.fileInfos
-    val delFiles = (originalFiles -- currentFiles).map(_.name).toSeq
+    val delFiles = (originalFiles -- currentFiles).map(_.name)
+
+    // Remove duplicate deleted file names in the previous log entry.
+    val prevDeletedFiles = previousIndexLogEntry.deletedFiles.filterNot(delFiles.contains)
 
     // TODO: Add test for the scenario where existing deletedFiles and newly deleted
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
-    delFiles ++ previousIndexLogEntry.deletedFiles
+    delFiles.toSeq ++ prevDeletedFiles
   }
 
   /**
@@ -139,10 +142,13 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val appendedFiles: Seq[String] = {
     val relation = previousIndexLogEntry.relations.head
     val originalFiles = relation.data.properties.content.fileInfos
-    val newFiles = (currentFiles -- originalFiles).map(_.name).toSeq
+    val newFiles = (currentFiles -- originalFiles).map(_.name)
+
+    // Remove duplicate appended file names in the previous log entry.
+    val prevAppendedFiles = previousIndexLogEntry.appendedFiles.filterNot(newFiles.contains)
 
     // TODO: Add test for the scenario where existing appendedFiles and newly appended
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
-    newFiles ++ previousIndexLogEntry.appendedFiles
+    newFiles.toSeq ++ prevAppendedFiles
   }
 }
