@@ -23,17 +23,58 @@ Now, we offer several options to handle appended and deleted files more efficien
 ## Options of using index when your dataset changes
 
 ### Refresh Index
-
-We provide several refresh modes to refresh index data.
+You can refresh an index according to its latest source data files by running the `refresh` command.
+Hyperspace provide several modes to refresh index. These modes differ in terms of the way the update the index and the amount of work done for that.
+You should pick a mode for refreshing an index according to its current size and total amount of data deleted from or appended to its source data files. 
+You can specify the mode as an argument when calling the `refresh` command.
+Currently, there are two refresh modes available for an index: `"full"` and `"incremental"`.
 
 #### Full
-TODO
+Using `refresh` with the `"full"` mode on an index causes the index refresh action perform a full rebuild of the index.
+This ends up creating a new version of the index and involves a full scan of the underlying latest source data.
+As a result, the amount of time it takes to refresh an index in this mode is similar to creating a new index with that size.
+The advantage is that once refresh in the full mode is finished successfully, new index files are created and organized in the most optimized way according to index's last source data content and the its bucketing configuration.
+
+Assume you have an index with the name `empIndex`. After adding and removing some data files from the dataset `empIndex` is created on, you can refresh it in the full mode as below:
+
+Scala:
+```scala
+import com.microsoft.hyperspace._
+
+val hs = new Hyperspace(spark)
+hs.refreshIndex("empIndex", "full")
+``` 
+
+Python:
+
+```python
+from hyperspace import Hyperspace
+
+hs = Hyperspace(spark)
+hs.refreshIndex("empIndex", "full")
+```
 
 #### Incremental
-TODO
+Append:
+Action to create indexes on newly arrived data. If the user appends new data to existing,
+pre-indexed data, they can use refresh api to generate indexes only on the additional data.
+Algorithm Outline:
+ * Identify newly added data files.
+ * Create new index version on these files.
+ * Update metadata to reflect the latest snapshot of index. This snapshot includes all the old
+    and the newly created index files. The source content points to the latest data files.
 
-#### Quick
-TODO
+Delete:
+Refresh index by removing index entries from any deleted source data file.
+Note this Refresh Action only fixes an index w.r.t deleted source data files
+and does not consider new source data files (if any).
+If some original source data file(s) are removed between previous version of index and now,
+this Refresh Action updates the index as follows:
+1. Deleted source data files are identified;
+2. Index records' lineage is leveraged to remove any index entry coming
+ from those deleted source data files.
+
+##### Optimize Index
 
 ### Hybrid Scan
 TODO
