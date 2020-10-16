@@ -750,5 +750,4 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       }
     }
   }
-
 }
