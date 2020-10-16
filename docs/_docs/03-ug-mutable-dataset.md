@@ -30,7 +30,8 @@ You can specify the mode as an argument when calling the `refresh` command.
 Currently, there are two refresh modes available for an index: `"full"` and `"incremental"`.
 
 #### Full
-Using `refresh` with the `"full"` mode on an index causes the index refresh action perform a full rebuild of the index.
+After some changes in an index's original dataset files, using `refresh` with the `"full"` mode on the index causes
+the index refresh action perform a full rebuild of the index.
 This ends up creating a new version of the index and involves a full scan of the underlying latest source data.
 As a result, the amount of time it takes to refresh an index in this mode is similar to creating a new index with that size.
 The advantage is that once refresh in the full mode is finished successfully, new index files are created and organized in the most optimized way according to index's last source data content and the its bucketing configuration.
@@ -55,26 +56,38 @@ hs.refreshIndex("empIndex", "full")
 ```
 
 #### Incremental
-Append:
-Action to create indexes on newly arrived data. If the user appends new data to existing,
-pre-indexed data, they can use refresh api to generate indexes only on the additional data.
-Algorithm Outline:
- * Identify newly added data files.
- * Create new index version on these files.
- * Update metadata to reflect the latest snapshot of index. This snapshot includes all the old
-    and the newly created index files. The source content points to the latest data files.
+After some changes in an index's original dataset files, using `refresh` with the `"incremental"` mode on the index causes
+the index refresh action to index newly added data files and fix any existing index file which has some deleted records.
+An index needs needs to have lineage enabled to be eligible for refresh in the incremental mode.
+This can be done by setting the configuration `spark.hyperspace.index.lineage.enabled` to ture before creating the index.
 
-Delete:
-Refresh index by removing index entries from any deleted source data file.
-Note this Refresh Action only fixes an index w.r.t deleted source data files
-and does not consider new source data files (if any).
-If some original source data file(s) are removed between previous version of index and now,
-this Refresh Action updates the index as follows:
-1. Deleted source data files are identified;
-2. Index records' lineage is leveraged to remove any index entry coming
- from those deleted source data files.
+Once refresh is called for an index in the incremental mode, Hyperspace checks latest dataset files and identifies
+deleted source data files and newly added ones. It recreates those portions of index which have records from the
+deleted files. Lineage is used to detect and fix these affected index files. Subsequently, Hyperspace creates new index files on
+newly added data files, according to the index's configuration. At the end of this process, index's metadata gets updated to reflect
+the latest snapshot of index. The source content of this snapshot points to the latest data files.     
+
+Assume you have an index with the name `empIndex` with lineage enabled. After adding and removing some data files from the dataset `empIndex` is created on, you can refresh it in the incremental mode as below:
+
+Scala:
+```scala
+import com.microsoft.hyperspace._
+
+val hs = new Hyperspace(spark)
+hs.refreshIndex("empIndex", "incremental")
+``` 
+
+Python:
+
+```python
+from hyperspace import Hyperspace
+
+hs = Hyperspace(spark)
+hs.refreshIndex("empIndex", "incremental")
+```
 
 ##### Optimize Index
+TODO
 
 ### Hybrid Scan
 TODO
