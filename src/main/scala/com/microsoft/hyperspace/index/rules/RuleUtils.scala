@@ -109,9 +109,10 @@ object RuleUtils {
       // handles the lists properly. Otherwise, as the source file list of each index entry
       // (entry.allSourceFileInfo) also contains the appended and deleted files, we cannot
       // get the actual appended files and deleted files correctly.
-      indexes.filter(index =>
-        index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
-          isHybridScanCandidate(index, filesByRelations.flatten))
+      indexes.filter(
+        index =>
+          index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
+            isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
       indexes.filter(
         index =>
@@ -320,9 +321,8 @@ object RuleUtils {
         } else {
           val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)()
           val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
-          val rel = {
+          val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
-          }
           val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileNames)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }

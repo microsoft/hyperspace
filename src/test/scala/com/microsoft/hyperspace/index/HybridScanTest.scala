@@ -19,9 +19,9 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, InSet, Literal, Not}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, EqualTo, In, InSet, Literal, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.{FileSourceScanExec, InputAdapter, ProjectExec, UnionExec, WholeStageCodegenExec}
+import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExec}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
@@ -374,8 +374,10 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             "spark.hyperspace.index.hybridscan.enabled" -> "true",
             "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
             val filter = filterQuery
-            assert(basePlan.equals(filter.queryExecution.optimizedPlan)
-              .equals(!transformationExpected))
+            assert(
+              basePlan
+                .equals(filter.queryExecution.optimizedPlan)
+                .equals(!transformationExpected))
           }
         }
     }
@@ -526,14 +528,12 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     withSQLConf(
       "spark.hyperspace.index.hybridscan.enabled" -> "true",
       "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
         val filter = filterQuery
         // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
         assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
       }
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
         val filter = filterQuery
         // Since number of deletedFiles = 2, index should not be applied even with Hybrid scan.
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
@@ -564,13 +564,14 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
       var deletedFilesList: Seq[Seq[String]] = Nil
       val nodes = planWithHybridScan collect {
+        // OptimizeIn would change `IN` to `EqualTo` if there is only one element in `In`.
         case p @ Filter(
-              Not(expr),
+              Not(EqualTo(left: Attribute, right: Literal)),
               LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
           // Check new filter condition on lineage column.
-          val attr = expr.children.head.asInstanceOf[Attribute]
-          val deletedFile = expr.children.last.asInstanceOf[Literal].toString
-          assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+          val colName = left.toString
+          val deletedFile = right.toString
+          assert(colName.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
           assert(!df.inputFiles.contains(deletedFile))
           assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
           assert(fsRelation.location.inputFiles.length === 4)
@@ -651,7 +652,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         "spark.hyperspace.index.hybridscan.enabled" -> "true",
         "spark.hyperspace.index.hybridscan.delete.enabled" -> "true",
         "spark.sql.optimizer.inSetConversionThreshold" -> "1") {
-        // Changed inSetConversionThreshould to cheeck InSet optimization.
+        // Changed inSetConversionThreshould to check InSet optimization.
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -673,14 +674,15 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(fsRelation.location.inputFiles.length === 4)
             deletedFilesList = deletedFilesList :+ deleted
             p
+          // OptimizeIn would change `IN` to `EqualTo` if there is only one element in `In`.
           case p @ Filter(
-          Not(expr),
-          LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+                Not(EqualTo(left: Attribute, right: Literal)),
+                LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
-            val attr = expr.children.head.asInstanceOf[Attribute]
-            val deletedFile = expr.children.last.asInstanceOf[Literal].toString
+            val colName = left.toString
+            val deletedFile = right.toString
             // This node should be df1 - Filter-Not with 1 deleted files.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(colName.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
             assert(!df1.inputFiles.contains(deletedFile))
             assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
             assert(fsRelation.location.inputFiles.length === 4)
