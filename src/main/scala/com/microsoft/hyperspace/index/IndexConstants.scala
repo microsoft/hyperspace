@@ -35,20 +35,20 @@ object IndexConstants {
   val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = "false"
 
   // This is a temporary config to support Hybrid scan on both append & delete dataset.
-  // The config does not work without the Hybrid scan config
+  // The config does not work without the Hybrid scan config -
   // "spark.hyperspace.index.hybridscan.enabled"
   // and will be removed after performance validation and optimization.
   // See https://github.com/microsoft/hyperspace/issues/184
   val INDEX_HYBRID_SCAN_DELETE_ENABLED = "spark.hyperspace.index.hybridscan.delete.enabled"
   val INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT = "false"
 
-  // With the current performance limitation of Hybrid scan for delete files, we limit
-  // the number of deleted files to avoid regression from Hybrid scan.
+  // While the performance validation of Hybrid scan for delete files described above,
+  // we limit the number of deleted files to avoid regression from Hybrid scan.
   // If the number of deleted files is larger than this config, the index is disabled and
   // cannot be a candidate for Hybrid Scan.
   val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES =
     "spark.hyperspace.index.hybridscan.delete.maxNumDeletedFiles"
-  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT = "10"
+  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT = "30"
 
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.
