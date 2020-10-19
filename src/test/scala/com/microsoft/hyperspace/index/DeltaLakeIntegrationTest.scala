@@ -48,7 +48,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
     super.afterAll()
   }
 
-  test("Index creation on Delta Lake table") {
+  test("Verify createIndex and refreshIndex on Delta Lake table.") {
     withTempPathAsString { dataPath =>
       import spark.implicits._
       val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
