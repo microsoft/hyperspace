@@ -34,9 +34,20 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
   private var testLogEntry: LogEntry = _
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
+  object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+  }
 
+  private def updateSourceFiles(): Unit = {
+    import spark.implicits._
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .write
+      .mode("append")
+      .parquet(sampleParquetDataLocation)
+  }
+
+  before {
     when(mockLogManager.getLatestId()).thenReturn(None)
     when(mockDataManager.getLatestVersionId()).thenReturn(None)
     when(mockDataManager.getPath(anyInt)).thenReturn(new Path("indexPath"))
@@ -55,7 +66,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   def testEntry(df: DataFrame): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      Seq(),
+      CreateActionBaseWrapper.getSourceRelations(df),
       null,
       null,
       LogicalPlanFingerprint(
@@ -83,6 +94,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("validate() passes if old index logs are found with ACTIVE state") {
     testLogEntry.state = ACTIVE
+    updateSourceFiles()
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
     val action = new RefreshAction(spark, mockLogManager, mockDataManager)
     action.validate()
@@ -90,9 +102,18 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("validate() fails if old index logs found with non-ACTIVE state") {
     testLogEntry.state = CREATING
+    updateSourceFiles()
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
     val action = new RefreshAction(spark, mockLogManager, mockDataManager)
     val ex = intercept[HyperspaceException](action.validate())
     assert(ex.getMessage.contains("Refresh is only supported in ACTIVE state"))
+  }
+
+  test("validate() fails if there is no source data change.") {
+    testLogEntry.state = ACTIVE
+    when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
+    val action = new RefreshAction(spark, mockLogManager, mockDataManager)
+    val ex = intercept[NoChangesException](action.validate())
+    assert(ex.getMessage.contains("Refresh full aborted"))
   }
 }
