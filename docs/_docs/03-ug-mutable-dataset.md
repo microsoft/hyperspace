@@ -99,12 +99,12 @@ TODO
 ### Hybrid Scan
 
 Hybrid Scan enables to utilize existing index data along with newly appended source files or
-deleted existing files, without explicit refresh operation. For appended files, Hybrid Scan works
-by changing the query plan to perform on-the-fly shuffle of newly appended data and merge with
-the index data. For deleted files, Hyperspace also modify the plan to exclude the rows from deleted files
+deleted existing files, without explicit refresh operation. For an index with appended source data files,
+HybridScan changes the query plan to shuffle new data on-the-fly and merge it with index records.
+For deleted files, Hyperspace also modifies the plan to exclude the rows from deleted files
 in the index data and for this, you need to set the lineage column config at index creation.
 
-This feature is disabled by default.
+Currently, HybridScan is disabled by default. You can check the configuration page to see how it can be enabled.
 
 In the current version (0.3), Hybrid Scan with deleted files needs further optimization when
 there are many deleted files in source dataset. Therefore, we provide 2 different configurations
