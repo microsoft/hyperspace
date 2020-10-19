@@ -101,10 +101,10 @@ TODO
 Hybrid Scan enables to utilize existing index data along with newly appended source files or
 deleted existing files, without explicit refresh operation. For an index with appended source data files,
 HybridScan changes the query plan to shuffle new data on-the-fly and merge it with index records.
-For deleted files, Hyperspace also modifies the plan to exclude the rows from deleted files
+For an index with deleted source data files, Hyperspace also modifies the plan to exclude the rows from deleted files
 in the index data and for this, you need to set the lineage column config at index creation.
 
-Currently, HybridScan is disabled by default. You can check the configuration page to see how it can be enabled.
+Currently, HybridScan is disabled by default. You can check the [configuration](02-ug-configuration.md) page to see how it can be enabled.
 
 In the current version (0.3), Hybrid Scan with deleted files needs further optimization when
 there are many deleted files in source dataset. Therefore, we provide 2 different configurations
@@ -194,7 +194,7 @@ query.show
 Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
 by scanning all indexed rows and confirming if it is from deleted source files or not.
 In order to trace which source file each row is from, you need to enable linage column config before creating an index.
-Check the [configuration](02-ug-configuration.md) page to see how lineage is enabled when creating an index.
+Check the [configuration](./02-ug-configuration.md) page to see how lineage is enabled when creating an index.
 
 Because of this nature of processing deleted rows, Hybrid Scan with deleted files is more expensive than appended files.
 Therefore, you need to be aware of possible regression from it.
@@ -228,4 +228,3 @@ spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
 // spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted",  30) // 30 by default
 Hyperspace.enable(spark)
 ```
-
