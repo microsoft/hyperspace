@@ -27,7 +27,7 @@ scalaVersion := scala212
 crossScalaVersions := supportedScalaVersions
 
 libraryDependencies ++= Seq(
-  if (scalaVersion.value == scala211) {
+  if (scalaVersion.value == scala211 || sparkVersion.value == "2.4.2") {
     "io.delta" %% "delta-core" % "0.6.1"
   } else {
     "io.delta" %% "delta-core" % "0.7.0"
