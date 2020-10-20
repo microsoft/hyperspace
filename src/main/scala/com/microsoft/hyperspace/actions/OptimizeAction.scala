@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
@@ -49,9 +51,6 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  *
  * `Full` mode: This allows for slow but complete optimization. ALL index files are
  * picked for compaction.
- *
- * TODO: Optimize can be a no-op if there is at most one optimizable file per bucket.
- *  https://github.com/microsoft/hyperspace/issues/204.
  *
  * @param spark SparkSession.
  * @param logManager IndexLogManager for index being refreshed.
@@ -106,20 +105,39 @@ class OptimizeAction(
 
     if (filesToOptimize.isEmpty) {
       throw NoChangesException(
-        "Optimize aborted as no index files smaller than " +
+        "Optimize aborted as no applicable files smaller than " +
           s"${HyperspaceConf.optimizeFileSizeThreshold(spark)} found.")
     }
   }
 
   private lazy val (filesToOptimize, filesToIgnore): (Seq[FileInfo], Seq[FileInfo]) = {
-    if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
-      val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
-      previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
-    } else {
-      // For 'full' mode, put all the existing index files into 'filesToOptimize' partition so
-      // that one file is created per bucket.
-      (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
+    val (possibleCandidates, largeFilesToIgnore) =
+      if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
+        val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
+        previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
+      } else {
+        // For 'full' mode, put all the existing index files into 'filesToOptimize' partition
+        // so that one file is created per bucket.
+        (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
+      }
+
+    // Check if there is only one index file in a bucket and exclude the index file
+    // as it doesn't need to be optimized.
+    val filesPerBucket = mutable.Map[String, List[FileInfo]]()
+    possibleCandidates.foreach { f =>
+      // Extract key from the file path; "part-XXXXX" indicates each bucket id.
+      val key = new Path(f.name).getName.substring(0, 10)
+      if (!filesPerBucket.contains(key)) {
+        filesPerBucket.put(key, List(f))
+      } else {
+        filesPerBucket.update(key, filesPerBucket(key) :+ f)
+      }
     }
+
+    // Get candidate index files for optimization based on the length of file list per bucket.
+    val (filesToOptimize, singleFiles) = filesPerBucket.values.partition(_.length > 1)
+
+    (filesToOptimize.flatten.toSeq, singleFiles.flatten.toSeq ++ largeFilesToIgnore)
   }
 
   override def logEntry: LogEntry = {

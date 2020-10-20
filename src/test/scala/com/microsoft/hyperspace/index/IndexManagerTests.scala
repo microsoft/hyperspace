@@ -314,7 +314,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       hyperspace.optimizeIndex(indexConfig.indexName)
 
       // Check if latest log file is updated with newly created index files.
-      validateMetadata("index", Set("v__=2"))
+      // Since we appended 3 records for incremental refresh (v_==1) and optimized as v_==2,
+      // some of index data files should be from v__=0.
+      validateMetadata("index", Set("v__=0", "v__=2"))
     }
   }
 
@@ -399,9 +401,42 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           case Seq(
               OptimizeActionEvent(_, _, "Operation started."),
               OptimizeActionEvent(_, _, msg)) =>
-            assert(msg.contains("Optimize aborted as no index files smaller than 1 found."))
+            assert(msg.contains("Optimize aborted as no applicable files smaller than 1 found."))
           case _ => fail()
         }
+      }
+    }
+  }
+
+  test("Verify optimize is a no-op if it is not needed.") {
+    withTempPathAsString { testPath =>
+      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+
+      // Check if latest log file is updated with newly created index files.
+      val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
+
+      MockEventLogger.reset()
+      hyperspace.optimizeIndex(indexConfig.indexName)
+
+      // Check that no new log files were created in this operation.
+      assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
+
+      // Check emitted events.
+      MockEventLogger.emittedEvents match {
+        case Seq(
+            OptimizeActionEvent(_, _, "Operation started."),
+            OptimizeActionEvent(_, _, msg)) =>
+          assert(
+            msg.contains("Optimize aborted as no applicable files smaller than 268435456 found."))
+        case _ => fail()
       }
     }
   }
