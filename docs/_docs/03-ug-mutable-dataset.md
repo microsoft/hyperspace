@@ -89,13 +89,12 @@ hs.refreshIndex("empIndex", "incremental")
 ```
 
 ### Optimize Index
-The fastest way to index newly added source data files and merge them into an existing index is by calling `refreshIndex`
-with the `"incremental"` mode. In this mode, each time refresh is called, it creates fresh index files for new data files
-and updates index metadata to include them in the index content.
+The fastest way to index new data files and merge them into an existing index is by calling `refreshIndex`
+with the `"incremental"` mode. In this mode, each time refresh is called to index newly appended source data files,
+it creates fresh index files for these files and updates index metadata to include them in the index content.
 As these index files accumulate, they could affect query performance when the index is used.
-Once the index is leveraged for a query,
-the large number of these files could increase overall query time as more index files need to be accessed and potentially
-read to compute the query results.
+Once the index is leveraged for a query, the large number of these files could increase overall query time as more index
+files need to be accessed and potentially read to compute the query results.
 Hyperspace provides the `optimizeIndex` command to alleviate above issue by changing index files layout for an
 index which has many index files, due to incremental refresh call(s). This is achieved by merging index files together,
 if possible, and replacing them with fewer larger files that capture exact same index records. This process is similar to
@@ -106,9 +105,9 @@ final outcome depends on how index records are stored in existing index files.
 Two or more index files can be merged with each other, if and only if they all have index records which belong to the
 same bucket (according to index configuration).
 When running `optimizeIndex` command, Hyperspace tries to find such groups of index files and merge them together.
-However, if most of the index files have records from different buckets, then final physical layout of index files
-after running optimize would be similar to the original layout. An example of such an index is an index right after
-creation or full refresh, or an index which is refreshed incrementally with very few additional small source data files.    
+However, if for each given bucket, all index records are already stored in a single index file (i.e. we dont have several index
+files for a bucket), then final physical layout of index files after running optimize would be similar to the original
+layout. An example of such an index is an index right after creation or full refresh.    
 
 Currently, there are two optimize modes available for an index: `"quick"` and `"full"`. These modes differ with each other
 in terms of the subset of index files they identify and try to merge.
@@ -145,7 +144,7 @@ hs.optimizeIndex("empIndex", "quick")
 In the `"full"` mode, `optimizeIndex` command considers all existing index files as candidates for merging. Therefore,
 Hyperspace does a full scan on current index content and identifies groups of index files which have index records belonging
 to the same bucket according to the index configuration. It then replaces each group with a single index file created through
-merging all the files in that group together. This mode tries  to achieve the best query performance improvement via a
+merging all the files in that group together. This mode tries to achieve the best query performance improvement via a
 potentially slow optimize index process.
 
 Assume you have an index with the name `empIndex`. After adding some data files to the dataset `empIndex` is created on
