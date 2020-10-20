@@ -48,8 +48,6 @@ class RefreshAction(
     super.validate()
 
     if (currentFiles.equals(previousIndexLogEntry.allSourceFileInfos)) {
-      // scalastyle:off
-      println("here")
       throw NoChangesException("Refresh full aborted as no source data changed.")
     }
   }

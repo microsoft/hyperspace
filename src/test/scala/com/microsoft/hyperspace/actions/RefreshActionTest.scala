@@ -114,6 +114,6 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
     val action = new RefreshAction(spark, mockLogManager, mockDataManager)
     val ex = intercept[NoChangesException](action.validate())
-    assert(ex.getMessage.contains("Refresh full aborted"))
+    assert(ex.getMessage.contains("Refresh full aborted as no source data changed."))
   }
 }
