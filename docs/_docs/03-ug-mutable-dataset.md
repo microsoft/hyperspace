@@ -66,7 +66,7 @@ After some files are added to or deleted from the original source files, an inde
 using `refreshIndex` with the `"incremental"` mode causes the index refresh action recreate any existing index file,
 which has some deleted records, to remove those records. Refresh also creates new index files by indexing newly added data files.
 An index needs to have lineage enabled to be eligible for refresh in the incremental mode.
-Check the [configuration](02-ug-configuration.md) page to see how lineage is enabled when creating an index.
+Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is enabled when creating an index.
 
 Once refresh is called for an index in the incremental mode, Hyperspace checks latest source data files and identifies
 deleted source data files and newly added ones. It recreates those portions of index which have records from the
@@ -104,7 +104,8 @@ HybridScan changes the query plan to shuffle new data on-the-fly and merge it wi
 For an index with deleted source data files, Hyperspace also modifies the plan to exclude the rows from deleted files
 in the index data and for this, you need to set the lineage column config at index creation.
 
-Currently, HybridScan is disabled by default. You can check the [configuration](02-ug-configuration.md) page to see how it can be enabled.
+Currently, HybridScan is disabled by default. You can check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/)
+page to see how it can be enabled.
 
 In the current version (0.3), Hybrid Scan with deleted files needs further optimization when
 there are many deleted files in source dataset. Therefore, we provide 2 different configurations
@@ -116,7 +117,7 @@ If your dataset is append-only dataset, you can use Hybrid Scan for appended fil
 In this case, Hyperspace does not perform Hybrid Scan for those indexes which have one or more
 deleted files in their source dataset.
 
-###### Configuration
+###### How to enable
 
 The following configurations turn on Hybrid Scan append-only. You need to call `spark.enableHyperspace`
 after setting the configuration to load additional modules for Hybrid Scan.
@@ -194,14 +195,14 @@ query.show
 Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
 by scanning all indexed rows and confirming if it is from deleted source files or not.
 In order to trace which source file each row is from, you need to enable linage column config before creating an index.
-Check the [configuration](./02-ug-configuration.md) page to see how lineage is enabled when creating an index.
+Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is enabled when creating an index.
 
 Because of this nature of processing deleted rows, Hybrid Scan with deleted files is more expensive than appended files.
 Therefore, you need to be aware of possible regression from it.
 
 We will provide several threshold configs after some experiments and optimizations.
 
-###### Configuration
+###### How to enable
 
 The following configurations turn on Hybrid Scan for both appended and deleted files. You need to call `spark.enableHyperspace`
 after setting the configuration to load additional modules for Hybrid Scan.
