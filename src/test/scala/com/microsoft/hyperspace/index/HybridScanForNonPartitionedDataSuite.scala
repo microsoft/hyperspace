@@ -29,68 +29,7 @@ class HybridScanForNonPartitionedDataSuite extends HybridScanTestSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    import spark.implicits._
-    val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     hyperspace = new Hyperspace(spark)
-
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatAppend)
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatAppend2)
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete)
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete2)
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete3)
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete4)
-    dfFromSample.write.format(fileFormat).save(sampleDataFormatBoth)
-    dfFromSample.write.format(fileFormat2).save(sampleDataFormat2Append)
-    dfFromSample.write.format(fileFormat2).save(sampleDataFormat2Delete)
-
-    val indexConfig1 = IndexConfig("indexType1", Seq("clicks"), Seq("query"))
-    val indexConfig2 = IndexConfig("indexType2", Seq("clicks"), Seq("Date"))
-
-    setupIndexAndChangeData(
-      fileFormat,
-      sampleDataFormatAppend,
-      indexConfig1.copy(indexName = "index_ParquetAppend"),
-      appendCnt = 1,
-      deleteCnt = 0)
-    setupIndexAndChangeData(
-      fileFormat,
-      sampleDataFormatAppend2,
-      indexConfig2.copy(indexName = "indexType2_ParquetAppend2"),
-      appendCnt = 1,
-      deleteCnt = 0)
-    setupIndexAndChangeData(
-      fileFormat2,
-      sampleDataFormat2Append,
-      indexConfig1.copy(indexName = "index_JsonAppend"),
-      appendCnt = 1,
-      deleteCnt = 0)
-
-    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      setupIndexAndChangeData(
-        fileFormat,
-        sampleDataFormatDelete,
-        indexConfig1.copy(indexName = "index_ParquetDelete"),
-        appendCnt = 0,
-        deleteCnt = 2)
-      setupIndexAndChangeData(
-        fileFormat,
-        sampleDataFormatDelete3,
-        indexConfig2.copy(indexName = "indexType2_ParquetDelete3"),
-        appendCnt = 0,
-        deleteCnt = 2)
-      setupIndexAndChangeData(
-        fileFormat,
-        sampleDataFormatBoth,
-        indexConfig1.copy(indexName = "index_ParquetBoth"),
-        appendCnt = 1,
-        deleteCnt = 1)
-      setupIndexAndChangeData(
-        fileFormat2,
-        sampleDataFormat2Delete,
-        indexConfig1.copy(indexName = "index_JsonDelete"),
-        appendCnt = 0,
-        deleteCnt = 2)
-    }
   }
 
   test(
@@ -99,35 +38,46 @@ class HybridScanForNonPartitionedDataSuite extends HybridScanTestSuite {
     // This flag is for testing plan transformation if appended files could be load with index
     // data scan node. Currently, it's applied for a very specific case: FilterIndexRule,
     // Parquet source format, no partitioning, no deleted files.
-    val df = spark.read.format(fileFormat).load(sampleDataFormatAppend)
-    def filterQuery: DataFrame =
-      df.filter(df("clicks") <= 2000).select(df("query"))
-    val baseQuery = filterQuery
-    val basePlan = baseQuery.queryExecution.optimizedPlan
+    withTempPathAsString { testPath =>
+      val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
+        "parquet",
+        testPath,
+        indexConfig1.copy(indexName = "index_Append"),
+        appendCnt = 1,
+        deleteCnt = 0)
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-      val filter = filterQuery
-      assert(basePlan.equals(filter.queryExecution.optimizedPlan))
-    }
+      val df = spark.read.format("parquet").load(testPath)
+      def filterQuery: DataFrame =
+        df.filter(df("clicks") <= 2000).select(df("query"))
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
-      val filter = filterQuery
-      val planWithHybridScan = filter.queryExecution.optimizedPlan
-      assert(!basePlan.equals(planWithHybridScan))
+      val baseQuery = filterQuery
+      val basePlan = baseQuery.queryExecution.optimizedPlan
 
-      // Check appended file is added to relation node or not.
-      val nodes = planWithHybridScan.collect {
-        case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-          // Verify appended file is included or not.
-          assert(fsRelation.location.inputFiles.count(_.contains(sampleDataFormatAppend)) === 1)
-          // Verify number of index data files.
-          assert(fsRelation.location.inputFiles.count(_.contains("index_ParquetAppend")) === 4)
-          assert(fsRelation.location.inputFiles.length === 5)
-          p
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+        val filter = filterQuery
+        assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
-      // Filter Index and Parquet format source file can be handled with 1 LogicalRelation
-      assert(nodes.length === 1)
-      checkAnswer(baseQuery, filter)
+
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+        val filter = filterQuery
+        val planWithHybridScan = filter.queryExecution.optimizedPlan
+        assert(!basePlan.equals(planWithHybridScan))
+
+        // Check appended file is added to relation node or not.
+        val nodes = planWithHybridScan.collect {
+          case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+            // Verify appended file is included or not.
+            val files = fsRelation.location.inputFiles
+            assert(files.count(_.equals(appendedFiles.head)) === 1)
+            // Verify number of index data files.
+            assert(files.count(_.contains("index_Append")) === 4)
+            assert(files.length === 5)
+            p
+        }
+        // Filter Index and Parquet format source file can be handled with 1 LogicalRelation
+        assert(nodes.length === 1)
+        checkAnswer(baseQuery, filter)
+      }
     }
   }
 
@@ -135,35 +85,74 @@ class HybridScanForNonPartitionedDataSuite extends HybridScanTestSuite {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
     Seq(("indexWithoutLineage", "false", false), ("indexWithLineage", "true", true)) foreach {
       case (indexName, lineageColumnConfig, transformationExpected) =>
-        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> lineageColumnConfig) {
-          setupIndexAndChangeData(
-            fileFormat,
-            sampleDataFormatDelete2,
-            indexConfig.copy(indexName = indexName),
-            appendCnt = 0,
-            deleteCnt = 1)
+        withTempPathAsString { testPath =>
+          withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> lineageColumnConfig) {
+            setupIndexAndChangeData(
+              fileFormat,
+              testPath,
+              indexConfig.copy(indexName = indexName),
+              appendCnt = 0,
+              deleteCnt = 1)
 
-          val df = spark.read.format(fileFormat).load(sampleDataFormatDelete2)
-          def filterQuery: DataFrame =
-            df.filter(df("clicks") <= 2000).select(df("query"))
-          val baseQuery = filterQuery
-          val basePlan = baseQuery.queryExecution.optimizedPlan
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
-            val filter = filterQuery
-            assert(basePlan.equals(filter.queryExecution.optimizedPlan))
-          }
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-            val filter = filterQuery
-            assert(
-              basePlan
-                .equals(filter.queryExecution.optimizedPlan)
-                .equals(!transformationExpected))
+            val df = spark.read.format(fileFormat).load(testPath)
+
+            def filterQuery: DataFrame =
+              df.filter(df("clicks") <= 2000).select(df("query"))
+
+            val baseQuery = filterQuery
+            val basePlan = baseQuery.queryExecution.optimizedPlan
+            withSQLConf(
+              IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+              IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
+              val filter = filterQuery
+              assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+            }
+            withSQLConf(
+              IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+              IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+              val filter = filterQuery
+              assert(
+                basePlan
+                  .equals(filter.queryExecution.optimizedPlan)
+                  .equals(!transformationExpected))
+            }
           }
         }
     }
   }
+
+  test("Delete-only: filter rule, number of delete files threshold") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        setupIndexAndChangeData(
+          fileFormat,
+          testPath,
+          indexConfig1.copy(indexName = "IndexDeleteCntTest"),
+          appendCnt = 0,
+          deleteCnt = 2)
+      }
+
+      val df = spark.read.format(fileFormat).load(testPath)
+      def filterQuery: DataFrame =
+        df.filter(df("clicks") <= 2000).select(df("query"))
+      val baseQuery = filterQuery
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+
+      withSQLConf(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
+          val filter = filterQuery
+          // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
+          assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+        }
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
+          val filter = filterQuery
+          // Since number of deletedFiles = 2, index should not be applied even with Hybrid scan.
+          assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+        }
+      }
+    }
+  }
+
 }

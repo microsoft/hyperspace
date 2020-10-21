@@ -131,12 +131,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           .files
           .map { f =>
             new FileStatus(
-              f.size, // length
-              false, // isdir
-              0, // block_replication
-              1, // blocksize
-              f.modificationTime, // modification time
-              new Path(location.path, f.path)) // path
+              /* length */ f.size,
+              /* isDir */ false,
+              /* blockReplication */ 0,
+              /* blockSize */ 1,
+              /* modificationTime */ f.modificationTime,
+              new Path(location.path, f.path))
           }
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.

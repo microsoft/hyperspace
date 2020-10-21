@@ -17,12 +17,12 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.LogicalPlanUtils
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -121,19 +121,7 @@ private[actions] abstract class RefreshActionBase(
    * Build Set[FileInfo] to compare the source file list with the previous index version.
    */
   protected lazy val currentFiles: Set[FileInfo] = {
-    df.queryExecution.optimizedPlan
-      .collect {
-        case LogicalRelation(
-            HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-            _,
-            _,
-            _) =>
-          location
-            .allFiles()
-            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-      }
-      .flatten
-      .toSet
+    LogicalPlanUtils.retrieveCurFileInfos(df.queryExecution.optimizedPlan).toSet
   }
 
   /**

@@ -24,13 +24,14 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
+import org.apache.spark.sql.delta.files.TahoeLogFileIndex
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
 import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
-import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.util.{HyperspaceConf, LogicalPlanUtils}
 
 object RuleUtils {
 
@@ -91,20 +92,13 @@ object RuleUtils {
     }
 
     if (hybridScanEnabled) {
+      // TODO: Utilize version and path info for Delta Lake.
+      //  See https://github.com/microsoft/hyperspace/issues/148
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
-      val filesByRelations = plan
-        .collect {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-              _,
-              _,
-              _) =>
-            location.allFiles.map(f =>
-              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-        }
-      assert(filesByRelations.length == 1)
+      val filesByRelations = LogicalPlanUtils.retrieveCurFileInfos(plan)
+
       // index.deletedFiles and index.appendedFiles should be non-empty until Hybrid Scan
       // handles the lists properly. Otherwise, as the source file list of each index entry
       // (entry.allSourceFileInfo) also contains the appended and deleted files, we cannot
@@ -112,7 +106,7 @@ object RuleUtils {
       indexes.filter(
         index =>
           index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
-            isHybridScanCandidate(index, filesByRelations.flatten))
+            isHybridScanCandidate(index, filesByRelations))
     } else {
       indexes.filter(
         index =>
@@ -240,7 +234,8 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    val isParquetSourceFormat = index.relations.head.fileFormat.equals("parquet")
+    val fileFormat = index.relations.head.fileFormat
+    val isParquetSourceFormat = fileFormat.equals("parquet") || fileFormat.equals("delta")
     var unhandledAppendedFiles: Seq[Path] = Nil
 
     // Get transformed plan with index data and appended files if applicable.
@@ -250,12 +245,11 @@ object RuleUtils {
       // can be transformed to 'Project -> Filter -> Logical Relation'. Thus, with transformDown,
       // it will be matched again and transformed recursively which causes stack overflow exception.
       case baseRelation @ LogicalRelation(
-            _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _ @HadoopFsRelation(baseLocation: FileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
-        val curFiles = location.allFiles
-          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+        val curFiles = LogicalPlanUtils.retrieveCurFileInfos(baseRelation)
 
         val (filesDeleted, filesAppended) =
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
@@ -275,7 +269,7 @@ object RuleUtils {
 
         val filesToRead = {
           if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty ||
-              location.partitionSchema.nonEmpty) {
+              baseLocation.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -382,11 +376,11 @@ object RuleUtils {
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
       case baseRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            fsRelation @ HadoopFsRelation(location: FileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
-        val options = extractBasePath(location.partitionSpec)
+        val options = extractBasePath(location)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -412,19 +406,24 @@ object RuleUtils {
     planForAppended
   }
 
-  private def extractBasePath(partitionSpec: PartitionSpec): Option[String] = {
-    if (partitionSpec == PartitionSpec.emptySpec) {
+  private def extractBasePath(location: FileIndex): Option[String] = {
+    if (location.partitionSchema.isEmpty) {
       None
     } else {
-      // For example, we could have the following in PartitionSpec:
-      //   - partition columns = "col1", "col2"
-      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
-      // , and going up the same number of directory levels as the number of partition columns
-      // will compute the base path. Note that PartitionSpec.partitions will always contain
-      // all the partitions in the path, so "partitions.head" is taken as an initial value.
-      val basePath = partitionSpec.partitionColumns
-        .foldLeft(partitionSpec.partitions.head.path)((path, _) => path.getParent)
-      Some(basePath.toString)
+      location match {
+        case p: PartitioningAwareFileIndex =>
+          // For example, we could have the following in PartitionSpec:
+          //   - partition columns = "col1", "col2"
+          //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+          // , and going up the same number of directory levels as the number of partition columns
+          // will compute the base path. Note that PartitionSpec.partitions will always contain
+          // all the partitions in the path, so "partitions.head" is taken as an initial value.
+          val basePath = p.partitionSpec.partitionColumns
+            .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
+          Some(basePath.toString)
+        case d: TahoeLogFileIndex =>
+          Some(d.path.toString)
+      }
     }
   }
 

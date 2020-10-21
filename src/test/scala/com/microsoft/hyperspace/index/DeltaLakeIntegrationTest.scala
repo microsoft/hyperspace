@@ -44,48 +44,103 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   }
 
   test("Verify createIndex and refreshIndex on Delta Lake table.") {
-    withTempPathAsString { dataPath =>
-      import spark.implicits._
-      val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      dfFromSample.write.format("delta").save(dataPath)
+    withIndex("deltaIndex") {
+      withTempPathAsString { dataPath =>
+        import spark.implicits._
+        val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        dfFromSample.write.format("delta").save(dataPath)
 
-      val deltaDf = spark.read.format("delta").load(dataPath)
-      hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+        val deltaDf = spark.read.format("delta").load(dataPath)
+        hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
 
-      def query(version: Option[Long] = None): DataFrame = {
-        if (version.isDefined) {
-          val deltaDf =
-            spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
-          deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
-        } else {
-          val deltaDf = spark.read.format("delta").load(dataPath)
-          deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
+        def query(version: Option[Long] = None): DataFrame = {
+          if (version.isDefined) {
+            val deltaDf =
+              spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
+            deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
+          } else {
+            val deltaDf = spark.read.format("delta").load(dataPath)
+            deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
+          }
         }
+
+        assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
+
+        // Create a new version by deleting entries.
+        val deltaTable = DeltaTable.forPath(dataPath)
+        deltaTable.delete("clicks > 2000")
+
+        // The index should not be applied for the updated version.
+        assert(!verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
+
+        // The index should be applied for the version at index creation.
+        assert(verifyIndexUse(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
+
+        hyperspace.refreshIndex("deltaIndex")
+
+        // The index should be applied for the updated version.
+        assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
+
+        // The index should not be applied for the version at index creation.
+        assert(!verifyIndexUse(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
       }
-
-      assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
-
-      // Create a new version by deleting entries.
-      val deltaTable = DeltaTable.forPath(dataPath)
-      deltaTable.delete("clicks > 2000")
-
-      // The index should not be applied for the updated version.
-      assert(!verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
-
-      // The index should be applied for the version at index creation.
-      assert(verifyIndexUse(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
-
-      hyperspace.refreshIndex("deltaIndex")
-
-      // The index should be applied for the updated version.
-      assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
-
-      // The index should not be applied for the version at index creation.
-      assert(!verifyIndexUse(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
     }
   }
 
-  def verifyIndexUse(plan: LogicalPlan, indexName: String): Boolean = {
+  test("Verify Hybrid Scan on Delta Lake table.") {
+    withIndex("deltaIndex") {
+      withTempPathAsString { dataPath =>
+        import spark.implicits._
+        val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        dfFromSample.write.format("delta").save(dataPath)
+
+        val deltaDf = spark.read.format("delta").load(dataPath)
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+        }
+
+        def query(version: Option[Long] = None): DataFrame = {
+          if (version.isDefined) {
+            val deltaDf =
+              spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
+            deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
+          } else {
+            val deltaDf = spark.read.format("delta").load(dataPath)
+            deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
+          }
+        }
+
+        assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex", true))
+
+        // Create a new version by deleting entries.
+        val deltaTable = DeltaTable.forPath(dataPath)
+        deltaTable.delete("clicks > 5000")
+
+        withSQLConf(
+          "spark.hyperspace.index.hybridscan.enabled" -> "true",
+          "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+          // The index should be applied for the updated version.
+          assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex", true))
+
+          // Append data.
+          dfFromSample
+            .limit(3)
+            .write
+            .format("delta")
+            .mode("append")
+            .save(dataPath)
+
+          // The index should be applied for the updated version.
+          assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex", true))
+        }
+      }
+    }
+  }
+
+  def verifyIndexUse(
+      plan: LogicalPlan,
+      indexName: String,
+      isHybridScan: Boolean = false): Boolean = {
     val rootPaths = plan.collect {
       case LogicalRelation(
           HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
@@ -94,6 +149,10 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           _) =>
         location.rootPaths
     }.flatten
-    rootPaths.nonEmpty && rootPaths.forall(_.toString.contains(indexName))
+    if (!isHybridScan) {
+      rootPaths.nonEmpty && rootPaths.forall(_.toString.contains(indexName))
+    } else {
+      rootPaths.nonEmpty && rootPaths.count(_.toString.contains(indexName)) > 0
+    }
   }
 }
