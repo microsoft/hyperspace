@@ -70,7 +70,7 @@ private[actions] abstract class RefreshActionBase(
       spark.read
         .schema(dataSchema)
         .format(rels.head.fileFormat)
-        .options(rels.head.options - "versionAsOf")
+        .options(rels.head.options - "versionAsOf" - "timestampAsOf")
         .load(rels.head.rootPaths.head)
     } else {
       spark.read

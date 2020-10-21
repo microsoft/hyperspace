@@ -142,8 +142,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
         val fileFormatName = "delta"
-        // "path" key in options can incur multiple data read unexpectedly.
-        val opts = options - "path"
+        // "path" key in options can incur multiple data read unexpectedly and keep
+        // the table version info as metadata.
+        val opts = options - "path" + ("versionAsOf" -> location.tableVersion.toString)
         Relation(
           Seq(PathUtils.makeAbsolute(location.path).toString),
           Hdfs(sourceDataProperties),

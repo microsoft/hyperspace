@@ -30,7 +30,6 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   private val sampleData = SampleData.testData
   private var hyperspace: Hyperspace = _
 
-
   override def beforeAll(): Unit = {
     super.beforeAll()
     hyperspace = new Hyperspace(spark)
@@ -44,10 +43,6 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
     spark.disableHyperspace()
   }
 
-  override def afterAll(): Unit = {
-    super.afterAll()
-  }
-
   test("Verify createIndex and refreshIndex on Delta Lake table.") {
     withTempPathAsString { dataPath =>
       import spark.implicits._
@@ -59,7 +54,8 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
 
       def query(version: Option[Long] = None): DataFrame = {
         if (version.isDefined) {
-          val deltaDf = spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
+          val deltaDf =
+            spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
           deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
         } else {
           val deltaDf = spark.read.format("delta").load(dataPath)
@@ -92,10 +88,10 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   def verifyIndexUse(plan: LogicalPlan, indexName: String): Boolean = {
     val rootPaths = plan.collect {
       case LogicalRelation(
-      HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-      _,
-      _,
-      _) =>
+          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
         location.rootPaths
     }.flatten
     rootPaths.nonEmpty && rootPaths.forall(_.toString.contains(indexName))
