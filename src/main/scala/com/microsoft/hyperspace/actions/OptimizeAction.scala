@@ -21,6 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.datasources.BucketingUtils
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, OPTIMIZING}
@@ -105,7 +106,7 @@ class OptimizeAction(
 
     if (filesToOptimize.isEmpty) {
       throw NoChangesException(
-        "Optimize aborted as no applicable files smaller than " +
+        "Optimize aborted as no optimizable index files smaller than " +
           s"${HyperspaceConf.optimizeFileSizeThreshold(spark)} found.")
     }
   }
@@ -123,10 +124,9 @@ class OptimizeAction(
 
     // Check if there is only one index file in a bucket and exclude the index file
     // as it doesn't need to be optimized.
-    val filesPerBucket = mutable.Map[String, List[FileInfo]]()
+    val filesPerBucket = mutable.Map[Int, List[FileInfo]]()
     possibleCandidates.foreach { f =>
-      // Extract key from the file path; "part-XXXXX" indicates each bucket id.
-      val key = new Path(f.name).getName.substring(0, 10)
+      val key = BucketingUtils.getBucketId(new Path(f.name).getName).get
       if (!filesPerBucket.contains(key)) {
         filesPerBucket.put(key, List(f))
       } else {

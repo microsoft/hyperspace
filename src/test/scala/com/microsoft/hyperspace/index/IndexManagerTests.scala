@@ -401,14 +401,16 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           case Seq(
               OptimizeActionEvent(_, _, "Operation started."),
               OptimizeActionEvent(_, _, msg)) =>
-            assert(msg.contains("Optimize aborted as no applicable files smaller than 1 found."))
+            assert(
+              msg.contains(
+                "Optimize aborted as no optimizable index files smaller than 1 found."))
           case _ => fail()
         }
       }
     }
   }
 
-  test("Verify optimize is a no-op if it is not needed.") {
+  test("Verify optimize is no-op if each bucket has a single index file.") {
     withTempPathAsString { testPath =>
       val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
       import spark.implicits._
@@ -435,7 +437,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             OptimizeActionEvent(_, _, "Operation started."),
             OptimizeActionEvent(_, _, msg)) =>
           assert(
-            msg.contains("Optimize aborted as no applicable files smaller than 268435456 found."))
+            msg.contains(
+              "Optimize aborted as no optimizable index files smaller than 268435456 found."))
         case _ => fail()
       }
     }
