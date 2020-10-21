@@ -20,6 +20,7 @@ import java.io.FileNotFoundException
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{HashMap, ListBuffer}
+import scala.collection.mutable
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
@@ -449,7 +450,28 @@ case class IndexLogEntry(
   override def hashCode(): Int = {
     config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
   }
+
+  /**
+   * A mutable map for holding auxiliary information of this index log entry while applying rules.
+   */
+  @JsonIgnore
+  private val tags: mutable.Map[IndexLogEntryTag[_], Any] = mutable.Map.empty
+
+  def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
+    tags(tag) = value
+  }
+
+  def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] = {
+    tags.get(tag).map(_.asInstanceOf[T])
+  }
+
+  def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
+    tags -= tag
+  }
 }
+
+// A tag of a `IndexLogEntry`, which defines name and type.
+case class IndexLogEntryTag[T](name: String)
 
 object IndexLogEntry {
   val VERSION: String = "0.1"

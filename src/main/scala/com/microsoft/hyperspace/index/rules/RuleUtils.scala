@@ -82,6 +82,12 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
       val deletedCnt = entry.allSourceFileInfos.size - commonCnt
 
+      // If there is no change in source dataset, this index can be applied by
+      // transformPlanToUseIndexOnlyScan.
+      entry.setTagValue(
+        IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+        !(commonCnt == entry.allSourceFileInfos.size && commonCnt == inputSourceFiles.size))
+
       if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
       } else {
@@ -172,11 +178,14 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    val transformed = if (HyperspaceConf.hybridScanEnabled(spark)) {
-      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
-    } else {
-      transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
-    }
+    val transformed =
+      if (!HyperspaceConf.hybridScanEnabled(spark) || !index
+        .getTagValue(IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+        .getOrElse(false)) {
+        transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
+      } else {
+        transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
+      }
     assert(!transformed.equals(plan))
     transformed
   }
