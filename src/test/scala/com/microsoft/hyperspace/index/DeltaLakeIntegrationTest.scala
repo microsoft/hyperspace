@@ -98,6 +98,6 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
       _) =>
         location.rootPaths
     }.flatten
-    rootPaths.nonEmpty && rootPaths.forall(p => p.toString.contains(indexName))
+    rootPaths.nonEmpty && rootPaths.forall(_.toString.contains(indexName))
   }
 }
