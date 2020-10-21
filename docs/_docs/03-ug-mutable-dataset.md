@@ -102,25 +102,27 @@ Hybrid Scan enables to utilize existing index data along with newly appended sou
 deleted existing files, without explicit refresh operation. For an index with appended source data files,
 HybridScan changes the query plan to shuffle new data on-the-fly and merge it with index records.
 For an index with deleted source data files, Hyperspace also modifies the plan to exclude the rows from deleted files
-in the index data and for this, you need to set the lineage column config at index creation.
+in the index data. This requires enabling lineage for the index at its creation time.
 
 Currently, HybridScan is disabled by default. You can check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/)
 page to see how it can be enabled.
 
-In the current version (0.3), Hybrid Scan with deleted files needs further optimization when
-there are many deleted files in source dataset. Therefore, we provide 2 different configurations
-for Hybrid Scan, so that you could enable it on demand.
+In the current version (0.3), if a dataset has many deleted source data files, query performance
+could degrade when Hybrid Scan is enforcing deletes at the query runtime. 
+Hyperspace provides two different configurations to tune this behavior. 
+You can use them to enable supporting deletes during Hybrid Scan and determine when it should be applied,
+depending on the total number of deleted source data files.
 
 #### Append-only dataset
 
 If your dataset is append-only dataset, you can use Hybrid Scan for appended files only.
-In this case, Hyperspace does not perform Hybrid Scan for those indexes which have one or more
-deleted files in their source dataset.
+In this case, Hyperspace will not pick an index with some deleted source data file(s) for Hybrid Scan.
 
 ###### How to enable
 
-The following configurations turn on Hybrid Scan append-only. You need to call `spark.enableHyperspace`
-after setting the configuration to load additional modules for Hybrid Scan.
+You can use the following configurations to enable Hybrid Scan for indexes on an append-only dataset.
+You need to call `spark.enableHyperspace` after setting the configuration to load additional modules
+for Hybrid Scan.
 
 Scala:
 ```scala
@@ -193,19 +195,21 @@ query.show
 #### Append and Delete dataset
 
 Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
-by scanning all indexed rows and confirming if it is from deleted source files or not.
+by scanning all index rows and verifying whether each is coming from a deleted source data file or not.
 In order to trace which source file each row is from, you need to enable linage column config before creating an index.
 Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is enabled when creating an index.
 
-Because of this nature of processing deleted rows, Hybrid Scan with deleted files is more expensive than appended files.
+Due to the way Hybrid Scan enforces deletes at the query time, supporting deletes is more expensive than appended
+files. It could cause performance regression if an index has a number of deleted source data files, especially for
+an index which is less effective for a given query.
 Therefore, you need to be aware of possible regression from it.
 
 We will provide several threshold configs after some experiments and optimizations.
 
 ###### How to enable
 
-The following configurations turn on Hybrid Scan for both appended and deleted files. You need to call `spark.enableHyperspace`
-after setting the configuration to load additional modules for Hybrid Scan.
+You can use the following configurations to enable Hybrid Scan for indexes on a dataset with both append and delete files.
+You need to call `spark.enableHyperspace` after setting the configuration to load additional modules for Hybrid Scan.
 
 We currently provide one threshold config:
 `spark.hyperspace.index.hybridscan.delete.maxNumDeleted`. If there are more deleted files than the config value,
