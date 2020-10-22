@@ -98,25 +98,28 @@ TODO
 
 ### Hybrid Scan
 
-Hybrid Scan enables to utilize existing index data along with newly appended source files or
-deleted existing files, without explicit refresh operation. For an index with appended source data files,
+Hybrid Scan utilizes existing index data along with newly appended source files and/or deleted
+source files, without explicit refresh operation. For an index with appended source files,
 HybridScan changes the query plan to shuffle new data on-the-fly and merge it with index records.
-For an index with deleted source data files, Hyperspace also modifies the plan to exclude the rows from deleted files
-in the index data. This requires enabling lineage for the index at its creation time.
+For an index with deleted source files, Hyperspace also modifies the plan to exclude the rows from
+deleted files in the index data. This requires enabling lineage for the index at its creation time.
 
 Currently, HybridScan is disabled by default. You can check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/)
 page to see how it can be enabled.
 
-In the current version (0.3), if a dataset has many deleted source data files, query performance
-could degrade when Hybrid Scan is enforcing deletes at the query runtime. 
-Hyperspace provides two different configurations to tune this behavior. 
-You can use them to enable supporting deletes during Hybrid Scan and determine when it should be applied,
-depending on the total number of deleted source data files.
+If a dataset has many deleted source files, query performance could degrade when Hybrid Scan is
+enforcing deletes at the query runtime. Hyperspace provides two different configurations to tune
+this behavior. 
+You can use them to enable supporting deletes during Hybrid Scan (spark.hyperspace.index.hybridscan.delete.maxNumDeleted)
+and determine when it should be applied, depending on the total number of deleted source files (spark.hyperspace.index.hybridscan.delete.enabled).
+You can check the detail in [Append and Delete](#append-and-delete-dataset) section.
 
 #### Append-only dataset
 
 If your dataset is append-only dataset, you can use Hybrid Scan for appended files only.
-In this case, Hyperspace will not pick an index with some deleted source data file(s) for Hybrid Scan.
+In this case, Hyperspace will not pick an index with some deleted source file(s) for Hybrid Scan.
+Hybrid Scan with only appended source files does not need the [lineage column](#lineage)
+and any other pre-requisite.
 
 ###### How to enable
 
@@ -195,12 +198,13 @@ query.show
 #### Append and Delete dataset
 
 Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
-by scanning all index rows and verifying whether each is coming from a deleted source data file or not.
+by scanning all index rows and verifying whether each is coming from a deleted source file or not.
 In order to trace which source file each row is from, you need to enable linage column config before creating an index.
-Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is enabled when creating an index.
+Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is
+enabled when creating an index.
 
 Due to the way Hybrid Scan enforces deletes at the query time, supporting deletes is more expensive than appended
-files. It could cause performance regression if an index has a number of deleted source data files, especially for
+files. It could cause performance regression if an index has a number of deleted source files, especially for
 an index which is less effective for a given query.
 Therefore, you need to be aware of possible regression from it.
 
@@ -220,7 +224,7 @@ Scala:
 import com.microsoft.hyperspace._
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
-// spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted",  30) // 30 by default
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) // 30 by default
 spark.enableHyperspace
 ```
 
@@ -230,6 +234,6 @@ from hyperspace import Hyperspace
 
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
-// spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted",  30) // 30 by default
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) # 30 by default
 Hyperspace.enable(spark)
 ```
