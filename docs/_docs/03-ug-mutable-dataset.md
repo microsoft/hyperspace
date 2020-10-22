@@ -204,9 +204,7 @@ Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configu
 enabled when creating an index.
 
 Due to the way Hybrid Scan enforces deletes at the query time, supporting deletes is more expensive than appended
-files. It could cause performance regression if an index has a number of deleted source files, especially for
-an index which is less effective for a given query.
-Therefore, you need to be aware of possible regression from it.
+files. It has some overhead to filter deleted rows, so you need to be aware of possible performance regression from it.
 
 We will provide several threshold configs after some experiments and optimizations.
 
