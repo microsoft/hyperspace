@@ -31,7 +31,7 @@ Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configu
 Once lineage is enabled for an index, Hyperspace adds a new column to the index schema to save the source data file path for each
 index entry. This means enabling lineage increases total storage size used for index files, proportional to the
 number of distinct source data files the index is built on. If you know you wont delete any source data file after index
-creation or you are fine recreating the index using [index refresh in the full mode](05-ug-optimize.md#optimize-index---full-mode)
+creation or you are fine recreating the index using [index refresh in the full mode](#refresh-index---full-mode)
 after deleting some data files, then you dont need to enable lineage for the index. 
 
 ### Refresh Index
