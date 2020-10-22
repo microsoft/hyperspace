@@ -121,22 +121,22 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           fileFormatName,
           opts)
       case LogicalRelation(
-          HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, fileFormat, options),
+          HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, _, options),
           _,
           _,
           _) =>
         val files = location
-          .getSnapshot(false)
-          .filesForScan(Seq(), Seq(), false)
+          .getSnapshot(stalenessAcceptable = false)
+          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
           .files
           .map { f =>
             new FileStatus(
-              /* length */ f.size,
-              /* isDir */ false,
-              /* blockReplication */ 0,
-              /* blockSize */ 1,
-              /* modificationTime */ f.modificationTime,
-              PathUtils.makeAbsolute(f.path))
+              f.size, // length
+              false, // isdir
+              0, // block_replication
+              1, // blocksize
+              f.modificationTime, // modification time
+              new Path(location.path, f.path)) // path
           }
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.

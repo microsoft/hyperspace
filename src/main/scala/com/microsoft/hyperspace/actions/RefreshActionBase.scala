@@ -64,20 +64,22 @@ private[actions] abstract class RefreshActionBase(
 
   // Reconstruct a df from schema
   protected lazy val df = {
-    val rels = previousIndexLogEntry.relations
-    val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
-    if (rels.head.fileFormat.equals("delta")) {
+    val rel = previousIndexLogEntry.relations.head
+    val dataSchema = DataType.fromJson(rel.dataSchemaJson).asInstanceOf[StructType]
+    if (rel.fileFormat.equals("delta")) {
+      // Exclude "versionAsOf" and "timestampAsOf" options, so that this DataFrame for refresh
+      // can see the latest snapshot.
       spark.read
         .schema(dataSchema)
-        .format(rels.head.fileFormat)
-        .options(rels.head.options - "versionAsOf" - "timestampAsOf")
-        .load(rels.head.rootPaths.head)
+        .format(rel.fileFormat)
+        .options(rel.options - "versionAsOf" - "timestampAsOf")
+        .load(rel.rootPaths.head)
     } else {
       spark.read
         .schema(dataSchema)
-        .format(rels.head.fileFormat)
-        .options(rels.head.options)
-        .load(rels.head.rootPaths: _*)
+        .format(rel.fileFormat)
+        .options(rel.options)
+        .load(rel.rootPaths: _*)
     }
   }
 
