@@ -124,25 +124,17 @@ and any other pre-requisite.
 ###### How to enable
 
 You can use the following configurations to enable Hybrid Scan for indexes on an append-only dataset.
-You need to call `spark.enableHyperspace` after setting the configuration to load additional modules
-for Hybrid Scan.
 
 Scala:
 ```scala
-import com.microsoft.hyperspace._
-
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
-spark.enableHyperspace
 ```
 
 Python:
 ```python
-from hyperspace import Hyperspace
-
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
-Hyperspace.enable(spark)
 ```
 
 ###### Example
@@ -191,7 +183,6 @@ spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 hs.explain(query, verbose = true)
 
 // Query execution with Hybrid Scan.
-spark.enableHyperspace
 query.show
 ```
 
@@ -212,7 +203,6 @@ We will provide several threshold configs after some experiments and optimizatio
 ###### How to enable
 
 You can use the following configurations to enable Hybrid Scan for indexes on a dataset with both append and delete files.
-You need to call `spark.enableHyperspace` after setting the configuration to load additional modules for Hybrid Scan.
 
 We currently provide one threshold config:
 `spark.hyperspace.index.hybridscan.delete.maxNumDeleted`. If there are more deleted files than the config value,
@@ -220,19 +210,14 @@ we do not perform Hybrid Scan for the index.
 
 Scala:
 ```scala
-import com.microsoft.hyperspace._
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) // 30 by default
-spark.enableHyperspace
 ```
 
 Python:
 ```python
-from hyperspace import Hyperspace
-
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
 spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) # 30 by default
-Hyperspace.enable(spark)
 ```
