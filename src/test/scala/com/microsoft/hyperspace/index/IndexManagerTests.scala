@@ -433,21 +433,36 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       // Check if latest log file is updated with newly created index files.
       val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
 
+      // Ensure all index files are smaller than the size threshold so that they can be
+      // possible candidates for optimizeIndex.. In this test, as the test data is tiny,
+      // all of index files are less than the threshold.
+      {
+        val index = logManager(systemPath, indexConfig.indexName)
+          .getLatestStableLog()
+          .get
+          .asInstanceOf[IndexLogEntry]
+        assert(
+          index.content.fileInfos
+            .forall(_.size < IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD_DEFAULT))
+      }
+
       MockEventLogger.reset()
       hyperspace.optimizeIndex(indexConfig.indexName)
 
-      val index = logManager(systemPath, indexConfig.indexName)
-        .getLatestStableLog()
-        .get
-        .asInstanceOf[IndexLogEntry]
+      {
+        val index = logManager(systemPath, indexConfig.indexName)
+          .getLatestStableLog()
+          .get
+          .asInstanceOf[IndexLogEntry]
 
-      // Check that no new log files were created in this operation.
-      assert(latestId == index.id)
+        // Check that no new log files were created in this operation.
+        assert(latestId == index.id)
 
-      // Check all index files are not needed to be optimized. (i.e. non-optimizable)
-      val filesPerBucket =
-        index.content.files.groupBy(f => BucketingUtils.getBucketId(f.getName))
-      assert(filesPerBucket.values.forall(_.size == 1))
+        // Check all index files are not needed to be optimized. (i.e. non-optimizable)
+        val filesPerBucket =
+          index.content.files.groupBy(f => BucketingUtils.getBucketId(f.getName))
+        assert(filesPerBucket.values.forall(_.size == 1))
+      }
 
       // Check emitted events.
       MockEventLogger.emittedEvents match {
