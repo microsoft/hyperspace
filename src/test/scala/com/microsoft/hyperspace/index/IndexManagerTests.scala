@@ -434,7 +434,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
 
       // Ensure all index files are smaller than the size threshold so that they can be
-      // possible candidates for optimizeIndex.. In this test, as the test data is tiny,
+      // possible candidates for optimizeIndex. In this test, as the test data is tiny,
       // all of index files are less than the threshold.
       {
         val index = logManager(systemPath, indexConfig.indexName)
