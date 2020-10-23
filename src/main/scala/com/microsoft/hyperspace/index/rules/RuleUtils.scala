@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
@@ -254,12 +254,12 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val curFileSet = location.allFiles
+        val curFiles = location.allFiles
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
 
         val (filesDeleted, filesAppended) =
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
-            val (exist, nonExist) = curFileSet.partition(index.allSourceFileInfos.contains)
+            val (exist, nonExist) = curFiles.partition(index.allSourceFileInfos.contains)
             val filesAppended = nonExist.map(f => new Path(f.name))
             if (exist.length < index.allSourceFileInfos.size) {
               (index.allSourceFileInfos -- exist, filesAppended)
@@ -272,11 +272,12 @@ object RuleUtils {
             // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
             (
               Nil,
-              curFileSet.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name)))
+              curFiles.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name)))
           }
 
         val filesToRead = {
-          if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty) {
+          if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty ||
+              location.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -291,8 +292,7 @@ object RuleUtils {
             // If BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently)
             // and the source format is parquet, we could read the appended files along
             // with the index data.
-            val files = index.content.files ++ filesAppended
-            files
+            index.content.files ++ filesAppended
           }
         }
 
@@ -381,18 +381,45 @@ object RuleUtils {
       filesAppended: Seq[Path]): LogicalPlan = {
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
-      case baseRelation @ LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
-        // Set the same output schema with the index plan to merge them using BucketUnion.
-        val updatedOutput =
-          baseOutput.filter(attr => indexSchema.fieldNames.contains(attr.name))
+      case baseRelation @ LogicalRelation(
+            fsRelation @ HadoopFsRelation(
+              baseLocation: PartitioningAwareFileIndex,
+              _,
+              _,
+              _,
+              _,
+              _),
+            baseOutput,
+            _,
+            _) =>
         val newLocation =
-          new InMemoryFileIndex(spark, filesAppended, Map(), None)
-        val newRelation =
-          fsRelation.copy(
-            location = newLocation,
-            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
-            options =
-              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
+          if (baseLocation.partitionSchema.isEmpty) {
+            new InMemoryFileIndex(spark, filesAppended, Map(), None)
+          } else {
+            // Set "basePath" so that partitioned columns are also included.
+            // This doesn't work for multiple basePaths.
+            val basePath = baseLocation.partitionSpec.partitionColumns
+              .foldLeft(baseLocation.partitionSpec.partitions.head.path)((path, _) =>
+                path.getParent)
+            new InMemoryFileIndex(
+              spark,
+              filesAppended,
+              Map("basePath" -> basePath.toString),
+              None)
+          }
+        val updatedSchema = StructType(
+          baseRelation.schema.filter(field =>
+            indexSchema.contains(field) || baseLocation.partitionSchema
+              .contains(field)))
+        // Set the same output schema with the index plan to merge them using BucketUnion.
+        val partitionColumns = baseLocation.partitionSchema.map(_.name)
+        val updatedOutput = baseOutput.filter(attr =>
+          indexSchema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+        val newRelation = fsRelation.copy(
+          location = newLocation,
+          dataSchema = updatedSchema,
+          options =
+            fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))

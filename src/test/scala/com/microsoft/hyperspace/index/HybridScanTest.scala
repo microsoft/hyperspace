@@ -35,26 +35,31 @@ import com.microsoft.hyperspace.util.FileUtils
 class HybridScanTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
 
-  private val sampleData = SampleData.testData
-  private val sampleDataLocationRoot = "src/test/resources/data/"
-  private val sampleParquetDataLocationAppend = sampleDataLocationRoot + "sampleparquet0"
-  private val sampleParquetDataLocationAppend2 = sampleDataLocationRoot + "sampleparquet1"
-  private val sampleParquetDataLocationDelete = sampleDataLocationRoot + "sampleparquet2"
-  private val sampleParquetDataLocationDelete2 = sampleDataLocationRoot + "sampleparquet3"
-  private val sampleParquetDataLocationDelete3 = sampleDataLocationRoot + "sampleparquet4"
-  private val sampleParquetDataLocationDelete4 = sampleDataLocationRoot + "sampleparquet5"
-  private val sampleParquetDataLocationBoth = sampleDataLocationRoot + "sampleparquet6"
-  private val sampleJsonDataLocationAppend = sampleDataLocationRoot + "samplejson1"
-  private val sampleJsonDataLocationDelete = sampleDataLocationRoot + "samplejson2"
-  private var hyperspace: Hyperspace = _
+  val sampleData = SampleData.testData
+  protected val sampleDataLocationRoot = "src/test/resources/data/"
+  protected val sampleDataFormatAppend = sampleDataLocationRoot + "sample0"
+  protected val sampleDataFormatAppend2 = sampleDataLocationRoot + "sample1"
+  protected val sampleDataFormatDelete = sampleDataLocationRoot + "sample2"
+  protected val sampleDataFormatDelete2 = sampleDataLocationRoot + "sample3"
+  protected val sampleDataFormatDelete3 = sampleDataLocationRoot + "sample4"
+  protected val sampleDataFormatDelete4 = sampleDataLocationRoot + "sample5"
+  protected val sampleDataFormatBoth = sampleDataLocationRoot + "sample6"
+  protected val sampleDataFormat2Append = sampleDataLocationRoot + "sample7"
+  protected val sampleDataFormat2Delete = sampleDataLocationRoot + "sample8"
+  var hyperspace: Hyperspace = _
+  var fileFormat = ""
+  var fileFormat2 = ""
+  var indexScanWithAppendFilesExpected = false
 
   // Creates an index with given 'df' and 'indexConfig'. Then copies the first 'appendCnt'
   // number of input files from 'df' and deletes the last 'deleteCnt' of the input files.
   def setupIndexAndChangeData(
-      df: DataFrame,
+      sourceFileFormat: String,
+      dataPath: String,
       indexConfig: IndexConfig,
       appendCnt: Int,
       deleteCnt: Int): Unit = {
+    val df = spark.read.format(sourceFileFormat).load(dataPath)
     hyperspace.createIndex(df, indexConfig)
     val inputFiles = df.inputFiles
     assert(appendCnt + deleteCnt < inputFiles.length)
@@ -73,56 +78,67 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     import spark.implicits._
-    hyperspace = new Hyperspace(spark)
-    FileUtils.delete(new Path(sampleDataLocationRoot))
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-    dfFromSample.write.parquet(sampleParquetDataLocationAppend)
-    dfFromSample.write.parquet(sampleParquetDataLocationAppend2)
-    dfFromSample.write.parquet(sampleParquetDataLocationDelete)
-    dfFromSample.write.parquet(sampleParquetDataLocationDelete2)
-    dfFromSample.write.parquet(sampleParquetDataLocationDelete3)
-    dfFromSample.write.parquet(sampleParquetDataLocationDelete4)
-    dfFromSample.write.parquet(sampleParquetDataLocationBoth)
-    dfFromSample.write.json(sampleJsonDataLocationAppend)
-    dfFromSample.write.json(sampleJsonDataLocationDelete)
+    hyperspace = new Hyperspace(spark)
+    fileFormat = "parquet"
+    fileFormat2 = "json"
+    indexScanWithAppendFilesExpected = true
+
+    FileUtils.delete(new Path(sampleDataLocationRoot))
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatAppend)
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatAppend2)
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete)
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete2)
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete3)
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatDelete4)
+    dfFromSample.write.format(fileFormat).save(sampleDataFormatBoth)
+    dfFromSample.write.format(fileFormat2).save(sampleDataFormat2Append)
+    dfFromSample.write.format(fileFormat2).save(sampleDataFormat2Delete)
 
     val indexConfig1 = IndexConfig("indexType1", Seq("clicks"), Seq("query"))
     val indexConfig2 = IndexConfig("indexType2", Seq("clicks"), Seq("Date"))
 
     setupIndexAndChangeData(
-      spark.read.parquet(sampleParquetDataLocationAppend),
+      fileFormat,
+      sampleDataFormatAppend,
       indexConfig1.copy(indexName = "index_ParquetAppend"),
       appendCnt = 1,
       deleteCnt = 0)
     setupIndexAndChangeData(
-      spark.read.parquet(sampleParquetDataLocationAppend2),
+      fileFormat,
+      sampleDataFormatAppend2,
       indexConfig2.copy(indexName = "indexType2_ParquetAppend2"),
       appendCnt = 1,
       deleteCnt = 0)
     setupIndexAndChangeData(
-      spark.read.json(sampleJsonDataLocationAppend),
+      fileFormat2,
+      sampleDataFormat2Append,
       indexConfig1.copy(indexName = "index_JsonAppend"),
       appendCnt = 1,
       deleteCnt = 0)
 
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       setupIndexAndChangeData(
-        spark.read.parquet(sampleParquetDataLocationDelete),
+        fileFormat,
+        sampleDataFormatDelete,
         indexConfig1.copy(indexName = "index_ParquetDelete"),
         appendCnt = 0,
         deleteCnt = 2)
       setupIndexAndChangeData(
-        spark.read.parquet(sampleParquetDataLocationDelete3),
+        fileFormat,
+        sampleDataFormatDelete3,
         indexConfig2.copy(indexName = "indexType2_ParquetDelete3"),
         appendCnt = 0,
         deleteCnt = 2)
       setupIndexAndChangeData(
-        spark.read.parquet(sampleParquetDataLocationBoth),
+        fileFormat,
+        sampleDataFormatBoth,
         indexConfig1.copy(indexName = "index_ParquetBoth"),
         appendCnt = 1,
         deleteCnt = 1)
       setupIndexAndChangeData(
-        spark.read.json(sampleJsonDataLocationDelete),
+        fileFormat2,
+        sampleDataFormat2Delete,
         indexConfig1.copy(indexName = "index_JsonDelete"),
         appendCnt = 0,
         deleteCnt = 2)
@@ -145,18 +161,19 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: filter index & parquet format, " +
       "index relation should include appended file paths") {
-    val df = spark.read.parquet(sampleParquetDataLocationAppend)
+    assume(indexScanWithAppendFilesExpected)
+    val df = spark.read.format(fileFormat).load(sampleDataFormatAppend)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
-    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
       val filter = filterQuery
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "true") {
+    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
@@ -165,7 +182,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
       val nodes = planWithHybridScan.collect {
         case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
           // Verify appended file is included or not.
-          assert(fsRelation.location.inputFiles.count(_.contains(".copy")) === 1)
+          assert(fsRelation.location.inputFiles.count(_.contains(sampleDataFormatAppend)) === 1)
           // Verify number of index data files.
           assert(fsRelation.location.inputFiles.count(_.contains("index_ParquetAppend")) === 4)
           assert(fsRelation.location.inputFiles.length === 5)
@@ -180,8 +197,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: join index, appended data should be shuffled with indexed columns " +
       "and merged by BucketUnion") {
-    val df1 = spark.read.parquet(sampleParquetDataLocationAppend)
-    val df2 = spark.read.parquet(sampleParquetDataLocationAppend2)
+    val df1 = spark.read.format(fileFormat).load(sampleDataFormatAppend)
+    val df2 = spark.read.format(fileFormat).load(sampleDataFormatAppend2)
     def joinQuery(): DataFrame = {
       val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
       val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
@@ -191,12 +208,12 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
     withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-      withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
         val join = joinQuery()
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
-      withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "true") {
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -206,8 +223,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           case b @ BucketUnion(children, bucketSpec) =>
             assert(bucketSpec.numBuckets === 200)
             assert(
-              bucketSpec.bucketColumnNames.size === 1 && bucketSpec.bucketColumnNames.head
-                .equals("clicks"))
+              bucketSpec.bucketColumnNames.size === 1 &&
+                bucketSpec.bucketColumnNames.head === "clicks")
 
             val childNodes = children.collect {
               case r @ RepartitionByExpression(
@@ -217,7 +234,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 assert(attrs.size === 1)
                 assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
                 // Check 1 appended file.
-                assert(fsRelation.location.inputFiles.forall(_.contains(".copy")))
+                assert(fsRelation.location.inputFiles.forall(f =>
+                  f.contains(sampleDataFormatAppend) || f.contains(sampleDataFormatAppend2)))
                 assert(fsRelation.location.inputFiles.length === 1)
                 assert(numBucket === 200)
                 r
@@ -252,19 +270,20 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               assert(children.last.isInstanceOf[ShuffleExchangeExec])
               assert(bucketSpec.numBuckets === 200)
               p
-            case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+            case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
               // Check filter pushed down properly.
               assert(
-                dataFilters.toString.contains(" >= 2000)") && dataFilters.toString.contains(
-                  " <= 4000)"))
+                (dataFilters.toString.contains(" >= 2000)") &&
+                  dataFilters.toString.contains(" <= 4000)")) ||
+                  (partitionFilters.toString.contains(" >= 2000)") &&
+                    partitionFilters.toString.contains(" <= 4000)")))
               p
           }
           assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === 2)
           // 2 of index, 2 of appended file
           assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 4)
-
-          checkAnswer(join, baseQuery)
         }
+        checkAnswer(join, baseQuery)
       }
     }
   }
@@ -272,17 +291,17 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: filter rule & json format, " +
       "appended data should be shuffled and merged by Union") {
-    val df = spark.read.json(sampleJsonDataLocationAppend)
+    val df = spark.read.format(fileFormat2).load(sampleDataFormat2Append)
     def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
-    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
       val filter = filterQuery
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "true") {
+    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
@@ -328,9 +347,10 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             assert(children.head.isInstanceOf[ProjectExec]) // index data
             assert(children.last.isInstanceOf[ProjectExec]) // appended data
             p
-          case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+          case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
             // Check filter pushed down properly.
-            assert(dataFilters.toString.contains(" <= 2000)"))
+            assert(dataFilters.toString.contains(" <= 2000)") ||
+              partitionFilters.toString.contains(" <= 2000)"))
             p
         }
         assert(execNodes.count(_.isInstanceOf[UnionExec]) === 1)
@@ -338,9 +358,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 2)
         // Make sure there is no shuffle.
         execPlan.foreach(p => assert(!p.isInstanceOf[ShuffleExchangeExec]))
-
-        checkAnswer(baseQuery, filter)
       }
+      checkAnswer(baseQuery, filter)
     }
   }
 
@@ -348,31 +367,30 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     "Delete-only: filter index & parquet format, " +
       "Hybrid Scan for delete support doesn't work without lineage column") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
-    Seq(
-      ("indexNameWithoutLineage", "false", false),
-      ("indexNameWithLineage", "true", true)) foreach {
+    Seq(("indexWithoutLineage", "false", false), ("indexWithLineage", "true", true)) foreach {
       case (indexName, lineageColumnConfig, transformationExpected) =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> lineageColumnConfig) {
           setupIndexAndChangeData(
-            spark.read.parquet(sampleParquetDataLocationDelete2),
+            fileFormat,
+            sampleDataFormatDelete2,
             indexConfig.copy(indexName = indexName),
             appendCnt = 0,
             deleteCnt = 1)
 
-          val df = spark.read.parquet(sampleParquetDataLocationDelete2)
+          val df = spark.read.format(fileFormat).load(sampleDataFormatDelete2)
           def filterQuery: DataFrame =
             df.filter(df("clicks") <= 2000).select(df("query"))
           val baseQuery = filterQuery
           val basePlan = baseQuery.queryExecution.optimizedPlan
           withSQLConf(
-            "spark.hyperspace.index.hybridscan.enabled" -> "true",
-            "spark.hyperspace.index.hybridscan.delete.enabled" -> "false") {
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
             val filter = filterQuery
             assert(basePlan.equals(filter.queryExecution.optimizedPlan))
           }
           withSQLConf(
-            "spark.hyperspace.index.hybridscan.enabled" -> "true",
-            "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
             val filter = filterQuery
             assert(
               basePlan
@@ -387,8 +405,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     "Delete-only: filter index & parquet, json format, " +
       "index relation should have additional filter for deleted files") {
     Seq(
-      (sampleParquetDataLocationDelete, "index_ParquetDelete", "parquet"),
-      (sampleJsonDataLocationDelete, "index_JsonDelete", "json")) foreach {
+      (sampleDataFormatDelete, "index_ParquetDelete", "parquet"),
+      (sampleDataFormat2Delete, "index_JsonDelete", "json")) foreach {
       case (dataPath, indexName, dataFormat) =>
         val df = spark.read.format(dataFormat).load(dataPath)
         def filterQuery: DataFrame =
@@ -397,15 +415,15 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
         val basePlan = baseQuery.queryExecution.optimizedPlan
 
         withSQLConf(
-          "spark.hyperspace.index.hybridscan.enabled" -> "true",
-          "spark.hyperspace.index.hybridscan.delete.enabled" -> "false") {
+          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
           val filter = filterQuery
           assert(basePlan.equals(filter.queryExecution.optimizedPlan))
         }
 
         withSQLConf(
-          "spark.hyperspace.index.hybridscan.enabled" -> "true",
-          "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
           val filter = filterQuery
           val planWithHybridScan = filter.queryExecution.optimizedPlan
           assert(!basePlan.equals(planWithHybridScan))
@@ -447,8 +465,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   }
 
   test("Delete-only: join index, deleted files should be excluded from each index relation.") {
-    val df1 = spark.read.parquet(sampleParquetDataLocationDelete)
-    val df2 = spark.read.parquet(sampleParquetDataLocationDelete3)
+    val df1 = spark.read.format(fileFormat).load(sampleDataFormatDelete)
+    val df2 = spark.read.format(fileFormat).load(sampleDataFormatDelete3)
     def joinQuery(): DataFrame = {
       val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
       val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
@@ -458,14 +476,14 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
     withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-      withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
         val join = joinQuery()
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
       withSQLConf(
-        "spark.hyperspace.index.hybridscan.enabled" -> "true",
-        "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -513,21 +531,22 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       setupIndexAndChangeData(
-        spark.read.parquet(sampleParquetDataLocationDelete4),
+        fileFormat,
+        sampleDataFormatDelete4,
         indexConfig.copy(indexName = "IndexDeleteCntTest"),
         appendCnt = 0,
         deleteCnt = 2)
     }
 
-    val df = spark.read.parquet(sampleParquetDataLocationDelete4)
+    val df = spark.read.format(fileFormat).load(sampleDataFormatDelete4)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
     withSQLConf(
-      "spark.hyperspace.index.hybridscan.enabled" -> "true",
-      "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+      IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
       withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
         val filter = filterQuery
         // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
@@ -544,20 +563,20 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append+Delete: filter index & parquet format, " +
       "appended files should be handled with additional plan and merged by Union.") {
-    val df = spark.read.parquet(sampleParquetDataLocationBoth)
+    val df = spark.read.format(fileFormat).load(sampleDataFormatBoth)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
-    withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
       val filter = filterQuery
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
     withSQLConf(
-      "spark.hyperspace.index.hybridscan.enabled" -> "true",
-      "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+      IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
@@ -632,8 +651,8 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     "Append+Delete: join index, appended data should be shuffled with indexed columns " +
       "and merged by BucketUnion and deleted files are handled with index data.") {
     // One relation has both deleted & appended files and the other one has only deleted files.
-    val df1 = spark.read.parquet(sampleParquetDataLocationBoth)
-    val df2 = spark.read.parquet(sampleParquetDataLocationDelete3)
+    val df1 = spark.read.format(fileFormat).load(sampleDataFormatBoth)
+    val df2 = spark.read.format(fileFormat).load(sampleDataFormatDelete3)
     def joinQuery(): DataFrame = {
       val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
       val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
@@ -643,14 +662,14 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     val basePlan = baseQuery.queryExecution.optimizedPlan
 
     withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-      withSQLConf("spark.hyperspace.index.hybridscan.enabled" -> "false") {
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
         val join = joinQuery()
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
       withSQLConf(
-        "spark.hyperspace.index.hybridscan.enabled" -> "true",
-        "spark.hyperspace.index.hybridscan.delete.enabled" -> "true",
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true",
         "spark.sql.optimizer.inSetConversionThreshold" -> "1") {
         // Changed inSetConversionThreshould to check InSet optimization.
         val join = joinQuery()
