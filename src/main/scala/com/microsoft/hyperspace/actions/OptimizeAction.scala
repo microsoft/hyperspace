@@ -122,22 +122,13 @@ class OptimizeAction(
         (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
       }
 
-    // Check if there is only one index file in a bucket and exclude the index file
-    // as it doesn't need to be optimized.
-    val filesPerBucket = mutable.Map[Int, List[FileInfo]]()
-    possibleCandidates.foreach { f =>
-      val key = BucketingUtils.getBucketId(new Path(f.name).getName).get
-      if (!filesPerBucket.contains(key)) {
-        filesPerBucket.put(key, List(f))
-      } else {
-        filesPerBucket.update(key, filesPerBucket(key) :+ f)
-      }
-    }
+    // Files belonging to buckets that have only one file are ignored as they don't need to
+    // be optimized.
+    val filesPerBucket =
+      possibleCandidates.groupBy(f => BucketingUtils.getBucketId(new Path(f.name).getName))
+    val (filesToOptimize, singleFilesToIgnore) = filesPerBucket.values.partition(_.length > 1)
 
-    // Get candidate index files for optimization based on the length of file list per bucket.
-    val (filesToOptimize, singleFiles) = filesPerBucket.values.partition(_.length > 1)
-
-    (filesToOptimize.flatten.toSeq, singleFiles.flatten.toSeq ++ largeFilesToIgnore)
+    (filesToOptimize.flatten.toSeq, singleFilesToIgnore.flatten.toSeq ++ largeFilesToIgnore)
   }
 
   override def logEntry: LogEntry = {

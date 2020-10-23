@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{BucketingUtils, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
@@ -393,8 +393,16 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         MockEventLogger.reset()
         hyperspace.optimizeIndex(indexConfig.indexName)
 
+        val index = logManager(systemPath, indexConfig.indexName)
+          .getLatestStableLog()
+          .get
+          .asInstanceOf[IndexLogEntry]
+
         // Check that no new log files were created in this operation.
-        assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
+        assert(latestId == index.id)
+
+        // Check all index files are larger than the size threshold.
+        assert(index.content.fileInfos.forall(_.size > 1))
 
         // Check emitted events.
         MockEventLogger.emittedEvents match {
@@ -428,8 +436,18 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       MockEventLogger.reset()
       hyperspace.optimizeIndex(indexConfig.indexName)
 
+      val index = logManager(systemPath, indexConfig.indexName)
+        .getLatestStableLog()
+        .get
+        .asInstanceOf[IndexLogEntry]
+
       // Check that no new log files were created in this operation.
-      assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
+      assert(latestId == index.id)
+
+      // Check all index files are not needed to be optimized. (i.e. non-optimizable)
+      val filesPerBucket =
+        index.content.files.groupBy(f => BucketingUtils.getBucketId(f.getName))
+      assert(filesPerBucket.values.forall(_.size == 1))
 
       // Check emitted events.
       MockEventLogger.emittedEvents match {
