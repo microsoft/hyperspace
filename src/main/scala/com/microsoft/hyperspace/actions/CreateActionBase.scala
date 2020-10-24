@@ -18,12 +18,16 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{
+  HadoopFsRelation,
+  LogicalRelation,
+  PartitioningAwareFileIndex
+}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{input_file_name, udf}
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
@@ -63,7 +67,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val relations = sourceRelations(df)
+        val relations = sourceRelations(spark, df)
         // Currently we only support to create an index on a LogicalRelation.
         assert(relations.size == 1)
 
@@ -90,35 +94,17 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  protected def sourceRelations(df: DataFrame): Seq[Relation] =
+  protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(
-            location: PartitioningAwareFileIndex,
-            _,
-            dataSchema,
-            _,
-            fileFormat,
-            options),
-          _,
-          _,
-          _) =>
-        val files = location.allFiles
-        // Note that source files are currently fingerprinted when the optimized plan is
-        // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
-        val fileFormatName = fileFormat match {
-          case d: DataSourceRegister => d.shortName
-          case other => throw HyperspaceException(s"Unsupported file format: $other")
-        }
-        // "path" key in options can incur multiple data read unexpectedly.
-        val opts = options - "path"
-        Relation(
-          location.rootPaths.map(_.toString),
-          Hdfs(sourceDataProperties),
-          dataSchema.json,
-          fileFormatName,
-          opts)
+      case p: LogicalRelation =>
+        Hyperspace
+          .getContext(spark)
+          .sourceProviders
+          .view
+          .map(source => source.createRelation(p))
+          .collectFirst { case Some(x) => x }
+          .getOrElse(
+            throw HyperspaceException("No source provider could reconstruct the given relation."))
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
