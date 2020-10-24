@@ -81,33 +81,25 @@ object RuleUtils {
       // Find the number of common files between the source relations & index source files.
       val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
       val deletedCnt = entry.allSourceFileInfos.size - commonCnt
-      lazy val hybridScanRequired =
-        !(commonCnt == entry.allSourceFileInfos.size && commonCnt == inputSourceFiles.size)
 
-      if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
-        if (commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)) {
-          // If there is no change in source dataset, this index can be applied by
-          // transformPlanToUseIndexOnlyScan.
-          entry.setTagValue(
-            plan,
-            IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
-            hybridScanRequired)
-          true
-        } else {
-          false
-        }
-      } else {
-        // For append-only Hybrid Scan, deleted files are not allowed.
-        if (deletedCnt == 0 && commonCnt > 0) {
-          entry.setTagValue(
-            plan,
-            IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
-            hybridScanRequired)
-          true
-        } else {
-          false
-        }
+      lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn(spark) &&
+        commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
+
+      // For append-only Hybrid Scan, deleted files are not allowed
+      lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
+        commonCnt > 0
+
+      val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
+      if (isCandidate) {
+        // If there is no change in source dataset, the index can be applied by
+        // transformPlanToUseIndexOnlyScan.
+        entry.setTagValue(
+          plan,
+          IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+          !(commonCnt == entry.allSourceFileInfos.size &&
+            commonCnt == inputSourceFiles.size))
       }
+      isCandidate
     }
 
     if (hybridScanEnabled) {
