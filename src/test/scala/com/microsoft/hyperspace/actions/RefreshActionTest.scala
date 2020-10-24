@@ -35,7 +35,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private var testLogEntry: LogEntry = _
 
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
-    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(spark, df)
   }
 
   private def updateSourceFiles(): Unit = {

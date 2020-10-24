@@ -19,8 +19,8 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
-import com.microsoft.hyperspace.util.HashingUtils
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import com.microsoft.hyperspace.util.HashingUtils
 
 /**
  * [[FileBasedSignatureProvider]] provides the logical plan signature based on files in the
