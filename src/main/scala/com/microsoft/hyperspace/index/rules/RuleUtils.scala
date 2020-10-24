@@ -179,12 +179,12 @@ object RuleUtils {
     assert(getLogicalRelation(plan).isDefined)
 
     val transformed =
-      if (!HyperspaceConf.hybridScanEnabled(spark) || !index
+      if (HyperspaceConf.hybridScanEnabled(spark) && index
         .getTagValue(IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
         .getOrElse(false)) {
-        transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
-      } else {
         transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
+      } else {
+        transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
       }
     assert(!transformed.equals(plan))
     transformed
