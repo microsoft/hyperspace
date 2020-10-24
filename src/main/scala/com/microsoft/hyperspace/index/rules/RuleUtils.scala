@@ -85,6 +85,7 @@ object RuleUtils {
       // If there is no change in source dataset, this index can be applied by
       // transformPlanToUseIndexOnlyScan.
       entry.setTagValue(
+        plan,
         IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
         !(commonCnt == entry.allSourceFileInfos.size && commonCnt == inputSourceFiles.size))
 
@@ -180,8 +181,8 @@ object RuleUtils {
 
     val transformed =
       if (HyperspaceConf.hybridScanEnabled(spark) && index
-        .getTagValue(IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
-        .getOrElse(false)) {
+            .getTagValue(plan, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+            .getOrElse(false)) {
         transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
       } else {
         transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)

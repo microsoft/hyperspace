@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -455,19 +456,25 @@ case class IndexLogEntry(
    * A mutable map for holding auxiliary information of this index log entry while applying rules.
    */
   @JsonIgnore
-  private val tags: mutable.Map[IndexLogEntryTag[_], Any] = mutable.Map.empty
+  private val tags: mutable.Map[(LogicalPlan, IndexLogEntryTag[_]), Any] = mutable.Map.empty
 
-  def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
-    tags(tag) = value
-  }
+  def setTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], value: T): Unit =
+    tags((plan, tag)) = value
 
-  def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] = {
-    tags.get(tag).map(_.asInstanceOf[T])
-  }
+  def getTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Option[T] =
+    tags.get((plan, tag)).map(_.asInstanceOf[T])
 
-  def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
-    tags -= tag
-  }
+  def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit =
+    tags.remove((plan, tag))
+
+  def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit =
+    tags((null, tag)) = value
+
+  def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] =
+    tags.get((null, tag)).map(_.asInstanceOf[T])
+
+  def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit =
+    tags.remove((null, tag))
 }
 
 // A tag of a `IndexLogEntry`, which defines name and type.

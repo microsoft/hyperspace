@@ -146,7 +146,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
               assert(indexes.head.name == "index1")
               assert(
                 indexes.head
-                  .getTagValue(IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+                  .getTagValue(plan, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
                   .getOrElse(false) == expectedHybridScanTag)
             } else {
               assert(indexes.isEmpty)
