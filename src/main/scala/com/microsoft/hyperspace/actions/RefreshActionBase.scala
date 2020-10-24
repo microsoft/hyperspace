@@ -78,8 +78,6 @@ private[actions] abstract class RefreshActionBase(
     IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
   }
 
-  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
-
   final override val transientState: String = REFRESHING
 
   final override val finalState: String = ACTIVE

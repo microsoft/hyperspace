@@ -16,8 +16,10 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.collection.mutable
+
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -45,6 +47,8 @@ class RefreshDeleteAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager)
     with Logging {
+
+  private lazy val fileIdsMap = getFileIdsMap(df)
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     RefreshDeleteActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
@@ -90,7 +94,18 @@ class RefreshDeleteAction(
   }
 
   override def logEntry: LogEntry = {
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    val entry =
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileIdsMap._1, fileIdsMap._2)
     entry.withAppendedAndDeletedFiles(appendedFiles, Seq())
+  }
+
+  final override def getFileIdsMap(df: DataFrame): (Map[String, Long], Long) = {
+    var lastFileId = previousIndexLogEntry.lastFileId
+    val fileIdsMap = mutable.Map() ++ previousIndexLogEntry.fileIdsMap
+    appendedFiles.foreach { f =>
+      lastFileId += 1
+      fileIdsMap.put(f, lastFileId)
+    }
+    (fileIdsMap.toMap, lastFileId)
   }
 }

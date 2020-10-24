@@ -16,7 +16,9 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.spark.sql.SparkSession
+import scala.collection.mutable
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshAppendActionEvent}
@@ -40,12 +42,15 @@ class RefreshAppendAction(
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
+
+  private lazy val fileIdsMap = getFileIdsMap(dfWithAppendedFiles)
+
   final override def op(): Unit = {
     // TODO: The current implementation picks the number of buckets and
     //  "spark.hyperspace.index.lineage.enabled" from session config. This should be
     //  user-configurable to allow maintain the existing bucket numbers in the index log entry.
     //  https://github.com/microsoft/hyperspace/issues/196.
-    write(spark, dfWithAppendedFiles, indexConfig)
+    write(spark, dfWithAppendedFiles, indexConfig, fileIdsMap._1)
   }
 
   /**
@@ -80,7 +85,8 @@ class RefreshAppendAction(
    */
   override def logEntry: LogEntry = {
     // Log entry with complete data and newly index files.
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    val entry =
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileIdsMap._1, fileIdsMap._2)
 
     // Merge new index files with old index files.
     val mergedContent = Content(previousIndexLogEntry.content.root.merge(entry.content.root))
@@ -92,4 +98,23 @@ class RefreshAppendAction(
   override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     RefreshAppendActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
+
+  final override def getFileIdsMap(df: DataFrame): (Map[String, Long], Long) = {
+    var lastFileId = previousIndexLogEntry.lastFileId
+    val fileIdsMap = mutable.Map() ++ previousIndexLogEntry.fileIdsMap
+    appendedFiles.foreach { f =>
+      lastFileId += 1
+      fileIdsMap.put(f, lastFileId)
+    }
+    (fileIdsMap.toMap, lastFileId)
+  }
+
+  // pouriap
+//  override def lastFileId: Long = {
+//    val id = previousIndexLogEntry.source.plan.properties.lastFileId
+//    if (id < 0) {
+//      throw HyperspaceException(s"Invalid last file id: $id.")
+//    }
+//    id
+//  }
 }

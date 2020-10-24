@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.collection.mutable
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
@@ -51,7 +53,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
-      path: Path): IndexLogEntry = {
+      path: Path,
+      fileIdsMap: Map[String, Long],
+      lastFileId: Long): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path)
     val numBuckets = numBucketsForIndex(spark)
 
@@ -59,7 +63,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // Resolve the passed column names with existing column names from the dataframe.
     val (indexDataFrame, resolvedIndexedColumns, resolvedIncludedColumns) =
-      prepareIndexDataFrame(spark, df, indexConfig)
+      prepareIndexDataFrame(spark, df, indexConfig, fileIdsMap)
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
@@ -85,6 +89,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Content.fromDirectory(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
+          .withFileIdsMap(lastFileId, fileIdsMap)
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
@@ -121,11 +126,15 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           opts)
     }
 
-  protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
+  protected def write(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: IndexConfig,
+      fileIdsMap: Map[String, Long]): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
-      prepareIndexDataFrame(spark, df, indexConfig)
+      prepareIndexDataFrame(spark, df, indexConfig, fileIdsMap)
 
     // run job
     val repartitionedIndexDataFrame =
@@ -165,7 +174,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   private def prepareIndexDataFrame(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
+      indexConfig: IndexConfig,
+      fileIdsMap: Map[String, Long]): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
     val addLineage = indexLineageEnabled(spark)
@@ -191,11 +201,20 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet
       // - Normalized path to be stored in DATA_FILE_NAME_COLUMN column:
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
-      val absolutePath: UserDefinedFunction = udf(
-        (filePath: String) => filePath.replace("file:///", "file:/"))
+//      val absolutePath: UserDefinedFunction = udf(  // pouriap
+//        (filePath: String) => filePath.replace("file:///", "file:/"))
+      val getFileId: UserDefinedFunction = udf((filePath: String) => {
+        fileIdsMap
+          .get(filePath.replace("file:///", "file:/")) match {
+          case Some(id) => id
+          case _ =>
+            throw HyperspaceException(
+              s"Encountered source data file with unknown file id. (File: $filePath).")
+        }
+      })
 
       df.select(allIndexColumns.head, allIndexColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, absolutePath(input_file_name()))
+        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, getFileId(input_file_name()))
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }
@@ -213,4 +232,26 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     assert(partitionSchemas.length == 1)
     partitionSchemas.head.map(_.name)
   }
+
+  protected def getFileIdsMap(df: DataFrame): (Map[String, Long], Long) = {
+    var lastId = -1L
+    val fileIdsMap = mutable.Map[String, Long]()
+    df.queryExecution.optimizedPlan.collect {
+      case LogicalRelation(
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
+        val files = location.allFiles
+        files.map { f =>
+          val filePath = f.getPath.toUri.toString.replace("file:///", "file:/")
+          lastId += 1
+          fileIdsMap.put(filePath, lastId)
+        }
+    }
+    (fileIdsMap.toMap, lastId)
+  }
+
+  // pouriap
+//  protected def lastFileId: Long = -1L // file ids for a new index starts from 0
 }

@@ -36,8 +36,13 @@ class RefreshAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
+  private lazy val fileIdsMap = getFileIdsMap(df)
+
+  override def logEntry: LogEntry =
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileIdsMap._1, fileIdsMap._2)
+
   final override def op(): Unit = {
-    write(spark, df, indexConfig)
+    write(spark, df, indexConfig, fileIdsMap._1)
   }
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
