@@ -184,9 +184,8 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    // If there is no need to do HybridScan even with HybridScanConfig enabled, the index can
-    // be applied with the general way -transformPlanToUseIndexOnlyScan- and the outcome will
-    // be same as there is no source data change.
+    // If there is no change in source data files, the index can be applied with the general
+    // way, transformPlanToUseIndexOnlyScan, regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
     lazy val hybridScanRequired = index.getTagValue(
       getLogicalRelation(plan).get,
