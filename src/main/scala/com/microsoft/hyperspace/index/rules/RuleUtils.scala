@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
@@ -382,37 +382,34 @@ object RuleUtils {
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
       case baseRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(
-              baseLocation: PartitioningAwareFileIndex,
-              _,
-              _,
-              _,
-              _,
-              _),
+            fsRelation @ HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
         val newLocation =
-          if (baseLocation.partitionSchema.isEmpty) {
+          if (location.partitionSchema.isEmpty) {
             new InMemoryFileIndex(spark, filesAppended, Map(), None)
           } else {
-            // Set "basePath" so that partitioned columns are also included.
-            // This doesn't work for multiple basePaths.
-            val basePath = baseLocation.partitionSpec.partitionColumns
-              .foldLeft(baseLocation.partitionSpec.partitions.head.path)((path, _) =>
-                path.getParent)
+            // Set "basePath" so that partitioned columns are also included in the output schema.
+            val basePath = location.partitionSpec.partitionColumns
+              .foldRight(location.partitionSpec.partitions.head.path) { (col, path) =>
+                if (path.getName.contains(col.name)) {
+                  path.getParent
+                } else {
+                  path
+                }
+              }
             new InMemoryFileIndex(
               spark,
               filesAppended,
               Map("basePath" -> basePath.toString),
               None)
           }
-        val updatedSchema = StructType(
-          baseRelation.schema.filter(field =>
-            indexSchema.contains(field) || baseLocation.partitionSchema
-              .contains(field)))
         // Set the same output schema with the index plan to merge them using BucketUnion.
-        val partitionColumns = baseLocation.partitionSchema.map(_.name)
+        // Include partition columns for data loading.
+        val partitionColumns = location.partitionSchema.map(_.name)
+        val updatedSchema = StructType(baseRelation.schema.filter(col =>
+          indexSchema.contains(col) || location.partitionSchema.contains(col)))
         val updatedOutput = baseOutput.filter(attr =>
           indexSchema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
         val newRelation = fsRelation.copy(

@@ -100,5 +100,4 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
         deleteCnt = 2)
     }
   }
-
 }
