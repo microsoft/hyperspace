@@ -21,10 +21,52 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 import com.microsoft.hyperspace.index.Relation
 
+/**
+ * ::Experimental::
+ * A trait that a data source should implement so that an index can be created/managed and
+ * utilized for the data source.
+ *
+ * @since 0.3.0
+ */
 trait SourceProvider {
+  /**
+   * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
+   *
+   * This API is used when an index is created.
+   *
+   * If the given logical relation does not belong to this provider, None should be returned.
+   *
+   * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
+   *         Otherwise, None.
+   */
   def createRelation(logicalRelation: LogicalRelation): Option[Relation]
 
+  /**
+   * Reconstructs [[DataFrame]] using the given [[Relation]].
+   *
+   * This API is used when an index is refreshed.
+   *
+   * If the given relation does not belong to this provider, None should be returned.
+   *
+   * @param spark Spark session.
+   * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
+   * @return [[DataFrame]] object if the given 'relation' can be processed by this provider.
+   *         Otherwise, None.
+   */
   def reconstructDataFrame(spark: SparkSession, relation: Relation): Option[DataFrame]
 
-  def signature(relation: LogicalRelation): Option[String]
+  /**
+   * Computes the signature using the given [[LogicalRelation]].
+   *
+   * This API is used when the signature of source needs to be computed, e.g., creating an index,
+   * computing query plan's signature, etc.
+   *
+   * If the given logical relation does not belong to this provider, None should be returned.
+   *
+   * @param logicalRelation logical relation to compute signature from.
+   * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
+   *         Otherwise, None.
+   */
+  def signature(logicalRelation: LogicalRelation): Option[String]
 }
