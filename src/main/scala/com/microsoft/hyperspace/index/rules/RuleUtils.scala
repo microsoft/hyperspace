@@ -81,19 +81,32 @@ object RuleUtils {
       // Find the number of common files between the source relations & index source files.
       val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
       val deletedCnt = entry.allSourceFileInfos.size - commonCnt
-
-      // If there is no change in source dataset, this index can be applied by
-      // transformPlanToUseIndexOnlyScan.
-      entry.setTagValue(
-        plan,
-        IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
-        !(commonCnt == entry.allSourceFileInfos.size && commonCnt == inputSourceFiles.size))
+      lazy val hybridScanRequired =
+        !(commonCnt == entry.allSourceFileInfos.size && commonCnt == inputSourceFiles.size)
 
       if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
-        commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
+        if (commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)) {
+          // If there is no change in source dataset, this index can be applied by
+          // transformPlanToUseIndexOnlyScan.
+          entry.setTagValue(
+            plan,
+            IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+            hybridScanRequired)
+          true
+        } else {
+          false
+        }
       } else {
         // For append-only Hybrid Scan, deleted files are not allowed.
-        deletedCnt == 0 && commonCnt > 0
+        if (deletedCnt == 0 && commonCnt > 0) {
+          entry.setTagValue(
+            plan,
+            IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+            hybridScanRequired)
+          true
+        } else {
+          false
+        }
       }
     }
 
@@ -179,14 +192,19 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    val transformed =
-      if (HyperspaceConf.hybridScanEnabled(spark) && index
-            .getTagValue(getLogicalRelation(plan).get, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
-            .getOrElse(false)) {
-        transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
-      } else {
-        transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
-      }
+    // If there is no need to do HybridScan even with HybridScanConfig enabled, the index can
+    // be applied with the general way -transformPlanToUseIndexOnlyScan- and the outcome will
+    // be same as there is no source data change.
+    // This tag should always exist if Hybrid Scan is enabled.
+    lazy val hybridScanRequired = index.getTagValue(
+      getLogicalRelation(plan).get,
+      IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+
+    val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired.get) {
+      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
+    } else {
+      transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
+    }
     assert(!transformed.equals(plan))
     transformed
   }

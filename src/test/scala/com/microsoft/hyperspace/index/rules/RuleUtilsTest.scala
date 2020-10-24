@@ -134,7 +134,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled: Boolean,
             hybridScanDeleteEnabled: Boolean,
             expectCandidateIndex: Boolean,
-            expectedHybridScanTag: Boolean): Unit = {
+            expectedHybridScanTag: Option[Boolean]): Unit = {
           withSQLConf(
             "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
             "spark.hyperspace.index.hybridscan.delete.enabled" ->
@@ -142,12 +142,11 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             val indexes = RuleUtils
               .getCandidateIndexes(spark, allIndexes, plan)
             if (expectCandidateIndex) {
-              assert(indexes.length == 1)
-              assert(indexes.head.name == "index1")
+              assert(indexes.length === 1)
+              assert(indexes.head.name === "index1")
               assert(
-                indexes.head
-                  .getTagValue(plan, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
-                  .getOrElse(false) == expectedHybridScanTag)
+                indexes.head.getTagValue(plan, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+                  === expectedHybridScanTag)
             } else {
               assert(indexes.isEmpty)
             }
@@ -163,13 +162,13 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = true,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = true,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = Some(false))
         }
 
         // Scenario #1: Append new files.
@@ -182,13 +181,13 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = true,
-            expectedHybridScanTag = true)
+            expectedHybridScanTag = Some(true))
         }
 
         // Scenario #2: Delete 1 file.
@@ -201,19 +200,19 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
             expectCandidateIndex = true,
-            expectedHybridScanTag = true)
+            expectedHybridScanTag = Some(true))
         }
 
         // Scenario #3: Replace all files.
@@ -226,13 +225,13 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
             expectCandidateIndex = false,
-            expectedHybridScanTag = false)
+            expectedHybridScanTag = None)
         }
       }
     }
