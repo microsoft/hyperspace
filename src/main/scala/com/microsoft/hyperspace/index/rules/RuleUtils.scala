@@ -181,7 +181,7 @@ object RuleUtils {
 
     val transformed =
       if (HyperspaceConf.hybridScanEnabled(spark) && index
-            .getTagValue(plan, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+            .getTagValue(getLogicalRelation(plan).get, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
             .getOrElse(false)) {
         transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
       } else {
