@@ -56,12 +56,6 @@ object IndexConstants {
   // See https://github.com/microsoft/hyperspace/issues/185
   val INDEX_RELATION_IDENTIFIER: (String, String) = "indexRelation" -> "true"
 
-  // Tags are used while applying rules.
-  // INDEX_HYBRIDSCAN_REQUIRED_TAG indicates if Hybrid Scan is required for this index or not.
-  // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
-  val INDEX_HYBRIDSCAN_REQUIRED_TAG: IndexLogEntryTag[Boolean] =
-  IndexLogEntryTag[Boolean]("hybridScanRequired")
-
   // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
   val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
 

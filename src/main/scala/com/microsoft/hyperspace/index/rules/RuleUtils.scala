@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -95,7 +95,7 @@ object RuleUtils {
         // transformPlanToUseIndexOnlyScan.
         entry.setTagValue(
           plan,
-          IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+          IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG,
           !(commonCnt == entry.allSourceFileInfos.size &&
             commonCnt == inputSourceFiles.size))
       }
@@ -189,7 +189,7 @@ object RuleUtils {
     // This tag should always exist if Hybrid Scan is enabled.
     lazy val hybridScanRequired = index.getTagValue(
       getLogicalRelation(plan).get,
-      IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+      IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG)
 
     val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired.get) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)

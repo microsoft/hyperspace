@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants}
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -145,7 +145,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
               assert(indexes.length === 1)
               assert(indexes.head.name === "index1")
               assert(
-                indexes.head.getTagValue(plan, IndexConstants.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+                indexes.head.getTagValue(plan, IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG)
                   === expectedHybridScanTag)
             } else {
               assert(indexes.isEmpty)
