@@ -334,8 +334,8 @@ object Hdfs {
    */
   case class Properties(
       content: Content,
-      appendedFiles: Seq[String] = Nil,
-      deletedFiles: Seq[String] = Nil)
+      appendedFiles: Seq[FileInfo] = Nil,
+      deletedFiles: Seq[FileInfo] = Nil)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -389,15 +389,16 @@ case class IndexLogEntry(
       .toSet
   }
 
-  def deletedFiles: Seq[String] = {
+  def deletedFiles: Seq[FileInfo] = {
     relations.head.data.properties.deletedFiles
   }
 
-  def appendedFiles: Seq[String] = {
+  def appendedFiles: Seq[FileInfo] = {
     relations.head.data.properties.appendedFiles
   }
 
-  def withAppendedAndDeletedFiles(appended: Seq[String], deleted: Seq[String]): IndexLogEntry = {
+  def withAppendedAndDeletedFiles(appended: Seq[FileInfo], deleted: Seq[FileInfo]): IndexLogEntry
+  = {
     copy(
       source = source.copy(
         plan = source.plan.copy(

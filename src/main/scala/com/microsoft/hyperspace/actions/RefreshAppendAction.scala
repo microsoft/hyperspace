@@ -67,7 +67,7 @@ class RefreshAppendAction(
       .schema(df.schema)
       .format(relation.fileFormat)
       .options(relation.options)
-      .load(appendedFiles: _*)
+      .load(appendedFiles.map(_.name): _*)
   }
 
   /**
