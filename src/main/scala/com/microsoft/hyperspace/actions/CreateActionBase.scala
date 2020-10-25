@@ -92,14 +92,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case p: LogicalRelation =>
-        Hyperspace
-          .getContext(spark)
-          .sourceProviders
-          .view
-          .map(source => source.createRelation(p))
-          .collectFirst { case Some(x) => x }
-          .getOrElse(throw HyperspaceException(
-            "No source providers could reconstruct the given relation."))
+        Hyperspace.getContext(spark).sourceProviderManager.createRelation(p)
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

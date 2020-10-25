@@ -69,3 +69,22 @@ trait SourceProvider {
    */
   def signature(logicalRelation: LogicalRelation): Option[String]
 }
+
+/**
+ * ::Experimental::
+ * A trait that a source provider's builder should implement. Each source provider should have an
+ * accompanying builder in order to be plugged into the SourceProviderManager.
+ *
+ * The reason for having a builder is to inject [[SparkSession]] to the source provider if needed.
+ *
+ * @since 0.3.0
+ */
+trait SourceProviderBuilder {
+  /**
+   * Builds a [[SourceProvider]].
+   *
+   * @param spark Spark session.
+   * @return [[SourceProvider]] object.
+   */
+  def build(spark: SparkSession): SourceProvider
+}

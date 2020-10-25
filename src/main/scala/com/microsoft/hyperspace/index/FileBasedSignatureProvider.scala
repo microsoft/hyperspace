@@ -50,11 +50,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
     var fingerprint = ""
     logicalPlan.foreachUp {
       case p: LogicalRelation =>
-        Hyperspace.getContext.sourceProviders.view
-          .map(source => source.signature(p))
-          .collectFirst { case Some(x) => x }
-          .map(fingerprint ++= _)
-          .orElse(throw HyperspaceException("No signature is found from source providers"))
+        fingerprint ++= Hyperspace.getContext.sourceProviderManager.signature(p)
       case _ =>
     }
 

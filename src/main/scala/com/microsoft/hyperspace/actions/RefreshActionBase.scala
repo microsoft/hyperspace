@@ -17,12 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{
-  HadoopFsRelation,
-  LogicalRelation,
-  PartitioningAwareFileIndex
-}
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
@@ -69,14 +64,7 @@ private[actions] abstract class RefreshActionBase(
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
-    Hyperspace
-      .getContext(spark)
-      .sourceProviders
-      .view
-      .map(source => source.reconstructDataFrame(relations.head))
-      .collectFirst { case Some(x) => x }
-      .getOrElse(
-        throw HyperspaceException("No source provider could reconstruct the given relation."))
+    Hyperspace.getContext(spark).sourceProviderManager.reconstructDataFrame(relations.head)
   }
 
   protected lazy val indexConfig: IndexConfig = {

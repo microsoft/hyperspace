@@ -25,7 +25,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.index.{Content, Hdfs, Relation}
-import com.microsoft.hyperspace.index.sources.SourceProvider
+import com.microsoft.hyperspace.index.sources.{SourceProvider, SourceProviderBuilder}
 import com.microsoft.hyperspace.util.HashingUtils
 
 /**
@@ -146,4 +146,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends SourceProv
     fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
       fileStatus.getPath.toString
   }
+}
+
+class DefaultFileBasedSourceBuilder extends SourceProviderBuilder {
+  override def build(spark: SparkSession): SourceProvider = new DefaultFileBasedSource(spark)
 }
