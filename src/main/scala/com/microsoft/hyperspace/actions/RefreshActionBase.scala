@@ -73,7 +73,7 @@ private[actions] abstract class RefreshActionBase(
       .getContext(spark)
       .sourceProviders
       .view
-      .map(source => source.reconstructDataFrame(spark, relations.head))
+      .map(source => source.reconstructDataFrame(relations.head))
       .collectFirst { case Some(x) => x }
       .getOrElse(
         throw HyperspaceException("No source provider could reconstruct the given relation."))

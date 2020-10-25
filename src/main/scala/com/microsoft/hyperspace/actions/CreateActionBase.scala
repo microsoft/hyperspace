@@ -18,14 +18,9 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{
-  HadoopFsRelation,
-  LogicalRelation,
-  PartitioningAwareFileIndex
-}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{input_file_name, udf}
-import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
@@ -103,8 +98,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           .view
           .map(source => source.createRelation(p))
           .collectFirst { case Some(x) => x }
-          .getOrElse(
-            throw HyperspaceException("No source provider could reconstruct the given relation."))
+          .getOrElse(throw HyperspaceException(
+            "No source providers could reconstruct the given relation."))
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

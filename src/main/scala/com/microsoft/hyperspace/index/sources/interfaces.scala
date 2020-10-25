@@ -49,12 +49,11 @@ trait SourceProvider {
    *
    * If the given relation does not belong to this provider, None should be returned.
    *
-   * @param spark Spark session.
    * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
    * @return [[DataFrame]] object if the given 'relation' can be processed by this provider.
    *         Otherwise, None.
    */
-  def reconstructDataFrame(spark: SparkSession, relation: Relation): Option[DataFrame]
+  def reconstructDataFrame(relation: Relation): Option[DataFrame]
 
   /**
    * Computes the signature using the given [[LogicalRelation]].

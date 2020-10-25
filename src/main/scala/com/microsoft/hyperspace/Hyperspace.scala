@@ -22,7 +22,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 import com.microsoft.hyperspace.index.sources.SourceProvider
-import com.microsoft.hyperspace.index.sources.default.DefaultSourceProvider
+import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSource
 
 class Hyperspace(spark: SparkSession) {
   private val indexManager: IndexManager = Hyperspace.getContext(spark).indexCollectionManager
@@ -191,5 +191,5 @@ object Hyperspace {
 private[hyperspace] class HyperspaceContext(val spark: SparkSession) {
   val indexCollectionManager = CachingIndexCollectionManager(spark)
 
-  val sourceProviders: Seq[SourceProvider] = Seq(DefaultSourceProvider)
+  val sourceProviders: Seq[SourceProvider] = Seq(new DefaultFileBasedSource(spark))
 }
