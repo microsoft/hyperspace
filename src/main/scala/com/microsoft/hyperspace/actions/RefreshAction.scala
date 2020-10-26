@@ -45,6 +45,18 @@ class RefreshAction(
     write(spark, df, indexConfig, fileIdsMap._1)
   }
 
+  /**
+   * Validate index is in active state for refreshing and there are some changes in
+   * source data file(s).
+   */
+  final override def validate(): Unit = {
+    super.validate()
+
+    if (currentFiles.equals(previousIndexLogEntry.allSourceFileInfos)) {
+      throw NoChangesException("Refresh full aborted as no source data changed.")
+    }
+  }
+
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     RefreshActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
