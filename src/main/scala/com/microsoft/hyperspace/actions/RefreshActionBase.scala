@@ -102,7 +102,10 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val deletedFiles: Seq[FileInfo] = {
     val relation = previousIndexLogEntry.relations.head
     val originalFiles = relation.data.properties.content.fileInfos
-    (originalFiles -- currentFiles).toSeq
+
+    // TODO: Add test for the scenario where existing appendedFiles and newly appended
+    //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
+    ((originalFiles -- currentFiles) ++ previousIndexLogEntry.deletedFiles).toSeq
   }
 
   /**
