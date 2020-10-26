@@ -109,7 +109,7 @@ private[actions] abstract class RefreshActionBase(
     val prevDeletedFiles =
       previousIndexLogEntry.deletedFiles.filterNot(f => delFileNames.contains(f.name))
 
-    // TODO: Add test for the scenario where existing appendedFiles and newly appended
+    // TODO: Add test for the scenario where existing deletedFiles and newly deleted
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
     delFiles.toSeq ++ prevDeletedFiles
   }
