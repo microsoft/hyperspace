@@ -126,16 +126,36 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                  "properties" : { }
         |                }
         |              },
-        |              "deletedFiles" : [{
-        |                    "name" : "file:/rootpath/f1",
+        |              "deletedFiles" : {
+        |                "root" : {
+        |                  "name" : "",
+        |                  "files" : [ {
+        |                    "name" : "f1",
         |                    "size" : 10,
         |                    "modifiedTime" : 10
         |                  }],
-        |              "appendedFiles" : [{
-        |                    "name" : "file:/rootpath/f3",
+        |                  "subDirs" : [ ]
+        |                },
+        |                "fingerprint" : {
+        |                  "kind" : "NoOp",
+        |                  "properties" : { }
+        |                }
+        |              },
+        |              "appendedFiles" : {
+        |                "root" : {
+        |                  "name" : "",
+        |                  "files" : [ {
+        |                    "name" : "f3",
         |                    "size" : 10,
-        |                    "modifiedTime" : 10}]
-        |            },
+        |                    "modifiedTime" : 10
+        |                  }],
+        |                  "subDirs" : [ ]
+        |                },
+        |                "fingerprint" : {
+        |                  "kind" : "NoOp",
+        |                  "properties" : { }
+        |                }
+        |            }},
         |            "kind" : "HDFS"
         |          },
         |          "dataSchemaJson" : "schema",
@@ -173,8 +193,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         Seq("rootpath"),
         Hdfs(Hdfs.Properties(Content(
           Directory("", Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)), Seq())),
-          Seq(FileInfo("file:/rootpath/f3", 10, 10)),
-          Seq(FileInfo("file:/rootpath/f1", 10, 10)))),
+          Content(Directory("", Seq(FileInfo("f3", 10, 10)))),
+          Content(Directory("", Seq(FileInfo("f1", 10, 10)))))),
         "schema",
         "type",
         Map())),
