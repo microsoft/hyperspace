@@ -94,7 +94,13 @@ object Content {
    * @param files List of leaf files.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
+  def fromLeafFiles(files: Seq[FileStatus]): Option[Content] = {
+    if (files.nonEmpty) {
+      Some(Content(Directory.fromLeafFiles(files)))
+    } else {
+      None
+    }
+  }
 }
 
 /**
@@ -157,8 +163,6 @@ case class Directory(
 }
 
 object Directory {
-  // Empty directory identifier.
-  val emptyDirectory: Directory = Directory("")
 
   /**
    * Create a Directory object from a directory path by recursively listing its leaf files. All
@@ -212,57 +216,57 @@ object Directory {
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(files: Seq[FileStatus]): Directory = {
-    if (files.isEmpty) {
-      Directory.emptyDirectory
-    } else {
-      require(
-        files.forall(!_.isDirectory),
-        "All files must be leaf files for creation of Directory.")
+    require(
+      files.nonEmpty,
+      s"Empty files list found while creating a ${Directory.getClass.getName}.")
 
-      /* from org.apache.spark.sql.execution.datasources.InMemoryFileIndex. */
-      val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
+    require(
+      files.forall(!_.isDirectory),
+      "All files must be leaf files for creation of Directory.")
 
-      // Hashmap from directory path to Directory object, used below for quick access from path.
-      val pathToDirectory = HashMap[Path, Directory]()
+    /* from org.apache.spark.sql.execution.datasources.InMemoryFileIndex. */
+    val leafDirToChildrenFiles = files.toArray.groupBy(_.getPath.getParent)
 
-      for ((dirPath, files) <- leafDirToChildrenFiles) {
-        val allFiles = ListBuffer[FileInfo]()
-        allFiles.appendAll(files.map(FileInfo(_)))
+    // Hashmap from directory path to Directory object, used below for quick access from path.
+    val pathToDirectory = HashMap[Path, Directory]()
 
-        if (pathToDirectory.contains(dirPath)) {
-          // Map already contains this directory. Just append the files to its existing list.
-          pathToDirectory(dirPath).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(allFiles)
-        } else {
-          var curDirPath = dirPath
-          // Create a new Directory object and add it to Map
-          val subDirs = ListBuffer[Directory]()
-          var directory = Directory(curDirPath.getName, files = allFiles, subDirs = subDirs)
+    for ((dirPath, files) <- leafDirToChildrenFiles) {
+      val allFiles = ListBuffer[FileInfo]()
+      allFiles.appendAll(files.map(FileInfo(_)))
+
+      if (pathToDirectory.contains(dirPath)) {
+        // Map already contains this directory. Just append the files to its existing list.
+        pathToDirectory(dirPath).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(allFiles)
+      } else {
+        var curDirPath = dirPath
+        // Create a new Directory object and add it to Map
+        val subDirs = ListBuffer[Directory]()
+        var directory = Directory(curDirPath.getName, files = allFiles, subDirs = subDirs)
+        pathToDirectory.put(curDirPath, directory)
+
+        // Keep creating parent Directory objects and add to the map if non-existing.
+        while (curDirPath.getParent != null && !pathToDirectory.contains(curDirPath.getParent)) {
+          curDirPath = curDirPath.getParent
+
+          directory = Directory(
+            if (curDirPath.isRoot) curDirPath.toString else curDirPath.getName,
+            subDirs = ListBuffer(directory),
+            files = ListBuffer[FileInfo]())
+
           pathToDirectory.put(curDirPath, directory)
+        }
 
-          // Keep creating parent Directory objects and add to the map if non-existing.
-          while (curDirPath.getParent != null && !pathToDirectory.contains(curDirPath.getParent)) {
-            curDirPath = curDirPath.getParent
-
-            directory = Directory(
-              if (curDirPath.isRoot) curDirPath.toString else curDirPath.getName,
-              subDirs = ListBuffer(directory),
-              files = ListBuffer[FileInfo]())
-
-            pathToDirectory.put(curDirPath, directory)
-          }
-
-          // Either root is reached (parent == null) or an existing directory is found. If it's the
-          // latter, add the newly created directory tree to its subDirs.
-          if (curDirPath.getParent != null) {
-            pathToDirectory(curDirPath.getParent).subDirs
-              .asInstanceOf[ListBuffer[Directory]]
-              .append(directory)
-          }
+        // Either root is reached (parent == null) or an existing directory is found. If it's the
+        // latter, add the newly created directory tree to its subDirs.
+        if (curDirPath.getParent != null) {
+          pathToDirectory(curDirPath.getParent).subDirs
+            .asInstanceOf[ListBuffer[Directory]]
+            .append(directory)
         }
       }
-
-      pathToDirectory(getRoot(files.head.getPath))
     }
+
+    pathToDirectory(getRoot(files.head.getPath))
   }
 
   // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
@@ -336,8 +340,8 @@ object Hdfs {
    */
   case class Properties(
       content: Content,
-      appendedFiles: Content = Content(Directory.emptyDirectory),
-      deletedFiles: Content = Content(Directory.emptyDirectory))
+      appendedFiles: Option[Content] = None,
+      deletedFiles: Option[Content] = None)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -390,18 +394,18 @@ case class IndexLogEntry(
   }
 
   def deletedFiles: Set[FileInfo] = {
-    if (relations.head.data.properties.deletedFiles.root.equals(Directory.emptyDirectory)) {
-      Set()
+    if (relations.head.data.properties.deletedFiles.isDefined) {
+      relations.head.data.properties.deletedFiles.get.fileInfos
     } else {
-      relations.head.data.properties.deletedFiles.fileInfos
+      Set()
     }
   }
 
   def appendedFiles: Set[FileInfo] = {
-    if (relations.head.data.properties.appendedFiles.root.equals(Directory.emptyDirectory)) {
-      Set()
+    if (relations.head.data.properties.appendedFiles.isDefined) {
+      relations.head.data.properties.appendedFiles.get.fileInfos
     } else {
-      relations.head.data.properties.appendedFiles.fileInfos
+      Set()
     }
   }
 
