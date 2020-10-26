@@ -27,7 +27,7 @@ import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule, JoinIndexRuleV2}
+import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
@@ -69,7 +69,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   }
 
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
-    val expectedOptimizationRuleBatch = Seq(JoinIndexRuleV2, JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
     val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
 
     assert(
@@ -253,55 +253,6 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
           |from t2, (select c3, c1 as alias from t1) as newt
           |where t2.c3 = newt.c3""".stripMargin)
       verifyNoChange(query2)
-    }
-  }
-
-  test("E2E test for join rule V2: optimizes SortMergeJoin, ignores BroadcastHashJoin.") {
-    // Choose a threshold based on the data, which makes some tables small and eligible for BHJ.
-    withSQLConf(
-      "spark.sql.autoBroadcastJoinThreshold" -> "6000",
-      "spark.hyperspace.rule.joinV2.enabled" -> "true") {
-      val df1 = spark.read.parquet(nonPartitionedDataPath)
-      val df2 = spark.read.parquet(nonPartitionedDataPath)
-      df1.union(df1).union(df1).write.mode("overwrite").parquet(testDir + "bigdata")
-      val bigDataPath = testDir + "bigdata"
-      val bigDf = spark.read.parquet(bigDataPath)
-
-      val df1IndexConfig = IndexConfig("df1ic", Seq("c1"), Seq("c2", "c4"))
-      val df2IndexConfig1 = IndexConfig("df2ic1", Seq("c1"), Seq("c2", "c3"))
-      val df2IndexConfig2 = IndexConfig("df2ic2", Seq("c2"), Seq("c1", "c3"))
-      val bigDfIndexConfig = IndexConfig("bigdfic", Seq("c2"), Seq("c1", "c3"))
-
-      hyperspace.createIndex(df1, df1IndexConfig)
-      hyperspace.createIndex(df2, df2IndexConfig1)
-      hyperspace.createIndex(df2, df2IndexConfig2)
-      hyperspace.createIndex(bigDf, bigDfIndexConfig)
-
-      def query(): DataFrame = {
-        val join1 = df1.join(df2, df1("c1") === df2("c1")).select(df1("c4"), df2("c2"), df2("c3"))
-        bigDf.join(join1, bigDf("c2") === df2("c2")).select(bigDf("c2"), df2("c3"))
-      }
-
-      // If the rule works correctly, only bigDf and df2 will be replaced by indexes.
-      spark.disableHyperspace()
-      val dfWithHyperspaceDisabled = query()
-      val schemaWithHyperspaceDisabled = dfWithHyperspaceDisabled.schema
-      val sortedRowsWithHyperspaceDisabled = getSortedRows(dfWithHyperspaceDisabled)
-
-      // Setting up only JoinIndexRuleV2 so that other rules don't interfere with test.
-      spark.sessionState.experimentalMethods.extraOptimizations ++= JoinIndexRuleV2 :: Nil
-      val dfWithHyperspaceEnabled = query()
-
-      assert(
-        queryPlanHasExpectedRootPaths(
-          dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
-          getIndexFilesPath(bigDfIndexConfig.indexName) ++
-            Seq(new Path(nonPartitionedDataPath).makeQualified(fileSystem)) ++
-            getIndexFilesPath(df2IndexConfig2.indexName)))
-
-      assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
-      assert(
-        sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))
     }
   }
 

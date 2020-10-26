@@ -23,16 +23,16 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
-import com.microsoft.hyperspace.TestUtils.copyWithState
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.TestUtils.{copyWithState, logManager}
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.Directory.FileInfo
+import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  override val systemPath =
-    PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -68,8 +68,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
           if (enableLineage) {
-            expectedSchema = expectedSchema.add(
-              StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType, false))
+            expectedSchema =
+              expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_COLUMN, StringType))
           }
           val expected = new IndexSummary(
             indexConfig1.indexName,
@@ -227,18 +227,198 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           .options(option)
           .format(format)
           .save(refreshTestLocation)
-        hyperspace.refreshIndex(indexConfig.indexName)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_FULL)
+        val newIndexLocation = s"$systemPath/index_$format"
         indexCount = spark.read
-          .parquet(s"$systemPath/index_$format" +
+          .parquet(newIndexLocation +
             s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
           .count()
 
         // Check if index got updated
         assert(indexCount == 3)
 
+        // Check if lastest log file is updated with newly created index files
+        val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+        val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+        val latestLog = logManager.getLatestLog()
+        assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+        val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+        val indexFiles = indexLog.content.files
+        assert(indexFiles.nonEmpty)
+        assert(indexFiles.forall(_.getName.startsWith("part-0")))
+        assert(indexLog.state.equals("ACTIVE"))
+
         FileUtils.delete(new Path(refreshTestLocation))
       case _ => fail("invalid test")
     }
+  }
+
+  test("Verify incremental refresh (append-only) should index only newly appended data.") {
+    withTempPathAsString { testPath =>
+      // Setup. Create sample data and index.
+      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+      assert(countRecords(0) == 10)
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=0"))
+
+      // Change original data.
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+      // Check if index got updated.
+      assert(countRecords(1) == 3)
+
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=0", "v__=1"))
+    }
+  }
+
+  test("Verify quick optimize rebuild of index after index incremental refresh.") {
+    withTempPathAsString { testPath =>
+      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+      assert(countRecords(0) == 10)
+
+      // Change original data.
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+      // Check if index got updated.
+      assert(countRecords(1) == 3)
+
+      hyperspace.optimizeIndex(indexConfig.indexName)
+
+      // Check if latest log file is updated with newly created index files.
+      validateMetadata("index", Set("v__=2"))
+    }
+  }
+
+  test(
+    "Verify quick optimize rebuild of index after index incremental refresh with files" +
+      " from multiple directories.") {
+    // Test Logic:
+    // 1. Create large data, such that index files are > threshold.
+    // 2. Add small data. Refresh index every time. Here, index files will be smaller than
+    // threshold.
+    // 3. Call optimize. Check the metadata. It should not contain small index files created
+    // during refresh operations.
+    withTempPathAsString { testPath =>
+      withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "900") {
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        val smallData = SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+
+        // Create large data. Index files will be bigger than threshold.
+        val bigData = smallData.union(smallData).union(smallData).union(smallData)
+        bigData.write.parquet(testPath)
+
+        val df = spark.read.parquet(testPath)
+        hyperspace.createIndex(df, indexConfig)
+        validateMetadata("index", Set("v__=0"))
+        assert(countRecords(0) == 40)
+
+        // Append small amounts of new data and call incremental refresh.
+        smallData.write.mode("append").parquet(testPath)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+        validateMetadata("index", Set("v__=0", "v__=1"))
+        assert(countRecords(1) == 10)
+
+        smallData.write.mode("append").parquet(testPath)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+        validateMetadata("index", Set("v__=0", "v__=1", "v__=2"))
+        assert(countRecords(2) == 10)
+
+        // Check after optimize,
+        hyperspace.optimizeIndex(indexConfig.indexName)
+        validateMetadata("index", Set("v__=0", "v__=3"))
+        assert(countRecords(3) == 20)
+      }
+    }
+  }
+
+  test("Verify optimize is a no-op if no small files found.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "1") {
+        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
+        hyperspace.createIndex(df, indexConfig)
+
+        // Change original data.
+        SampleData.testData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .limit(3)
+          .write
+          .mode("append")
+          .parquet(testPath)
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+        // Check if latest log file is updated with newly created index files.
+        val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
+
+        MockEventLogger.reset()
+        hyperspace.optimizeIndex(indexConfig.indexName)
+
+        // Check that no new log files were created in this operation.
+        assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
+
+        // Check emitted events.
+        MockEventLogger.emittedEvents match {
+          case Seq(
+              OptimizeActionEvent(_, _, "Operation started."),
+              OptimizeActionEvent(_, _, msg)) =>
+            assert(msg.contains("Optimize aborted as no index files smaller than 1 found."))
+          case _ => fail()
+        }
+      }
+    }
+  }
+
+  private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
+    val newIndexLocation = s"$systemPath/$indexName"
+    val indexPath = PathUtils.makeAbsolute(newIndexLocation)
+    val logManager = IndexLogManagerFactoryImpl.create(indexPath)
+    val latestLog = logManager.getLatestLog()
+    assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
+    val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+    val indexFiles = indexLog.content.files
+    assert(indexFiles.nonEmpty)
+    assert(indexFiles.forall(_.getName.startsWith("part-0")))
+    assert(indexLog.state.equals("ACTIVE"))
+    // Check all files belong to the provided index versions only.
+    assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
   }
 
   private def expectedIndex(
@@ -261,9 +441,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _,
               _) =>
-            val files = location.allFiles.map(FileInfo(_))
-            val sourceDataProperties =
-              Hdfs.Properties(Content("", Seq(Content.Directory("", files, NoOpFingerprint()))))
+            val files = location.allFiles
+            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
@@ -291,10 +470,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
-          Content(
-            s"$systemPath/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Seq()),
+          Content.fromDirectory(
+            PathUtils.makeAbsolute(new Path(s"$systemPath/${indexConfig.indexName}" +
+              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state
@@ -306,5 +484,11 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   // Verify if the indexes currently stored in Hyperspace matches the given indexes.
   private def verifyIndexes(expectedIndexes: Seq[IndexLogEntry]): Unit = {
     assert(IndexCollectionManager(spark).getIndexes().toSet == expectedIndexes.toSet)
+  }
+
+  private def countRecords(version: Int): Long = {
+    spark.read
+      .parquet(s"$systemPath/index/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version")
+      .count()
   }
 }

@@ -21,8 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
-import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, NamedExpression, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
@@ -109,10 +108,9 @@ object RuleUtils {
       // handles the lists properly. Otherwise, as the source file list of each index entry
       // (entry.allSourceFileInfo) also contains the appended and deleted files, we cannot
       // get the actual appended files and deleted files correctly.
-      indexes.filter(
-        index =>
-          index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
-            isHybridScanCandidate(index, filesByRelations.flatten))
+      indexes.filter(index =>
+        index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
+          isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
       indexes.filter(
         index =>
@@ -323,8 +321,7 @@ object RuleUtils {
           val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
           val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
-          val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileNames)), rel)
-          Project(updatedOutput, OptimizeIn(filterForDeleted))
+          Project(updatedOutput, Filter(Not(In(lineageAttr, deletedFileNames)), rel))
         }
     }
 

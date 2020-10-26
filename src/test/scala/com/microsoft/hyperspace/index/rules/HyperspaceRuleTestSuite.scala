@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation}
@@ -25,23 +25,37 @@ import org.apache.spark.sql.types.{StructField, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{Content, CoveringIndex, Hdfs, HyperspaceSuite, IndexConstants, IndexLogEntry, IndexLogManagerImpl, LogicalPlanFingerprint, LogicalPlanSignatureProvider, NoOpFingerprint, Signature, Source, SparkPlan}
+import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.Hdfs.Properties
 
 trait HyperspaceRuleTestSuite extends HyperspaceSuite {
-  def createIndex(
+  private val filenames = Seq("f1.parquet", "f2.parquet")
+  def createIndexLogEntry(
       name: String,
       indexCols: Seq[AttributeReference],
       includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry = {
+      plan: LogicalPlan,
+      appendedFiles: Seq[String] = Seq(),
+      deletedFiles: Seq[String] = Seq()): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
       case Some(s) =>
         val sourcePlanProperties = SparkPlan.Properties(
-          Seq(),
+          Seq(
+            Relation(
+              Seq("dummy"),
+              Hdfs(Properties(Content(Directory("/")), appendedFiles, deletedFiles)),
+              "schema",
+              "format",
+              Map())),
           null,
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
+
+        val indexFiles = getIndexDataFilesPaths(name).map { path =>
+          new FileStatus(10, false, 1, 10, 10, path)
+        }
 
         val indexLogEntry = IndexLogEntry(
           name,
@@ -51,23 +65,27 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          Content(getIndexDataFilesPath(name).toUri.toString, Seq()),
+          Content.fromLeafFiles(indexFiles),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
         indexLogEntry.state = Constants.States.ACTIVE
-        logManager.writeLog(0, indexLogEntry)
+        assert(logManager.writeLog(0, indexLogEntry))
         indexLogEntry
 
       case None => throw HyperspaceException("Invalid plan for index dataFrame.")
     }
   }
 
-  def getIndexDataFilesPath(indexName: String): Path =
-    new Path(
-      new Path(systemPath, indexName),
-      s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+  def getIndexDataFilesPaths(indexName: String): Seq[Path] =
+    filenames.map { f =>
+      new Path(
+        new Path(
+          new Path(systemPath, indexName),
+          s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
+        f)
+    }
 
   def schemaFromAttributes(attributes: Attribute*): StructType =
     StructType(attributes.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))

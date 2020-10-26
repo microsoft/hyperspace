@@ -62,7 +62,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
             .Columns(Seq("RGUID"), Seq("Date")),
           IndexLogEntry.schemaString(schema),
           10)),
-      Content(indexDir, Seq()),
+      Content(Directory(indexDir)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE

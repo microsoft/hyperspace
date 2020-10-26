@@ -22,6 +22,7 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -62,11 +63,26 @@ class IndexCollectionManager(
     }
   }
 
-  override def refresh(indexName: String): Unit = {
+  override def refresh(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
-      new RefreshAction(spark, logManager, dataManager).run()
+      if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
+        new RefreshDeleteAction(spark, logManager, dataManager).run()
+        new RefreshAppendAction(spark, logManager, dataManager).run()
+      } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
+        new RefreshAction(spark, logManager, dataManager).run()
+      } else {
+        throw HyperspaceException(s"Unsupported refresh mode '$mode' found.")
+      }
+    }
+  }
+
+  override def optimize(indexName: String, mode: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
+      val dataManager = indexDataManagerFactory.create(indexPath)
+      new OptimizeAction(spark, logManager, dataManager, mode).run()
     }
   }
 
@@ -165,7 +181,27 @@ private[hyperspace] object IndexSummary {
       entry.derivedDataset.properties.columns.included,
       entry.numBuckets,
       entry.derivedDataset.properties.schemaString,
-      entry.content.root,
+      indexDirPath(entry),
       entry.state)
+  }
+
+  /**
+   * This method extracts the most top-level (or top-most) index directory which
+   * has either
+   * - at least one leaf file, or
+   * - more than one subdirectories, or
+   * - no files and no subdirectories (this case will not happen for real index scenarios).
+   *
+   * @param entry Index log entry.
+   * @return Path to the first leaf directory starting from the root.
+   */
+  private def indexDirPath(entry: IndexLogEntry): String = {
+    var root = entry.content.root
+    var indexDirPath = new Path(entry.content.root.name)
+    while (root.files.isEmpty && root.subDirs.size == 1) {
+      root = root.subDirs.head
+      indexDirPath = new Path(indexDirPath, root.name)
+    }
+    indexDirPath.toString
   }
 }
