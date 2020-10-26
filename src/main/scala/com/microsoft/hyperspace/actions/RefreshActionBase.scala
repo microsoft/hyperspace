@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -101,33 +100,36 @@ private[actions] abstract class RefreshActionBase(
    * are the files for which the index was never updated in the past.
    */
   protected lazy val deletedFiles: Seq[String] = {
-    val rels = previousIndexLogEntry.relations
-    val originalFiles = rels.head.data.properties.content.fileInfos
-    val currentFiles = rels.head.rootPaths
-      .flatMap { p =>
-        Content
-          .fromDirectory(path = new Path(p), throwIfNotExists = true)
-          .fileInfos
-      }
-      .map(f => f.name -> f)
-      .toMap
+    val relation = previousIndexLogEntry.relations.head
+    val originalFiles = relation.data.properties.content.fileInfos
+    val delFiles = (originalFiles -- currentFiles).map(_.name)
 
-    var delFiles = Seq[String]()
-    originalFiles.foreach { f =>
-      currentFiles.get(f.name) match {
-        case Some(v) =>
-          if (!f.equals(v)) {
-            throw HyperspaceException(
-              "Index refresh (to handle deleted source data) aborted. " +
-                s"Existing source data file info is changed (file: ${f.name}).")
-          }
-        case None => delFiles :+= f.name
-      }
-    }
+    // Remove duplicate deleted file names in the previous log entry.
+    val prevDeletedFiles = previousIndexLogEntry.deletedFiles.filterNot(delFiles.contains)
 
     // TODO: Add test for the scenario where existing deletedFiles and newly deleted
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
-    delFiles ++ previousIndexLogEntry.deletedFiles
+    delFiles.toSeq ++ prevDeletedFiles
+  }
+
+  /**
+   * Retrieve the source file list from reconstructed "df" for refresh.
+   * Build Set[FileInfo] to compare the source file list with the previous index version.
+   */
+  protected lazy val currentFiles: Set[FileInfo] = {
+    df.queryExecution.optimizedPlan
+      .collect {
+        case LogicalRelation(
+            HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
+          location
+            .allFiles()
+            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+      }
+      .flatten
+      .toSet
   }
 
   /**
@@ -137,24 +139,16 @@ private[actions] abstract class RefreshActionBase(
    * Finally, append the previously known appended files to the result. These
    * are the files for which index was never updated in the past.
    */
-  protected lazy val appendedFiles = {
+  protected lazy val appendedFiles: Seq[String] = {
     val relation = previousIndexLogEntry.relations.head
+    val originalFiles = relation.data.properties.content.fileInfos
+    val newFiles = (currentFiles -- originalFiles).map(_.name)
 
-    // TODO: improve this to take last modified time of files into account.
-    //   https://github.com/microsoft/hyperspace/issues/182
-    val originalFiles = relation.data.properties.content.files.map(_.toString)
-
-    val allFiles = df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        location.allFiles().map(_.getPath.toString)
-    }.flatten
+    // Remove duplicate appended file names in the previous log entry.
+    val prevAppendedFiles = previousIndexLogEntry.appendedFiles.filterNot(newFiles.contains)
 
     // TODO: Add test for the scenario where existing appendedFiles and newly appended
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
-    allFiles.diff(originalFiles) ++ previousIndexLogEntry.appendedFiles
+    newFiles.toSeq ++ prevAppendedFiles
   }
 }

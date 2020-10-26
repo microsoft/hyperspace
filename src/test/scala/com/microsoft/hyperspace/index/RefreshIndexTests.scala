@@ -196,7 +196,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate incremental refresh index (to handle deletes from the source data) " +
-      "fails as expected when file info for an existing source data file changes.") {
+      "works well when file info for an existing source data file changes.") {
     SampleData.save(
       spark,
       nonPartitionedDataPath,
@@ -205,19 +205,79 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+    }
 
-      // Replace a source data file with a new file with same name but different properties.
-      val deletedFile = deleteOneDataFile(nonPartitionedDataPath)
-      FileUtils.createFile(
-        deletedFile.getFileSystem(new Configuration),
-        deletedFile,
-        "I am some random content :).")
+    // Replace a source data file with a new file with same name but different properties.
+    val deletedFile = deleteOneDataFile(nonPartitionedDataPath)
+    val sourcePath = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.head)
+    val fs = deletedFile.getFileSystem(new Configuration)
+    fs.copyToLocalFile(sourcePath, deletedFile)
 
-      val ex = intercept[HyperspaceException](
-        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
+    {
+      // Check the index log entry before refresh.
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 1)
+      assert(getIndexFilesCount(indexLogEntry, version = 0) == indexLogEntry.content.files.size)
+    }
+
+    val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+    new RefreshDeleteAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      // Check the index log entry after RefreshDeleteAction.
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
+      assert(indexLogEntry.deletedFiles.isEmpty)
+      assert(indexLogEntry.appendedFiles.size == 1)
+      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+    }
+
+    new RefreshAppendAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      // Check the index log entry after RefreshAppendAction.
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(indexLogEntry.deletedFiles.isEmpty)
+      assert(indexLogEntry.appendedFiles.isEmpty)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
+      val files = indexLogEntry.relations.head.data.properties.content.files
+      assert(files.exists(_.equals(deletedFile)))
       assert(
-        ex.getMessage.contains("Index refresh (to handle deleted source data) aborted. " +
-          "Existing source data file info is changed"))
+        getIndexFilesCount(indexLogEntry, version = 1) +
+          getIndexFilesCount(indexLogEntry, version = 2)
+          == indexLogEntry.content.fileInfos.size)
+    }
+
+    // Modify the file again.
+    val sourcePath2 = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.last)
+    fs.copyToLocalFile(sourcePath2, deletedFile)
+
+    new RefreshAppendAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      // Check non-empty deletedFiles after RefreshAppendAction.
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(indexLogEntry.deletedFiles.size == 1)
+      assert(indexLogEntry.appendedFiles.isEmpty)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 7)
+      val files = indexLogEntry.relations.head.data.properties.content.files
+      assert(files.exists(_.equals(deletedFile)))
+      assert(
+        getIndexFilesCount(indexLogEntry, version = 1) +
+          getIndexFilesCount(indexLogEntry, version = 2) +
+          getIndexFilesCount(indexLogEntry, version = 3) == indexLogEntry.content.fileInfos.size)
     }
   }
 
@@ -348,13 +408,15 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Validate the configs for incremental index data is consistent with" +
-    "the previous version.") {
+  test(
+    "Validate the configs for incremental index data is consistent with" +
+      "the previous version.") {
     withTempPathAsString { testPath =>
       SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
       val df = spark.read.parquet(testPath)
 
-      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "false",
+      withSQLConf(
+        IndexConstants.INDEX_LINEAGE_ENABLED -> "false",
         IndexConstants.INDEX_NUM_BUCKETS -> "20") {
         hyperspace.createIndex(df, indexConfig)
       }
@@ -368,7 +430,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         .mode("append")
         .parquet(testPath)
 
-      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
+      withSQLConf(
+        IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
         IndexConstants.INDEX_NUM_BUCKETS -> "10") {
         hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
       }
@@ -376,6 +439,88 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
       assert(!indexLogEntry.hasLineageColumn(spark))
       assert(indexLogEntry.numBuckets === 20)
+    }
+  }
+
+  test("Validate incremental refresh deduplicate appended and deleted file names.") {
+    SampleData.save(
+      spark,
+      nonPartitionedDataPath,
+      Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+    val nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
+
+    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+    }
+
+    // Replace a source data file with a new file with same name but different properties.
+    val deletedFile = deleteOneDataFile(nonPartitionedDataPath)
+    val sourcePath = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.head)
+    val sourcePath2 = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.last)
+    val fs = sourcePath.getFileSystem(new Configuration)
+    fs.copyToLocalFile(sourcePath, deletedFile)
+
+    val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+    new RefreshDeleteAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
+      assert(indexLogEntry.deletedFiles.isEmpty)
+      assert(indexLogEntry.appendedFiles.size == 1)
+      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+    }
+
+    // Update the appended file again.
+    fs.copyToLocalFile(sourcePath2, deletedFile)
+    new RefreshDeleteAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
+      assert(indexLogEntry.deletedFiles.isEmpty)
+      assert(indexLogEntry.appendedFiles.size == 1)
+      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+    }
+
+    // Update the appended file again.
+    fs.copyToLocalFile(sourcePath, deletedFile)
+    new RefreshAppendAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 7)
+      assert(indexLogEntry.appendedFiles.isEmpty)
+      assert(indexLogEntry.deletedFiles.size == 1)
+      assert(indexLogEntry.deletedFiles.head.contains(deletedFile.getName))
+    }
+
+    // Update the appended file again.
+    fs.copyToLocalFile(sourcePath2, deletedFile)
+    new RefreshAppendAction(
+      spark,
+      IndexLogManagerFactoryImpl.create(indexPath),
+      IndexDataManagerFactoryImpl.create(indexPath))
+      .run()
+
+    {
+      val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+      assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 9)
+      assert(indexLogEntry.appendedFiles.isEmpty)
+      assert(indexLogEntry.deletedFiles.size == 1)
+      assert(indexLogEntry.deletedFiles.head.contains(deletedFile.getName))
     }
   }
 
@@ -402,5 +547,15 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     assert(entry.isDefined)
     assert(entry.get.isInstanceOf[IndexLogEntry])
     entry.get.asInstanceOf[IndexLogEntry]
+  }
+
+  private def getIndexFilesCount(
+      entry: IndexLogEntry,
+      version: Int,
+      allowEmpty: Boolean = false) = {
+    val cnt = entry.content.fileInfos
+      .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version"))
+    assert(allowEmpty || cnt > 0)
+    cnt
   }
 }
