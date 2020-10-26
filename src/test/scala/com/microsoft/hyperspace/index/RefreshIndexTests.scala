@@ -25,7 +25,7 @@ import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
 
 /**
  * Unit E2E test cases for RefreshIndex.
@@ -84,11 +84,20 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             deleteOneDataFile(partitionedDataPath, true)
           }
 
+          // Get deleted file id  // pouriap changed
+          val ixLogPath = PathUtils.makeAbsolute(
+            s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
+          val ixLogJson =
+            FileUtils.readContents(ixLogPath.getFileSystem(new Configuration), ixLogPath)
+          val fileIdsMap = JsonUtils.fromJson[IndexLogEntry](ixLogJson).fileIdsMap
+          val fileId = fileIdsMap.get(deletedFile.toString)
+          assert(fileId.nonEmpty)
+
           // Validate only index records whose lineage is the deleted file are removed.
           val originalIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
             s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
           val originalIndexWithoutDeletedFile = originalIndexDF
-            .filter(s"""${IndexConstants.DATA_FILE_NAME_COLUMN} != "$deletedFile"""")
+            .filter(s"""${IndexConstants.DATA_FILE_NAME_COLUMN} != ${fileId.get}""")
 
           hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 

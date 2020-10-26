@@ -100,7 +100,8 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val deletedFiles: Seq[String] = {
     val relation = previousIndexLogEntry.relations.head
     val originalFiles = relation.data.properties.content.fileInfos
-    val delFiles = (originalFiles -- currentFiles).map(_.name)
+//    val delFiles = (originalFiles -- currentFiles).map(_.name) // pouriap changed
+    val delFiles = originalFiles.map(_.name) -- currentFiles.map(_.name)
 
     // Remove duplicate deleted file names in the previous log entry.
     val prevDeletedFiles = previousIndexLogEntry.deletedFiles.filterNot(delFiles.contains)
@@ -140,7 +141,8 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val appendedFiles: Seq[String] = {
     val relation = previousIndexLogEntry.relations.head
     val originalFiles = relation.data.properties.content.fileInfos
-    val newFiles = (currentFiles -- originalFiles).map(_.name)
+    // val newFiles = (currentFiles -- originalFiles).map(_.name) // pouriap changed
+    val newFiles = currentFiles.map(_.name) -- originalFiles.map(_.name)
 
     // Remove duplicate appended file names in the previous log entry.
     val prevAppendedFiles = previousIndexLogEntry.appendedFiles.filterNot(newFiles.contains)

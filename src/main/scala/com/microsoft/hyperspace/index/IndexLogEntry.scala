@@ -54,7 +54,8 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
     rec(
       new Path(root.name),
       root,
-      (f, prefix) => FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime)).toSet
+      (f, prefix) =>
+        FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
   }
 
   private def rec[T](
