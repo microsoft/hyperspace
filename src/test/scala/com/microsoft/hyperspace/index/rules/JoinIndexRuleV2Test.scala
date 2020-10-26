@@ -17,22 +17,19 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.{FileStatus, Path}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{QueryTest, SparkSession}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
-import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.serde.LogicalPlanSerDeUtils
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class JoinIndexRuleV2Test extends HyperspaceRuleTestSuite {
-  val parentPath = new Path("src/test/resources/joinIndexTest")
-  val systemPath = new Path(parentPath, "idroot")
+class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
+  val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexRuleTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -78,7 +75,7 @@ class JoinIndexRuleV2Test extends HyperspaceRuleTestSuite {
    */
   override def beforeAll(): Unit = {
     super.beforeAll()
-    FileUtils.delete(parentPath)
+    FileUtils.delete(systemPath)
 
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
 
@@ -142,12 +139,12 @@ class JoinIndexRuleV2Test extends HyperspaceRuleTestSuite {
     //  +- Filter isnotnull(t3c1#4)
     //   +- Relation[t3c1#4,t3c2#5,t3c3#6,t3c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
-    createIndex("t3i1", Seq(t3c1), Seq(t3c3), t3ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t3i1", Seq(t3c1), Seq(t3c3), t3ProjectNode)
   }
 
   before {
@@ -164,48 +161,54 @@ class JoinIndexRuleV2Test extends HyperspaceRuleTestSuite {
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(parentPath)
+    FileUtils.delete(systemPath)
     super.afterAll()
   }
 
   // test: does not update plan for bhj
   test("Join rule does not update plan for Broadcast Hash Join compatible joins") {
-    val joinCondition = EqualTo(t1c1, t3c1)
-    val originalPlan =
-      Join(t1ProjectNode, t3ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRuleV2(originalPlan)
-    assert(updatedPlan.equals(originalPlan))
+    withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
+      val joinCondition = EqualTo(t1c1, t3c1)
+      val originalPlan =
+        Join(t1ProjectNode, t3ProjectNode, JoinType("inner"), Some(joinCondition))
+      val updatedPlan = JoinIndexRuleV2(originalPlan)
+      assert(updatedPlan.equals(originalPlan))
+    }
   }
 
   // test: updates plan for smj
   test("Join rule works if indexes exist and configs are set correctly") {
-    val joinCondition = EqualTo(t1c1, t2c1)
-    val originalPlan =
-      Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRuleV2(originalPlan)
-    assert(!updatedPlan.equals(originalPlan))
+    withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
+      val joinCondition = EqualTo(t1c1, t2c1)
+      val originalPlan =
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val updatedPlan = JoinIndexRuleV2(originalPlan)
+      assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths =
-      Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
-    verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
+      val indexPaths =
+        getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
+      verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
+    }
   }
 
   // test: updates plan for smj with bhj
   test("Join rule updates sort merge join part of a plan with both smj and bhj.") {
-    val bhjCondition = EqualTo(t2c1, t3c1)
-    val bhjJoin =
-      Join(t2ProjectNode, t3ProjectNode, JoinType("inner"), Some(bhjCondition))
+    withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
+      val bhjCondition = EqualTo(t2c1, t3c1)
+      val bhjJoin =
+        Join(t2ProjectNode, t3ProjectNode, JoinType("inner"), Some(bhjCondition))
 
-    val smjCondition = EqualTo(t1c1, t2c1)
-    val originalPlan =
-      Join(t1ProjectNode, bhjJoin, JoinType("inner"), Some(smjCondition))
+      val smjCondition = EqualTo(t1c1, t2c1)
+      val originalPlan =
+        Join(t1ProjectNode, bhjJoin, JoinType("inner"), Some(smjCondition))
 
-    val updatedPlan = JoinIndexRuleV2(originalPlan)
-    assert(!updatedPlan.equals(originalPlan))
+      val updatedPlan = JoinIndexRuleV2(originalPlan)
+      assert(!updatedPlan.equals(originalPlan))
 
-    val indexPaths =
-      Seq(getIndexDataFilesPath("t1i1"), getIndexDataFilesPath("t2i1"))
-    verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths ++ Seq(new Path("t3")))
+      val indexPaths =
+        getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
+      verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths ++ Seq(new Path("t3")))
+    }
   }
 
   private def verifyUpdatedIndex(

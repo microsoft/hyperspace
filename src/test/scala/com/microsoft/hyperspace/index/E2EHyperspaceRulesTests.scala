@@ -18,22 +18,24 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
-import org.apache.spark.sql.catalyst.plans.SQLHelper
+import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
+import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
+import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule, JoinIndexRuleV2}
 import com.microsoft.hyperspace.util.PathUtils
 
-class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
+class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   private val testDir = "src/test/resources/e2eTests/"
   private val nonPartitionedDataPath = testDir + "sampleparquet"
   private val partitionedDataPath = testDir + "samplepartitionedparquet"
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
-  private val fileSystem =
-    new Path(nonPartitionedDataPath).getFileSystem(new Configuration)
+  private val fileSystem = new Path(nonPartitionedDataPath).getFileSystem(new Configuration)
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
@@ -67,45 +69,36 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
-    val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationRuleBatch = Seq(JoinIndexRuleV2, JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
 
     assert(
       !spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      !spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
 
     spark.enableHyperspace()
     assert(
       spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
+    assert(
+      spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
 
     spark.disableHyperspace()
     assert(
       !spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
-  }
-
-  test("verify join rule v2 enabled when flighting flag is set.") {
-    val expectedOptimizationRuleBatch = Seq(JoinIndexRuleV2, JoinIndexRule, FilterIndexRule)
-
-    withSQLConf("spark.hyperspace.enableJoinRuleV2" -> "true") {
-      assert(
-        !spark.sessionState.experimentalMethods.extraOptimizations
-          .containsSlice(expectedOptimizationRuleBatch))
-
-      spark.enableHyperspace()
-      assert(
-        spark.sessionState.experimentalMethods.extraOptimizations
-          .containsSlice(expectedOptimizationRuleBatch))
-
-      spark.disableHyperspace()
-      assert(
-        !spark.sessionState.experimentalMethods.extraOptimizations
-          .containsSlice(expectedOptimizationRuleBatch))
-    }
+    assert(
+      !spark.sessionState.experimentalMethods.extraStrategies
+        .containsSlice(expectedOptimizationStrategy))
   }
 
   test(
-    "E2E test for filter query on partitioned and non-partitioned data with and without lineage.") {
+    "E2E test for filter query on partitioned and non-partitioned data with and without " +
+      "lineage.") {
     Seq(nonPartitionedDataPath, partitionedDataPath).foreach { loc =>
       Seq(true, false).foreach { enableLineage =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
@@ -117,7 +110,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
             def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c1")
 
-            verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+            verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
           }
         }
       }
@@ -133,7 +126,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     def query(): DataFrame = df.filter("C3 == 'facebook'").select("C3", "c1")
 
     // Verify if case-insensitive index works with case-insensitive query.
-    verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+    verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
   }
 
   test("E2E test for case sensitive filter query where changing conf changes behavior.") {
@@ -150,7 +143,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     }
 
     withSQLConf("spark.sql.caseSensitive" -> "false") {
-      verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+      verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
     }
   }
 
@@ -172,7 +165,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
             // Verify no Project node is present in the query plan, as a result of using SELECT *
             assert(query().queryExecution.optimizedPlan.collect { case p: Project => p }.isEmpty)
 
-            verifyIndexUsage(query, Seq(getIndexFilesPath(indexConfig.indexName)))
+            verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
           }
         }
       }
@@ -202,9 +195,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
             verifyIndexUsage(
               query,
-              Seq(
-                getIndexFilesPath(leftDfIndexConfig.indexName),
-                getIndexFilesPath(rightDfIndexConfig.indexName)))
+              getIndexFilesPath(leftDfIndexConfig.indexName) ++
+                getIndexFilesPath(rightDfIndexConfig.indexName))
           }
         }
       }
@@ -226,9 +218,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     verifyIndexUsage(
       query,
-      Seq(
-        getIndexFilesPath(leftDfIndexConfig.indexName),
-        getIndexFilesPath(rightDfIndexConfig.indexName)))
+      getIndexFilesPath(leftDfIndexConfig.indexName) ++
+        getIndexFilesPath(rightDfIndexConfig.indexName))
   }
 
   test("E2E test for join query with alias columns is not supported.") {
@@ -267,7 +258,9 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
   test("E2E test for join rule V2: optimizes SortMergeJoin, ignores BroadcastHashJoin.") {
     // Choose a threshold based on the data, which makes some tables small and eligible for BHJ.
-    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "6000") {
+    withSQLConf(
+      "spark.sql.autoBroadcastJoinThreshold" -> "6000",
+      "spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val df1 = spark.read.parquet(nonPartitionedDataPath)
       val df2 = spark.read.parquet(nonPartitionedDataPath)
       df1.union(df1).union(df1).write.mode("overwrite").parquet(testDir + "bigdata")
@@ -302,10 +295,9 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       assert(
         queryPlanHasExpectedRootPaths(
           dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
-          Seq(
-            getIndexFilesPath(bigDfIndexConfig.indexName),
-            new Path(nonPartitionedDataPath).makeQualified(fileSystem),
-            getIndexFilesPath(df2IndexConfig2.indexName))))
+          getIndexFilesPath(bigDfIndexConfig.indexName) ++
+            Seq(new Path(nonPartitionedDataPath).makeQualified(fileSystem)) ++
+            getIndexFilesPath(df2IndexConfig2.indexName)))
 
       assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
       assert(
@@ -331,9 +323,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
       verifyIndexUsage(
         query,
-        Seq(
-          getIndexFilesPath(leftDfIndexConfig.indexName),
-          getIndexFilesPath(rightDfIndexConfig.indexName)))
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
     }
   }
 
@@ -367,9 +358,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       def query(): DataFrame = spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
       verifyIndexUsage(
         query,
-        Seq(
-          getIndexFilesPath(leftDfIndexConfig.indexName),
-          getIndexFilesPath(rightDfIndexConfig.indexName)))
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
     }
   }
 
@@ -392,9 +382,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       def query(): DataFrame = spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
       verifyIndexUsage(
         query,
-        Seq(
-          getIndexFilesPath(leftDfIndexConfig.indexName),
-          getIndexFilesPath(rightDfIndexConfig.indexName)))
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++
+          getIndexFilesPath(rightDfIndexConfig.indexName))
     }
   }
 
@@ -425,9 +414,8 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
 
     verifyIndexUsage(
       query(leftDf, rightDf),
-      Seq(
-        getIndexFilesPath(leftDfJoinIndexConfig.indexName),
-        getIndexFilesPath(rightDfJoinIndexConfig.indexName)))
+      getIndexFilesPath(leftDfJoinIndexConfig.indexName) ++
+        getIndexFilesPath(rightDfJoinIndexConfig.indexName))
   }
 
   test("E2E test for first enableHyperspace() followed by disableHyperspace().") {
@@ -451,7 +439,7 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
     assert(
       queryPlanHasExpectedRootPaths(
         dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
-        Seq(getIndexFilesPath(indexConfig.indexName))))
+        getIndexFilesPath(indexConfig.indexName)))
 
     assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
     assert(sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))
@@ -469,12 +457,177 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
       sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfAfterHyperspaceDisabled)))
   }
 
+  test("Verify JoinIndexRule utilizes indexes correctly after incremental refresh (append-only).") {
+    withTempPathAsString { testPath =>
+      // Setup. Create data.
+      val indexConfig = IndexConfig("index", Seq("c2"), Seq("c4"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.load(testPath)
+
+      // Create index.
+      hyperspace.createIndex(df, indexConfig)
+
+      // Append to original data.
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
+
+      // Refresh index.
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+      // Create a join query.
+      val leftDf = spark.read.parquet(testPath)
+      val rightDf = spark.read.parquet(testPath)
+
+      def query(): DataFrame = {
+        leftDf
+          .join(rightDf, leftDf("c2") === rightDf("c2"))
+          .select(leftDf("c2"), rightDf("c4"))
+      }
+
+      // Verify indexes are used, and all index files are picked.
+      verifyIndexUsage(
+        query,
+        getIndexFilesPath(indexConfig.indexName, Seq(0, 1)) ++
+          getIndexFilesPath(indexConfig.indexName, Seq(0, 1)))
+
+      // With Hyperspace disabled, verify there are shuffle and sort nodes as expected.
+      spark.disableHyperspace()
+      val dfWithHyperspaceDisabled = query()
+      var shuffleNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+        case s: ShuffleExchangeExec => s
+      }
+      assert(shuffleNodes.size == 2)
+      var sortNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+        case s: SortExec => s
+      }
+      assert(sortNodes.size == 2)
+
+      // With Hyperspace enabled, verify bucketing works as expected. This is reflected in
+      // shuffle nodes being eliminated.
+      spark.enableHyperspace()
+      val dfWithHyperspaceEnabled = query()
+      shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+        case s: ShuffleExchangeExec => s
+      }
+      assert(shuffleNodes.isEmpty)
+
+      // SortExec is expected to be present because there are multiple files per bucket.
+      sortNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+        case s: SortExec => s
+      }
+      assert(sortNodes.size == 2)
+    }
+  }
+
   test("Test for isHyperspaceEnabled().") {
     assert(!spark.isHyperspaceEnabled(), "Hyperspace must be disabled by default.")
     spark.enableHyperspace()
     assert(spark.isHyperspaceEnabled())
     spark.disableHyperspace()
     assert(!spark.isHyperspaceEnabled())
+  }
+
+  test("Validate index usage after incremental refresh with some source data file deleted.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        // Save a copy of source data files.
+        val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+        SampleData.save(spark, testPath, dataColumns)
+
+        // Create index on original source data files.
+        val df = spark.read.parquet(testPath)
+        val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1"))
+        hyperspace.createIndex(df, indexConfig)
+
+        // Verify index usage for index version (v=0).
+        def query(): DataFrame =
+          spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c1")
+
+        verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
+
+        // Delete some source data file.
+        TestUtils.deleteFiles(testPath, "*parquet", 1)
+
+        // Verify index is not used.
+        spark.enableHyperspace()
+        val planRootPaths = getAllRootPaths(query().queryExecution.optimizedPlan)
+        spark.disableHyperspace()
+        assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(testPath))))
+
+        // Refresh the index to remove deleted source data file records from index.
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+        // Verify index usage on latest version of index (v=1) after refresh.
+        verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, Seq(1)))
+      }
+    }
+  }
+
+  test(
+    "Verify JoinIndexRule utilizes indexes correctly after incremental refresh when some file " +
+      "gets deleted and some appended to source data.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        // Setup. Create data.
+        val indexConfig = IndexConfig("index", Seq("c2"), Seq("c4"))
+        import spark.implicits._
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.load(testPath)
+
+        // Create index.
+        hyperspace.createIndex(df, indexConfig)
+
+        // Delete some source data file.
+        TestUtils.deleteFiles(testPath, "*parquet", 1)
+
+        // Append to original data.
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(3)
+          .write
+          .mode("append")
+          .parquet(testPath)
+
+        // Refresh index.
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
+
+        // Create a join query.
+        val leftDf = spark.read.parquet(testPath)
+        val rightDf = spark.read.parquet(testPath)
+
+        def query(): DataFrame = {
+          leftDf
+            .join(rightDf, leftDf("c2") === rightDf("c2"))
+            .select(leftDf("c2"), rightDf("c4"))
+        }
+
+        // Verify indexes are used, and all index files are picked.
+        verifyIndexUsage(
+          query,
+          getIndexFilesPath(indexConfig.indexName, Seq(1, 2)) ++
+            getIndexFilesPath(indexConfig.indexName, Seq(1, 2)))
+
+        // Verify correctness of results.
+        spark.disableHyperspace()
+        val dfWithHyperspaceDisabled = query()
+        spark.enableHyperspace()
+        val dfWithHyperspaceEnabled = query()
+        checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+      }
+    }
   }
 
   /**
@@ -503,12 +656,17 @@ class E2EHyperspaceRulesTests extends HyperspaceSuite with SQLHelper {
           _,
           _,
           _) =>
-        location.rootPaths.head
-    }
+        location.rootPaths
+    }.flatten
   }
 
-  private def getIndexFilesPath(indexName: String): Path = {
-    new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+  private def getIndexFilesPath(indexName: String, versions: Seq[Int] = Seq(0)): Seq[Path] = {
+    versions.flatMap { v =>
+      Content
+        .fromDirectory(
+          new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$v"))
+        .files
+    }
   }
 
   /**

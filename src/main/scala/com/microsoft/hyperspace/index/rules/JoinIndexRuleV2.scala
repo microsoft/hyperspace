@@ -16,15 +16,22 @@
 
 package com.microsoft.hyperspace.index.rules
 
+import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, AttributeSet, Expression}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.index.rules.JoinRuleUtils._
-import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.rules.JoinIndexRule.spark
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
  * Join Index Rule V2. This rule tries to optimizes both sides of a shuffle based join
@@ -41,14 +48,16 @@ import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
  * 2. Independently check left and right sides of the join for available indexes. If an index
  *    is picked, the shuffle on that side will be eliminated.
  */
-object JoinIndexRuleV2
-    extends Rule[LogicalPlan]
-    with Logging
-    with HyperspaceEventLogging
-    with ActiveSparkSession {
-  def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
-    case join @ Join(l, r, _, Some(condition)) if eligible(l, r, condition) =>
-      updatePlan(join)
+object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSession {
+  def apply(plan: LogicalPlan): LogicalPlan = {
+    if (HyperspaceConf.joinV2RuleEnabled(spark)) {
+      plan transformUp {
+        case join @ Join(l, r, _, Some(condition)) if eligible(l, r, condition) =>
+          updatePlan(join)
+      }
+    } else {
+      plan
+    }
   }
 
   private def contains(
@@ -65,10 +74,10 @@ object JoinIndexRuleV2
       .getContext(spark)
       .indexCollectionManager
 
-    val availableIndexes = RuleUtils.getCandidateIndexes(indexManager, relation)
-    if (availableIndexes.isEmpty) {
-      return relation
-    }
+    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
+    //  the code to support indexes in transitioning states as well.
+    //  See https://github.com/microsoft/hyperspace/issues/65
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
     val tempVar = (joinCols.toSet ++ requiredCols.toSet)
       .map(_.asInstanceOf[AttributeReference])
@@ -77,7 +86,6 @@ object JoinIndexRuleV2
       relation.outputSet
         .filter(c => contains(tempVar, c.asInstanceOf[AttributeReference]))
         .map(_.name)
-        .toSeq
     val reqdIdxCols = relation.outputSet
       .filter(
         c =>
@@ -85,12 +93,26 @@ object JoinIndexRuleV2
             joinCols.toSet.map((col: Attribute) => col.asInstanceOf[AttributeReference]),
             c.asInstanceOf[AttributeReference]))
       .map(_.name)
-      .toSeq
 
-    filterUsableIndexes(availableIndexes, reqdIdxCols, allReqdCols).headOption match {
-      case None => relation
-      case Some(index) => updateLogicalRelationWithIndex(spark, relation, index)
+    val usableIndexes = allIndexes
+      .filter { index =>
+        index.config.indexedColumns.toSet.equals(reqdIdxCols.toSet) &&
+        allReqdCols.forall(
+          c =>
+            (index.config.indexedColumns ++ index.config.includedColumns)
+              .contains(c))
+      }
+
+    if (usableIndexes.isEmpty) {
+      return relation
     }
+
+    val candidateIndexes = RuleUtils.getCandidateIndexes(spark, usableIndexes, relation)
+    if (candidateIndexes.isEmpty) {
+      return relation
+    }
+
+    RuleUtils.transformPlanToUseIndex(spark, candidateIndexes.head, relation, true)
   }
 
   private def updatePlan(join: Join): Join = {
@@ -109,7 +131,8 @@ object JoinIndexRuleV2
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
 
-    val joinCols = condition.references.map(_.asInstanceOf[AttributeReference]).toSet
+    val joinCols =
+      condition.references.map(_.asInstanceOf[AttributeReference]).toSet
     val eligibleBaseRelations = plan.collectLeaves().filter {
       case relation: LogicalRelation =>
         relation.output.toSet.exists(col => contains(joinCols, col))
@@ -147,7 +170,29 @@ object JoinIndexRuleV2
   }
 
   private def isBroadcastJoin(l: LogicalPlan, r: LogicalPlan): Boolean = {
-    val broadcastThreshold: Long = spark.conf.get("spark.sql.autoBroadcastJoinThreshold").toLong
+    val broadcastThreshold: Long =
+      SparkSession.getActiveSession.get.conf
+        .get("spark.sql.autoBroadcastJoinThreshold")
+        .toLong
     l.stats.sizeInBytes <= broadcastThreshold || r.stats.sizeInBytes <= broadcastThreshold
+  }
+
+  /**
+   * Check for supported Join Conditions. Equi-Joins in simple CNF form are supported.
+   *
+   * Predicates should be of the form (A = B and C = D and E = F and...). OR based conditions
+   * are not supported. E.g. (A = B OR C = D) is not supported
+   *
+   * TODO (500053): Investigate whether OR condition can use bucketing info for optimization
+   *
+   * @param condition the join condition
+   * @return true if the condition is supported. False otherwise.
+   */
+  private def isJoinConditionSupported(condition: Expression): Boolean = {
+    condition match {
+      case EqualTo(_: AttributeReference, _: AttributeReference) => true
+      case And(left, right) => isJoinConditionSupported(left) && isJoinConditionSupported(right)
+      case _ => false
+    }
   }
 }
