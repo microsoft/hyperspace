@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.index.{Content, CoveringIndex, IndexConstants, IndexLogEntry, LogEntry, Source}
+import com.microsoft.hyperspace.index.IndexConstants
 
 /**
  * Helper class to extract Hyperspace-related configs from SparkSession.
@@ -70,5 +70,19 @@ object HyperspaceConf {
         IndexConstants.INDEX_LINEAGE_ENABLED,
         IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
       .toBoolean
+  }
+
+  def fileBasedSourceBuilders(spark: SparkSession): String = {
+    spark.sessionState.conf
+      .getConfString(
+        "spark.hyperspace.index.sources.fileBasedBuilders",
+        "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder")
+  }
+
+  def supportedFileFormatsForDefaultFileBasedSource(spark: SparkSession): String = {
+    spark.sessionState.conf
+      .getConfString(
+        "spark.hyperspace.index.sources.defaultFileBasedSource.supportedFileFormats",
+        "avro,csv,json,orc,parquet,text")
   }
 }

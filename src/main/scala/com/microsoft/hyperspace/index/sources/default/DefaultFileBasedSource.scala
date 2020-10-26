@@ -25,8 +25,8 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.index.{Content, Hdfs, Relation}
-import com.microsoft.hyperspace.index.sources.{SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.HashingUtils
+import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -35,8 +35,13 @@ import com.microsoft.hyperspace.util.HashingUtils
  *   - The relation is [[HadoopFsRelation]] with [[PartitioningAwareFileIndex]] as file index.
  *   - Its file format implements [[DataSourceRegister]].
  */
-class DefaultFileBasedSource(private val spark: SparkSession) extends SourceProvider {
-  private val supportedFormats = Set("avro", "csv", "json", "orc", "parquet", "text")
+class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
+  private val supportedFormats: CacheWithTransform[String, Set[String]] =
+    new CacheWithTransform[String, Set[String]]({ () =>
+      HyperspaceConf.supportedFileFormatsForDefaultFileBasedSource(spark)
+    }, { formats =>
+      formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
+    })
 
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
@@ -80,19 +85,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends SourceProv
   }
 
   private def isSupportedFileFormatName(name: String): Boolean = {
-    val supportedFileFormatsOverride = spark.sessionState.conf
-      .getConfString(
-        "spark.hyperspace.index.sources.defaultFileBasedSource.supportedFileFormats",
-        "")
-    if (supportedFileFormatsOverride.nonEmpty) {
-      supportedFileFormatsOverride
-        .toLowerCase(Locale.ROOT)
-        .split(",")
-        .map(_.trim)
-        .contains(name.toLowerCase(Locale.ROOT))
-    } else {
-      supportedFormats.contains(name.toLowerCase(Locale.ROOT))
-    }
+    supportedFormats.load().contains(name.toLowerCase(Locale.ROOT))
   }
 
   /**
