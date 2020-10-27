@@ -91,7 +91,7 @@ object RuleUtils {
     }
 
     if (hybridScanEnabled) {
-      // TODO: Duplicate listing files for the given 361relation as in
+      // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
       val filesByRelations = plan
