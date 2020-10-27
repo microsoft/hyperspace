@@ -391,15 +391,13 @@ object RuleUtils {
         val options = if (location.partitionSchema.isEmpty) {
           Map[String, String]()
         } else {
-          // Set "basePath" so that partitioned columns are also included in the output schema.
+          // Retrieve basePath from a partition path.
           val basePath = location.partitionSpec.partitionColumns
-            .foldRight(location.partitionSpec.partitions.head.path) { (col, path) =>
-              if (path.getName.contains(col.name)) {
-                path.getParent
-              } else {
-                path
-              }
+            .foldLeft(location.partitionSpec.partitions.head.path) { (path, _) =>
+              path.getParent
             }
+
+          // Set "basePath" so that partitioned columns are also included in the output schema.
           Map("basePath" -> basePath.toString)
         }
         val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
