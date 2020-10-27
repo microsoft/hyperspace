@@ -79,8 +79,8 @@ object RuleUtils {
       //  See https://github.com/microsoft/hyperspace/issues/158
 
       // Find the number of common files between the source relations & index source files.
-      val commonCnt = inputSourceFiles.count(entry.allSourceFileInfos.contains)
-      val deletedCnt = entry.allSourceFileInfos.size - commonCnt
+      val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
+      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
       if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
@@ -259,10 +259,10 @@ object RuleUtils {
 
         val (filesDeleted, filesAppended) =
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
-            val (exist, nonExist) = curFileSet.partition(index.allSourceFileInfos.contains)
+            val (exist, nonExist) = curFileSet.partition(index.sourceFileInfoSet.contains)
             val filesAppended = nonExist.map(f => new Path(f.name))
-            if (exist.length < index.allSourceFileInfos.size) {
-              (index.allSourceFileInfos -- exist, filesAppended)
+            if (exist.length < index.sourceFileInfoSet.size) {
+              (index.sourceFileInfoSet -- exist, filesAppended)
             } else {
               (Nil, filesAppended)
             }
@@ -272,7 +272,7 @@ object RuleUtils {
             // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
             (
               Nil,
-              curFileSet.filterNot(index.allSourceFileInfos.contains).map(f => new Path(f.name)))
+              curFileSet.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
           }
 
         val filesToRead = {

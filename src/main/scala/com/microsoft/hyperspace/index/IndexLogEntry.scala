@@ -94,7 +94,13 @@ object Content {
    * @param files List of leaf files.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(files: Seq[FileStatus]): Content = Content(Directory.fromLeafFiles(files))
+  def fromLeafFiles(files: Seq[FileStatus]): Option[Content] = {
+    if (files.nonEmpty) {
+      Some(Content(Directory.fromLeafFiles(files)))
+    } else {
+      None
+    }
+  }
 }
 
 /**
@@ -334,8 +340,8 @@ object Hdfs {
    */
   case class Properties(
       content: Content,
-      appendedFiles: Seq[String] = Nil,
-      deletedFiles: Seq[String] = Nil)
+      appendedFiles: Option[Content] = None,
+      deletedFiles: Option[Content] = None)
 }
 
 // IndexLogEntry-specific Relation that represents the source relation.
@@ -382,22 +388,28 @@ case class IndexLogEntry(
     source.plan.properties.relations
   }
 
+  // FileInfo's 'name' contains the full path to the file.
   @JsonIgnore
-  lazy val allSourceFileInfos: Set[FileInfo] = {
-    relations
-      .flatMap(_.data.properties.content.fileInfos)
-      .toSet
+  lazy val sourceFileInfoSet: Set[FileInfo] = {
+    relations.head.data.properties.content.fileInfos
   }
 
-  def deletedFiles: Seq[String] = {
-    relations.head.data.properties.deletedFiles
+  // FileInfo's 'name' contains the full path to the file.
+  def deletedFiles: Set[FileInfo] = {
+    relations.head.data.properties.deletedFiles.map(_.fileInfos).getOrElse(Set())
   }
 
-  def appendedFiles: Seq[String] = {
-    relations.head.data.properties.appendedFiles
+  // FileInfo's 'name' contains the full path to the file.
+  def appendedFiles: Set[FileInfo] = {
+    relations.head.data.properties.appendedFiles.map(_.fileInfos).getOrElse(Set())
   }
 
-  def withAppendedAndDeletedFiles(appended: Seq[String], deleted: Seq[String]): IndexLogEntry = {
+  def withAppendedAndDeletedFiles(
+      appended: Seq[FileInfo],
+      deleted: Seq[FileInfo]): IndexLogEntry = {
+    def toFileStatus(f: FileInfo) = {
+      new FileStatus(f.size, false, 0, 1, f.modifiedTime, new Path(f.name))
+    }
     copy(
       source = source.copy(
         plan = source.plan.copy(
@@ -406,7 +418,8 @@ case class IndexLogEntry(
               relations.head.copy(
                 data = relations.head.data.copy(
                   properties = relations.head.data.properties.copy(
-                    appendedFiles = appended, deletedFiles = deleted))))))))
+                    appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus)),
+                    deletedFiles = Content.fromLeafFiles(deleted.map(toFileStatus))))))))))
   }
 
   def bucketSpec: BucketSpec =
