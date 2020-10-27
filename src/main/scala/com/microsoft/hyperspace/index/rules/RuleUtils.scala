@@ -286,6 +286,8 @@ object RuleUtils {
             // In case there are both deleted and appended files, we cannot handle the appended
             // files along with deleted files as source files do not have the lineage column which
             // is required for excluding the index data from deleted files.
+            // If the source relation is partitioned, we cannot read the appended files with the
+            // index data as the schema of partitioned files are not equivalent to the index data.
             unhandledAppendedFiles = filesAppended
             index.content.files
           } else {
@@ -386,25 +388,21 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val newLocation =
-          if (location.partitionSchema.isEmpty) {
-            new InMemoryFileIndex(spark, filesAppended, Map(), None)
-          } else {
-            // Set "basePath" so that partitioned columns are also included in the output schema.
-            val basePath = location.partitionSpec.partitionColumns
-              .foldRight(location.partitionSpec.partitions.head.path) { (col, path) =>
-                if (path.getName.contains(col.name)) {
-                  path.getParent
-                } else {
-                  path
-                }
+        val options = if (location.partitionSchema.isEmpty) {
+          Map[String, String]()
+        } else {
+          // Set "basePath" so that partitioned columns are also included in the output schema.
+          val basePath = location.partitionSpec.partitionColumns
+            .foldRight(location.partitionSpec.partitions.head.path) { (col, path) =>
+              if (path.getName.contains(col.name)) {
+                path.getParent
+              } else {
+                path
               }
-            new InMemoryFileIndex(
-              spark,
-              filesAppended,
-              Map("basePath" -> basePath.toString),
-              None)
-          }
+            }
+          Map("basePath" -> basePath.toString)
+        }
+        val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
         val partitionColumns = location.partitionSchema.map(_.name)
