@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.sources
 
 import scala.util.{Success, Try}
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.util.hyperspace.Utils
 
@@ -27,6 +27,7 @@ import com.microsoft.hyperspace.index.Relation
 import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
 
 /**
+ *
  *
  * @param spark
  */
@@ -50,8 +51,8 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   /**
    *
    */
-  def reconstructDataFrame(relation: Relation): DataFrame = {
-    run(p => p.reconstructDataFrame(relation))
+  def refreshRelation(relation: Relation): Relation = {
+    run(p => p.refreshRelation(relation))
   }
 
   /**
@@ -109,7 +110,7 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
         case p: FileBasedSourceProvider => p
         case other =>
           throw HyperspaceException(
-            s"Builder '$builder' did not build FileBasedSourceProvider: '$other')")
+            s"'$builder' did not build FileBasedSourceProvider: '$other')")
       }
     }
   }

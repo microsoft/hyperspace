@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
-import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.index.{Content, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
@@ -77,6 +76,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     }
   }
 
+  /**
+   * Returns true if the given [[FileFormat]] is supported, false otherwise.
+   *
+   * @param format [[FileFormat]] object.
+   * @return true if the given [[FileFormat]] is supported, false otherwise.
+   */
   private def isSupportedFileFormat(format: FileFormat): Boolean = {
     format match {
       case d: DataSourceRegister if isSupportedFileFormatName(d.shortName) => true
@@ -84,40 +89,41 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     }
   }
 
+  /**
+   * Returns true if the given format name is supported, false otherwise.
+   *
+   * @param name File format name (e.g, parquet, csv, json, etc.).
+   * @return true if the given format name is supported, false otherwise.
+   */
   private def isSupportedFileFormatName(name: String): Boolean = {
     supportedFormats.load().contains(name.toLowerCase(Locale.ROOT))
   }
 
   /**
-   * Reconstructs [[DataFrame]] using the given [[Relation]].
+   * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
    *
    * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
-   * @return [[DataFrame]] object if the given 'relation' can be processed by this provider.
+   * @return [[Relation]] object if the given 'relation' can be processed by this provider.
    *         Otherwise, None.
    */
-  override def reconstructDataFrame(relation: Relation): Option[DataFrame] = {
+  override def refreshRelation(relation: Relation): Option[Relation] = {
     if (isSupportedFileFormatName(relation.fileFormat)) {
-      val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
-      val df = spark.read
-        .schema(dataSchema)
-        .format(relation.fileFormat)
-        .options(relation.options)
-        .load(relation.rootPaths: _*)
-      Some(df)
+      // No change is needed because rootPaths will be pointing to the latest source files.
+      Some(relation)
     } else {
       None
     }
   }
 
   /**
-   * Computes the signature using the given [[LogicalRelation]].
+   * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
+   * using all the files found in [[PartitioningAwareFileIndex]].
    *
    * @param logicalRelation logical relation to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
   override def signature(logicalRelation: LogicalRelation): Option[String] = {
-    // Currently we are only collecting plan fingerprint from hdfs file based scan nodes.
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
           if isSupportedFileFormat(format) =>
@@ -141,6 +147,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 }
 
+/**
+ * Builder for building [[DefaultFileBasedSource]].
+ */
 class DefaultFileBasedSourceBuilder extends SourceProviderBuilder {
   override def build(spark: SparkSession): SourceProvider = new DefaultFileBasedSource(spark)
 }
