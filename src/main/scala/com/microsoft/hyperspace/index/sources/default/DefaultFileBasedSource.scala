@@ -62,7 +62,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
         // "path" key in options can incur multiple data read unexpectedly.
         val opts = options - "path"
