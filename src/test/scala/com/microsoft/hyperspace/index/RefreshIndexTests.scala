@@ -319,7 +319,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
           assert(indexLogEntry.deletedFiles.isEmpty)
           assert((oldFiles -- latestFiles).isEmpty)
-          assert(indexLogEntry.appendedFiles.toSet.equals(latestFiles -- oldFiles))
+          assert(indexLogEntry.appendedFiles.equals(latestFiles -- oldFiles))
         }
       }
     }
@@ -360,7 +360,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         assert(indexLogEntry.appendedFiles.isEmpty)
 
         val latestFiles = listFiles(testPath).toSet
-        assert(indexLogEntry.deletedFiles.toSet === (oldFiles -- latestFiles))
+        assert(indexLogEntry.deletedFiles === (oldFiles -- latestFiles))
       }
     }
   }

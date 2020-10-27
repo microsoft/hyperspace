@@ -144,7 +144,7 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val appendedFiles: Seq[FileInfo] = {
     val relation = previousIndexLogEntry.relations.head
     val originalFiles = relation.data.properties.content.fileInfos
-    val newFiles = (currentFiles -- originalFiles)
+    val newFiles = currentFiles -- originalFiles
     val newFileNames = newFiles.map(_.name)
 
     // Remove duplicate appended file names in the previous log entry.

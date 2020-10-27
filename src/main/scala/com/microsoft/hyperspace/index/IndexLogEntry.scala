@@ -388,34 +388,26 @@ case class IndexLogEntry(
     source.plan.properties.relations
   }
 
+  // FileInfo's 'name' contains the full path to the file.
   @JsonIgnore
-  lazy val allSourceFileInfos: Set[FileInfo] = {
+  lazy val sourceFileInfoSet: Set[FileInfo] = {
     relations.head.data.properties.content.fileInfos
   }
 
+  // FileInfo's 'name' contains the full path to the file.
   def deletedFiles: Set[FileInfo] = {
-    if (relations.head.data.properties.deletedFiles.isDefined) {
-      relations.head.data.properties.deletedFiles.get.fileInfos
-    } else {
-      Set()
-    }
+    relations.head.data.properties.deletedFiles.map(_.fileInfos).getOrElse(Set())
   }
 
+  // FileInfo's 'name' contains the full path to the file.
   def appendedFiles: Set[FileInfo] = {
-    if (relations.head.data.properties.appendedFiles.isDefined) {
-      relations.head.data.properties.appendedFiles.get.fileInfos
-    } else {
-      Set()
-    }
+    relations.head.data.properties.appendedFiles.map(_.fileInfos).getOrElse(Set())
   }
 
   def withAppendedAndDeletedFiles(
-    appended: Seq[FileInfo],
-    deleted: Seq[FileInfo]): IndexLogEntry = {
-    val appendedFiles = appended.map { f =>
-        new FileStatus(f.size, false, 0, 1, f.modifiedTime, new Path(f.name))
-    }
-    val deletedFiles = deleted.map { f =>
+      appended: Seq[FileInfo],
+      deleted: Seq[FileInfo]): IndexLogEntry = {
+    def toFileStatus(f: FileInfo) = {
       new FileStatus(f.size, false, 0, 1, f.modifiedTime, new Path(f.name))
     }
     copy(
@@ -426,8 +418,8 @@ case class IndexLogEntry(
               relations.head.copy(
                 data = relations.head.data.copy(
                   properties = relations.head.data.properties.copy(
-                    appendedFiles = Content.fromLeafFiles(appendedFiles),
-                    deletedFiles = Content.fromLeafFiles(deletedFiles)))))))))
+                    appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus)),
+                    deletedFiles = Content.fromLeafFiles(deleted.map(toFileStatus))))))))))
   }
 
   def bucketSpec: BucketSpec =
