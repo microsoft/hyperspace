@@ -568,8 +568,8 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         // Verify indexes are used, and all index files are picked.
         verifyIndexUsage(
           query,
-          getIndexFilesPath(indexConfig.indexName, Seq(1, 2)) ++
-            getIndexFilesPath(indexConfig.indexName, Seq(1, 2)))
+          getIndexFilesPath(indexConfig.indexName, Seq(1)) ++ // for Left
+            getIndexFilesPath(indexConfig.indexName, Seq(1))) // for Right
 
         // Verify correctness of results.
         spark.disableHyperspace()
@@ -591,6 +591,7 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   private def queryPlanHasExpectedRootPaths(
       optimizedPlan: LogicalPlan,
       expectedPaths: Seq[Path]): Boolean = {
+    assert(getAllRootPaths(optimizedPlan) === expectedPaths)
     getAllRootPaths(optimizedPlan).equals(expectedPaths)
   }
 
