@@ -96,8 +96,7 @@ object RuleUtils {
         entry.setTagValue(
           plan,
           IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG,
-          !(commonCnt == entry.allSourceFileInfos.size &&
-            commonCnt == inputSourceFiles.size))
+          !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
       }
       isCandidate
     }
@@ -130,21 +129,6 @@ object RuleUtils {
         index =>
           index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
             signatureValid(index))
-    }
-  }
-
-  /**
-   * Extract the LogicalRelation node if the given logical plan is linear.
-   *
-   * @param logicalPlan given logical plan to extract LogicalRelation from.
-   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
-   */
-  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
-    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
-    if (lrs.length == 1) {
-      Some(lrs.head)
-    } else {
-      None // logicalPlan is non-linear or it has no LogicalRelation.
     }
   }
 
@@ -198,6 +182,21 @@ object RuleUtils {
     }
     assert(!transformed.equals(plan))
     transformed
+  }
+
+  /**
+   * Extract the LogicalRelation node if the given logical plan is linear.
+   *
+   * @param logicalPlan given logical plan to extract LogicalRelation from.
+   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
+   */
+  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
+    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
+    if (lrs.length == 1) {
+      Some(lrs.head)
+    } else {
+      None // logicalPlan is non-linear or it has no LogicalRelation.
+    }
   }
 
   /**
