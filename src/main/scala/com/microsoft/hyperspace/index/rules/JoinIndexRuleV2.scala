@@ -62,19 +62,22 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
 
   /**
    * Return a logical plan with source data replaced by index data. The index should cover the
-   * relevant join columns as indexed columns, and requiredCols should be part of all index
-   * columns.
+   * relevant join columns as indexed columns. The index should also cover only the relevant
+   * columns from the list of allReferencedCols from this side of the plan.
    *
    * @param relation Source logical relation.
-   * @param joinCols Columns used in join predicate.
-   * @param requiredCols Columns required to be present in the chosen index.
+   * @param joinCols All columns used in join predicate. This is a superset of columns from the
+   *                 relation as well as other join columns from other relations.
+   * @param allReferencedCols All columns referenced in the logical plan on any given side of Join
+   *                          node. This list of columns includes the output columns from the
+   *                          plan as well as other referenced columns from intermediate nodes.
    *
    * @return Logical plan with eligible indexes if found, otherwise return original relation.
    */
   private def setIndexes(
       relation: LogicalRelation,
       joinCols: Set[AttributeReference],
-      requiredCols: Seq[Attribute]): LogicalPlan = {
+      allReferencedCols: Seq[Attribute]): LogicalPlan = {
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
@@ -84,11 +87,11 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     //  See https://github.com/microsoft/hyperspace/issues/65.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val tempVar = (joinCols ++ requiredCols.toSet).map(_.asInstanceOf[AttributeReference])
+    val allCols = (joinCols ++ allReferencedCols.toSet).map(_.asInstanceOf[AttributeReference])
 
     val allReqdCols =
       relation.outputSet
-        .filter(c => contains(tempVar, c.asInstanceOf[AttributeReference]))
+        .filter(c => contains(allCols, c.asInstanceOf[AttributeReference]))
         .map(_.name)
     val reqdIdxCols = relation.outputSet
       .filter(
