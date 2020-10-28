@@ -88,7 +88,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify getIndexes()") {
     hyperspace.createIndex(df, indexConfig1)
-//    hyperspace.createIndex(df, indexConfig2)
+    hyperspace.createIndex(df, indexConfig2)
 
     val expectedIndex1 = expectedIndex(
       indexConfig1,
@@ -101,8 +101,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       df)
 
     // Verify if indexes returned match the actual created indexes.
-//    verifyIndexes(Seq(expectedIndex1, expectedIndex2))
-    verifyIndexes(Seq(expectedIndex1))
+    verifyIndexes(Seq(expectedIndex1, expectedIndex2))
   }
 
   test("Verify delete().") {
@@ -560,19 +559,11 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       .getIndexes()
       .map { i =>
         val map = i.sourceFileInfoSet.map(f => f.name -> IndexConstants.UNKNOWN_FILE_ID).toMap
-        i.withFileIdsMap(IndexConstants.UNKNOWN_FILE_ID, map)
+        val entry = i.withFileIdsMap(IndexConstants.UNKNOWN_FILE_ID, map)
+        entry.state = i.state
+        entry
       }
       .toSet
-
-    // --- pouriap added ---------------
-    val namesEqual = actualIndexes.toSeq.head.name == expectedIndexes.head.name
-    val derdsEqual = actualIndexes.toSeq.head.derivedDataset == expectedIndexes.head.derivedDataset
-    val contentsEqual = actualIndexes.toSeq.head.content == expectedIndexes.head.content
-    val sourcesEqual = actualIndexes.toSeq.head.source == expectedIndexes.head.source
-    val extraEqual = actualIndexes.toSeq.head.extra == expectedIndexes.head.extra
-
-    val entryEqual = actualIndexes.head == expectedIndexes.head
-    // ----------------------------------
 
     assert(actualIndexes == expectedIndexes.toSet)
   }
