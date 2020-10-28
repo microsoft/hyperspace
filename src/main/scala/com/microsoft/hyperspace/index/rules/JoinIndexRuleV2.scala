@@ -60,6 +60,17 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     attributes.exists(_.semanticEquals(attribute))
   }
 
+  /**
+   * Return a logical plan with source data replaced by index data. The index should cover the
+   * relevant join columns as indexed columns, and requiredCols should be part of all index
+   * columns.
+   *
+   * @param relation Source logical relation.
+   * @param joinCols Columns used in join predicate.
+   * @param requiredCols Columns required to be present in the chosen index.
+   *
+   * @return Logical plan with eligible indexes if found, otherwise return original relation.
+   */
   private def setIndexes(
       relation: LogicalRelation,
       joinCols: Set[AttributeReference],
@@ -108,8 +119,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
 
   private def updatePlan(join: Join): Join = {
     val newLeft: LogicalPlan = updateIfSupported(join.left, join.condition.get)
-    val newRight: LogicalPlan =
-      updateIfSupported(join.right, join.condition.get)
+    val newRight: LogicalPlan = updateIfSupported(join.right, join.condition.get)
     join.copy(left = newLeft, right = newRight)
   }
 
@@ -117,7 +127,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     // Either left or right or both sides should contain half of references.
     // All references for any side, either left or right, should all come from the same leaf node.
     //
-    // e.g. if join condition refers to columns A, B, C, D, two columns should come from left, 2
+    // E.g. if join condition refers to columns A, B, C, D, two columns should come from left, 2
     // from right. This would be by default true. Nothing to do in this part. Let's say A,B
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
@@ -127,6 +137,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       case relation: LogicalRelation => relation.output.exists(contains(joinCols, _))
       case _ => false
     }
+
     if (eligibleBaseRelations.length != 1) {
       return plan
     }
