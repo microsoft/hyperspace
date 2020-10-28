@@ -72,7 +72,7 @@ class RefreshAppendAction(
       .schema(df.schema)
       .format(relation.fileFormat)
       .options(relation.options)
-      .load(appendedFiles: _*)
+      .load(appendedFiles.map(_.name): _*)
   }
 
   /**
@@ -104,7 +104,7 @@ class RefreshAppendAction(
     val fileIdsMap = mutable.Map() ++ previousIndexLogEntry.fileIdsMap
     appendedFiles.foreach { f =>
       lastFileId += 1
-      fileIdsMap.put(f, lastFileId)
+      fileIdsMap.put(f.name, lastFileId)
     }
     (fileIdsMap.toMap, lastFileId)
   }

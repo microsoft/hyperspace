@@ -23,6 +23,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -97,14 +98,16 @@ private[actions] abstract class RefreshActionBase(
    * Finally, append the previously known deleted files to the result. These
    * are the files for which the index was never updated in the past.
    */
-  protected lazy val deletedFiles: Seq[String] = {
+  protected lazy val deletedFiles: Seq[FileInfo] = {
     val relation = previousIndexLogEntry.relations.head
-    val originalFiles = relation.data.properties.content.fileInfos
-//    val delFiles = (originalFiles -- currentFiles).map(_.name) // pouriap changed
-    val delFiles = originalFiles.map(_.name) -- currentFiles.map(_.name)
+    val originalFiles = // pouriap changed (removed file ids)
+      relation.data.properties.content.fileInfos // .map(_.copy(id = UNKNOWN_FILE_ID))
+    val delFiles = originalFiles -- currentFiles
+    val delFileNames = delFiles.map(_.name)
 
     // Remove duplicate deleted file names in the previous log entry.
-    val prevDeletedFiles = previousIndexLogEntry.deletedFiles.filterNot(delFiles.contains)
+    val prevDeletedFiles =
+      previousIndexLogEntry.deletedFiles.filterNot(f => delFileNames.contains(f.name))
 
     // TODO: Add test for the scenario where existing deletedFiles and newly deleted
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.
@@ -125,7 +128,14 @@ private[actions] abstract class RefreshActionBase(
             _) =>
           location
             .allFiles()
-            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+            .map { f =>
+              val filePath = f.getPath.toString
+              previousIndexLogEntry.fileIdsMap.get(filePath) match {
+                case Some(id) =>
+                  FileInfo(filePath, f.getLen, f.getModificationTime, id)
+                case _ =>
+                  FileInfo(filePath, f.getLen, f.getModificationTime)
+            }}
       }
       .flatten
       .toSet
@@ -138,14 +148,16 @@ private[actions] abstract class RefreshActionBase(
    * Finally, append the previously known appended files to the result. These
    * are the files for which index was never updated in the past.
    */
-  protected lazy val appendedFiles: Seq[String] = {
+  protected lazy val appendedFiles: Seq[FileInfo] = {
     val relation = previousIndexLogEntry.relations.head
-    val originalFiles = relation.data.properties.content.fileInfos
-    // val newFiles = (currentFiles -- originalFiles).map(_.name) // pouriap changed
-    val newFiles = currentFiles.map(_.name) -- originalFiles.map(_.name)
+    val originalFiles = // pouriap changed (removed file ids)
+      relation.data.properties.content.fileInfos // .map(_.copy(id = UNKNOWN_FILE_ID))
+    val newFiles = currentFiles -- originalFiles
+    val newFileNames = newFiles.map(_.name)
 
     // Remove duplicate appended file names in the previous log entry.
-    val prevAppendedFiles = previousIndexLogEntry.appendedFiles.filterNot(newFiles.contains)
+    val prevAppendedFiles =
+      previousIndexLogEntry.appendedFiles.filterNot(f => newFileNames.contains(f.name))
 
     // TODO: Add test for the scenario where existing appendedFiles and newly appended
     //  files are updated. https://github.com/microsoft/hyperspace/issues/195.

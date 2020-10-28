@@ -113,11 +113,13 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                  "files" : [ {
         |                    "name" : "f1",
         |                    "size" : 100,
-        |                    "modifiedTime" : 100
+        |                    "modifiedTime" : 100,
+        |                    "id" : 0
         |                  }, {
         |                    "name" : "f2",
         |                    "size" : 200,
-        |                    "modifiedTime" : 200
+        |                    "modifiedTime" : 200,
+        |                    "id" : 1
         |                  } ],
         |                  "subDirs" : [ ]
         |                },
@@ -126,8 +128,23 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                  "properties" : { }
         |                }
         |              },
-        |              "deletedFiles" : ["file:/rootpath/f1"],
-        |              "appendedFiles" : ["file:/rootpath/f3"]
+        |              "deletedFiles" : {
+        |                "root" : {
+        |                  "name" : "",
+        |                  "files" : [ {
+        |                    "name" : "f1",
+        |                    "size" : 10,
+        |                    "modifiedTime" : 10,
+        |                    "id" : 2
+        |                  }],
+        |                  "subDirs" : [ ]
+        |                },
+        |                "fingerprint" : {
+        |                  "kind" : "NoOp",
+        |                  "properties" : { }
+        |                }
+        |              },
+        |              "appendedFiles" : null
         |            },
         |            "kind" : "HDFS"
         |          },
@@ -145,7 +162,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |            } ]
         |          },
         |          "kind" : "LogicalPlan"
-        |        }
+        |        },
+        |        "lastFileId" : 2
         |      },
         |      "kind" : "Spark"
         |    }
@@ -165,16 +183,17 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       Seq(Relation(
         Seq("rootpath"),
         Hdfs(Hdfs.Properties(Content(
-          Directory("", Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)), Seq())),
-          Seq("file:/rootpath/f3"),
-          Seq("file:/rootpath/f1"))),
+          Directory("", Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 200L, 200L, 1)), Seq())),
+          None,
+          Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2))))))),
         "schema",
         "type",
         Map())),
-      null,
-      null,
+      rawPlan = null,
+      sql = null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))))
+        LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))),
+      lastFileId = 2)
 
     val expected = IndexLogEntry(
       "indexName",

@@ -144,7 +144,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: filter index & parquet format, " +
-      "index relation should include appended file paths") {
+      "index relation should include appended file paths.") {
     val df = spark.read.parquet(sampleParquetDataLocationAppend)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
@@ -385,7 +385,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Delete-only: filter index & parquet, json format, " +
-      "index relation should have additional filter for deleted files") {
+      "index relation should have additional filter for deleted files.") {
     Seq(
       (sampleParquetDataLocationDelete, "index_ParquetDelete", "parquet"),
       (sampleJsonDataLocationDelete, "index_JsonDelete", "json")) foreach {
@@ -416,7 +416,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
               // Check new filter condition on lineage column.
               assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
-              val deleted = deletedFileNames.map(_.toString)
+              val deleted = deletedFileNames.map(_.toString) // pouriap changed
               assert(deleted.length === 2)
               assert(deleted.distinct.length === deleted.length)
               assert(deleted.forall(f => !df.inputFiles.contains(f)))

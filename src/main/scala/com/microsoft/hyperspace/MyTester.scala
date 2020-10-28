@@ -30,27 +30,36 @@ object MyTester {
 
     // create index
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath)
-    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
+    // spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
 
     val hyperspace: Hyperspace = Hyperspace()
-    val indexConfig = IndexConfig("nix", Seq("n_nationkey"), Seq("n_name", "n_regionkey"))
+    val indexConfig = IndexConfig("nix", Seq("n_nationkey", "n_name", "n_regionkey"), Seq("n_comment"))
     hyperspace.createIndex(df, indexConfig)
     println("Indexes created.")
 
     // query
     spark.enableHyperspace
-    val qdf = spark.read.parquet(dataPath)
-      .filter("n_nationkey > 12")
-      .select("n_name", "n_nationkey")
+    // filter
+//    val qdf = spark.read.parquet(dataPath)
+//      .filter("n_nationkey > 12")
+//      .select("n_name", "n_nationkey")
+//    qdf.explain(true)
+//    qdf.show()
+
+    // self-join
+    val left = spark.read.parquet(dataPath)
+    val right = spark.read.parquet(dataPath)
+    val qdf = left.join(right, left("n_nationkey") === right("n_nationkey") && left("n_regionkey") === right("n_regionkey"))
+      .select(left("n_comment"))
     qdf.explain(true)
     qdf.show()
 
     // read index content
-    spark.read.parquet("C:\\Users\\pouriap\\Desktop\\scratch\\relTest\\ix\\nix\\v__=0")
-      .groupBy(IndexConstants.DATA_FILE_NAME_COLUMN)
-      .count()
-//      .select(IndexConstants.DATA_FILE_NAME_COLUMN)
-//      .distinct()
-      .show(30, false)
+//    spark.read.parquet("C:\\Users\\pouriap\\Desktop\\scratch\\relTest\\ix\\nix\\v__=0")
+//      .groupBy(IndexConstants.DATA_FILE_NAME_COLUMN)
+//      .count()
+////      .select(IndexConstants.DATA_FILE_NAME_COLUMN)
+////      .distinct()
+//      .show(30, false)
   }
 }

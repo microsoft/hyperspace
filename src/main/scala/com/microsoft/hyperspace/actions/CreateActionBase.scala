@@ -111,7 +111,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")
@@ -242,12 +242,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           _,
           _,
           _) =>
-        val files = location.allFiles
-        files.map { f =>
+        location.allFiles.foreach {f =>
           val filePath = f.getPath.toUri.toString.replace("file:///", "file:/")
           lastId += 1
-          fileIdsMap.put(filePath, lastId)
-        }
+          fileIdsMap.put(filePath, lastId)}
     }
     (fileIdsMap.toMap, lastId)
   }

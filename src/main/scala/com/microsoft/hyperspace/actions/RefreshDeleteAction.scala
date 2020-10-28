@@ -84,7 +84,8 @@ class RefreshDeleteAction(
     val refreshDF =
       spark.read
         .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-        .filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles: _*))
+        .filter(
+          !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles.map(_.id): _*))
 
     refreshDF.write.saveWithBuckets(
       refreshDF,
@@ -104,7 +105,7 @@ class RefreshDeleteAction(
     val fileIdsMap = mutable.Map() ++ previousIndexLogEntry.fileIdsMap
     appendedFiles.foreach { f =>
       lastFileId += 1
-      fileIdsMap.put(f, lastFileId)
+      fileIdsMap.put(f.name, lastFileId)
     }
     (fileIdsMap.toMap, lastFileId)
   }

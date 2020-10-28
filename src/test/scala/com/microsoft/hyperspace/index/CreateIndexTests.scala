@@ -220,20 +220,24 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
   test("Verify content of lineage column.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       val dataPath = new Path(nonPartitionedDataPath, "*parquet")
-      val dataFileNames = dataPath.getFileSystem(new Configuration)
+      val dataFilesCount = dataPath
+        .getFileSystem(new Configuration)
         .globStatus(dataPath)
-        .map(_.getPath)
+        .length
+        .toLong
+
+      val lineageRange = 0L to dataFilesCount
 
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
       val indexRecordsDF = spark.read.parquet(
         s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
-      val lineageFileNames = indexRecordsDF
+      val lineageValues = indexRecordsDF
         .select(IndexConstants.DATA_FILE_NAME_COLUMN)
         .distinct()
         .collect()
-        .map(r => new Path(r.getString(0)))
+        .map(r => r.getLong(0))
 
-      assert(lineageFileNames.toSet === dataFileNames.toSet)
+      lineageValues.forall(lineageRange.contains(_))
     }
   }
 }

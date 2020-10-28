@@ -26,6 +26,7 @@ import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteActio
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent}
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
+import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 /**
  * Unit E2E test cases for RefreshIndex.
@@ -242,7 +243,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
       assert(indexLogEntry.deletedFiles.isEmpty)
       assert(indexLogEntry.appendedFiles.size == 1)
-      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+      assert(indexLogEntry.appendedFiles.head.name.contains(deletedFile.getName))
     }
 
     new RefreshAppendAction(
@@ -327,7 +328,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
           assert(indexLogEntry.deletedFiles.isEmpty)
           assert((oldFiles -- latestFiles).isEmpty)
-          assert(indexLogEntry.appendedFiles.toSet.equals(latestFiles -- oldFiles))
+          assert(indexLogEntry.appendedFiles.equals(latestFiles -- oldFiles))
         }
       }
     }
@@ -368,7 +369,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
         assert(indexLogEntry.appendedFiles.isEmpty)
 
         val latestFiles = listFiles(testPath).toSet
-        assert(indexLogEntry.deletedFiles.toSet.equals(oldFiles -- latestFiles))
+        assert(indexLogEntry.deletedFiles === (oldFiles -- latestFiles))
       }
     }
   }
@@ -481,7 +482,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
       assert(indexLogEntry.deletedFiles.isEmpty)
       assert(indexLogEntry.appendedFiles.size == 1)
-      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+      assert(indexLogEntry.appendedFiles.head.name.contains(deletedFile.getName))
     }
 
     // Update the appended file again.
@@ -497,7 +498,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
       assert(indexLogEntry.deletedFiles.isEmpty)
       assert(indexLogEntry.appendedFiles.size == 1)
-      assert(indexLogEntry.appendedFiles.head.contains(deletedFile.getName))
+      assert(indexLogEntry.appendedFiles.head.name.contains(deletedFile.getName))
     }
 
     // Update the appended file again.
@@ -513,7 +514,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 7)
       assert(indexLogEntry.appendedFiles.isEmpty)
       assert(indexLogEntry.deletedFiles.size == 1)
-      assert(indexLogEntry.deletedFiles.head.contains(deletedFile.getName))
+      assert(indexLogEntry.deletedFiles.head.name.contains(deletedFile.getName))
     }
 
     // Update the appended file again.
@@ -529,7 +530,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 9)
       assert(indexLogEntry.appendedFiles.isEmpty)
       assert(indexLogEntry.deletedFiles.size == 1)
-      assert(indexLogEntry.deletedFiles.head.contains(deletedFile.getName))
+      assert(indexLogEntry.deletedFiles.head.name.contains(deletedFile.getName))
     }
   }
 
@@ -545,10 +546,11 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     TestUtils.deleteFiles(dataPath, "*parquet", 1).head
   }
 
-  private def listFiles(path: String): Seq[String] = {
+  private def listFiles(path: String): Seq[FileInfo] = {
     val absolutePath = PathUtils.makeAbsolute(path)
     val fs = absolutePath.getFileSystem(new Configuration)
-    fs.listStatus(absolutePath).toSeq.map(_.getPath.toString)
+    fs.listStatus(absolutePath).toSeq.filter(f => DataPathFilter.accept(f.getPath)).map(f =>
+      FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
   }
 
   private def getLatestStableLog(indexName: String): IndexLogEntry = {

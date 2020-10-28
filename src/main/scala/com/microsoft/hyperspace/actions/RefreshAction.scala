@@ -52,7 +52,7 @@ class RefreshAction(
   final override def validate(): Unit = {
     super.validate()
 
-    if (currentFiles.equals(previousIndexLogEntry.allSourceFileInfos)) {
+    if (currentFiles.equals(previousIndexLogEntry.sourceFileInfoSet)) {
       throw NoChangesException("Refresh full aborted as no source data changed.")
     }
   }
