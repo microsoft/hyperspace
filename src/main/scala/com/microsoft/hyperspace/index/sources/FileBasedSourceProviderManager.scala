@@ -27,63 +27,82 @@ import com.microsoft.hyperspace.index.Relation
 import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
 
 /**
+ * [[FileBasedSourceProviderManager]] is responsible for loading source providers which implements
+ * [[FileBasedSourceProvider]] and running APIs for each provider loaded.
  *
+ * Each API in [[FileBasedSourceProvider]] returns [[Option]] and this manager ensures that only
+ * one provider returns [[Some]] for each API.
  *
- * @param spark
+ * @param spark Spark session.
  */
 class FileBasedSourceProviderManager(spark: SparkSession) {
   private val sourceProviders: CacheWithTransform[String, Seq[FileBasedSourceProvider]] =
     new CacheWithTransform[String, Seq[FileBasedSourceProvider]]({ () =>
       HyperspaceConf.fileBasedSourceBuilders(spark)
     }, { builderClassNames =>
-      providers(builderClassNames)
+      buildProviders(builderClassNames)
     })
 
   /**
+   * Runs createRelation() for each provider.
    *
-   * @param logicalRelation
-   * @return
+   * @param logicalRelation Logical relation to create [[Relation]] from.
+   * @return [[Relation]] created from the given logical relation.
+   * @throws HyperspaceException if multiple providers returns [[Some]] or
+   *                             if no providers return [[Some]].
    */
   def createRelation(logicalRelation: LogicalRelation): Relation = {
     run(p => p.createRelation(logicalRelation))
   }
 
   /**
+   * Runs refreshRelation() for each provider.
    *
+   * @param relation [[Relation]] to refresh.
+   * @return Refreshed [[Relation]].
+   * @throws HyperspaceException if multiple providers returns [[Some]] or
+   *                             if no providers return [[Some]].
    */
   def refreshRelation(relation: Relation): Relation = {
     run(p => p.refreshRelation(relation))
   }
 
   /**
+   * Runs signature() for each provider.
    *
-   * @param logicalRelation
-   * @return
+   * @param logicalRelation Logical relation to compute signature from.
+   * @return Computed signature.
+   * @throws HyperspaceException if multiple providers returns [[Some]] or
+   *                             if no providers return [[Some]].
    */
   def signature(logicalRelation: LogicalRelation): String = {
     run(p => p.signature(logicalRelation))
   }
 
   /**
+   * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
+   * [[Option]] for each provider built. This function ensures that only one provider returns
+   * [[Some]] when 'f' is executed.
    *
-   * @param f
-   * @tparam A
-   * @return
+   * @param f Function that runs a [[FileBasedSourceProvider]]'s API that returns [[Option]]
+   *          given a provider.
+   * @tparam A Type of the object that 'f' returns, wrapped in [[Option]].
+   * @return The object in [[Some]] that 'f' returns.
    */
   private def run[A](f: FileBasedSourceProvider => Option[A]): A = {
     sourceProviders
       .load()
-      .foldLeft(Option.empty[(A, FileBasedSourceProvider)]) { (acc, p) =>
-        val result = f(p)
-        if (result.isDefined) {
-          if (acc.isDefined) {
+      .foldLeft(Option.empty[(A, FileBasedSourceProvider)]) { (result, provider) =>
+        val cur = f(provider)
+        if (cur.isDefined) {
+          if (result.isDefined) {
             throw HyperspaceException(
               "Multiple source providers returned valid results: " +
-                s"'${p.getClass.getName}' and '${acc.get._2.getClass.getName}'")
+                s"'${provider.getClass.getName}' and '${result.get._2.getClass.getName}'")
           }
-          Some(result.get, p)
+          Some(cur.get, provider)
         } else {
-          acc
+          result
         }
       }
       .map(_._1)
@@ -93,11 +112,15 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Given a comma separated class names that implement [[SourceProviderBuilder]], this method
+   * builds source providers that implement [[FileBasedSourceProvider]].
    *
-   * @param builderClassNames
-   * @return
+   * @param builderClassNames Name of classes to load as [[SourceProviderBuilder]].
+   * @return [[FileBasedSourceProvider]] objects built.
+   * @throws HyperspaceException if given builders cannot be loaded or
+   *                             if builder doesn't build [[FileBasedSourceProvider]].
    */
-  private def providers(builderClassNames: String): Seq[FileBasedSourceProvider] = {
+  private def buildProviders(builderClassNames: String): Seq[FileBasedSourceProvider] = {
     val builders = builderClassNames.split(",").map(_.trim).map { name =>
       Try(Utils.classForName(name).getConstructor().newInstance()) match {
         case Success(builder: SourceProviderBuilder) => builder
