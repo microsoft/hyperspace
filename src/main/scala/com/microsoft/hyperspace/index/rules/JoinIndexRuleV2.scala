@@ -135,7 +135,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       condition.references.map(_.asInstanceOf[AttributeReference]).toSet
     val eligibleBaseRelations = plan.collectLeaves().filter {
       case relation: LogicalRelation =>
-        relation.output.toSet.exists(col => contains(joinCols, col))
+        relation.output.exists(contains(joinCols, _))
       case _ => false
     }
     if (eligibleBaseRelations.length != 1) {
