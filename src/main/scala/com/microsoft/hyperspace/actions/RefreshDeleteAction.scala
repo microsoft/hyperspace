@@ -84,8 +84,7 @@ class RefreshDeleteAction(
     val refreshDF =
       spark.read
         .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-        .filter(
-          !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles.map(_.id): _*))
+        .filter(!col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles.map(_.id): _*))
 
     refreshDF.write.saveWithBuckets(
       refreshDF,
@@ -100,6 +99,18 @@ class RefreshDeleteAction(
     entry.withAppendedAndDeletedFiles(appendedFiles, Seq())
   }
 
+  /**
+   * Generate a mapping for source data files by assigning a unique file id
+   * to each source data file. Once assigned, this file id does not change
+   * for a given file and is used to refer to that file.
+   * We extract last file id from previous version of index and start
+   * assigning file ids to new source data files according to that
+   * to make sure there is no gap or duplicate in file ids.
+   *
+   * @param df DataFrame to index.
+   * @return mapping of source data file paths to their file ids, and the
+   *         last assigned file id.
+   */
   final override def getFileIdsMap(df: DataFrame): (Map[String, Long], Long) = {
     var lastFileId = previousIndexLogEntry.lastFileId
     val fileIdsMap = mutable.Map() ++ previousIndexLogEntry.fileIdsMap

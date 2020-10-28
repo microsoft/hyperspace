@@ -179,7 +179,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: join index, appended data should be shuffled with indexed columns " +
-      "and merged by BucketUnion") {
+      "and merged by BucketUnion.") {
     val df1 = spark.read.parquet(sampleParquetDataLocationAppend)
     val df2 = spark.read.parquet(sampleParquetDataLocationAppend2)
     def joinQuery(): DataFrame = {
@@ -271,7 +271,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: filter rule & json format, " +
-      "appended data should be shuffled and merged by Union") {
+      "appended data should be shuffled and merged by Union.") {
     val df = spark.read.json(sampleJsonDataLocationAppend)
     def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
@@ -346,11 +346,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Delete-only: filter index & parquet format, " +
-      "Hybrid Scan for delete support doesn't work without lineage column") {
+      "Hybrid Scan for delete support doesn't work without lineage column.") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
-    Seq(
-      ("indexNameWithoutLineage", "false", false),
-      ("indexNameWithLineage", "true", true)) foreach {
+    Seq(("indexNameWithoutLineage", "false", false), ("indexNameWithLineage", "true", true)) foreach {
       case (indexName, lineageColumnConfig, transformationExpected) =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> lineageColumnConfig) {
           setupIndexAndChangeData(
@@ -416,7 +414,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
               // Check new filter condition on lineage column.
               assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
-              val deleted = deletedFileNames.map(_.toString) // pouriap changed
+              val deleted = deletedFileNames.map(_.toString)
               assert(deleted.length === 2)
               assert(deleted.distinct.length === deleted.length)
               assert(deleted.forall(f => !df.inputFiles.contains(f)))

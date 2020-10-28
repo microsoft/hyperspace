@@ -59,7 +59,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   }
 
   test("Verify that indexes() returns the correct dataframe with and without lineage.") {
-    Seq(true).foreach { enableLineage =>
+    Seq(true, false).foreach { enableLineage =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig1.indexName) {
           import spark.implicits._
@@ -88,7 +88,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify getIndexes()") {
     hyperspace.createIndex(df, indexConfig1)
-    // hyperspace.createIndex(df, indexConfig2) // pouriap revert
+    hyperspace.createIndex(df, indexConfig2)
 
     val expectedIndex1 = expectedIndex(
       indexConfig1,
@@ -101,8 +101,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       df)
 
     // Verify if indexes returned match the actual created indexes.
-    // verifyIndexes(Seq(expectedIndex1, expectedIndex2)) // pouriap revert
-    verifyIndexes(Seq(expectedIndex1))
+    verifyIndexes(Seq(expectedIndex1, expectedIndex2))
   }
 
   test("Verify delete().") {
@@ -555,13 +554,15 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   // Verify if the indexes currently stored in Hyperspace matches the given indexes.
   private def verifyIndexes(expectedIndexes: Seq[IndexLogEntry]): Unit = {
-    val actualIndexes = IndexCollectionManager(spark).getIndexes().map { i =>
-      val map = i.sourceFileInfoSet.map(f => f.name -> IndexConstants.UNKNOWN_FILE_ID).toMap
-      i.withFileIdsMap(-1L, map)
-    }.toSet
+    // remove file ids from soucre data files' fileInfos
+    val actualIndexes = IndexCollectionManager(spark)
+      .getIndexes()
+      .map { i =>
+        val map = i.sourceFileInfoSet.map(f => f.name -> IndexConstants.UNKNOWN_FILE_ID).toMap
+        i.withFileIdsMap(-1L, map)
+      }
+      .toSet
 
-    // pouriap changed it
-//    assert(IndexCollectionManager(spark).getIndexes().toSet == expectedIndexes.toSet)
     assert(actualIndexes == expectedIndexes.toSet)
   }
 

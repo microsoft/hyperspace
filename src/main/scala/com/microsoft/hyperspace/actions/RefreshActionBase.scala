@@ -23,7 +23,6 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -100,8 +99,7 @@ private[actions] abstract class RefreshActionBase(
    */
   protected lazy val deletedFiles: Seq[FileInfo] = {
     val relation = previousIndexLogEntry.relations.head
-    val originalFiles = // pouriap changed (removed file ids)
-      relation.data.properties.content.fileInfos // .map(_.copy(id = UNKNOWN_FILE_ID))
+    val originalFiles = relation.data.properties.content.fileInfos
     val delFiles = originalFiles -- currentFiles
     val delFileNames = delFiles.map(_.name)
 
@@ -128,7 +126,8 @@ private[actions] abstract class RefreshActionBase(
             _) =>
           location
             .allFiles()
-            .map { f =>
+            .map { f => // for each file, if it already has a file id,
+                        // add that id to its corresponding FileInfo.
               val filePath = f.getPath.toString
               previousIndexLogEntry.fileIdsMap.get(filePath) match {
                 case Some(id) =>
@@ -150,8 +149,7 @@ private[actions] abstract class RefreshActionBase(
    */
   protected lazy val appendedFiles: Seq[FileInfo] = {
     val relation = previousIndexLogEntry.relations.head
-    val originalFiles = // pouriap changed (removed file ids)
-      relation.data.properties.content.fileInfos // .map(_.copy(id = UNKNOWN_FILE_ID))
+    val originalFiles = relation.data.properties.content.fileInfos
     val newFiles = currentFiles -- originalFiles
     val newFileNames = newFiles.map(_.name)
 

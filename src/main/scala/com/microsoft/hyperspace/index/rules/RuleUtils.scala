@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{LongType, StringType, StructType}
+import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
@@ -80,7 +80,7 @@ object RuleUtils {
       //  See https://github.com/microsoft/hyperspace/issues/158
 
       // Find the number of common files between the source relations & index source files.
-      val sourceFileInfoSet = // pouriap added
+      val sourceFileInfoSet = // remove file id so comparison only uses actual file properties.
         entry.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID))
       val commonCnt = inputSourceFiles.count(sourceFileInfoSet.contains)
       val deletedCnt = sourceFileInfoSet.size - commonCnt
@@ -262,13 +262,14 @@ object RuleUtils {
 
         val (filesDeleted, filesAppended) =
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
-            val sourceFileInfos =
-              index.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID)) // pouriap added
+            val sourceFileInfos = // remove file id so comparison only uses actual file properties.
+              index.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID))
             val (exist, nonExist) = curFileSet.partition(sourceFileInfos.contains)
             val filesAppended = nonExist.map(f => new Path(f.name))
             if (exist.length < sourceFileInfos.size) {
-              val deletedFilesInfo = (sourceFileInfos -- exist).map {
-                f =>
+              // for deleted files, add back the file ids. The file ids will be
+              // used as lineage in the injected filter.
+              val deletedFilesInfo = (sourceFileInfos -- exist).map { f =>
                 val fileId = index.fileIdsMap(f.name)
                 f.copy(id = fileId)
               }
@@ -282,7 +283,7 @@ object RuleUtils {
             // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
             (
               Nil,
-              curFileSet // pouriap changed
+              curFileSet
                 .filterNot(index.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID)).contains)
                 .map(f => new Path(f.name)))
           }
@@ -331,10 +332,7 @@ object RuleUtils {
         if (filesDeleted.isEmpty) {
           baseRelation.copy(relation = relation, output = updatedOutput)
         } else {
-          // pouriap changed
-//          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)()
           val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, LongType)()
-//          val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
           val deletedFileNames = filesDeleted.map(f => Literal(f.id)).toArray
           val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))

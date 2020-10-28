@@ -226,6 +226,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
         .length
         .toLong
 
+      // File ids are assigned incrementally starting from 0.
       val lineageRange = 0L to dataFilesCount
 
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)

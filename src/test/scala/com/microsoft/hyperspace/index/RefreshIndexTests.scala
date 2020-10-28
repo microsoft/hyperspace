@@ -85,7 +85,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             deleteOneDataFile(partitionedDataPath, true)
           }
 
-          // Get deleted file id  // pouriap changed
+          // Get deleted file's file id, used as lineage for its records
           val ixLogPath = PathUtils.makeAbsolute(
             s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
           val ixLogJson =
@@ -549,8 +549,10 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   private def listFiles(path: String): Seq[FileInfo] = {
     val absolutePath = PathUtils.makeAbsolute(path)
     val fs = absolutePath.getFileSystem(new Configuration)
-    fs.listStatus(absolutePath).toSeq.filter(f => DataPathFilter.accept(f.getPath)).map(f =>
-      FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+    fs.listStatus(absolutePath)
+      .toSeq
+      .filter(f => DataPathFilter.accept(f.getPath))
+      .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
   }
 
   private def getLatestStableLog(indexName: String): IndexLogEntry = {
