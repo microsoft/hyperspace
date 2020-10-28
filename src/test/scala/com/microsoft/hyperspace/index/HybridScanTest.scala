@@ -348,7 +348,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     "Delete-only: filter index & parquet format, " +
       "Hybrid Scan for delete support doesn't work without lineage column.") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
-    Seq(("indexNameWithoutLineage", "false", false), ("indexNameWithLineage", "true", true)) foreach {
+    Seq(
+      ("indexNameWithoutLineage", "false", false),
+      ("indexNameWithLineage", "true", true)) foreach {
       case (indexName, lineageColumnConfig, transformationExpected) =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> lineageColumnConfig) {
           setupIndexAndChangeData(
