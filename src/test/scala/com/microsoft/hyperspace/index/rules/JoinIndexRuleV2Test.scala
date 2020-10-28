@@ -81,7 +81,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
 
     val t1Location =
       new InMemoryFileIndex(spark, Seq(new Path("t1")), Map.empty, Some(t1Schema), NoopCache) {
-        // Update allFiles() so that length of files is greater than spark's broadcast threshold
+        // Update allFiles() so that length of files is greater than spark's broadcast threshold.
         override def allFiles(): Seq[FileStatus] = {
           val length = spark.conf
             .get("spark.sql.autoBroadcastJoinThreshold")
@@ -92,7 +92,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
 
     val t2Location =
       new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t1Schema), NoopCache) {
-        // Update allFiles() so that length of files is greater than spark's broadcast threshold
+        // Update allFiles() so that length of files is greater than spark's broadcast threshold.
         override def allFiles(): Seq[FileStatus] = {
           val length = spark.conf
             .get("spark.sql.autoBroadcastJoinThreshold")
@@ -103,7 +103,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
 
     val t3Location =
       new InMemoryFileIndex(spark, Seq(new Path("t3")), Map.empty, Some(t1Schema), NoopCache) {
-        // Update allFiles() so that length of files is less than spark's broadcast threshold
+        // Update allFiles() so that length of files is less than spark's broadcast threshold.
         override def allFiles(): Seq[FileStatus] = {
           val length = spark.conf
             .get("spark.sql.autoBroadcastJoinThreshold")
@@ -165,7 +165,6 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     super.afterAll()
   }
 
-  // test: does not update plan for bhj
   test("Join rule does not update plan for Broadcast Hash Join compatible joins") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val joinCondition = EqualTo(t1c1, t3c1)
@@ -176,7 +175,6 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     }
   }
 
-  // test: updates plan for smj
   test("Join rule works if indexes exist and configs are set correctly") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val joinCondition = EqualTo(t1c1, t2c1)
@@ -191,7 +189,6 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     }
   }
 
-  // test: updates plan for smj with bhj
   test("Join rule updates sort merge join part of a plan with both smj and bhj.") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val bhjCondition = EqualTo(t2c1, t3c1)
@@ -219,7 +216,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     assert(basePaths(updatedPlan) == indexPaths)
   }
 
-  /** method to check if tree structures of two logical plans are the same. */
+  /** Method to check if tree structures of two logical plans are the same. */
   private def treeStructureEquality(plan1: LogicalPlan, plan2: LogicalPlan): Boolean = {
     val originalNodeCount = plan1.treeString.split("\n").length
     val updatedNodeCount = plan2.treeString.split("\n").length
@@ -227,11 +224,11 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     if (originalNodeCount == updatedNodeCount) {
       (0 until originalNodeCount).forall { i =>
         plan1(i) match {
-          // for LogicalRelation, we just check if the updated also has LogicalRelation. If the
-          // updated plan uses index, the root paths will be different here
+          // For LogicalRelation, we just check if the updated also has LogicalRelation. If the
+          // updated plan uses index, the root paths will be different here.
           case _: LogicalRelation => plan2(i).isInstanceOf[LogicalRelation]
 
-          // for other node types, we compare exact matching between original and updated plans
+          // For other node types, we compare exact matching between original and updated plans.
           case node => node.simpleString.equals(plan2(i).simpleString)
         }
       }
@@ -240,7 +237,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     }
   }
 
-  /** Returns tuple of left and right base relation paths for a logical plan */
+  /** Returns tuple of left and right base relation paths for a logical plan. */
   private def basePaths(plan: LogicalPlan): Seq[Path] = {
     plan
       .collectLeaves()
