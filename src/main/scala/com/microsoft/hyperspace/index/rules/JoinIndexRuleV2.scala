@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
@@ -62,7 +62,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
 
   private def setIndexes(
       relation: LogicalRelation,
-      joinCols: AttributeSet,
+      joinCols: Set[AttributeReference],
       requiredCols: Seq[Attribute]): LogicalPlan = {
     val indexManager = Hyperspace
       .getContext(spark)
@@ -73,8 +73,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     //  See https://github.com/microsoft/hyperspace/issues/65.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val tempVar = (joinCols.toSet ++ requiredCols.toSet)
-      .map(_.asInstanceOf[AttributeReference])
+    val tempVar = (joinCols ++ requiredCols.toSet).map(_.asInstanceOf[AttributeReference])
 
     val allReqdCols =
       relation.outputSet
@@ -84,7 +83,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       .filter(
         c =>
           contains(
-            joinCols.toSet.map((col: Attribute) => col.asInstanceOf[AttributeReference]),
+            joinCols.map((col: Attribute) => col.asInstanceOf[AttributeReference]),
             c.asInstanceOf[AttributeReference]))
       .map(_.name)
 
@@ -92,9 +91,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       .filter { index =>
         index.config.indexedColumns.toSet.equals(reqdIdxCols.toSet) &&
         allReqdCols.forall(
-          c =>
-            (index.config.indexedColumns ++ index.config.includedColumns)
-              .contains(c))
+          (index.config.indexedColumns ++ index.config.includedColumns).contains(_))
       }
 
     if (usableIndexes.isEmpty) {
@@ -125,8 +122,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
 
-    val joinCols =
-      condition.references.map(_.asInstanceOf[AttributeReference]).toSet
+    val joinCols = condition.references.map(_.asInstanceOf[AttributeReference]).toSet
     val eligibleBaseRelations = plan.collectLeaves().filter {
       case relation: LogicalRelation => relation.output.exists(contains(joinCols, _))
       case _ => false
@@ -140,12 +136,12 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       return plan
     }
 
-    updateIndex(plan, condition.references, plan.output)
+    updateIndex(plan, joinCols, plan.output)
   }
 
   private def updateIndex(
       plan: LogicalPlan,
-      joinCols: AttributeSet,
+      joinCols: Set[AttributeReference],
       requiredCols: Seq[Attribute]): LogicalPlan =
     plan match {
       case p: LogicalRelation => setIndexes(p, joinCols, requiredCols)
