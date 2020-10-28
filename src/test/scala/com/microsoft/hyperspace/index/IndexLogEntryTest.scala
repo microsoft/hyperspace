@@ -126,8 +126,22 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                  "properties" : { }
         |                }
         |              },
-        |              "deletedFiles" : ["file:/rootpath/f1"],
-        |              "appendedFiles" : ["file:/rootpath/f3"]
+        |              "deletedFiles" : {
+        |                "root" : {
+        |                  "name" : "",
+        |                  "files" : [ {
+        |                    "name" : "f1",
+        |                    "size" : 10,
+        |                    "modifiedTime" : 10
+        |                  }],
+        |                  "subDirs" : [ ]
+        |                },
+        |                "fingerprint" : {
+        |                  "kind" : "NoOp",
+        |                  "properties" : { }
+        |                }
+        |              },
+        |              "appendedFiles" : null
         |            },
         |            "kind" : "HDFS"
         |          },
@@ -166,8 +180,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         Seq("rootpath"),
         Hdfs(Hdfs.Properties(Content(
           Directory("", Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)), Seq())),
-          Seq("file:/rootpath/f3"),
-          Seq("file:/rootpath/f1"))),
+          None,
+          Some(Content(Directory("", Seq(FileInfo("f1", 10, 10))))))),
         "schema",
         "type",
         Map())),

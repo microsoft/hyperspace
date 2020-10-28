@@ -17,11 +17,16 @@
 package com.microsoft.hyperspace.util
 
 /**
+ * A cache object that stores both initial and final value.
+ * The initial value is produced by 'init' and the final value is produced by 'transform'
+ * using the initial value.
  *
- * @param init
- * @param transform
- * @tparam A
- * @tparam B
+ * The cached initial/final values will be updated only if the initial value is modified.
+ *
+ * @param init Function to produce an initial value.
+ * @param transform Function to transform the initial value.
+ * @tparam A Type of the initial value.
+ * @tparam B Type of the final value.
  */
 class CacheWithTransform[A, B](val init: () => A, val transform: A => B) {
   private var initValue: A = _

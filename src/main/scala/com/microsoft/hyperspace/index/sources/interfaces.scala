@@ -71,17 +71,17 @@ trait FileBasedSourceProvider extends SourceProvider {
   def createRelation(logicalRelation: LogicalRelation): Option[Relation]
 
   /**
-   * Reconstructs [[DataFrame]] using the given [[Relation]].
+   * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
    *
    * This API is used when an index is refreshed.
    *
    * If the given relation does not belong to this provider, None should be returned.
    *
    * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
-   * @return [[DataFrame]] object if the given 'relation' can be processed by this provider.
+   * @return [[Relation]] object if the given 'relation' can be processed by this provider.
    *         Otherwise, None.
    */
-  def reconstructDataFrame(relation: Relation): Option[DataFrame]
+  def refreshRelation(relation: Relation): Option[Relation]
 
   /**
    * Computes the signature using the given [[LogicalRelation]].
