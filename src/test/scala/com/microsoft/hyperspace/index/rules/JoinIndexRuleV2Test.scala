@@ -218,7 +218,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     val originalNodeCount = plan1.treeString.split("\n").length
     val updatedNodeCount = plan2.treeString.split("\n").length
 
-    if (originalNodeCount == updatedNodeCount) {
+    (originalNodeCount == updatedNodeCount) &&
       (0 until originalNodeCount).forall { i =>
         plan1(i) match {
           // For LogicalRelation, we just check if the updated also has LogicalRelation. If the
@@ -229,8 +229,6 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
           case node => node.simpleString.equals(plan2(i).simpleString)
         }
       }
-    } else {
-      false
     }
   }
 
