@@ -87,25 +87,24 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     //  See https://github.com/microsoft/hyperspace/issues/65.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val allCols = (joinCols ++ allReferencedCols.toSet).map(_.asInstanceOf[AttributeReference])
+    val allCols = (joinCols ++ allReferencedCols).map(_.asInstanceOf[AttributeReference])
 
     val allReqdCols =
       relation.outputSet
         .filter(c => contains(allCols, c.asInstanceOf[AttributeReference]))
         .map(_.name)
+    val joinColAttrs = joinCols.map((col: Attribute) => col.asInstanceOf[AttributeReference])
     val reqdIdxCols = relation.outputSet
-      .filter(
-        c =>
-          contains(
-            joinCols.map((col: Attribute) => col.asInstanceOf[AttributeReference]),
-            c.asInstanceOf[AttributeReference]))
+      .filter(c => contains(joinColAttrs, c.asInstanceOf[AttributeReference]))
       .map(_.name)
+      .toSet
 
     val usableIndexes = allIndexes
       .filter { index =>
-        index.config.indexedColumns.toSet.equals(reqdIdxCols.toSet) &&
-        allReqdCols.forall(
-          (index.config.indexedColumns ++ index.config.includedColumns).contains(_))
+        val indexConfigCols = index.config.indexedColumns ++ index.config.includedColumns
+
+        index.config.indexedColumns.toSet.equals(reqdIdxCols) &&
+        allReqdCols.forall(indexConfigCols.contains(_))
       }
 
     usableIndexes match {
@@ -119,9 +118,9 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
   }
 
   private def updatePlan(join: Join): Join = {
-    val newLeft: LogicalPlan = updateIfSupported(join.left, join.condition.get)
-    val newRight: LogicalPlan = updateIfSupported(join.right, join.condition.get)
-    join.copy(left = newLeft, right = newRight)
+    join.copy(
+      left = updateIfSupported(join.left, join.condition.get),
+      right = updateIfSupported(join.right, join.condition.get))
   }
 
   private def updateIfSupported(plan: LogicalPlan, condition: Expression): LogicalPlan = {
@@ -167,7 +166,10 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
   }
 
   private def isBroadcastJoin(l: LogicalPlan, r: LogicalPlan): Boolean = {
-    val broadcastThreshold: Long =
+    // This logic is picked from `JoinSelection.canBroadcast(logicalPlan)`. Please refer:
+    // https://github.com/apache/spark/blob/branch-2.4/sql/core/src/main/scala/org/apache/spark/
+    // sql/execution/SparkStrategies.scala#L150-L155.
+    val broadcastThreshold =
       SparkSession.getActiveSession.get.conf
         .get("spark.sql.autoBroadcastJoinThreshold")
         .toLong
