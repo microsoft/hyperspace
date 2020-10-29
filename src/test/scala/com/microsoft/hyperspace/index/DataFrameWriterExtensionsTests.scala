@@ -22,7 +22,7 @@ import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
 import org.apache.spark.sql.execution.datasources.BucketingUtils
@@ -67,16 +67,20 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
   /**
    * An internal wrapper method for testing bucketing.
    */
-  private def testInternal(numBuckets: Int, bucketByCols: Seq[String]): Unit = {
+  private def testInternal(
+      numBuckets: Int,
+      bucketByCols: Seq[String],
+      mode: SaveMode = SaveMode.Overwrite): Unit = {
     df.write
-      .saveWithBuckets(df, sampleDataBucketedLocation, numBuckets, bucketByCols)
+      .saveWithBuckets(df, sampleDataBucketedLocation, numBuckets, bucketByCols, mode)
 
     testBucketing(
       new File(sampleDataBucketedLocation),
       "parquet",
       numBuckets,
       bucketByCols,
-      bucketByCols)
+      bucketByCols,
+      mode)
   }
 
   /**
@@ -92,7 +96,8 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
       source: String,
       numBuckets: Int,
       bucketCols: Seq[String],
-      sortCols: Seq[String] = Nil): Unit = {
+      sortCols: Seq[String] = Nil,
+      mode: SaveMode): Unit = {
     val allBucketFiles =
       dataDir.listFiles().filterNot(f => f.getName.startsWith(".") || f.getName.startsWith("_"))
 
@@ -143,7 +148,11 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
 
     // Check that the rows read back from all bucket files match the rows in the data frame.
     val allRowsInDataFrame = df.collect().toSeq
-    assert(allRowsInBucketFiles.length == allRowsInDataFrame.length)
+    if (mode.equals(SaveMode.Overwrite)) {
+      assert(allRowsInBucketFiles.length == allRowsInDataFrame.length)
+    } else if (mode.equals(SaveMode.Append)) {
+      assert(allRowsInBucketFiles.length == allRowsInDataFrame.length * 2)
+    }
     assert(
       allRowsInBucketFiles.forall(allRowsInDataFrame.contains(_)) && allRowsInDataFrame
         .forall(allRowsInBucketFiles.contains(_)))
@@ -161,5 +170,13 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
     val bucketByCols = Seq("clicks", "Query")
 
     testInternal(numBuckets, bucketByCols)
+  }
+
+  test("test of saveWithBuckets using Append mode") {
+    val numBuckets = 3
+    val bucketByCols = Seq("clicks", "Query")
+
+    testInternal(numBuckets, bucketByCols)
+    testInternal(numBuckets, bucketByCols, SaveMode.Append)
   }
 }

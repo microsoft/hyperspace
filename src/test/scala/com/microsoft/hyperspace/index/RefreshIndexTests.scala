@@ -22,9 +22,9 @@ import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
 import com.microsoft.hyperspace.TestUtils.logManager
-import com.microsoft.hyperspace.actions.{RefreshAppendAction, RefreshDeleteAction, RefreshIncrementalAction}
+import com.microsoft.hyperspace.actions.RefreshIncrementalAction
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
-import com.microsoft.hyperspace.telemetry.{RefreshAppendActionEvent, RefreshDeleteActionEvent, RefreshIncrementalActionEvent}
+import com.microsoft.hyperspace.telemetry.RefreshIncrementalActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
