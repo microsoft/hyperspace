@@ -23,9 +23,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.HyperspaceConf
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 
 /**
  * Join Index Rule V2. This rule tries to optimizes both sides of a shuffle based join
