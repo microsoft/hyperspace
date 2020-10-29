@@ -113,8 +113,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       case _ =>
         RuleUtils.getCandidateIndexes(spark, usableIndexes, relation) match {
           case Nil => relation
-          case candidateIndex :: _ =>
-            RuleUtils.transformPlanToUseIndex(spark, candidateIndex, relation, true)
+          case index +: _ => RuleUtils.transformPlanToUseIndex(spark, index, relation, true)
         }
     }
   }

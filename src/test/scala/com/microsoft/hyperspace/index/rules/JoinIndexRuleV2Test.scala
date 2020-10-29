@@ -183,8 +183,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
       val updatedPlan = JoinIndexRuleV2(originalPlan)
       assert(!updatedPlan.equals(originalPlan))
 
-      val indexPaths =
-        getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
+      val indexPaths = getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
       verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
     }
   }
@@ -192,12 +191,10 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
   test("Join rule updates sort merge join part of a plan with both smj and bhj.") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val bhjCondition = EqualTo(t2c1, t3c1)
-      val bhjJoin =
-        Join(t2ProjectNode, t3ProjectNode, JoinType("inner"), Some(bhjCondition))
+      val bhjJoin = Join(t2ProjectNode, t3ProjectNode, JoinType("inner"), Some(bhjCondition))
 
       val smjCondition = EqualTo(t1c1, t2c1)
-      val originalPlan =
-        Join(t1ProjectNode, bhjJoin, JoinType("inner"), Some(smjCondition))
+      val originalPlan = Join(t1ProjectNode, bhjJoin, JoinType("inner"), Some(smjCondition))
 
       val updatedPlan = JoinIndexRuleV2(originalPlan)
       assert(!updatedPlan.equals(originalPlan))
