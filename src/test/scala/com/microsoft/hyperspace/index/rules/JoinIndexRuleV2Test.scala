@@ -219,15 +219,14 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     val updatedNodeCount = plan2.treeString.split("\n").length
 
     (originalNodeCount == updatedNodeCount) &&
-      (0 until originalNodeCount).forall { i =>
-        plan1(i) match {
-          // For LogicalRelation, we just check if the updated also has LogicalRelation. If the
-          // updated plan uses index, the root paths will be different here.
-          case _: LogicalRelation => plan2(i).isInstanceOf[LogicalRelation]
+    (0 until originalNodeCount).forall { i =>
+      plan1(i) match {
+        // For LogicalRelation, we just check if the updated also has LogicalRelation. If the
+        // updated plan uses index, the root paths will be different here.
+        case _: LogicalRelation => plan2(i).isInstanceOf[LogicalRelation]
 
-          // For other node types, we compare exact matching between original and updated plans.
-          case node => node.simpleString.equals(plan2(i).simpleString)
-        }
+        // For other node types, we compare exact matching between original and updated plans.
+        case node => node.simpleString.equals(plan2(i).simpleString)
       }
     }
   }
