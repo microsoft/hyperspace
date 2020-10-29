@@ -226,12 +226,10 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       .run()
 
     {
-      // Check the index log entry after RefreshDeleteAction.
+      // Check the index log entry after RefreshIncrementalAction.
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 3)
       assert(indexLogEntry.deletedFiles.isEmpty)
-
-      // Check the index log entry after RefreshAppendAction.
       assert(indexLogEntry.appendedFiles.isEmpty)
 
       val files = indexLogEntry.relations.head.data.properties.content.files
@@ -251,7 +249,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       .run()
 
     {
-      // Check non-empty deletedFiles after RefreshAppendAction.
+      // Check non-empty deletedFiles after RefreshIncrementalAction.
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
       assert(indexLogEntry.deletedFiles.isEmpty)
       assert(indexLogEntry.appendedFiles.isEmpty)
@@ -264,8 +262,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Validate RefreshAppendAction updates appended and deleted files in metadata as " +
-      "expected, when some file gets deleted and some appended to source data.") {
+    "Validate RefreshIncrementalAction updates appended and deleted files in metadata "
+      + "expected, when some file gets deleted and some appended to source data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
