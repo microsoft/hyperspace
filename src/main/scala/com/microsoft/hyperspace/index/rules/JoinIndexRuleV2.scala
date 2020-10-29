@@ -23,9 +23,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 
 /**
  * Join Index Rule V2. This rule tries to optimizes both sides of a shuffle based join
@@ -108,16 +108,15 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
           (index.config.indexedColumns ++ index.config.includedColumns).contains(_))
       }
 
-    if (usableIndexes.isEmpty) {
-      return relation
+    usableIndexes match {
+      case Nil => relation
+      case _ =>
+        RuleUtils.getCandidateIndexes(spark, usableIndexes, relation) match {
+          case Nil => relation
+          case candidateIndex :: _ =>
+            RuleUtils.transformPlanToUseIndex(spark, candidateIndex, relation, true)
+        }
     }
-
-    val candidateIndexes = RuleUtils.getCandidateIndexes(spark, usableIndexes, relation)
-    if (candidateIndexes.isEmpty) {
-      return relation
-    }
-
-    RuleUtils.transformPlanToUseIndex(spark, candidateIndexes.head, relation, true)
   }
 
   private def updatePlan(join: Join): Join = {
@@ -141,16 +140,12 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
       case _ => false
     }
 
-    if (eligibleBaseRelations.length != 1) {
-      return plan
+    eligibleBaseRelations match {
+      case Seq(r: LogicalRelation)
+          if r.output.toSet.count(c => contains(joinCols, c)) * 2 != joinCols.size =>
+        updateIndex(plan, joinCols, plan.output)
+      case _ => plan
     }
-
-    val eligibleRelation = eligibleBaseRelations.head.asInstanceOf[LogicalRelation]
-    if (eligibleRelation.output.toSet.count(c => contains(joinCols, c)) * 2 != joinCols.size) {
-      return plan
-    }
-
-    updateIndex(plan, joinCols, plan.output)
   }
 
   private def updateIndex(
