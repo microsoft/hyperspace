@@ -124,10 +124,10 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     t2FilterNode = Filter(IsNotNull(t2c1), t2ScanNode)
     t3FilterNode = Filter(IsNotNull(t3c1), t3ScanNode)
 
-    t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
     // Project [t1c1#0, t1c3#2]
     //  +- Filter isnotnull(t1c1#0)
     //   +- Relation[t1c1#0,t1c2#1,t1c3#2,t1c4#3] parquet
+    t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
 
     t2ProjectNode = Project(Seq(t2c1, t2c3), t2FilterNode)
     // Project [t2c1#4, t2c3#6]
