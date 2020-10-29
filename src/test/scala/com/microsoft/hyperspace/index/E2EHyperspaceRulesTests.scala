@@ -387,10 +387,9 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
     spark.enableHyperspace()
     val dfWithHyperspaceEnabled = query(df)
 
-    assert(
-      queryPlanHasExpectedRootPaths(
-        dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
-        getIndexFilesPath(indexConfig.indexName)))
+    verifyQueryPlanHasExpectedRootPaths(
+      dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
+      getIndexFilesPath(indexConfig.indexName))
 
     assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
     assert(sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))
@@ -398,10 +397,9 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
     spark.disableHyperspace()
     val dfAfterHyperspaceDisabled = query(df)
 
-    assert(
-      queryPlanHasExpectedRootPaths(
-        dfAfterHyperspaceDisabled.queryExecution.optimizedPlan,
-        rootPathsWithHyperspaceDisabled))
+    verifyQueryPlanHasExpectedRootPaths(
+      dfAfterHyperspaceDisabled.queryExecution.optimizedPlan,
+      rootPathsWithHyperspaceDisabled)
 
     assert(schemaWithHyperspaceDisabled.equals(dfAfterHyperspaceDisabled.schema))
     assert(
@@ -582,17 +580,15 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
   }
 
   /**
-   * Check that if the query plan has the expected rootPaths.
+   * Verify that the query plan has the expected rootPaths.
    *
    * @param optimizedPlan the optimized query plan.
    * @param expectedPaths the expected paths in the query plan.
-   * @return has or not.
    */
-  private def queryPlanHasExpectedRootPaths(
+  private def verifyQueryPlanHasExpectedRootPaths(
       optimizedPlan: LogicalPlan,
-      expectedPaths: Seq[Path]): Boolean = {
+      expectedPaths: Seq[Path]): Unit = {
     assert(getAllRootPaths(optimizedPlan) === expectedPaths)
-    getAllRootPaths(optimizedPlan).equals(expectedPaths)
   }
 
   /**
@@ -641,10 +637,9 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
     spark.enableHyperspace()
     val dfWithHyperspaceEnabled = f()
 
-    assert(
-      queryPlanHasExpectedRootPaths(
-        dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
-        expectedRootPaths))
+    verifyQueryPlanHasExpectedRootPaths(
+      dfWithHyperspaceEnabled.queryExecution.optimizedPlan,
+      expectedRootPaths)
 
     assert(schemaWithHyperspaceDisabled.equals(dfWithHyperspaceEnabled.schema))
     assert(sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfWithHyperspaceEnabled)))

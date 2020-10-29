@@ -72,7 +72,7 @@ class RefreshIncrementalAction(
         spark.read
           .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
           .filter(
-            !col(s"${IndexConstants.DATA_FILE_NAME_COLUMN}").isin(deletedFiles.map(_.name): _*))
+            !col(IndexConstants.DATA_FILE_NAME_COLUMN).isin(deletedFiles.map(_.name): _*))
 
       // Write refreshed data using Append mode if there are index data files from appended files.
       val writeMode = if (appendedFiles.nonEmpty) {

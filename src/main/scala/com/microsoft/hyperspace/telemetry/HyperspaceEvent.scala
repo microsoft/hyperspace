@@ -107,7 +107,7 @@ case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
 
 /**
  * Index Refresh Event for incremental mode. Emitted when refresh is called on an index
- * with config flag set to create index for appended source data files.
+ * with "incremental" mode to handle appended/deleted source data files.
  *
  * @param appInfo AppInfo for spark application.
  * @param index Related index.

@@ -71,8 +71,7 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
       numBuckets: Int,
       bucketByCols: Seq[String],
       mode: SaveMode = SaveMode.Overwrite): Unit = {
-    df.write
-      .saveWithBuckets(df, sampleDataBucketedLocation, numBuckets, bucketByCols, mode)
+    df.write.saveWithBuckets(df, sampleDataBucketedLocation, numBuckets, bucketByCols, mode)
 
     testBucketing(
       new File(sampleDataBucketedLocation),

@@ -51,7 +51,7 @@ object DataFrameWriterExtensions {
         path: String,
         numBuckets: Int,
         bucketByColNames: Seq[String],
-        mode: SaveMode = SaveMode.Overwrite): Unit = {
+        mode: SaveMode): Unit = {
       require(numBuckets > 0, "The number of buckets must be a positive integer.")
 
       runCommand(df.sparkSession) {

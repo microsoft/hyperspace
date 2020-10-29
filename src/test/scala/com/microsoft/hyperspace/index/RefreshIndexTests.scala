@@ -262,8 +262,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "Validate RefreshIncrementalAction updates appended and deleted files in metadata "
-      + "expected, when some file gets deleted and some appended to source data.") {
+    "Validate RefreshIncrementalAction updates appended and deleted files in metadata " +
+      "expected, when some file gets deleted and some appended to source data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
