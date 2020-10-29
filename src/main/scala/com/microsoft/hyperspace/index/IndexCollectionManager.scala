@@ -68,8 +68,7 @@ class IndexCollectionManager(
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
       if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
-        new RefreshDeleteAction(spark, logManager, dataManager).run()
-        new RefreshAppendAction(spark, logManager, dataManager).run()
+        new RefreshIncrementalAction(spark, logManager, dataManager).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager).run()
       } else {
