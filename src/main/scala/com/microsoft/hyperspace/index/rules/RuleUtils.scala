@@ -122,21 +122,6 @@ object RuleUtils {
   }
 
   /**
-   * Extract the LogicalRelation node if the given logical plan is linear.
-   *
-   * @param logicalPlan given logical plan to extract LogicalRelation from.
-   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
-   */
-  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
-    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
-    if (lrs.length == 1) {
-      Some(lrs.head)
-    } else {
-      None // logicalPlan is non-linear or it has no LogicalRelation.
-    }
-  }
-
-  /**
    * Check if an index was applied the given relation or not.
    * This can be determined by an identifier in options field of HadoopFsRelation.
    *
@@ -179,6 +164,21 @@ object RuleUtils {
     }
     assert(!transformed.equals(plan))
     transformed
+  }
+
+  /**
+   * Extract the LogicalRelation node if the given logical plan is linear.
+   *
+   * @param logicalPlan given logical plan to extract LogicalRelation from.
+   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
+   */
+  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
+    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
+    if (lrs.length == 1) {
+      Some(lrs.head)
+    } else {
+      None // logicalPlan is non-linear or it has no LogicalRelation.
+    }
   }
 
   /**
@@ -270,9 +270,7 @@ object RuleUtils {
             // Append-only implementation of getting appended files for efficiency.
             // It is guaranteed that there is no deleted files via the condition
             // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
-            (
-              Nil,
-              curFiles.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
+            (Nil, curFiles.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
           }
 
         val filesToRead = {

@@ -17,19 +17,19 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.util.FileUtils
 
 class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite {
 
+  // Test cases in HybridScanTest will be executed with indexes on partitioned data sources.
   override def beforeAll(): Unit = {
     super[HyperspaceSuite].beforeAll()
     import spark.implicits._
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     hyperspace = new Hyperspace(spark)
-    fileFormat = "parquet"
-    fileFormat2 = "json"
 
     FileUtils.delete(new Path(sampleDataLocationRoot))
     dfFromSample.write
@@ -100,4 +100,148 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
         deleteCnt = 2)
     }
   }
+
+  test("Verify Hybrid Scan for newly added partition after index creation.") {
+    withTempPathAsString { testPath =>
+      import spark.implicits._
+      val (testData, appendData) = sampleData.partition(_._1 != "2019-10-03")
+      assert(testData.nonEmpty)
+      assert(appendData.nonEmpty)
+      testData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .format(fileFormat)
+        .save(testPath)
+
+      val df = spark.read.format(fileFormat).load(testPath)
+      hyperspace.createIndex(df, IndexConfig("indexName", Seq("Date"), Seq("clicks")))
+      def filterQuery(df: DataFrame): DataFrame = {
+        df.filter(df("Date") > "2000-01-01").select(df("clicks"))
+      }
+      withIndex("indexName") {
+        // Check the index is applied regardless of Hybrid Scan config.
+        {
+          spark.disableHyperspace()
+          val baseQuery = filterQuery(df)
+          val basePlan = baseQuery.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val filter = filterQuery(df)
+            assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+            val filter = filterQuery(df)
+            assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+        }
+
+        // Append data creating new partition.
+        appendData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .write
+          .partitionBy("Date")
+          .mode("append")
+          .format(fileFormat)
+          .save(testPath)
+
+        {
+          // Check the index is applied with newly added partition using Hybrid Scan.
+          val df = spark.read.format(fileFormat).load(testPath)
+          spark.disableHyperspace()
+          val baseQuery = filterQuery(df)
+          val basePlan = baseQuery.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val filter = filterQuery(df)
+            assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+            val filter = filterQuery(df)
+            assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+        }
+      }
+    }
+  }
+
+  test("Verify Hybrid Scan for partitioned source data with user specified basePath.") {
+    withTempPathAsString { testPath =>
+      import spark.implicits._
+      val (testData, appendData) = sampleData.partition(_._1 != "2019-10-03")
+      assert(testData.nonEmpty)
+      assert(appendData.nonEmpty)
+      testData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .format(fileFormat)
+        .save(testPath)
+
+      // Create an index only for "Data=2017-09-03" partition.
+      val indexSourcePath = testPath + "/Date=2017-09-03"
+      val df = spark.read.format(fileFormat).option("basePath", testPath).load(indexSourcePath)
+      hyperspace.createIndex(df, IndexConfig("indexName", Seq("Date"), Seq("clicks")))
+      def filterQuery(df: DataFrame): DataFrame = {
+        df.filter(df("Date") > "2000-01-01").select(df("clicks"))
+      }
+
+      withIndex("indexName") {
+        // Check the index is applied regardless of Hybrid Scan config.
+        {
+          spark.disableHyperspace()
+          val baseQuery = filterQuery(df)
+          val basePlan = baseQuery.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val filter = filterQuery(df)
+            assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+            val filter = filterQuery(df)
+            assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+        }
+
+        // Append data creating new partition.
+        appendData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .write
+          .partitionBy("Date")
+          .mode("append")
+          .format(fileFormat)
+          .save(testPath)
+
+        {
+          // Check the index is applied with newly added partition using Hybrid Scan.
+          val df = spark.read.format(fileFormat).option("basePath", testPath).load(testPath)
+          spark.disableHyperspace()
+          val baseQuery = filterQuery(df)
+          val basePlan = baseQuery.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val filter = filterQuery(df)
+            assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+            val filter = filterQuery(df)
+            assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+            checkAnswer(baseQuery, filter)
+          }
+        }
+      }
+    }
+  }
+
 }

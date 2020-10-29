@@ -47,42 +47,24 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   protected val sampleDataFormat2Append = sampleDataLocationRoot + "sample7"
   protected val sampleDataFormat2Delete = sampleDataLocationRoot + "sample8"
   var hyperspace: Hyperspace = _
-  var fileFormat = ""
-  var fileFormat2 = ""
-  var indexScanWithAppendFilesExpected = false
 
-  // Creates an index with given 'df' and 'indexConfig'. Then copies the first 'appendCnt'
-  // number of input files from 'df' and deletes the last 'deleteCnt' of the input files.
-  def setupIndexAndChangeData(
-      sourceFileFormat: String,
-      dataPath: String,
-      indexConfig: IndexConfig,
-      appendCnt: Int,
-      deleteCnt: Int): Unit = {
-    val df = spark.read.format(sourceFileFormat).load(dataPath)
-    hyperspace.createIndex(df, indexConfig)
-    val inputFiles = df.inputFiles
-    assert(appendCnt + deleteCnt < inputFiles.length)
+  // Introduce fileFormat to support "delta" format soon.
+  val fileFormat = "parquet"
+  val fileFormat2 = "json"
 
-    val fs = systemPath.getFileSystem(new Configuration)
-    for (i <- 0 until appendCnt) {
-      val sourcePath = new Path(inputFiles(i))
-      val destPath = new Path(inputFiles(i) + ".copy")
-      fs.copyToLocalFile(sourcePath, destPath)
-    }
-    for (i <- 1 to deleteCnt) {
-      fs.delete(new Path(inputFiles(inputFiles.length - i)), false)
-    }
-  }
+  // This flag is for testing plan transformation if appended files could be load with index data
+  // scan node.
+  // For now, it's applied for a very specific case: FilterIndexRule, Parquet source format,
+  // no partitioning, no deleted files. This is false by default and will be changed to true if
+  // the test is required.
+  var indexDataScanWithAppendedFilesExpected = false
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     import spark.implicits._
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     hyperspace = new Hyperspace(spark)
-    fileFormat = "parquet"
-    fileFormat2 = "json"
-    indexScanWithAppendFilesExpected = true
+    indexDataScanWithAppendedFilesExpected = true
 
     FileUtils.delete(new Path(sampleDataLocationRoot))
     dfFromSample.write.format(fileFormat).save(sampleDataFormatAppend)
@@ -145,6 +127,31 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  // Construct a df with `sourceFileFormat` and `sourcePath` and create an index with the df and
+  // given 'indexConfig'. Then copies the first 'appendCnt' number of input files from 'df' and
+  // deletes the last 'deleteCnt' of the input files.
+  def setupIndexAndChangeData(
+      sourceFileFormat: String,
+      sourcePath: String,
+      indexConfig: IndexConfig,
+      appendCnt: Int,
+      deleteCnt: Int): Unit = {
+    val df = spark.read.format(sourceFileFormat).load(sourcePath)
+    hyperspace.createIndex(df, indexConfig)
+    val inputFiles = df.inputFiles
+    assert(appendCnt + deleteCnt < inputFiles.length)
+
+    val fs = systemPath.getFileSystem(new Configuration)
+    for (i <- 0 until appendCnt) {
+      val sourcePath = new Path(inputFiles(i))
+      val destPath = new Path(inputFiles(i) + ".copy")
+      fs.copyToLocalFile(sourcePath, destPath)
+    }
+    for (i <- 1 to deleteCnt) {
+      fs.delete(new Path(inputFiles(inputFiles.length - i)), false)
+    }
+  }
+
   before {
     spark.enableHyperspace()
   }
@@ -161,7 +168,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: filter index & parquet format, " +
       "index relation should include appended file paths") {
-    assume(indexScanWithAppendFilesExpected)
+    assume(indexDataScanWithAppendedFilesExpected)
     val df = spark.read.format(fileFormat).load(sampleDataFormatAppend)
     def filterQuery: DataFrame =
       df.filter(df("clicks") <= 2000).select(df("query"))
@@ -272,11 +279,15 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               p
             case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
               // Check filter pushed down properly.
-              assert(
-                (dataFilters.toString.contains(" >= 2000)") &&
-                  dataFilters.toString.contains(" <= 4000)")) ||
-                  (partitionFilters.toString.contains(" >= 2000)") &&
-                    partitionFilters.toString.contains(" <= 4000)")))
+              if (partitionFilters.nonEmpty) {
+                assert(
+                  partitionFilters.toString.contains(" >= 2000)") && partitionFilters.toString
+                    .contains(" <= 4000)"))
+              } else {
+                assert(
+                  dataFilters.toString.contains(" >= 2000)") && dataFilters.toString.contains(
+                    " <= 4000)"))
+              }
               p
           }
           assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === 2)
@@ -349,8 +360,9 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             p
           case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
             // Check filter pushed down properly.
-            assert(dataFilters.toString.contains(" <= 2000)") ||
-              partitionFilters.toString.contains(" <= 2000)"))
+            assert(
+              dataFilters.toString.contains(" <= 2000)") ||
+                partitionFilters.toString.contains(" <= 2000)"))
             p
         }
         assert(execNodes.count(_.isInstanceOf[UnionExec]) === 1)
