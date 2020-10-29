@@ -142,7 +142,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
 
     eligibleBaseRelations match {
       case Seq(r: LogicalRelation)
-          if r.output.toSet.count(c => contains(joinCols, c)) * 2 != joinCols.size =>
+          if r.output.toSet.count(c => contains(joinCols, c)) * 2 == joinCols.size =>
         updateIndex(plan, joinCols, plan.output)
       case _ => plan
     }
