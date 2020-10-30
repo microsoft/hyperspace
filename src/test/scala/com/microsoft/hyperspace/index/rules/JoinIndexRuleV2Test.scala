@@ -91,7 +91,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
       }
 
     val t2Location =
-      new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t1Schema), NoopCache) {
+      new InMemoryFileIndex(spark, Seq(new Path("t2")), Map.empty, Some(t2Schema), NoopCache) {
         // Update allFiles() so that length of files is greater than spark's broadcast threshold.
         override def allFiles(): Seq[FileStatus] = {
           val length = spark.conf
@@ -102,7 +102,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
       }
 
     val t3Location =
-      new InMemoryFileIndex(spark, Seq(new Path("t3")), Map.empty, Some(t1Schema), NoopCache) {
+      new InMemoryFileIndex(spark, Seq(new Path("t3")), Map.empty, Some(t3Schema), NoopCache) {
         // Update allFiles() so that length of files is less than spark's broadcast threshold.
         override def allFiles(): Seq[FileStatus] = {
           val length = spark.conf
@@ -120,19 +120,21 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     t2ScanNode = LogicalRelation(t2Relation, Seq(t2c1, t2c2, t2c3, t2c4), None, false)
     t3ScanNode = LogicalRelation(t3Relation, Seq(t3c1, t3c2, t3c3, t3c4), None, false)
 
-    t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
+    t1FilterNode = Filter(And(IsNotNull(t1c1), IsNotNull(t1c2)), t1ScanNode)
     t2FilterNode = Filter(And(IsNotNull(t2c1), IsNotNull(t2c2)), t2ScanNode)
     t3FilterNode = Filter(IsNotNull(t3c1), t3ScanNode)
 
-    t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
+    t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
 
     t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
     t3ProjectNode = Project(Seq(t3c2, t3c3), t3FilterNode)
 
-    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c2, t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
     createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c2, t2c3), t2ProjectNode)
     createIndexLogEntry("t2i2", Seq(t2c2), Seq(t2c1, t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i3", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
     createIndexLogEntry("t3i1", Seq(t3c2), Seq(t3c3), t3ProjectNode)
   }
 
@@ -201,6 +203,38 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
       val indexPaths =
         getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
       verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths ++ Seq(new Path("t3")))
+    }
+  }
+
+  test("Join rule doesn't update plan for multi-column joins if columns aren't one-to-one" +
+    " matched.") {
+    // Test Setup:
+    //      SMJ(t1c1 = t2c1 and t1c1 = t2c2)
+    //     /   \
+    //   t1    t2
+    withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
+      val condition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1, t2c2))
+      val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(condition))
+
+      val updatedPlan = JoinIndexRuleV2(originalPlan)
+      assert(updatedPlan.equals(originalPlan))
+    }
+  }
+
+  test("Join rule updates plan for multi-column joins if columns are one-to-one matched.") {
+    // Test Setup:
+    //      SMJ(t1c1 = t2c1 and t1c2 = t2c2)
+    //     /   \
+    //   t1    t2
+    withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
+      val condition = And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2))
+      val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(condition))
+
+      val updatedPlan = JoinIndexRuleV2(originalPlan)
+      assert(!updatedPlan.equals(originalPlan))
+
+      val indexPaths = getIndexDataFilesPaths("t1i2") ++ getIndexDataFilesPaths("t2i3")
+      verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
     }
   }
 
