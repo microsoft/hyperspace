@@ -25,6 +25,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
+import com.microsoft.hyperspace.TestUtils.basePaths
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -268,16 +269,5 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
         case node => node.simpleString.equals(plan2(i).simpleString)
       }
     }
-  }
-
-  /** Returns base relation paths for a logical plan. */
-  private def basePaths(plan: LogicalPlan): Seq[Path] = {
-    plan
-      .collectLeaves()
-      .collect {
-        case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
-          location.rootPaths
-      }
-      .flatten
   }
 }

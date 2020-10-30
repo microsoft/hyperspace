@@ -35,6 +35,21 @@ import com.microsoft.hyperspace.util.HyperspaceConf
 object RuleUtils {
 
   /**
+   * Check if the candidate plan is already modified by Hyperspace or not.
+   * This can be determined by an identifier in options field of HadoopFsRelation.
+   *
+   * @param plan Logical plan.
+   * @return true if the relation in the plan is modified by Hyperspace.
+   */
+  private[rules] def isPlanModified(plan: LogicalPlan): Boolean = {
+    plan.find {
+      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+        RuleUtils.isIndexApplied(fsRelation)
+      case _ => false
+    }.isDefined
+  }
+
+  /**
    * Filter the given candidate indexes by matching signatures and index status.
    * If Hybrid Scan is enabled, it compares the file metadata directly, and does not
    * match signatures. By doing that, we could perform file-level comparison between

@@ -26,6 +26,7 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.rules.JoinIndexRule.extractConditions
+import com.microsoft.hyperspace.index.rules.RuleUtils.isPlanModified
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
@@ -139,9 +140,9 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
     require(condition.references.forall(_.isInstanceOf[AttributeReference]))
     val joinCols =
-      extractConditions(condition).flatMap(_.references.map(_.asInstanceOf[AttributeReference]))
+      extractConditions(condition).flatMap(_.children.map(_.asInstanceOf[AttributeReference]))
     val eligibleBaseRelations = plan.collectLeaves().filter {
-      case relation: LogicalRelation => relation.output.exists(contains(joinCols, _))
+      case r: LogicalRelation if !isPlanModified(r) => r.output.exists(contains(joinCols, _))
       case _ => false
     }
 
