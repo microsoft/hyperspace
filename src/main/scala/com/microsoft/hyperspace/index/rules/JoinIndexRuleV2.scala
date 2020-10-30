@@ -42,6 +42,9 @@ import com.microsoft.hyperspace.util.HyperspaceConf
  *       "spark.sql.autoBroadcastJoinThreshold".
  * 2. Independently check left and right sides of the join for available indexes. If an index
  *    is picked, the shuffle on that side will be eliminated.
+ *
+ * TODO: Investigate prioritization of this rule w.r.t. [[JoinIndexRule]].
+ *  https://github.com/microsoft/hyperspace/issues/236.
  */
 object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSession {
   def apply(plan: LogicalPlan): LogicalPlan = {
