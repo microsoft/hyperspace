@@ -117,6 +117,17 @@ case class RefreshIncrementalActionEvent(appInfo: AppInfo, index: IndexLogEntry,
   extends HyperspaceIndexCRUDEvent
 
 /**
+ * Index Refresh Event for quick mode. Emitted when refresh is called on an index
+ * with "quick" mode to update index metadata only for appended/deleted source data files.
+ *
+ * @param appInfo AppInfo for spark application.
+ * @param index Related index.
+ * @param message Message about event.
+ */
+case class RefreshQuickActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+  extends HyperspaceIndexCRUDEvent
+
+/**
  * Index Optimize Event for index files.
  *
  * @param appInfo AppInfo for spark application.

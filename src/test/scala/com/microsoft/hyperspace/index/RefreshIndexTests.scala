@@ -22,7 +22,7 @@ import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
 import com.microsoft.hyperspace.TestUtils.logManager
-import com.microsoft.hyperspace.actions.RefreshIncrementalAction
+import com.microsoft.hyperspace.actions.{RefreshIncrementalAction, RefreshQuickAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.RefreshIncrementalActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
@@ -382,6 +382,67 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
       assert(!indexLogEntry.hasLineageColumn(spark))
       assert(indexLogEntry.numBuckets === 20)
+    }
+  }
+
+  test(
+    "Validate RefreshQuickAction updates appended and deleted files in metadata " +
+      "expected, when some file gets deleted and some appended to source data.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val df = spark.read.parquet(testPath)
+          hyperspace.createIndex(df, indexConfig)
+
+          val oldFiles = listFiles(testPath).toSet
+
+          // Delete one source data file.
+          deleteOneDataFile(testPath)
+
+          // Add some new data to source.
+          import spark.implicits._
+          SampleData.testData
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+            .write
+            .mode("append")
+            .parquet(testPath)
+
+          val prevIndexLogEntry = getLatestStableLog(indexConfig.indexName)
+
+          val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
+          new RefreshQuickAction(
+            spark,
+            IndexLogManagerFactoryImpl.create(indexPath),
+            IndexDataManagerFactoryImpl.create(indexPath))
+            .run()
+
+          val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+          val latestFiles = listFiles(testPath).toSet
+          val expectedDeletedFiles = oldFiles -- latestFiles
+          val expectedAppendedFiles = latestFiles -- oldFiles
+
+          val signatureProvider = LogicalPlanSignatureProvider.create()
+          val latestDf = spark.read.parquet(testPath)
+          val expectedLatestSignature =
+            signatureProvider.signature(latestDf.queryExecution.optimizedPlan).get
+
+          // Check `Update` is collected properly.
+          assert(indexLogEntry.sourceUpdate.isDefined)
+          assert(
+            indexLogEntry.sourceUpdate.get.latestSignatures.head.value
+              == expectedLatestSignature)
+          assert(indexLogEntry.appendedFiles === expectedAppendedFiles)
+          assert(indexLogEntry.deletedFiles === expectedDeletedFiles)
+
+          // Check index data files and source data files are not updated.
+          assert(
+            indexLogEntry.relations.head.data.properties.content.fileInfos
+              === prevIndexLogEntry.relations.head.data.properties.content.fileInfos)
+          assert(indexLogEntry.content.fileInfos === prevIndexLogEntry.content.fileInfos)
+        }
+      }
     }
   }
 
