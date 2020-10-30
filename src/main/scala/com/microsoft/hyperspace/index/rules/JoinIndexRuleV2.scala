@@ -138,6 +138,9 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     // from right. This would be by default true. Nothing to do in this part. Let's say A,B
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
+    //
+    // TODO: Improve this algorithm based on whether number of buckets for an index match
+    //  "spark.sql.shuffle.partitions". Refer https://github.com/microsoft/hyperspace/issues/237.
     require(condition.references.forall(_.isInstanceOf[AttributeReference]))
     val joinCols =
       extractConditions(condition).flatMap(_.children.map(_.asInstanceOf[AttributeReference]))
