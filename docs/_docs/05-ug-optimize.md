@@ -19,6 +19,11 @@ index which has many index files, due to incremental refresh call(s). This is ac
 if possible, and replacing them with fewer larger files that capture exact same index records. This process is similar to
 compaction in append-only log structured merge index structures.
 
+One important point is that `optimizeIndex` differs from `refreshIndex` in the sense that `optimizeIndex` is an index-only operation.
+Unlike `refreshIndex`, when `optimizeIndex` is running on an index, it does not look at the current state of the source data files.
+If there were any source data file changes after last refresh, `optimizeIndex` will not apply those data changes
+to the index files.
+
 You should note that the `optimizeIndex` command is a best effort to modify index files layout and its
 final outcome depends on how index records are stored in existing index files.
 Two or more index files can be merged with each other, if and only if they all have index records which belong to the
@@ -65,10 +70,6 @@ Hyperspace does a full scan on current index content and identifies groups of in
 to the same bucket according to the index configuration. It then replaces each group with a single index file created through
 merging all the files in that group together. This mode tries to achieve the best query performance improvement via a
 potentially slow optimize index process.
-You should note that `optimizeIndex` differs from `refreshIndex` in the sense that `optimizeIndex` is an index-only operation.
-Unlike `refreshIndex`, when `optimizeIndex` is running on an index, it does not look at the current state of the source data files.
-If there were any source data file changes after index creation or last refresh, `optimizeIndex` will not apply those data changes
-to the index files.
 
 Assume you have an index with the name `empIndex`. After adding some source data files to the dataset `empIndex` is created on
 and refreshing it in the incremental mode, you can optimize `empIndex` in the full mode as below:
