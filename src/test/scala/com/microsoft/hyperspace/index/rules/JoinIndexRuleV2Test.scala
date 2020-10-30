@@ -121,30 +121,19 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     t3ScanNode = LogicalRelation(t3Relation, Seq(t3c1, t3c2, t3c3, t3c4), None, false)
 
     t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
-    t2FilterNode = Filter(IsNotNull(t2c1), t2ScanNode)
+    t2FilterNode = Filter(And(IsNotNull(t2c1), IsNotNull(t2c2)), t2ScanNode)
     t3FilterNode = Filter(IsNotNull(t3c1), t3ScanNode)
 
-    // Project [t1c1#0, t1c3#2]
-    //  +- Filter isnotnull(t1c1#0)
-    //   +- Relation[t1c1#0,t1c2#1,t1c3#2,t1c4#3] parquet
     t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
 
-    t2ProjectNode = Project(Seq(t2c1, t2c3), t2FilterNode)
-    // Project [t2c1#4, t2c3#6]
-    //  +- Filter isnotnull(t2c1#4)
-    //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
+    t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
-    t3ProjectNode = Project(Seq(t3c1, t3c3), t3FilterNode)
-    // Project [t3c1#4, t3c3#6]
-    //  +- Filter isnotnull(t3c1#4)
-    //   +- Relation[t3c1#4,t3c2#5,t3c3#6,t3c4#7] parquet
+    t3ProjectNode = Project(Seq(t3c2, t3c3), t3FilterNode)
 
     createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
-    createIndexLogEntry("t3i1", Seq(t3c1), Seq(t3c3), t3ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c2, t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c2), Seq(t2c1, t2c3), t2ProjectNode)
+    createIndexLogEntry("t3i1", Seq(t3c2), Seq(t3c3), t3ProjectNode)
   }
 
   before {
@@ -175,7 +164,9 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     }
   }
 
-  test("Join rule works if indexes exist and configs are set correctly") {
+  test(
+    "Join rule updates sort merge join part of a plan if indexes exist and configs are set" +
+      " correctly") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val joinCondition = EqualTo(t1c1, t2c1)
       val originalPlan =
@@ -189,8 +180,16 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
   }
 
   test("Join rule updates sort merge join part of a plan with both smj and bhj.") {
+    // Test Setup:
+    //      SMJ(t1c1 = t2c1)
+    //     /   \
+    //   t1    BHJ(t2c2 = t3c2)
+    //        /   \
+    //       t2   t3
+    // When V2 is run, this should optimize indexes for t1 and t2 based on join condition in SMJ
+    // and ignore the BHJ.
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
-      val bhjCondition = EqualTo(t2c1, t3c1)
+      val bhjCondition = EqualTo(t2c2, t3c2)
       val bhjJoin = Join(t2ProjectNode, t3ProjectNode, JoinType("inner"), Some(bhjCondition))
 
       val smjCondition = EqualTo(t1c1, t2c1)
