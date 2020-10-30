@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -92,7 +92,8 @@ class OptimizeAction(
       repartitionedDf,
       indexDataPath.toString,
       logEntry.asInstanceOf[IndexLogEntry].numBuckets,
-      indexConfig.indexedColumns)
+      indexConfig.indexedColumns,
+      SaveMode.Overwrite)
   }
 
   override def validate(): Unit = {

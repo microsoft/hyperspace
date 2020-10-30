@@ -315,7 +315,7 @@ object RuleUtils {
         val newSchema = StructType(
           index.schema.filter(s =>
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
-              IndexConstants.DATA_FILE_NAME_COLUMN))))
+              IndexConstants.DATA_FILE_NAME_ID))))
 
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = HadoopFsRelation(
@@ -332,7 +332,7 @@ object RuleUtils {
         if (filesDeleted.isEmpty) {
           baseRelation.copy(relation = relation, output = updatedOutput)
         } else {
-          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, LongType)()
+          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_ID, LongType)()
           val deletedFileNames = filesDeleted.map(f => Literal(f.id)).toArray
           val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))

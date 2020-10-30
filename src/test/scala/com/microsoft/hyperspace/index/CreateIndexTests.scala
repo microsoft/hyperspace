@@ -166,7 +166,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)
+            Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }
 
@@ -181,7 +181,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN) ++ partitionKeys).sorted)
+            Seq(IndexConstants.DATA_FILE_NAME_ID) ++ partitionKeys).sorted)
     }
   }
 
@@ -196,7 +196,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN)).sorted)
+            Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }
 
@@ -213,7 +213,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
           (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
-            Seq(IndexConstants.DATA_FILE_NAME_COLUMN, partitionKeys(1))).sorted)
+            Seq(IndexConstants.DATA_FILE_NAME_ID, partitionKeys(1))).sorted)
     }
   }
 
@@ -233,7 +233,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       val indexRecordsDF = spark.read.parquet(
         s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
       val lineageValues = indexRecordsDF
-        .select(IndexConstants.DATA_FILE_NAME_COLUMN)
+        .select(IndexConstants.DATA_FILE_NAME_ID)
         .distinct()
         .collect()
         .map(r => r.getLong(0))

@@ -415,7 +415,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 Not(In(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
               // Check new filter condition on lineage column.
-              assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+              assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
               val deleted = deletedFileNames.map(_.toString)
               assert(deleted.length === 2)
               assert(deleted.distinct.length === deleted.length)
@@ -475,7 +475,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               Not(In(attr, deletedFileNames)),
               LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
             val deleted = deletedFileNames.map(_.toString)
             assert(deleted.length === 2)
             assert(deleted.distinct.length === deleted.length)
@@ -571,7 +571,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
           // Check new filter condition on lineage column.
           val colName = left.toString
           val deletedFile = right.toString
-          assert(colName.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+          assert(colName.contains(IndexConstants.DATA_FILE_NAME_ID))
           assert(!df.inputFiles.contains(deletedFile))
           assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
           assert(fsRelation.location.inputFiles.length === 4)
@@ -607,7 +607,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             // Check filter pushed down properly.
             val filterStr = dataFilters.toString
             assert(filterStr.contains(" <= 2000)"))
-            if (filterStr.contains(IndexConstants.DATA_FILE_NAME_COLUMN)) {
+            if (filterStr.contains(IndexConstants.DATA_FILE_NAME_ID)) {
               assert(deletedFilesList.flatten.forall(filterStr.contains(_)))
               assert(!deletePushDownFilterFound)
               deletePushDownFilterFound = true
@@ -663,7 +663,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
                 Not(InSet(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
             // This node should be df2 - Filter-Not-InSet with 2 deleted files.
             assert(deletedFileNames.size === 2)
             val deleted = deletedFileNames.map(_.toString).toSeq
@@ -682,7 +682,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
             val colName = left.toString
             val deletedFile = right.toString
             // This node should be df1 - Filter-Not with 1 deleted files.
-            assert(colName.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(colName.contains(IndexConstants.DATA_FILE_NAME_ID))
             assert(!df1.inputFiles.contains(deletedFile))
             assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
             assert(fsRelation.location.inputFiles.length === 4)
@@ -732,7 +732,7 @@ class HybridScanTest extends QueryTest with HyperspaceSuite {
               val filterStr = dataFilters.toString
               assert(filterStr.contains(" >= 2000)") && filterStr.contains(" <= 4000)"))
               // Check deleted files.
-              if (filterStr.contains(IndexConstants.DATA_FILE_NAME_COLUMN)) {
+              if (filterStr.contains(IndexConstants.DATA_FILE_NAME_ID)) {
                 deletedFiles = deletedFiles.filterNot(filterStr.contains(_))
                 deleteFilesPushDownFilterCnt += 1
               }

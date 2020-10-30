@@ -490,7 +490,7 @@ case class IndexLogEntry(
 
   def hasLineageColumn(spark: SparkSession): Boolean = {
     ResolverUtils
-      .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, schema.fieldNames)
+      .resolve(spark, IndexConstants.DATA_FILE_NAME_ID, schema.fieldNames)
       .isDefined
   }
 
