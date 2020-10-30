@@ -424,7 +424,7 @@ object JoinIndexRule
    * @param condition Join condition
    * @return Sequence of simple conditions from original condition
    */
-  private def extractConditions(condition: Expression): Seq[Expression] = condition match {
+  private[rules] def extractConditions(condition: Expression): Seq[Expression] = condition match {
     case EqualTo(_: AttributeReference, _: AttributeReference) =>
       Seq(condition)
     case And(left, right) =>

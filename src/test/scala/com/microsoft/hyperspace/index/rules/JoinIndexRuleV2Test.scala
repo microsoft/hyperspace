@@ -156,7 +156,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     super.afterAll()
   }
 
-  test("Join rule does not update plan for Broadcast Hash Join compatible joins") {
+  test("Join rule does not update plan for Broadcast Hash Join compatible joins.") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val joinCondition = EqualTo(t1c1, t3c1)
       val originalPlan =
@@ -168,7 +168,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
 
   test(
     "Join rule updates sort merge join part of a plan if indexes exist and configs are set" +
-      " correctly") {
+      " correctly.") {
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val joinCondition = EqualTo(t1c1, t2c1)
       val originalPlan =
@@ -200,24 +200,30 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
       val updatedPlan = JoinIndexRuleV2(originalPlan)
       assert(!updatedPlan.equals(originalPlan))
 
-      val indexPaths =
-        getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
+      val indexPaths = getIndexDataFilesPaths("t1i1") ++ getIndexDataFilesPaths("t2i1")
       verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths ++ Seq(new Path("t3")))
     }
   }
 
-  test("Join rule doesn't update plan for multi-column joins if columns aren't one-to-one" +
-    " matched.") {
+  test(
+    "Join rule updates one side of the plan for multi-column joins if it satisfies required " +
+      "partitioning.") {
     // Test Setup:
     //      SMJ(t1c1 = t2c1 and t1c1 = t2c2)
     //     /   \
     //   t1    t2
+    // Since t2 contains an index which satisfies the required partitioning, index for t2 should
+    // be picked. For t1, same column is used in both predicates and so index will not be picked.
     withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
       val condition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1, t2c2))
       val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(condition))
 
       val updatedPlan = JoinIndexRuleV2(originalPlan)
-      assert(updatedPlan.equals(originalPlan))
+      assert(!updatedPlan.equals(originalPlan))
+      verifyUpdatedIndex(
+        originalPlan,
+        updatedPlan,
+        Seq(new Path("t1")) ++ getIndexDataFilesPaths("t2i3"))
     }
   }
 

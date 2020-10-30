@@ -25,6 +25,7 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.rules.JoinIndexRule.extractConditions
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
@@ -55,7 +56,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
   }
 
   private def contains(
-      attributes: Set[AttributeReference],
+      attributes: Seq[AttributeReference],
       attribute: AttributeReference): Boolean = {
     attributes.exists(_.semanticEquals(attribute))
   }
@@ -76,7 +77,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
    */
   private def setIndexes(
       relation: LogicalRelation,
-      joinCols: Set[AttributeReference],
+      joinCols: Seq[AttributeReference],
       allReferencedCols: Seq[Attribute]): LogicalPlan = {
     val indexManager = Hyperspace
       .getContext(spark)
@@ -134,7 +135,8 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
     require(condition.references.forall(_.isInstanceOf[AttributeReference]))
-    val joinCols = condition.references.map(_.asInstanceOf[AttributeReference]).toSet
+    val joinCols =
+      extractConditions(condition).flatMap(_.references.map(_.asInstanceOf[AttributeReference]))
     val eligibleBaseRelations = plan.collectLeaves().filter {
       case relation: LogicalRelation => relation.output.exists(contains(joinCols, _))
       case _ => false
@@ -164,7 +166,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
    */
   private def updateIndex(
       plan: LogicalPlan,
-      joinCols: Set[AttributeReference],
+      joinCols: Seq[AttributeReference],
       requiredCols: Seq[Attribute]): LogicalPlan = {
     plan match {
       case p: LogicalRelation => setIndexes(p, joinCols, requiredCols)
