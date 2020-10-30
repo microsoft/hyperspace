@@ -87,7 +87,9 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     //  See https://github.com/microsoft/hyperspace/issues/65.
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val allCols = (joinCols ++ allReferencedCols).map(_.asInstanceOf[AttributeReference])
+    val allCols = (joinCols ++ allReferencedCols).collect {
+      case c: AttributeReference => c
+    }
 
     val allReqdCols =
       relation.outputSet
@@ -131,7 +133,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     // from right. This would be by default true. Nothing to do in this part. Let's say A,B
     // come from left. C,D come from right. The requirement is both A and B should come from the
     // same leaf node on left. Same for C and D. Both should come from same leaf node on right.
-
+    require(condition.references.forall(_.isInstanceOf[AttributeReference]))
     val joinCols = condition.references.map(_.asInstanceOf[AttributeReference]).toSet
     val eligibleBaseRelations = plan.collectLeaves().filter {
       case relation: LogicalRelation => relation.output.exists(contains(joinCols, _))
