@@ -146,10 +146,24 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
     }
   }
 
+  /**
+   * Update the plan by replacing source data with indexes. To make sure the index covers all
+   * required columns, traverse down the plan and collect all referenced columns from all nodes
+   * starting from top of the plan to the bottom.
+   *
+   * Please note: we can't use plan.transform(...) here because we have to collect referenced
+   * columns from every node we traverse till the end.
+   * @param plan Original plan.
+   * @param joinCols All referenced join columns from join condition.
+   * @param requiredCols Superset of all columns which are referenced in the plan. If an index
+   *                     is chosen to replace a base relation `r`, it should contain all the
+   *                     columns from this `requiredCols`, which directly belong to `r`.
+   * @return Logical plan with indexes if applicable indexes are found, else the original plan.
+   */
   private def updateIndex(
       plan: LogicalPlan,
       joinCols: Set[AttributeReference],
-      requiredCols: Seq[Attribute]): LogicalPlan =
+      requiredCols: Seq[Attribute]): LogicalPlan = {
     plan match {
       case p: LogicalRelation => setIndexes(p, joinCols, requiredCols)
       case p: LeafNode => p
@@ -160,6 +174,7 @@ object JoinIndexRuleV2 extends Rule[LogicalPlan] with Logging with ActiveSparkSe
           }
         }
     }
+  }
 
   private def eligible(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
     !isBroadcastJoin(l, r) && isJoinConditionSupported(condition)
