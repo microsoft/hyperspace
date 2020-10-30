@@ -230,7 +230,7 @@ class JoinIndexRuleV2Test extends QueryTest with HyperspaceRuleTestSuite {
     }
   }
 
-  /** Returns tuple of left and right base relation paths for a logical plan. */
+  /** Returns base relation paths for a logical plan. */
   private def basePaths(plan: LogicalPlan): Seq[Path] = {
     plan
       .collectLeaves()
