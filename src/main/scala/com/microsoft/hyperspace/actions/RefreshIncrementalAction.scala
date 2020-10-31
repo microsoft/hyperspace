@@ -52,7 +52,7 @@ class RefreshIncrementalAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
-  private lazy val fileIdsMap = getFileIdsMap(df)
+  private lazy val fileNameToIdMap = getFileNameToIdMap(df)
 
   final override def op(): Unit = {
     logInfo(
@@ -66,7 +66,7 @@ class RefreshIncrementalAction(
         .format(previousIndexLogEntry.relations.head.fileFormat)
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
-      write(spark, dfWithAppendedFiles, indexConfig, fileIdsMap._1)
+      write(spark, dfWithAppendedFiles, indexConfig, fileNameToIdMap._1)
     }
 
     if (deletedFiles.nonEmpty) {
@@ -106,7 +106,7 @@ class RefreshIncrementalAction(
     }
 
     // To handle deleted files, lineage column is required for the index.
-    if (deletedFiles.nonEmpty && !previousIndexLogEntry.hasLineageColumn(spark)) {
+    if (deletedFiles.nonEmpty && !previousIndexLogEntry.hasLineageColumn) {
       throw HyperspaceException(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
@@ -127,7 +127,13 @@ class RefreshIncrementalAction(
    */
   override def logEntry: LogEntry = {
     val entry =
-      getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileIdsMap._1, fileIdsMap._2)
+      getIndexLogEntry(
+        spark,
+        df,
+        indexConfig,
+        indexDataPath,
+        fileNameToIdMap._1,
+        fileNameToIdMap._2)
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.
@@ -155,13 +161,13 @@ class RefreshIncrementalAction(
    * @return mapping of source data file paths to their file ids, and the
    *         last assigned file id.
    */
-  final override def getFileIdsMap(df: DataFrame): (Map[String, Long], Long) = {
+  final override def getFileNameToIdMap(df: DataFrame): (Map[String, Long], Long) = {
     var lastFileId = previousIndexLogEntry.lastFileId
-    val fileIdsMap = mutable.Map() ++ previousIndexLogEntry.fileIdsMap
+    val fileNameToIdMap = mutable.Map() ++ previousIndexLogEntry.fileNameToIdMap
     appendedFiles.foreach { f =>
       lastFileId += 1
-      fileIdsMap.put(f.name, lastFileId)
+      fileNameToIdMap.put(f.name, lastFileId)
     }
-    (fileIdsMap.toMap, lastFileId)
+    (fileNameToIdMap.toMap, lastFileId)
   }
 }

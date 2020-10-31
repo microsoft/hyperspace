@@ -168,28 +168,23 @@ case class Directory(
    * Update fileInfos stored under this directory with their corresponding
    * file ids from a given mapping.
    *
-   * @param fileIdsMap Given mapping of file paths to file ids.
+   * @param fileNameToIdMap Given mapping of file paths to file ids.
    * @param prefixPath Parent path of given directory.
    * @return Directory instance whose fileInfos are updated with file ids.
   */
-  def withFileIds(fileIdsMap: Map[String, Long], prefixPath: String): Directory = {
+  def withFileIds(fileNameToIdMap: Map[String, Long], prefixPath: String): Directory = {
     def addFileId(f: FileInfo): FileInfo = {
       val fullPath = new Path(prefixPath, f.name).toString
-      fileIdsMap.get(fullPath) match {
-        case Some(i) =>
-          f.copy(id = i)
-        case _ =>
-          throw HyperspaceException(
-            s"Encountered source data file with unknown file id. " +
-              s"(File: $fullPath).")
+      fileNameToIdMap.get(fullPath) match {
+        case Some(i) => f.copy(id = i)
+        case _ => throw HyperspaceException(s"Unknown source data found: '$fullPath'.")
       }
     }
 
     copy(
       files = files.map(addFileId),
       subDirs = subDirs.map {
-        d =>
-          d.withFileIds(fileIdsMap, new Path(prefixPath, d.name).toString)}
+        d => d.withFileIds(fileNameToIdMap, new Path(prefixPath, d.name).toString)}
     )
   }
 }
@@ -488,25 +483,21 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
-  def hasLineageColumn(spark: SparkSession): Boolean = {
-    ResolverUtils
-      .resolve(spark, IndexConstants.DATA_FILE_NAME_ID, schema.fieldNames)
-      .isDefined
-  }
-
-  def fileIdsMap: Map[String, Long] = {
-    val fileIdsMap = mutable.Map[String, Long]()
-    sourceFileInfoSet
-      .foreach(f => fileIdsMap.put(f.name, f.id))
-    fileIdsMap.toMap
-  }
+  def hasLineageColumn: Boolean = schema.fieldNames.contains(IndexConstants.DATA_FILE_NAME_ID)
 
   @JsonIgnore
-  lazy val lastFileId: Long = {
+  lazy val fileNameToIdMap: Map[String, Long] = {
+    val fileNameToIdMap = mutable.Map[String, Long]()
+    sourceFileInfoSet.foreach(f => fileNameToIdMap.put(f.name, f.id))
+    fileNameToIdMap.toMap
+  }
+
+
+  def lastFileId: Long = {
     source.plan.properties.lastFileId
   }
 
-  def withFileIdsMap(lastId: Long, map: Map[String, Long]): IndexLogEntry = {
+  def withFileNameToIdMap(lastId: Long, map: Map[String, Long]): IndexLogEntry = {
     copy(
       source = source.copy(
         plan = source.plan.copy(

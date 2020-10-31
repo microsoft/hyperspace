@@ -90,8 +90,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
           val ixLogJson =
             FileUtils.readContents(ixLogPath.getFileSystem(new Configuration), ixLogPath)
-          val fileIdsMap = JsonUtils.fromJson[IndexLogEntry](ixLogJson).fileIdsMap
-          val fileId = fileIdsMap.get(deletedFile.toString)
+          val fileNameToIdMap = JsonUtils.fromJson[IndexLogEntry](ixLogJson).fileNameToIdMap
+          val fileId = fileNameToIdMap.get(deletedFile.toString)
           assert(fileId.nonEmpty)
 
           // Validate only index records whose lineage is the deleted file are removed.
@@ -391,7 +391,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       }
 
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
-      assert(!indexLogEntry.hasLineageColumn(spark))
+      assert(!indexLogEntry.hasLineageColumn)
       assert(indexLogEntry.numBuckets === 20)
     }
   }

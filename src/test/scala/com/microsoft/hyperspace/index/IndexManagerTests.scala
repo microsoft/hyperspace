@@ -559,7 +559,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       .getIndexes()
       .map { i =>
         val map = i.sourceFileInfoSet.map(f => f.name -> IndexConstants.UNKNOWN_FILE_ID).toMap
-        val entry = i.withFileIdsMap(IndexConstants.UNKNOWN_FILE_ID, map)
+        val entry = i.withFileNameToIdMap(IndexConstants.UNKNOWN_FILE_ID, map)
         entry.state = i.state
         entry
       }

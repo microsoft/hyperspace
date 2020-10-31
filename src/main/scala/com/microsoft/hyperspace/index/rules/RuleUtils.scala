@@ -85,7 +85,7 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(sourceFileInfoSet.contains)
       val deletedCnt = sourceFileInfoSet.size - commonCnt
 
-      if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
+      if (hybridScanDeleteEnabled && entry.hasLineageColumn) {
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
       } else {
         // For append-only Hybrid Scan, deleted files are not allowed.
@@ -261,7 +261,7 @@ object RuleUtils {
           .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
 
         val (filesDeleted, filesAppended) =
-          if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
+          if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
             val sourceFileInfos = // remove file id so comparison only uses actual file properties.
               index.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID))
             val (exist, nonExist) = curFileSet.partition(sourceFileInfos.contains)
@@ -270,7 +270,7 @@ object RuleUtils {
               // for deleted files, add back the file ids. The file ids will be
               // used as lineage in the injected filter.
               val deletedFilesInfo = (sourceFileInfos -- exist).map { f =>
-                val fileId = index.fileIdsMap(f.name)
+                val fileId = index.fileNameToIdMap(f.name)
                 f.copy(id = fileId)
               }
               (deletedFilesInfo, filesAppended)

@@ -59,7 +59,7 @@ private[actions] abstract class RefreshActionBase(
   // Refresh maintains the same lineage column config as the existing index.
   // See above getNumBucketsConfig for more detail.
   override protected final def indexLineageEnabled(spark: SparkSession): Boolean = {
-    previousIndexLogEntry.hasLineageColumn(spark)
+    previousIndexLogEntry.hasLineageColumn
   }
 
   // Reconstruct a df from schema
@@ -129,7 +129,7 @@ private[actions] abstract class RefreshActionBase(
             .map { f => // for each file, if it already has a file id,
                         // add that id to its corresponding FileInfo.
               val filePath = f.getPath.toString
-              previousIndexLogEntry.fileIdsMap.get(filePath) match {
+              previousIndexLogEntry.fileNameToIdMap.get(filePath) match {
                 case Some(id) =>
                   FileInfo(filePath, f.getLen, f.getModificationTime, id)
                 case _ =>
