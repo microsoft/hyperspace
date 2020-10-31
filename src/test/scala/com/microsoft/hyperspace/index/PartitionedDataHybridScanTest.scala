@@ -22,11 +22,10 @@ import org.apache.spark.sql.DataFrame
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.util.FileUtils
 
-class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite {
-
-  // Test cases in HybridScanTest will be executed with indexes on partitioned data sources.
+class PartitionedDataHybridScanTest extends HybridScanTestSuite {
+  // Test cases in HybridScanTestSuite will be executed with indexes on partitioned data sources.
   override def beforeAll(): Unit = {
-    super[HyperspaceSuite].beforeAll()
+    super[HybridScanTestSuite].beforeAll()
     import spark.implicits._
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     hyperspace = new Hyperspace(spark)
@@ -107,7 +106,8 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
       val (testData, appendData) = sampleData.partition(_._1 != "2019-10-03")
       assert(testData.nonEmpty)
       assert(appendData.nonEmpty)
-      testData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
         .write
         .partitionBy("Date")
         .format(fileFormat)
@@ -140,7 +140,8 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
         }
 
         // Append data creating new partition.
-        appendData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        appendData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .write
           .partitionBy("Date")
           .mode("append")
@@ -174,18 +175,23 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
   test("Verify Hybrid Scan for partitioned source data with user specified basePath.") {
     withTempPathAsString { testPath =>
       import spark.implicits._
+      // sampleData has 3 partitions: 2017-09-03, 2018-09-03, 2019-10-03
       val (testData, appendData) = sampleData.partition(_._1 != "2019-10-03")
       assert(testData.nonEmpty)
       assert(appendData.nonEmpty)
-      testData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
         .write
         .partitionBy("Date")
         .format(fileFormat)
         .save(testPath)
 
-      // Create an index only for "Data=2017-09-03" partition.
-      val indexSourcePath = testPath + "/Date=2017-09-03"
-      val df = spark.read.format(fileFormat).option("basePath", testPath).load(indexSourcePath)
+      // Create an index only for "Date=2017-09-03" and "Date=2018-09-03" partition using user
+      // specified basePath. In this way, rootPaths of the index will be both partition paths,
+      // not the basePath.
+      val indexSourcePaths = Seq(testPath + "/Date=2017-09-03", testPath + "/Date=2018-09-03")
+      val df =
+        spark.read.format(fileFormat).option("basePath", testPath).load(indexSourcePaths: _*)
       hyperspace.createIndex(df, IndexConfig("indexName", Seq("Date"), Seq("clicks")))
       def filterQuery(df: DataFrame): DataFrame = {
         df.filter(df("Date") > "2000-01-01").select(df("clicks"))
@@ -194,6 +200,7 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
       withIndex("indexName") {
         // Check the index is applied regardless of Hybrid Scan config.
         {
+          val df = spark.read.format(fileFormat).load(testPath)
           spark.disableHyperspace()
           val baseQuery = filterQuery(df)
           val basePlan = baseQuery.queryExecution.optimizedPlan
@@ -212,17 +219,20 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
           }
         }
 
-        // Append data creating new partition.
-        appendData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        // Append data creating new partition, Date=2019-10-03.
+        appendData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
           .write
           .partitionBy("Date")
           .mode("append")
           .format(fileFormat)
           .save(testPath)
 
-        {
+        assert(FileUtils.getDirectorySize(new Path(testPath + "/Date=2019-10-03")) > 0)
+
+          {
           // Check the index is applied with newly added partition using Hybrid Scan.
-          val df = spark.read.format(fileFormat).option("basePath", testPath).load(testPath)
+          val df = spark.read.format(fileFormat).load(testPath)
           spark.disableHyperspace()
           val baseQuery = filterQuery(df)
           val basePlan = baseQuery.queryExecution.optimizedPlan
@@ -230,12 +240,15 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
 
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
             val filter = filterQuery(df)
+            // Since rootPaths are partition specific paths - "/Date=2017-09-03" and
+            // "/Date=2018-09-03", the index won't be applied with the newly appended partition.
             assert(basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
           }
 
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
             val filter = filterQuery(df)
+            // The new partition can be handled with Hybrid Scan approach.
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
           }
@@ -243,5 +256,4 @@ class PartitionedDataHybridScanTest extends HybridScanTest with HyperspaceSuite 
       }
     }
   }
-
 }

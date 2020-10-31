@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
@@ -386,18 +386,14 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val options = if (location.partitionSchema.isEmpty) {
-          Map[String, String]()
-        } else {
-          // Retrieve basePath from a partition path.
-          val basePath = location.partitionSpec.partitionColumns
-            .foldLeft(location.partitionSpec.partitions.head.path) { (path, _) =>
-              path.getParent
-            }
-
-          // Set "basePath" so that partitioned columns are also included in the output schema.
-          Map("basePath" -> basePath.toString)
+        val options = extractBasePath(location.partitionSpec) match {
+          case Some(basePath) =>
+            // Set "basePath" so that partitioned columns are also included in the output schema.
+            Map("basePath" -> basePath)
+          case _ =>
+            Map[String, String]()
         }
+
         val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
@@ -415,6 +411,22 @@ object RuleUtils {
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended
+  }
+
+  private def extractBasePath(partitionSpec: PartitionSpec): Option[String] = {
+    if (partitionSpec == PartitionSpec.emptySpec) {
+      None
+    } else {
+      // For example, we could have the following in PartitionSpec:
+      //   - partition columns = "col1", "col2"
+      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+      // , and going up the same number of directory levels as the number of partition columns
+      // will compute the base path. Note that PartitionSpec.partitions will always contain
+      // all the partitions in the path, so "partitions.head" is taken as an initial value.
+      val basePath = partitionSpec.partitionColumns
+        .foldLeft(partitionSpec.partitions.head.path)((path, _) => path.getParent)
+      Some(basePath.toString)
+    }
   }
 
   /**
