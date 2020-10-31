@@ -491,7 +491,7 @@ case class IndexLogEntry(
     sourceFileInfoSet.foreach(f => fileNameToIdMap.put(f.name, f.id))
     fileNameToIdMap.toMap
   }
-  
+
   def lastFileId: Long = {
     source.plan.properties.lastFileId
   }
