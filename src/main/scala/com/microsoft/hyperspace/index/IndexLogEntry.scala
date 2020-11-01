@@ -339,9 +339,9 @@ object LogicalPlanFingerprint {
  * @param deletedFiles Deleted files.
  */
 case class Update(
-  fingerprint: LogicalPlanFingerprint,
-  appendedFiles: Option[Content] = None,
-  deletedFiles: Option[Content] = None)
+    fingerprint: LogicalPlanFingerprint,
+    appendedFiles: Option[Content] = None,
+    deletedFiles: Option[Content] = None)
 
 // IndexLogEntry-specific Hdfs that represents the source data.
 case class Hdfs(properties: Hdfs.Properties) {
