@@ -386,13 +386,12 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val options = extractBasePath(location.partitionSpec) match {
-          case Some(basePath) =>
+        val options = extractBasePath(location.partitionSpec)
+          .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
-          case _ =>
-            Map[String, String]()
-        }
+          }
+          .getOrElse(Map())
 
         val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
         // Set the same output schema with the index plan to merge them using BucketUnion.
