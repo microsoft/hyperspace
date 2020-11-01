@@ -264,8 +264,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test(
-    "Delete-only: index relation should have additional filter for deleted files") {
+  test("Delete-only: index relation should have additional filter for deleted files") {
     // Test for both file format
     Seq(
       (sampleDataFormatDelete, "index_ParquetDelete", "parquet"),
@@ -327,8 +326,9 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Delete-only: join rule, deleted files should be excluded from each index data" +
-    " relation.") {
+  test(
+    "Delete-only: join rule, deleted files should be excluded from each index data" +
+      " relation.") {
     val df1 = spark.read.format(fileFormat).load(sampleDataFormatDelete)
     val df2 = spark.read.format(fileFormat).load(sampleDataFormatDelete3)
     def joinQuery(): DataFrame = {
