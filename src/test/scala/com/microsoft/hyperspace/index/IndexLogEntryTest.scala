@@ -127,9 +127,12 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                }
         |              },
         |              "update" : {
-        |                "latestSignatures" : [ {
-        |                  "provider" : "provider",
-        |                  "value" : "signature" } ],
+        |                "fingerprint" : {
+        |                "properties" : {
+        |                  "signatures" : [ {
+        |                    "provider" : "provider",
+        |                    "value" : "signatureValue"
+        |                  } ] } },
         |                "deletedFiles" : {
         |                  "root" : {
         |                    "name" : "",
@@ -197,7 +200,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
                 Update(
                   LogicalPlanFingerprint(
                     LogicalPlanFingerprint.Properties(
-                      Seq(Signature("signatureProvider", "dfSignature")))),
+                      Seq(Signature("provider", "signatureValue")))),
                   None,
                   Some(Content(Directory("", Seq(FileInfo("f1", 10, 10)))))
                 )
