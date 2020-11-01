@@ -431,7 +431,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           // Check `Update` is collected properly.
           assert(indexLogEntry.sourceUpdate.isDefined)
           assert(
-            indexLogEntry.sourceUpdate.get.latestSignatures.head.value
+            indexLogEntry.sourceUpdate.get.fingerprint.properties.signatures.head.value
               == expectedLatestSignature)
           assert(indexLogEntry.appendedFiles === expectedAppendedFiles)
           assert(indexLogEntry.deletedFiles === expectedDeletedFiles)

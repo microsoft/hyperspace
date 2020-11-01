@@ -327,15 +327,19 @@ object LogicalPlanFingerprint {
 }
 
 /**
- * Updated source data since lst time derived dataset was updated. Note that index data does not
- * cover appendedFiles and deleted Files.
+ * Captures any HDFS updates.
  *
+ * @note 'fingerprint' shouldn't be tied to [[LogicalPlanFingerprint]], but it's a free-form
+ *       class, meaning it has "kind" and "properties" so that different classes can be plugged
+ *       in. Thus, 'fingerprint' is still a generic field in terms of the metadata log
+ *       specification.
+ *
+ * @param fingerprint Fingerprint of the update.
  * @param appendedFiles Appended files.
  * @param deletedFiles Deleted files.
- * @param latestSignatures Latest signatures including appendedFiles and deletedFiles.
  */
 case class Update(
-  latestSignatures: Seq[Signature],
+  fingerprint: LogicalPlanFingerprint,
   appendedFiles: Option[Content] = None,
   deletedFiles: Option[Content] = None)
 
@@ -348,7 +352,7 @@ object Hdfs {
   /**
    * Hdfs file properties.
    * @param content Content object representing Hdfs file based data source.
-   * @param update Source data update since the last time derived dataset was updated.
+   * @param update Captures any updates since 'content' was created.
    */
   case class Properties(content: Content, update: Option[Update] = None)
 }
@@ -418,7 +422,7 @@ case class IndexLogEntry(
   }
 
   def copyWithUpdate(
-      latestSignature: Seq[Signature],
+      latestSignature: LogicalPlanFingerprint,
       appended: Seq[FileInfo],
       deleted: Seq[FileInfo]): IndexLogEntry = {
     def toFileStatus(f: FileInfo) = {

@@ -70,10 +70,12 @@ class RefreshQuickAction(
    */
   override def logEntry: LogEntry = {
     val signatureProvider = LogicalPlanSignatureProvider.create()
-    val latestSignature = signatureProvider.signature(df.queryExecution.optimizedPlan).get
-    previousIndexLogEntry.copyWithUpdate(
-      Seq(Signature(signatureProvider.name, latestSignature)),
-      appendedFiles,
-      deletedFiles)
+    val latestFingerprint = LogicalPlanFingerprint(
+      LogicalPlanFingerprint.Properties(
+        Seq(
+          Signature(
+            signatureProvider.name,
+            signatureProvider.signature(df.queryExecution.optimizedPlan).get))))
+    previousIndexLogEntry.copyWithUpdate(latestFingerprint, appendedFiles, deletedFiles)
   }
 }

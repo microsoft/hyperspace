@@ -195,7 +195,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
               ),
               Some(
                 Update(
-                  Seq(Signature("provider", "signature")),
+                  LogicalPlanFingerprint(
+                    LogicalPlanFingerprint.Properties(
+                      Seq(Signature("signatureProvider", "dfSignature")))),
                   None,
                   Some(Content(Directory("", Seq(FileInfo("f1", 10, 10)))))
                 )
