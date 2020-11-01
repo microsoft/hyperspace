@@ -25,7 +25,7 @@ import com.microsoft.hyperspace.util.FileUtils
 class PartitionedDataHybridScanTest extends HybridScanTestSuite {
   // Test cases in HybridScanTestSuite will be executed with indexes on partitioned data sources.
   override def beforeAll(): Unit = {
-    super[HybridScanTestSuite].beforeAll()
+    super.beforeAll()
     import spark.implicits._
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     hyperspace = new Hyperspace(spark)
@@ -198,8 +198,8 @@ class PartitionedDataHybridScanTest extends HybridScanTestSuite {
       }
 
       withIndex("indexName") {
-        // Check the index is applied regardless of Hybrid Scan config.
         {
+          // Check the index is applied regardless of Hybrid Scan config.
           val df = spark.read.format(fileFormat).load(testPath)
           spark.disableHyperspace()
           val baseQuery = filterQuery(df)
@@ -230,7 +230,7 @@ class PartitionedDataHybridScanTest extends HybridScanTestSuite {
 
         assert(FileUtils.getDirectorySize(new Path(testPath + "/Date=2019-10-03")) > 0)
 
-          {
+        {
           // Check the index is applied with newly added partition using Hybrid Scan.
           val df = spark.read.format(fileFormat).load(testPath)
           spark.disableHyperspace()
