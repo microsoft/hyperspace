@@ -357,7 +357,15 @@ object Hdfs {
   case class Properties(content: Content, update: Option[Update] = None)
 }
 
-// IndexLogEntry-specific Relation that represents the source relation.
+/**
+ * IndexLogEntry-specific Relation that represents the source relation.
+ *
+ * @param rootPaths List of root paths for the source relation.
+ * @param data Source data since last time derived dataset was updated.
+ * @param dataSchemaJson Schema in json format.
+ * @param fileFormat File format name.
+ * @param options Options to read the source relation.
+ */
 case class Relation(
     rootPaths: Seq[String],
     data: Hdfs,
