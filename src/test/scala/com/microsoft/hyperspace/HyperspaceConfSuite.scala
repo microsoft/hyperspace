@@ -29,7 +29,7 @@ class HyperspaceConfSuite extends SparkFunSuite with SparkInvolvedSuite {
       10,
       INDEX_NUM_BUCKETS,
       5,
-      200)
+      INDEX_NUM_BUCKETS_DEFAULT)
   }
 
   // Verify the different behaviors when the given 'getConf' supports both legacy and new configs.
