@@ -109,15 +109,10 @@ object RuleUtils {
       // handles the lists properly. Otherwise, as the source file list of each index entry
       // (entry.allSourceFileInfo) also contains the appended and deleted files, we cannot
       // get the actual appended files and deleted files correctly.
-      indexes.filter(
-        index =>
-          index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
-            isHybridScanCandidate(index, filesByRelations.flatten))
+      indexes.filter(index =>
+        index.created && isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
-      indexes.filter(
-        index =>
-          index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
-            signatureValid(index))
+      indexes.filter(index => index.created && signatureValid(index))
     }
   }
 
@@ -172,11 +167,12 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    val transformed = if (HyperspaceConf.hybridScanEnabled(spark)) {
-      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
-    } else {
-      transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
-    }
+    val transformed =
+      if (HyperspaceConf.hybridScanEnabled(spark) || index.hasSourceUpdate) {
+        transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
+      } else {
+        transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
+      }
     assert(!transformed.equals(plan))
     transformed
   }
@@ -254,10 +250,11 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val curFileSet = location.allFiles
-          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-
-        val (filesDeleted, filesAppended) =
+        val (filesDeleted, filesAppended) = if (index.hasSourceUpdate) {
+          (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
+        } else {
+          val curFileSet = location.allFiles
+            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
             val (exist, nonExist) = curFileSet.partition(index.sourceFileInfoSet.contains)
             val filesAppended = nonExist.map(f => new Path(f.name))
@@ -274,6 +271,7 @@ object RuleUtils {
               Nil,
               curFileSet.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
           }
+        }
 
         val filesToRead = {
           if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty) {
