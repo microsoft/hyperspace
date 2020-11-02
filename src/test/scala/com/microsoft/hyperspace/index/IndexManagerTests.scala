@@ -489,7 +489,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     assert(indexFiles.forall(_.getName.startsWith("part-0")))
     assert(indexLog.state.equals("ACTIVE"))
     // Check all files belong to the provided index versions only.
-    assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
+    assert(indexFiles.map(_.getParent.getName).toSet === indexVersions)
   }
 
   private def expectedIndex(
