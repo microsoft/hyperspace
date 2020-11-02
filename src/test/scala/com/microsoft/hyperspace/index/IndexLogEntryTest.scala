@@ -69,131 +69,152 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   test("IndexLogEntry spec example") {
     val schemaString =
       """{\"type\":\"struct\",
-          |\"fields\":[
-          |{\"name\":\"RGUID\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},
-          |{\"name\":\"Date\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}
-          |""".stripMargin.replaceAll("\r", "").replaceAll("\n", "")
+        |\"fields\":[
+        |{\"name\":\"RGUID\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},
+        |{\"name\":\"Date\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}
+        |""".stripMargin.replaceAll("\r", "").replaceAll("\n", "")
 
     val jsonString =
       s"""
-        |{
-        |  "name" : "indexName",
-        |  "derivedDataset" : {
-        |    "properties" : {
-        |      "columns" : {
-        |        "indexed" : [ "col1" ],
-        |        "included" : [ "col2", "col3" ]
-        |      },
-        |      "schemaString" : "$schemaString",
-        |      "numBuckets" : 200
-        |    },
-        |    "kind" : "CoveringIndex"
-        |  },
-        |  "content" : {
-        |    "root" : {
-        |      "name" : "rootContentPath",
-        |      "files" : [ ],
-        |      "subDirs" : [ ]
-        |    },
-        |    "fingerprint" : {
-        |      "kind" : "NoOp",
-        |      "properties" : { }
-        |    }
-        |  },
-        |  "source" : {
-        |    "plan" : {
-        |      "properties" : {
-        |        "relations" : [ {
-        |          "rootPaths" : [ "rootpath" ],
-        |          "data" : {
-        |            "properties" : {
-        |              "content" : {
-        |                "root" : {
-        |                  "name" : "",
-        |                  "files" : [ {
-        |                    "name" : "f1",
-        |                    "size" : 100,
-        |                    "modifiedTime" : 100,
-        |                    "id" : 0
-        |                  }, {
-        |                    "name" : "f2",
-        |                    "size" : 200,
-        |                    "modifiedTime" : 200,
-        |                    "id" : 1
-        |                  } ],
-        |                  "subDirs" : [ ]
-        |                },
-        |                "fingerprint" : {
-        |                  "kind" : "NoOp",
-        |                  "properties" : { }
-        |                }
-        |              },
-        |              "deletedFiles" : {
-        |                "root" : {
-        |                  "name" : "",
-        |                  "files" : [ {
-        |                    "name" : "f1",
-        |                    "size" : 10,
-        |                    "modifiedTime" : 10,
-        |                    "id" : 2
-        |                  }],
-        |                  "subDirs" : [ ]
-        |                },
-        |                "fingerprint" : {
-        |                  "kind" : "NoOp",
-        |                  "properties" : { }
-        |                }
-        |              },
-        |              "appendedFiles" : null
-        |            },
-        |            "kind" : "HDFS"
-        |          },
-        |          "dataSchemaJson" : "schema",
-        |          "fileFormat" : "type",
-        |          "options" : { }
-        |        } ],
-        |        "rawPlan" : null,
-        |        "sql" : null,
-        |        "fingerprint" : {
-        |          "properties" : {
-        |            "signatures" : [ {
-        |              "provider" : "provider",
-        |              "value" : "signatureValue"
-        |            } ]
-        |          },
-        |          "kind" : "LogicalPlan"
-        |        },
-        |        "lastFileId" : 2
-        |      },
-        |      "kind" : "Spark"
-        |    }
-        |  },
-        |  "extra" : { },
-        |  "version" : "0.1",
-        |  "id" : 0,
-        |  "state" : "ACTIVE",
-        |  "timestamp" : 1578818514080,
-        |  "enabled" : true
-        |}""".stripMargin
+         |{
+         |  "name" : "indexName",
+         |  "derivedDataset" : {
+         |    "properties" : {
+         |      "columns" : {
+         |        "indexed" : [ "col1" ],
+         |        "included" : [ "col2", "col3" ]
+         |      },
+         |      "schemaString" : "$schemaString",
+         |      "numBuckets" : 200
+         |    },
+         |    "kind" : "CoveringIndex"
+         |  },
+         |  "content" : {
+         |    "root" : {
+         |      "name" : "rootContentPath",
+         |      "files" : [ ],
+         |      "subDirs" : [ ]
+         |    },
+         |    "fingerprint" : {
+         |      "kind" : "NoOp",
+         |      "properties" : { }
+         |    }
+         |  },
+         |  "source" : {
+         |    "plan" : {
+         |      "properties" : {
+         |        "relations" : [ {
+         |          "rootPaths" : [ "rootpath" ],
+         |          "data" : {
+         |            "properties" : {
+         |              "content" : {
+         |                "root" : {
+         |                  "name" : "",
+         |                  "files" : [ {
+         |                    "name" : "f1",
+         |                    "size" : 100,
+         |                    "modifiedTime" : 100,
+         |                    "id" : 0
+         |                  }, {
+         |                    "name" : "f2",
+         |                    "size" : 200,
+         |                    "modifiedTime" : 200,
+         |                    "id" : 1
+         |                  } ],
+         |                  "subDirs" : [ ]
+         |                },
+         |                "fingerprint" : {
+         |                  "kind" : "NoOp",
+         |                  "properties" : { }
+         |                }
+         |              },
+         |              "update" : {
+         |                "deletedFiles" : {
+         |                  "root" : {
+         |                    "name" : "",
+         |                    "files" : [ {
+         |                      "name" : "f1",
+         |                      "size" : 10,
+         |                      "modifiedTime" : 10,
+         |                      "id" : 2
+         |                    }],
+         |                    "subDirs" : [ ]
+         |                  },
+         |                  "fingerprint" : {
+         |                    "kind" : "NoOp",
+         |                    "properties" : { }
+         |                  }
+         |                },
+         |                "appendedFiles" : null
+         |              }
+         |            },
+         |            "kind" : "HDFS"
+         |          },
+         |          "dataSchemaJson" : "schema",
+         |          "fileFormat" : "type",
+         |          "options" : { }
+         |        } ],
+         |        "rawPlan" : null,
+         |        "sql" : null,
+         |        "fingerprint" : {
+         |          "properties" : {
+         |            "signatures" : [ {
+         |              "provider" : "provider",
+         |              "value" : "signatureValue"
+         |            } ]
+         |          },
+         |          "kind" : "LogicalPlan"
+         |        },
+         |        "lastFileId" : 2
+         |      },
+         |      "kind" : "Spark"
+         |    }
+         |  },
+         |  "extra" : { },
+         |  "version" : "0.1",
+         |  "id" : 0,
+         |  "state" : "ACTIVE",
+         |  "timestamp" : 1578818514080,
+         |  "enabled" : true
+         |}""".stripMargin
 
     val schema =
       StructType(Array(StructField("RGUID", StringType), StructField("Date", StringType)))
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
-      Seq(Relation(
-        Seq("rootpath"),
-        Hdfs(Hdfs.Properties(Content(
-          Directory("", Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 200L, 200L, 1)), Seq())),
-          None,
-          Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2))))))),
-        "schema",
-        "type",
-        Map())),
-      rawPlan = null,
-      sql = null,
+      Seq(
+        Relation(
+          Seq("rootpath"),
+          Hdfs(
+            Hdfs.Properties(
+              Content(
+                Directory(
+                  "",
+                  Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 200L, 200L, 1)),
+                  Seq()
+                )
+              ),
+              Some(
+                Update(
+                  None,
+                  Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2)))))
+                )
+              )
+            )
+          ),
+          "schema",
+          "type",
+          Map()
+        )
+      ),
+      null,
+      null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))),
-      lastFileId = 2)
+        LogicalPlanFingerprint
+          .Properties(Seq(Signature("provider", "signatureValue")))
+      ),
+      2
+    )
 
     val expected = IndexLogEntry(
       "indexName",
