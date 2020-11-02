@@ -37,6 +37,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
   private var df: DataFrame = _
+  private var expectedLastFileId: Long = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -47,6 +48,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       sampleParquetDataLocation,
       Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     df = spark.read.parquet(sampleParquetDataLocation)
+    expectedLastFileId = getNumberOfFiles(df) - 1 // fileId starts from 0
   }
 
   after {
@@ -89,18 +91,18 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   test("Verify getIndexes()") {
     hyperspace.createIndex(df, indexConfig1)
     hyperspace.createIndex(df, indexConfig2)
-    
+
     val expectedIndex1 = expectedIndex(
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      getLastFileId(indexConfig1.indexName))
+      expectedLastFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      getLastFileId(indexConfig2.indexName))
+      expectedLastFileId)
 
     // Verify if indexes returned match the actual created indexes.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -114,13 +116,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      getLastFileId(indexConfig1.indexName))
+      expectedLastFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      getLastFileId(indexConfig2.indexName))
+      expectedLastFileId)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -142,13 +144,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      getLastFileId(indexConfig1.indexName))
+      expectedLastFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      getLastFileId(indexConfig2.indexName))
+      expectedLastFileId)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -175,13 +177,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      getLastFileId(indexConfig1.indexName))
+      expectedLastFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      getLastFileId(indexConfig2.indexName))
+      expectedLastFileId)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -573,11 +575,17 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       .count()
   }
 
-  private def getLastFileId(name: String): Long = {
-    IndexCollectionManager(spark)
-      .getIndexes()
-      .find(_.name.equals(name))
-      .map(_.lastFileId)
-      .getOrElse(IndexConstants.UNKNOWN_FILE_ID)
+  private def getNumberOfFiles(df: DataFrame): Long = {
+    var fileCount = 0L
+    df.queryExecution.optimizedPlan.collect {
+      case LogicalRelation(
+          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+          _,
+          _,
+          _) =>
+        fileCount += location.allFiles.length
+    }
+
+    fileCount
   }
 }
