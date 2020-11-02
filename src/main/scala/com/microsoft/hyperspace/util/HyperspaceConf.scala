@@ -77,16 +77,16 @@ object HyperspaceConf {
    *
    * @param spark Spark session.
    * @param keys Config keys to look up.
-   * @param default Default value to fall back if no config keys are matched.
+   * @param defaultValue Default value to fall back if no config keys are matched.
    * @return Config value found. 'default' if no config value is found for the given keys.
    */
   private def getConfStringWithMultipleKeys(
       spark: SparkSession,
       keys: Seq[String],
-      default: String): String = {
+      defaultValue: String): String = {
     keys
       .find(spark.sessionState.conf.contains)
       .map(spark.sessionState.conf.getConfString)
-      .getOrElse(default)
+      .getOrElse(defaultValue)
   }
 }
