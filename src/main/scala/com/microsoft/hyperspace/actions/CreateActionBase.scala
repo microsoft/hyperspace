@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{input_file_name, udf}
@@ -106,7 +106,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")
@@ -137,7 +137,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         repartitionedIndexDataFrame,
         indexDataPath.toString,
         numBuckets,
-        resolvedIndexedColumns)
+        resolvedIndexedColumns,
+        SaveMode.Overwrite)
   }
 
   private def resolveConfig(
