@@ -265,8 +265,6 @@ object RuleUtils {
             val sourceFileInfos = // remove file id so comparison only uses actual file properties.
               index.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID))
             val (exist, nonExist) = curFiles.partition(sourceFileInfos.contains)
-            // pouriap
-            // val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
             val filesAppended = nonExist.map(f => new Path(f.name))
             if (exist.length < sourceFileInfos.size) {
               // for deleted files, add back the file ids. The file ids will be
@@ -279,12 +277,6 @@ object RuleUtils {
             } else {
               (Nil, filesAppended)
             }
-            // pouriap
-//            if (exist.length < index.sourceFileInfoSet.size) {
-//              (index.sourceFileInfoSet -- exist, filesAppended)
-//            } else {
-//              (Nil, filesAppended)
-//            }
           } else {
             // Append-only implementation of getting appended files for efficiency.
             // It is guaranteed that there is no deleted files via the condition
@@ -294,9 +286,6 @@ object RuleUtils {
               curFiles
                 .filterNot(index.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID)).contains)
                 .map(f => new Path(f.name)))
-            // pouriap
-            // (Nil,
-            // curFiles.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
           }
 
         val filesToRead = {
@@ -347,9 +336,6 @@ object RuleUtils {
         } else {
           val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_ID, LongType)()
           val deletedFileIds = filesDeleted.map(f => Literal(f.id)).toArray
-          // pouriap
-//          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)()
-//          val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
           val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
           val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
