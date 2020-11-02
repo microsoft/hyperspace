@@ -150,6 +150,9 @@ object RuleUtils {
 
     val transformed =
       if (HyperspaceConf.hybridScanEnabled(spark) || index.hasSourceUpdate) {
+        // In case the index has appended files and/or deleted files which are updated by quick
+        // refresh mode, we should handle them in query time by using Hybrid Scan.
+        // Because quick refresh doesn't update index data, but just metadata in IndexLogEntry.
         transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
       } else {
         transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
@@ -246,26 +249,31 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val (filesDeleted, filesAppended) = if (index.hasSourceUpdate) {
-          (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
-        } else {
-          val curFiles = location.allFiles
-            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-          if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
-            val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
-            val filesAppended = nonExist.map(f => new Path(f.name))
-            if (exist.length < index.sourceFileInfoSet.size) {
-              (index.sourceFileInfoSet -- exist, filesAppended)
-            } else {
-              (Nil, filesAppended)
-            }
+        val (filesDeleted, filesAppended) =
+          if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
+            // This index is refreshed as quick mode and validated with the latest signature.
+            // So we could use deleted files and appended files in IndexLogEntry.
+            (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
-            // Append-only implementation of getting appended files for efficiency.
-            // It is guaranteed that there is no deleted files via the condition
-            // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
-            (Nil, curFiles.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
+            val curFiles = location.allFiles
+              .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+            if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
+              val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
+              val filesAppended = nonExist.map(f => new Path(f.name))
+              if (exist.length < index.sourceFileInfoSet.size) {
+                (index.sourceFileInfoSet -- exist, filesAppended)
+              } else {
+                (Nil, filesAppended)
+              }
+            } else {
+              // Append-only implementation of getting appended files for efficiency.
+              // It is guaranteed that there is no deleted files via the condition
+              // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
+              (
+                Nil,
+                curFiles.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
+            }
           }
-        }
 
         val filesToRead = {
           if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty ||

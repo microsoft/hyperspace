@@ -583,35 +583,37 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
     "Verify JoinIndexRule utilizes indexes correctly after quick refresh when some file " +
       "gets deleted and some appended to source data.") {
     withTempPathAsString { testPath =>
-      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-        // Setup. Create data.
-        val indexConfig = IndexConfig("index", Seq("c2"), Seq("c4"))
-        import spark.implicits._
-        SampleData.testData
-          .toDF("c1", "c2", "c3", "c4", "c5")
-          .limit(10)
-          .write
-          .parquet(testPath)
-        val df = spark.read.load(testPath)
-        val oldFiles = df.inputFiles
+      // Setup. Create data.
+      val indexConfig = IndexConfig("index", Seq("c2"), Seq("c4"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.load(testPath)
+      val oldFiles = df.inputFiles
 
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         // Create index.
         hyperspace.createIndex(df, indexConfig)
+      }
 
-        // Delete some source data file.
-        TestUtils.deleteFiles(testPath, "*parquet", 1)
+      // Delete some source data file.
+      TestUtils.deleteFiles(testPath, "*parquet", 1)
 
-        // Append to original data.
-        SampleData.testData
-          .toDF("c1", "c2", "c3", "c4", "c5")
-          .limit(3)
-          .write
-          .mode("append")
-          .parquet(testPath)
+      // Append to original data.
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
 
-        // Refresh index.
-        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_QUICK)
+      // Refresh index.
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_QUICK)
 
+      {
         // Create a join query.
         val leftDf = spark.read.parquet(testPath)
         val rightDf = spark.read.parquet(testPath)
@@ -636,6 +638,48 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         spark.enableHyperspace()
         val dfWithHyperspaceEnabled = query()
         checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+      }
+
+      // Append to original data again.
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(1)
+        .write
+        .mode("append")
+        .parquet(testPath)
+
+      {
+        // Create a join query with updated dataset.
+        val leftDf = spark.read.parquet(testPath)
+        val rightDf = spark.read.parquet(testPath)
+
+        def query(): DataFrame = {
+          leftDf
+            .join(rightDf, leftDf("c2") === rightDf("c2"))
+            .select(leftDf("c2"), rightDf("c4"))
+        }
+        // Refreshed index as quick mode won't be applied with additional appended files.
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+          spark.disableHyperspace()
+          val dfWithHyperspaceDisabled = query()
+          val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+          val dfWithHyperspaceEnabled = query()
+          assert(basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
+        }
+
+        // Refreshed index as quick mode can be applied with Hybrid Scan config.
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+            spark.disableHyperspace()
+            val dfWithHyperspaceDisabled = query()
+            val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
+            spark.enableHyperspace()
+            val dfWithHyperspaceEnabled = query()
+            assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
+            checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+          }
+        }
       }
     }
   }
