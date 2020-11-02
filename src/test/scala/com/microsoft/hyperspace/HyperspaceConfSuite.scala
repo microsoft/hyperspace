@@ -57,7 +57,7 @@ class HyperspaceConfSuite extends SparkFunSuite with SparkInvolvedSuite {
     // Verify that the new config is returned if only new config is set.
     clear()
     spark.conf.set(newConfKey, newConfValue.toString)
-    assert(HyperspaceConf.numBucketsForIndex(spark) === newConfValue)
+    assert(getConf() === newConfValue)
 
     // Verify that new config is applied if both legacy and new configs are set.
     clear()
