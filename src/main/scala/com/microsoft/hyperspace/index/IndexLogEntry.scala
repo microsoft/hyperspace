@@ -329,17 +329,10 @@ object LogicalPlanFingerprint {
 /**
  * Captures any HDFS updates.
  *
- * @note 'fingerprint' shouldn't be tied to [[LogicalPlanFingerprint]], but it's a free-form
- *       class, meaning it has "kind" and "properties" so that different classes can be plugged
- *       in. Thus, 'fingerprint' is still a generic field in terms of the metadata log
- *       specification.
- *
- * @param fingerprint Fingerprint of the update.
  * @param appendedFiles Appended files.
  * @param deletedFiles Deleted files.
  */
 case class Update(
-    fingerprint: LogicalPlanFingerprint,
     appendedFiles: Option[Content] = None,
     deletedFiles: Option[Content] = None)
 
@@ -361,7 +354,9 @@ object Hdfs {
  * IndexLogEntry-specific Relation that represents the source relation.
  *
  * @param rootPaths List of root paths for the source relation.
- * @param data Source data since last time derived dataset was updated.
+ * @param data Source data for the relation.
+ *             Hdfs.properties.content captures source data which derived dataset was created from.
+ *             Hdfs.properties.update captures any updates since the derived dataset was created.
  * @param dataSchemaJson Schema in json format.
  * @param fileFormat File format name.
  * @param options Options to read the source relation.
@@ -430,7 +425,7 @@ case class IndexLogEntry(
   }
 
   def copyWithUpdate(
-      latestSignature: LogicalPlanFingerprint,
+      latestFingerprint: LogicalPlanFingerprint,
       appended: Seq[FileInfo],
       deleted: Seq[FileInfo]): IndexLogEntry = {
     def toFileStatus(f: FileInfo) = {
@@ -440,13 +435,13 @@ case class IndexLogEntry(
       source = source.copy(
         plan = source.plan.copy(
           properties = source.plan.properties.copy(
+            fingerprint = latestFingerprint,
             relations = Seq(
               relations.head.copy(
                 data = relations.head.data.copy(
                   properties = relations.head.data.properties.copy(
                     update = Some(
                       Update(
-                        latestSignature,
                         appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus)),
                         deletedFiles = Content.fromLeafFiles(deleted.map(toFileStatus))))))))))))
   }
