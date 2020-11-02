@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.SparkSession
 
-import com.microsoft.hyperspace.index.{Content, CoveringIndex, IndexConstants, IndexLogEntry, LogEntry, Source}
+import com.microsoft.hyperspace.index.IndexConstants
 
 /**
  * Helper class to extract Hyperspace-related configs from SparkSession.
@@ -57,11 +57,10 @@ object HyperspaceConf {
   }
 
   def numBucketsForIndex(spark: SparkSession): Int = {
-    spark.sessionState.conf
-      .getConfString(
-        IndexConstants.INDEX_NUM_BUCKETS,
-        IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString)
-      .toInt
+    getConfStringWithMultipleKeys(
+      spark,
+      Seq(IndexConstants.INDEX_NUM_BUCKETS, IndexConstants.INDEX_NUM_BUCKETS_LEGACY),
+      IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString).toInt
   }
 
   def indexLineageEnabled(spark: SparkSession): Boolean = {
@@ -70,5 +69,24 @@ object HyperspaceConf {
         IndexConstants.INDEX_LINEAGE_ENABLED,
         IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
       .toBoolean
+  }
+
+  /**
+   * Returns the config value whose key matches the first key given multiple keys. If no keys are
+   * matched, the given default value is returned.
+   *
+   * @param spark Spark session.
+   * @param keys Config keys to look up.
+   * @param default Default value to fall back if no config keys are matched.
+   * @return Config value found. 'default' if no config value is found for the given keys.
+   */
+  private def getConfStringWithMultipleKeys(
+      spark: SparkSession,
+      keys: Seq[String],
+      default: String): String = {
+    keys
+      .find(spark.sessionState.conf.contains)
+      .map(spark.sessionState.conf.getConfString)
+      .getOrElse(default)
   }
 }
