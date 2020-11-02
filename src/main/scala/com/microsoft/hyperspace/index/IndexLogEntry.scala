@@ -326,6 +326,16 @@ object LogicalPlanFingerprint {
   case class Properties(signatures: Seq[Signature])
 }
 
+/**
+ * Captures any HDFS updates.
+ *
+ * @param appendedFiles Appended files.
+ * @param deletedFiles Deleted files.
+ */
+case class Update(
+    appendedFiles: Option[Content] = None,
+    deletedFiles: Option[Content] = None)
+
 // IndexLogEntry-specific Hdfs that represents the source data.
 case class Hdfs(properties: Hdfs.Properties) {
   val kind = "HDFS"
@@ -335,16 +345,22 @@ object Hdfs {
   /**
    * Hdfs file properties.
    * @param content Content object representing Hdfs file based data source.
-   * @param appendedFiles Appended files since the last time derived dataset was updated.
-   * @param deletedFiles Deleted files since the last time derived dataset was updated.
+   * @param update Captures any updates since 'content' was created.
    */
-  case class Properties(
-      content: Content,
-      appendedFiles: Option[Content] = None,
-      deletedFiles: Option[Content] = None)
+  case class Properties(content: Content, update: Option[Update] = None)
 }
 
-// IndexLogEntry-specific Relation that represents the source relation.
+/**
+ * IndexLogEntry-specific Relation that represents the source relation.
+ *
+ * @param rootPaths List of root paths for the source relation.
+ * @param data Source data for the relation.
+ *             Hdfs.properties.content captures source data which derived dataset was created from.
+ *             Hdfs.properties.update captures any updates since the derived dataset was created.
+ * @param dataSchemaJson Schema in json format.
+ * @param fileFormat File format name.
+ * @param options Options to read the source relation.
+ */
 case class Relation(
     rootPaths: Seq[String],
     data: Hdfs,
@@ -394,17 +410,22 @@ case class IndexLogEntry(
     relations.head.data.properties.content.fileInfos
   }
 
-  // FileInfo's 'name' contains the full path to the file.
-  def deletedFiles: Set[FileInfo] = {
-    relations.head.data.properties.deletedFiles.map(_.fileInfos).getOrElse(Set())
+  def sourceUpdate: Option[Update] = {
+    relations.head.data.properties.update
   }
 
   // FileInfo's 'name' contains the full path to the file.
   def appendedFiles: Set[FileInfo] = {
-    relations.head.data.properties.appendedFiles.map(_.fileInfos).getOrElse(Set())
+    sourceUpdate.flatMap(_.appendedFiles).map(_.fileInfos).getOrElse(Set())
   }
 
-  def withAppendedAndDeletedFiles(
+  // FileInfo's 'name' contains the full path to the file.
+  def deletedFiles: Set[FileInfo] = {
+    sourceUpdate.flatMap(_.deletedFiles).map(_.fileInfos).getOrElse(Set())
+  }
+
+  def copyWithUpdate(
+      latestFingerprint: LogicalPlanFingerprint,
       appended: Seq[FileInfo],
       deleted: Seq[FileInfo]): IndexLogEntry = {
     def toFileStatus(f: FileInfo) = {
@@ -414,12 +435,15 @@ case class IndexLogEntry(
       source = source.copy(
         plan = source.plan.copy(
           properties = source.plan.properties.copy(
+            fingerprint = latestFingerprint,
             relations = Seq(
               relations.head.copy(
                 data = relations.head.data.copy(
                   properties = relations.head.data.properties.copy(
-                    appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus)),
-                    deletedFiles = Content.fromLeafFiles(deleted.map(toFileStatus))))))))))
+                    update = Some(
+                      Update(
+                        appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus)),
+                        deletedFiles = Content.fromLeafFiles(deleted.map(toFileStatus))))))))))))
   }
 
   def bucketSpec: BucketSpec =
