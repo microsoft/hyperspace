@@ -120,8 +120,8 @@ page to see how it can be enabled.
 If a dataset has many deleted source files, query performance could degrade when Hybrid Scan is
 enforcing deletes at the query runtime. Hyperspace provides two different configurations to tune
 this behavior. 
-You can use them to enable supporting deletes during Hybrid Scan (spark.hyperspace.index.hybridscan.delete.maxNumDeleted)
-and determine when it should be applied, depending on the total number of deleted source files (spark.hyperspace.index.hybridscan.delete.enabled).
+You can use them to enable supporting deletes during Hybrid Scan (`spark.hyperspace.index.hybridscan.delete.maxNumDeleted`)
+and determine when it should be applied, depending on the total number of deleted source files (`spark.hyperspace.index.hybridscan.delete.enabled`).
 You can check the detail in [Append and Delete](#append-and-delete-dataset) section.
 
 #### Append-only dataset
@@ -144,7 +144,7 @@ spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // fal
 Python:
 ```python
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
+spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) # false by default
 ```
 
 ###### Example
