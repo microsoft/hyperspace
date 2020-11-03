@@ -35,14 +35,13 @@ class CreateAction(
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
     with Action {
+
   final override def logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap._1, fileNameToIdMap._2)
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap.toMap, lastFileId)
 
   final override val transientState: String = CREATING
 
   final override val finalState: String = ACTIVE
-
-  private lazy val fileNameToIdMap = getFileNameToIdMap(df)
 
   final override def validate(): Unit = {
     // We currently only support createIndex() over HDFS file based scan nodes.
@@ -75,7 +74,7 @@ class CreateAction(
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
-  final override def op(): Unit = write(spark, df, indexConfig, fileNameToIdMap._1)
+  final override def op(): Unit = write(spark, df, indexConfig, fileNameToIdMap.toMap)
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.

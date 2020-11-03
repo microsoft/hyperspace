@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.functions.col
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -52,7 +52,11 @@ class RefreshIncrementalAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
-  private lazy val fileNameToIdMap = getFileNameToIdMap(df)
+  override val fileNameToIdMap = {
+    val map = mutable.Map[String, Long]()
+    map.put("", previousIndexLogEntry.lastFileId)
+    map ++ previousIndexLogEntry.fileNameToIdMap
+  }
 
   final override def op(): Unit = {
     logInfo(
@@ -66,7 +70,8 @@ class RefreshIncrementalAction(
         .format(previousIndexLogEntry.relations.head.fileFormat)
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
-      write(spark, dfWithAppendedFiles, indexConfig, fileNameToIdMap._1)
+
+      write(spark, dfWithAppendedFiles, indexConfig, fileNameToIdMap.toMap)
     }
 
     if (deletedFiles.nonEmpty) {
@@ -127,13 +132,7 @@ class RefreshIncrementalAction(
    */
   override def logEntry: LogEntry = {
     val entry =
-      getIndexLogEntry(
-        spark,
-        df,
-        indexConfig,
-        indexDataPath,
-        fileNameToIdMap._1,
-        fileNameToIdMap._2)
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap.toMap, lastFileId)
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.
@@ -147,27 +146,5 @@ class RefreshIncrementalAction(
       // New entry.
       entry
     }
-  }
-
-  /**
-   * Generate a mapping for source data files by assigning a unique file id
-   * to each source data file. Once assigned, this file id does not change
-   * for a given file and is used to refer to that file.
-   * We extract last file id from previous version of index and start
-   * assigning file ids to new source data files according to that
-   * to make sure there is no gap or duplicate in file ids.
-   *
-   * @param df DataFrame to index.
-   * @return mapping of source data file paths to their file ids, and the
-   *         last assigned file id.
-   */
-  final override def getFileNameToIdMap(df: DataFrame): (Map[String, Long], Long) = {
-    var lastFileId = previousIndexLogEntry.lastFileId
-    val fileNameToIdMap = mutable.Map() ++ previousIndexLogEntry.fileNameToIdMap
-    appendedFiles.foreach { f =>
-      lastFileId += 1
-      fileNameToIdMap.put(f.name, lastFileId)
-    }
-    (fileNameToIdMap.toMap, lastFileId)
   }
 }

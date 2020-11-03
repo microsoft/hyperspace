@@ -25,14 +25,13 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
-import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -95,11 +94,16 @@ object Content {
    * NOT be part of the returned object.
    *
    * @param files List of leaf files.
+   * @param fileNameToIdMap Mapping of full file paths to assigned file ids.
+   * @param lastFileId Last assigned file id.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(files: Seq[FileStatus]): Option[Content] = {
+  def fromLeafFiles(
+      files: Seq[FileStatus],
+      fileNameToIdMap: Option[mutable.Map[String, Long]] = None,
+      lastFileId: Long = UNKNOWN_FILE_ID): Option[Content] = {
     if (files.nonEmpty) {
-      Some(Content(Directory.fromLeafFiles(files)))
+      Some(Content(Directory.fromLeafFiles(files, fileNameToIdMap, lastFileId)))
     } else {
       None
     }
@@ -163,30 +167,6 @@ case class Directory(
           "Directory names must be same for merging directories.")
     }
   }
-
-  /**
-   * Update fileInfos stored under this directory with their corresponding
-   * file ids from a given mapping.
-   *
-   * @param fileNameToIdMap Given mapping of file paths to file ids.
-   * @param prefixPath Parent path of given directory.
-   * @return Directory instance whose fileInfos are updated with file ids.
-  */
-  def withFileIds(fileNameToIdMap: Map[String, Long], prefixPath: String): Directory = {
-    def addFileId(f: FileInfo): FileInfo = {
-      val fullPath = new Path(prefixPath, f.name).toString
-      fileNameToIdMap.get(fullPath) match {
-        case Some(i) => f.copy(id = i)
-        case _ => throw HyperspaceException(s"Unknown source data found: '$fullPath'.")
-      }
-    }
-
-    copy(
-      files = files.map(addFileId),
-      subDirs = subDirs.map {
-        d => d.withFileIds(fileNameToIdMap, new Path(prefixPath, d.name).toString)}
-    )
-  }
 }
 
 object Directory {
@@ -235,14 +215,21 @@ object Directory {
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
-   * NOT be part of the returned object
+   * NOT be part of the returned object.
+   * fileNameToIdMap, if specified, is used to assign file id to existing files. For any new file
+   * a new file id is generated (according to lastFileId) and gets added to fileNameToIdMap.
    * Pre-requisite: files list should be non-empty.
    * Pre-requisite: all files must be leaf files.
    *
    * @param files List of leaf files.
+   * @param fileNameToIdMap Mapping of full file paths to assigned file ids.
+   * @param lastFileId Last assigned file id.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(files: Seq[FileStatus]): Directory = {
+  def fromLeafFiles(
+      files: Seq[FileStatus],
+      fileNameToIdMap: Option[mutable.Map[String, Long]] = None,
+      lastFileId: Long = UNKNOWN_FILE_ID): Directory = {
     require(
       files.nonEmpty,
       s"Empty files list found while creating a ${Directory.getClass.getName}.")
@@ -257,9 +244,28 @@ object Directory {
     // Hashmap from directory path to Directory object, used below for quick access from path.
     val pathToDirectory = HashMap[Path, Directory]()
 
+    var lastId = lastFileId
     for ((dirPath, files) <- leafDirToChildrenFiles) {
       val allFiles = ListBuffer[FileInfo]()
-      allFiles.appendAll(files.map(FileInfo(_)))
+      allFiles.appendAll {
+        fileNameToIdMap match {
+          case Some(map) =>
+            files.map {
+              f =>
+                val fullPath = PathUtils.makeAbsolute(f.getPath).toString
+                val id = map.getOrElse(
+                  fullPath,
+                  {
+                    lastId += 1
+                    map.put(fullPath, lastId)
+                    lastId
+                  })
+
+                FileInfo(f, id)}
+          case None =>
+            files.map(FileInfo(_))
+        }
+      }
 
       if (pathToDirectory.contains(dirPath)) {
         // Map already contains this directory. Just append the files to its existing list.
@@ -293,6 +299,9 @@ object Directory {
       }
     }
 
+    if(fileNameToIdMap.isDefined) {
+      fileNameToIdMap.get.put("", lastId)
+    }
     pathToDirectory(getRoot(files.head.getPath))
   }
 
@@ -341,6 +350,11 @@ object FileInfo {
   def apply(s: FileStatus): FileInfo = {
     require(s.isFile, s"${FileInfo.getClass.getName} is applicable for files, not directories.")
     FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
+  }
+
+  def apply(s: FileStatus, id: Long): FileInfo = {
+    require(s.isFile, s"${FileInfo.getClass.getName} is applicable for files, not directories.")
+    FileInfo(s.getPath.getName, s.getLen, s.getModificationTime, id)
   }
 }
 
@@ -532,22 +546,12 @@ case class IndexLogEntry(
     source.plan.properties.lastFileId
   }
 
-  def withFileNameToIdMap(lastId: Long, map: Map[String, Long]): IndexLogEntry = {
+  def withLastFileId(lastId: Long, map: Map[String, Long]): IndexLogEntry = {
     copy(
       source = source.copy(
         plan = source.plan.copy(
           properties = source.plan.properties.copy(
-            lastFileId = lastId,
-            relations = Seq(
-              relations.head.copy(
-                data = relations.head.data.copy(
-                  properties = relations.head.data.properties.copy(
-                    content = relations.head.data.properties.content.copy(
-                      root = {
-                        val r = relations.head.data.properties.content.root
-                        r.withFileIds(map, r.name)
-                      }
-                    )))))))))
+            lastFileId = lastId))))
   }
 
   override def hashCode(): Int = {

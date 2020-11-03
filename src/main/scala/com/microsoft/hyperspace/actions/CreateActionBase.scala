@@ -40,6 +40,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
+  protected val fileNameToIdMap = mutable.Map[String, Long]()
+
+  final def lastFileId: Long = fileNameToIdMap.getOrElse("", -1L)
+
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
   }
@@ -88,7 +92,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Content.fromDirectory(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
-          .withFileNameToIdMap(lastFileId, fileNameToIdMap)
+          .withLastFileId(lastFileId, fileNameToIdMap)
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
@@ -110,7 +114,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
+        val sourceDataProperties =
+          Hdfs.Properties(Content.fromLeafFiles(files, Some(fileNameToIdMap), lastFileId).get)
+        assert(lastFileId != IndexConstants.UNKNOWN_FILE_ID)
+
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")
@@ -222,32 +229,5 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     // Currently we only support creating an index on a single LogicalRelation.
     assert(partitionSchemas.length == 1)
     partitionSchemas.head.map(_.name)
-  }
-
-  /**
-   * Generate a mapping for source data files by assigning a unique file id
-   * to each source data file. Once assigned, this file id does not change
-   * for a given file and is used to refer to that file.
-   *
-   * @param df DataFrame to index.
-   * @return mapping of source data file paths to their file ids, and the
-   *         last assigned file id.
-   */
-  protected def getFileNameToIdMap(df: DataFrame): (Map[String, Long], Long) = {
-    var lastId = -1L
-    val fileNameToIdMap = mutable.Map[String, Long]()
-    df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        location.allFiles.foreach { f =>
-          val filePath = PathUtils.makeAbsolute(f.getPath).toString
-          lastId += 1
-          fileNameToIdMap.put(filePath, lastId)
-        }
-    }
-    (fileNameToIdMap.toMap, lastId)
   }
 }

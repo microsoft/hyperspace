@@ -36,13 +36,12 @@ class RefreshAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
-  private lazy val fileNameToIdMap = getFileNameToIdMap(df)
-
-  override def logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap._1, fileNameToIdMap._2)
+  override def logEntry: LogEntry = {
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap.toMap, lastFileId)
+  }
 
   final override def op(): Unit = {
-    write(spark, df, indexConfig, fileNameToIdMap._1)
+    write(spark, df, indexConfig, fileNameToIdMap.toMap)
   }
 
   /**
