@@ -300,7 +300,7 @@ object Directory {
     }
 
     if(fileNameToIdMap.isDefined) {
-      fileNameToIdMap.get.put("", lastId)
+      fileNameToIdMap.get.put(IndexConstants.LAST_FILE_ID_KEY, lastId)
     }
     pathToDirectory(getRoot(files.head.getPath))
   }

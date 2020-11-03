@@ -42,7 +42,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   protected val fileNameToIdMap = mutable.Map[String, Long]()
 
-  final def lastFileId: Long = fileNameToIdMap.getOrElse("", -1L)
+  final def lastFileId: Long = fileNameToIdMap.getOrElse(IndexConstants.LAST_FILE_ID_KEY, -1L)
 
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
@@ -56,9 +56,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
-      path: Path,
-      fileNameToIdMap: Map[String, Long],
-      lastFileId: Long): IndexLogEntry = {
+      path: Path): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path)
     val numBuckets = numBucketsForIndex(spark)
 
@@ -66,7 +64,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // Resolve the passed column names with existing column names from the dataframe.
     val (indexDataFrame, resolvedIndexedColumns, resolvedIncludedColumns) =
-      prepareIndexDataFrame(spark, df, indexConfig, fileNameToIdMap)
+      prepareIndexDataFrame(spark, df, indexConfig)
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
@@ -92,7 +90,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Content.fromDirectory(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
-          .withLastFileId(lastFileId, fileNameToIdMap)
+          .withLastFileId(lastFileId, fileNameToIdMap.toMap)
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
@@ -135,12 +133,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def write(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig,
-      fileNameToIdMap: Map[String, Long]): Unit = {
+      indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
-      prepareIndexDataFrame(spark, df, indexConfig, fileNameToIdMap)
+      prepareIndexDataFrame(spark, df, indexConfig)
 
     // run job
     val repartitionedIndexDataFrame =
@@ -181,8 +178,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   private def prepareIndexDataFrame(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig,
-      fileNameToIdMap: Map[String, Long]): (DataFrame, Seq[String], Seq[String]) = {
+      indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
     val addLineage = indexLineageEnabled(spark)
@@ -205,8 +201,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet
       // - Normalized path to be looked up in fileNameToIdMap:
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
+      val fileIdMap = fileNameToIdMap.toMap
       val getFileId = udf((filePath: String) => {
-        fileNameToIdMap.getOrElse(
+        fileIdMap.getOrElse(
           filePath.replace("file:///", "file:/"),
           throw HyperspaceException(s"Unknown source data found: '$filePath'."))
       })

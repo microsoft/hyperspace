@@ -307,8 +307,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
 
           val latestFiles = listFiles(testPath).toSet
           val indexSourceFiles =
-            indexLogEntry.relations.head.data.properties.content.fileInfos.map(f =>
-              f.copy(id = -1L))
+            indexLogEntry.relations.head.data.properties.content.fileInfos
           val expectedDeletedFiles = oldFiles -- latestFiles
           val expectedAppendedFiles = latestFiles -- oldFiles
           assert(expectedDeletedFiles.forall(f => !indexSourceFiles.contains(f)))

@@ -80,10 +80,8 @@ object RuleUtils {
       //  See https://github.com/microsoft/hyperspace/issues/158
 
       // Find the number of common files between the source relations & index source files.
-      val sourceFileInfoSet = // remove file id so comparison only uses actual file properties.
-        entry.sourceFileInfoSet.map(_.copy(id = UNKNOWN_FILE_ID))
-      val commonCnt = inputSourceFiles.count(sourceFileInfoSet.contains)
-      val deletedCnt = sourceFileInfoSet.size - commonCnt
+      val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
+      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
       if (hybridScanDeleteEnabled && entry.hasLineageColumn) {
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)

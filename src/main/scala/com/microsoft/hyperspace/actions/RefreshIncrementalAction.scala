@@ -54,7 +54,7 @@ class RefreshIncrementalAction(
 
   override val fileNameToIdMap = {
     val map = mutable.Map[String, Long]()
-    map.put("", previousIndexLogEntry.lastFileId)
+    map.put(IndexConstants.LAST_FILE_ID_KEY, previousIndexLogEntry.lastFileId)
     map ++ previousIndexLogEntry.fileNameToIdMap
   }
 
@@ -71,7 +71,7 @@ class RefreshIncrementalAction(
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
 
-      write(spark, dfWithAppendedFiles, indexConfig, fileNameToIdMap.toMap)
+      write(spark, dfWithAppendedFiles, indexConfig)
     }
 
     if (deletedFiles.nonEmpty) {
@@ -131,8 +131,7 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry =
-      getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap.toMap, lastFileId)
+    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.

@@ -36,8 +36,7 @@ class CreateAction(
     extends CreateActionBase(dataManager)
     with Action {
 
-  final override def logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, fileNameToIdMap.toMap, lastFileId)
+  final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override val transientState: String = CREATING
 
@@ -74,7 +73,7 @@ class CreateAction(
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
-  final override def op(): Unit = write(spark, df, indexConfig, fileNameToIdMap.toMap)
+  final override def op(): Unit = write(spark, df, indexConfig)
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.
