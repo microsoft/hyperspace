@@ -118,15 +118,21 @@ private[actions] abstract class RefreshActionBase(
             _) =>
           location
             .allFiles()
-            .map { f => // for each file, if it already has a file id,
-                        // add that id to its corresponding FileInfo.
+            .map { f =>
+              // For each file, if it already has a file id, add that id
+              // to its corresponding FileInfo. Note that if the content
+              // of an existing file is changed, it still keeps its id.
+              // This wont cause an issue as the file will show as
+              // deleted/appended and its index entries will be
+              // fixed during refresh.
               val filePath = f.getPath.toString
               previousIndexLogEntry.fileNameToIdMap.get(filePath) match {
                 case Some(id) =>
                   FileInfo(filePath, f.getLen, f.getModificationTime, id)
                 case _ =>
                   FileInfo(filePath, f.getLen, f.getModificationTime)
-            }}
+              }
+            }
       }
       .flatten
       .toSet
