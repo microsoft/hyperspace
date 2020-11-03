@@ -12,7 +12,7 @@ class HyperspaceTestCase(unittest.TestCase):
         self.spark = SparkSession.builder \
             .master("local[4]") \
             .config("spark.ui.enabled", "false") \
-            .config("spark.hyperspace.index.num.buckets", "5") \
+            .config("spark.hyperspace.index.numBuckets", "5") \
             .appName(class_name) \
             .getOrCreate()
 
