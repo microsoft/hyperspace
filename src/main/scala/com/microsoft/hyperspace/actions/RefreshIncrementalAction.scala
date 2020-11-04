@@ -70,7 +70,6 @@ class RefreshIncrementalAction(
         .format(previousIndexLogEntry.relations.head.fileFormat)
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
-
       write(spark, dfWithAppendedFiles, indexConfig)
     }
 

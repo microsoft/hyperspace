@@ -130,10 +130,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           opts)
     }
 
-  protected def write(
-      spark: SparkSession,
-      df: DataFrame,
-      indexConfig: IndexConfig): Unit = {
+  protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =

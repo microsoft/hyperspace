@@ -398,7 +398,7 @@ object Hdfs {
 
   /**
    * Hdfs file properties.
- *
+   *
    * @param content Content object representing Hdfs file based data source.
    * @param update Captures any updates since 'content' was created.
    */
