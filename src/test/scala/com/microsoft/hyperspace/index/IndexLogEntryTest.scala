@@ -126,22 +126,24 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |                  "properties" : { }
         |                }
         |              },
-        |              "deletedFiles" : {
-        |                "root" : {
-        |                  "name" : "",
-        |                  "files" : [ {
-        |                    "name" : "f1",
-        |                    "size" : 10,
-        |                    "modifiedTime" : 10
-        |                  }],
-        |                  "subDirs" : [ ]
+        |              "update" : {
+        |                "deletedFiles" : {
+        |                  "root" : {
+        |                    "name" : "",
+        |                    "files" : [ {
+        |                      "name" : "f1",
+        |                      "size" : 10,
+        |                      "modifiedTime" : 10
+        |                    }],
+        |                    "subDirs" : [ ]
+        |                  },
+        |                  "fingerprint" : {
+        |                    "kind" : "NoOp",
+        |                    "properties" : { }
+        |                  }
         |                },
-        |                "fingerprint" : {
-        |                  "kind" : "NoOp",
-        |                  "properties" : { }
-        |                }
-        |              },
-        |              "appendedFiles" : null
+        |                "appendedFiles" : null
+        |              }
         |            },
         |            "kind" : "HDFS"
         |          },
@@ -176,19 +178,38 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       StructType(Array(StructField("RGUID", StringType), StructField("Date", StringType)))
 
     val expectedSourcePlanProperties = SparkPlan.Properties(
-      Seq(Relation(
-        Seq("rootpath"),
-        Hdfs(Hdfs.Properties(Content(
-          Directory("", Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)), Seq())),
-          None,
-          Some(Content(Directory("", Seq(FileInfo("f1", 10, 10))))))),
-        "schema",
-        "type",
-        Map())),
+      Seq(
+        Relation(
+          Seq("rootpath"),
+          Hdfs(
+            Hdfs.Properties(
+              Content(
+                Directory(
+                  "",
+                  Seq(FileInfo("f1", 100L, 100L), FileInfo("f2", 200L, 200L)),
+                  Seq()
+                )
+              ),
+              Some(
+                Update(
+                  None,
+                  Some(Content(Directory("", Seq(FileInfo("f1", 10, 10)))))
+                )
+              )
+            )
+          ),
+          "schema",
+          "type",
+          Map()
+        )
+      ),
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signatureValue")))))
+        LogicalPlanFingerprint
+          .Properties(Seq(Signature("provider", "signatureValue")))
+      )
+    )
 
     val expected = IndexLogEntry(
       "indexName",
