@@ -21,11 +21,15 @@ import org.apache.spark.sql.internal.SQLConf
 object IndexConstants {
   val INDEXES_DIR = "indexes"
 
-  // Constants related to Spark configuration.
+  // Config used for setting the system path, which is considered as a "root" path for Hyperspace;
+  // e.g, indexes are created under the system path.
   val INDEX_SYSTEM_PATH = "spark.hyperspace.system.path"
-  val INDEX_CREATION_PATH = "spark.hyperspace.index.creation.path"
-  val INDEX_SEARCH_PATHS = "spark.hyperspace.index.search.paths"
-  val INDEX_NUM_BUCKETS = "spark.hyperspace.index.num.buckets"
+
+  // Config used to set the number of buckets for the index.
+  val INDEX_NUM_BUCKETS_LEGACY = "spark.hyperspace.index.num.buckets"
+  val INDEX_NUM_BUCKETS = "spark.hyperspace.index.numBuckets"
+  // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
+  val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
 
   // This config enables Hybrid scan on mutable dataset at query time.
   // Currently, this config allows to perform Hybrid scan on append-only dataset.
@@ -55,9 +59,6 @@ object IndexConstants {
   // In Spark 3.0, we could utilize TreeNodeTag to mark the identifier for each plan.
   // See https://github.com/microsoft/hyperspace/issues/185
   val INDEX_RELATION_IDENTIFIER: (String, String) = "indexRelation" -> "true"
-
-  // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
-  val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
 
   val INDEX_CACHE_EXPIRY_DURATION_SECONDS =
     "spark.hyperspace.index.cache.expiryDurationInSeconds"
