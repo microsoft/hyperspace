@@ -166,7 +166,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         |      "kind" : "Spark"
         |    }
         |  },
-        |  "extra" : { },
+        |  "properties" : { },
         |  "version" : "0.1",
         |  "id" : 0,
         |  "state" : "ACTIVE",
