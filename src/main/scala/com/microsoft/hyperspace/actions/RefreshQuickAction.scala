@@ -23,7 +23,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshQuickActionEvent}
 
 /**
- * Action to refresh indexes metadata only with newly appended files and deleted files.
+ * Action to refresh index metadata only with newly appended files and deleted files.
  *
  * @param spark SparkSession.
  * @param logManager Index LogManager for index being refreshed.
@@ -33,7 +33,7 @@ class RefreshQuickAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-  extends RefreshActionBase(spark, logManager, dataManager) {
+    extends RefreshActionBase(spark, logManager, dataManager) {
   final override def op(): Unit = {
     logInfo(
       "Refresh index is updating metadata only with " + deletedFiles.size + " of" +
@@ -48,14 +48,13 @@ class RefreshQuickAction(
     super.validate()
 
     if (appendedFiles.isEmpty && deletedFiles.isEmpty) {
-      throw NoChangesException("Refresh incremental aborted as no source data change found.")
+      throw NoChangesException("Refresh quick aborted as no source data change found.")
     }
 
     // To handle deleted files, lineage column is required for the index.
     if (deletedFiles.nonEmpty && !previousIndexLogEntry.hasLineageColumn(spark)) {
       throw HyperspaceException(
-        "Index refresh (to handle deleted source data) is " +
-          "only supported on an index with lineage.")
+        "Index refresh to handle deleted source data is only supported on an index with lineage.")
     }
   }
 
