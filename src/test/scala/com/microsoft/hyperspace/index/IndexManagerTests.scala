@@ -48,7 +48,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       sampleParquetDataLocation,
       Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     df = spark.read.parquet(sampleParquetDataLocation)
-    expectedLastFileId = getNumberOfFiles(df) - 1 // fileId starts from 0
+    expectedLastFileId = df.inputFiles.length - 1 // fileId starts from 0
   }
 
   after {
@@ -573,19 +573,5 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     spark.read
       .parquet(s"$systemPath/index/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version")
       .count()
-  }
-
-  private def getNumberOfFiles(df: DataFrame): Long = {
-    var fileCount = 0L
-    df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        fileCount += location.allFiles.length
-    }
-
-    fileCount
   }
 }

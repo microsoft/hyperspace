@@ -85,7 +85,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             deleteOneDataFile(partitionedDataPath, true)
           }
 
-          // Get deleted file's file id, used as lineage for its records
+          // Get deleted file's file id, used as lineage for its records.
           val ixLogPath = PathUtils.makeAbsolute(
             s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
           val ixLogJson =

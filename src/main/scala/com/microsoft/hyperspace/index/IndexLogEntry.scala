@@ -246,27 +246,24 @@ object Directory {
 
     var lastId = lastFileId
     for ((dirPath, files) <- leafDirToChildrenFiles) {
-      val allFiles = ListBuffer[FileInfo]()
-      allFiles.appendAll {
-        fileNameToIdMap match {
-          case Some(map) =>
-            files.map {
-              f =>
-                val fullPath = PathUtils.makeAbsolute(f.getPath).toString
-                val id = map.getOrElse(
-                  fullPath,
-                  {
-                    lastId += 1
-                    map.put(fullPath, lastId)
-                    lastId
-                  })
+      val allFiles = fileNameToIdMap match {
+        case Some(map) =>
+          files.map {
+            f =>
+              val fullPath = PathUtils.makeAbsolute(f.getPath).toString
+              val id = map.getOrElse(
+                fullPath,
+                {
+                  lastId += 1
+                  map.put(fullPath, lastId)
+                  lastId
+                })
 
-                FileInfo(f, id)}
-          case None =>
-            files.map(FileInfo(_))
-        }
+              FileInfo(f, id)}
+        case None =>
+          files.map(FileInfo(_))
       }
-
+      
       if (pathToDirectory.contains(dirPath)) {
         // Map already contains this directory. Just append the files to its existing list.
         pathToDirectory(dirPath).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(allFiles)
@@ -537,7 +534,7 @@ case class IndexLogEntry(
 
   @JsonIgnore
   lazy val fileNameToIdMap: Map[String, Long] = {
-    val fileNameToIdMap = mutable.Map[String, Long]()
+    val fileNameToIdMap = mutable.HashMap[String, Long]()
     sourceFileInfoSet.foreach(f => fileNameToIdMap.put(f.name, f.id))
     fileNameToIdMap.toMap
   }

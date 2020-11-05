@@ -40,7 +40,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
-  protected val fileNameToIdMap = mutable.Map[String, Long]()
+  protected val fileNameToIdMap = mutable.HashMap[String, Long]()
 
   final def lastFileId: Long = fileNameToIdMap.getOrElse(IndexConstants.LAST_FILE_ID_KEY, -1L)
 

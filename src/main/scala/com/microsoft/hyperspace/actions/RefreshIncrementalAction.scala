@@ -53,7 +53,7 @@ class RefreshIncrementalAction(
     extends RefreshActionBase(spark, logManager, dataManager) {
 
   override val fileNameToIdMap = {
-    val map = mutable.Map[String, Long]()
+    val map = mutable.HashMap[String, Long]()
     map.put(IndexConstants.LAST_FILE_ID_KEY, previousIndexLogEntry.lastFileId)
     map ++ previousIndexLogEntry.fileNameToIdMap
   }
