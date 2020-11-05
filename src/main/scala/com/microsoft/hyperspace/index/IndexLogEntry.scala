@@ -243,7 +243,6 @@ object Directory {
 
     // Hashmap from directory path to Directory object, used below for quick access from path.
     val pathToDirectory = HashMap[Path, Directory]()
-
     var lastId = lastFileId
     for ((dirPath, files) <- leafDirToChildrenFiles) {
       val allFiles = fileNameToIdMap match {
@@ -263,7 +262,7 @@ object Directory {
         case None =>
           files.map(FileInfo(_))
       }
-      
+
       if (pathToDirectory.contains(dirPath)) {
         // Map already contains this directory. Just append the files to its existing list.
         pathToDirectory(dirPath).files.asInstanceOf[ListBuffer[FileInfo]].appendAll(allFiles)
