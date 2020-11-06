@@ -18,7 +18,8 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.execution.datasources.BucketingUtils
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, OPTIMIZING}
@@ -49,9 +50,6 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
  *
  * `Full` mode: This allows for slow but complete optimization. ALL index files are
  * picked for compaction.
- *
- * TODO: Optimize can be a no-op if there is at most one optimizable file per bucket.
- *  https://github.com/microsoft/hyperspace/issues/204.
  *
  * @param spark SparkSession.
  * @param logManager IndexLogManager for index being refreshed.
@@ -94,7 +92,8 @@ class OptimizeAction(
       repartitionedDf,
       indexDataPath.toString,
       logEntry.asInstanceOf[IndexLogEntry].numBuckets,
-      indexConfig.indexedColumns)
+      indexConfig.indexedColumns,
+      SaveMode.Overwrite)
   }
 
   override def validate(): Unit = {
@@ -106,20 +105,29 @@ class OptimizeAction(
 
     if (filesToOptimize.isEmpty) {
       throw NoChangesException(
-        "Optimize aborted as no index files smaller than " +
+        "Optimize aborted as no optimizable index files smaller than " +
           s"${HyperspaceConf.optimizeFileSizeThreshold(spark)} found.")
     }
   }
 
   private lazy val (filesToOptimize, filesToIgnore): (Seq[FileInfo], Seq[FileInfo]) = {
-    if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
-      val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
-      previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
-    } else {
-      // For 'full' mode, put all the existing index files into 'filesToOptimize' partition so
-      // that one file is created per bucket.
-      (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
-    }
+    val (possibleCandidates, largeFilesToIgnore) =
+      if (mode.equalsIgnoreCase(IndexConstants.OPTIMIZE_MODE_QUICK)) {
+        val threshold = HyperspaceConf.optimizeFileSizeThreshold(spark)
+        previousIndexLogEntry.content.fileInfos.toSeq.partition(_.size < threshold)
+      } else {
+        // For 'full' mode, put all the existing index files into 'filesToOptimize' partition
+        // so that one file is created per bucket.
+        (previousIndexLogEntry.content.fileInfos.toSeq, Seq())
+      }
+
+    // Files belonging to buckets that have only one file are ignored as they don't need to
+    // be optimized.
+    val filesPerBucket =
+      possibleCandidates.groupBy(f => BucketingUtils.getBucketId(new Path(f.name).getName))
+    val (filesToOptimize, singleFilesToIgnore) = filesPerBucket.values.partition(_.length > 1)
+
+    (filesToOptimize.flatten.toSeq, singleFilesToIgnore.flatten.toSeq ++ largeFilesToIgnore)
   }
 
   override def logEntry: LogEntry = {

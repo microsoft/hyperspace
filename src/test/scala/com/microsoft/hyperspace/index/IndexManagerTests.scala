@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{BucketingUtils, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
@@ -314,7 +314,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       hyperspace.optimizeIndex(indexConfig.indexName)
 
       // Check if latest log file is updated with newly created index files.
-      validateMetadata("index", Set("v__=2"))
+      // Since we appended 3 records for incremental refresh (v_==1) and optimized as v_==2,
+      // some of index data files should be from v__=0.
+      validateMetadata("index", Set("v__=0", "v__=2"))
     }
   }
 
@@ -391,17 +393,86 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         MockEventLogger.reset()
         hyperspace.optimizeIndex(indexConfig.indexName)
 
+        val index = logManager(systemPath, indexConfig.indexName)
+          .getLatestStableLog()
+          .get
+          .asInstanceOf[IndexLogEntry]
+
         // Check that no new log files were created in this operation.
-        assert(latestId == logManager(systemPath, indexConfig.indexName).getLatestId().get)
+        assert(latestId == index.id)
+
+        // Check all index files are larger than the size threshold.
+        assert(index.content.fileInfos.forall(_.size > 1))
 
         // Check emitted events.
         MockEventLogger.emittedEvents match {
           case Seq(
               OptimizeActionEvent(_, _, "Operation started."),
               OptimizeActionEvent(_, _, msg)) =>
-            assert(msg.contains("Optimize aborted as no index files smaller than 1 found."))
+            assert(
+              msg.contains(
+                "Optimize aborted as no optimizable index files smaller than 1 found."))
           case _ => fail()
         }
+      }
+    }
+  }
+
+  test("Verify optimize is no-op if each bucket has a single index file.") {
+    withTempPathAsString { testPath =>
+      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+
+      // Check if latest log file is updated with newly created index files.
+      val latestId = logManager(systemPath, indexConfig.indexName).getLatestId().get
+
+      // Ensure all index files are smaller than the size threshold so that they can be
+      // possible candidates for optimizeIndex. In this test, as the test data is tiny,
+      // all of index files are less than the threshold.
+      {
+        val index = logManager(systemPath, indexConfig.indexName)
+          .getLatestStableLog()
+          .get
+          .asInstanceOf[IndexLogEntry]
+        assert(
+          index.content.fileInfos
+            .forall(_.size < IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD_DEFAULT))
+      }
+
+      MockEventLogger.reset()
+      hyperspace.optimizeIndex(indexConfig.indexName)
+
+      {
+        val index = logManager(systemPath, indexConfig.indexName)
+          .getLatestStableLog()
+          .get
+          .asInstanceOf[IndexLogEntry]
+
+        // Check that no new log files were created in this operation.
+        assert(latestId == index.id)
+
+        // Check all index files are not needed to be optimized. (i.e. non-optimizable)
+        val filesPerBucket =
+          index.content.files.groupBy(f => BucketingUtils.getBucketId(f.getName))
+        assert(filesPerBucket.values.forall(_.size == 1))
+      }
+
+      // Check emitted events.
+      MockEventLogger.emittedEvents match {
+        case Seq(
+            OptimizeActionEvent(_, _, "Operation started."),
+            OptimizeActionEvent(_, _, msg)) =>
+          assert(
+            msg.contains(
+              "Optimize aborted as no optimizable index files smaller than 268435456 found."))
+        case _ => fail()
       }
     }
   }
@@ -418,7 +489,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     assert(indexFiles.forall(_.getName.startsWith("part-0")))
     assert(indexLog.state.equals("ACTIVE"))
     // Check all files belong to the provided index versions only.
-    assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
+    assert(indexFiles.map(_.getParent.getName).toSet === indexVersions)
   }
 
   private def expectedIndex(
@@ -442,7 +513,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _) =>
             val files = location.allFiles
-            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
