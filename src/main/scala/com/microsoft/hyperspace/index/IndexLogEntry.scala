@@ -247,9 +247,10 @@ object Directory {
     for ((dirPath, files) <- leafDirToChildrenFiles) {
       val allFiles = fileNameToIdMap match {
         case Some(map) =>
+          map.sizeHint(files.length) // add size hint for performance improvement.
           files.map {
             f =>
-              val fullPath = PathUtils.makeAbsolute(f.getPath).toString
+              val fullPath = f.getPath.toString
               val id = map.getOrElse(
                 fullPath,
                 {
