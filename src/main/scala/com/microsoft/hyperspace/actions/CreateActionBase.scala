@@ -140,7 +140,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           }
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
         val fileFormatName = "delta"
         // "path" key in options can incur multiple data read unexpectedly and keep
         // the table version info as metadata.
