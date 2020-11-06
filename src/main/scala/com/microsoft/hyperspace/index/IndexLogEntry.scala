@@ -243,11 +243,16 @@ object Directory {
 
     // Hashmap from directory path to Directory object, used below for quick access from path.
     val pathToDirectory = HashMap[Path, Directory]()
+
+    // add size hint for performance improvement.
+    if(fileNameToIdMap.isDefined) {
+      fileNameToIdMap.get.sizeHint(files.length)
+    }
+
     var maxId = maxFileId
     for ((dirPath, files) <- leafDirToChildrenFiles) {
       val allFiles = fileNameToIdMap match {
         case Some(map) =>
-          map.sizeHint(files.length) // add size hint for performance improvement.
           files.map {
             f =>
               val fullPath = f.getPath.toString
