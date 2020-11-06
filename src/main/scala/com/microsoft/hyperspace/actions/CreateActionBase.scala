@@ -42,7 +42,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   protected val fileNameToIdMap = mutable.HashMap[String, Long]()
 
-  final def lastFileId: Long = fileNameToIdMap.getOrElse(IndexConstants.LAST_FILE_ID_KEY, -1L)
+  final def maxFileId: Long = fileNameToIdMap.getOrElse(IndexConstants.MAX_FILE_ID, -1L)
 
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
@@ -77,7 +77,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           null,
           null,
           LogicalPlanFingerprint(
-            LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
+            LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))),
+          Map(IndexConstants.MAX_FILE_ID -> maxFileId.toString))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -90,7 +91,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Content.fromDirectory(absolutePath),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
-          .withLastFileId(lastFileId, fileNameToIdMap.toMap)
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
@@ -113,8 +113,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
-          Hdfs.Properties(Content.fromLeafFiles(files, Some(fileNameToIdMap), lastFileId).get)
-        assert(lastFileId != IndexConstants.UNKNOWN_FILE_ID)
+          Hdfs.Properties(Content.fromLeafFiles(files, Some(fileNameToIdMap), maxFileId).get)
+        assert(maxFileId != IndexConstants.UNKNOWN_FILE_ID)
 
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName

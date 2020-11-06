@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
+import com.microsoft.hyperspace.index.IndexConstants.{DEFAULT_MAX_FILE_ID, MAX_FILE_ID, UNKNOWN_FILE_ID}
 import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
@@ -95,15 +95,15 @@ object Content {
    *
    * @param files List of leaf files.
    * @param fileNameToIdMap Mapping of full file paths to assigned file ids.
-   * @param lastFileId Last assigned file id.
+   * @param maxFileId Largest assigned file id value.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
       files: Seq[FileStatus],
       fileNameToIdMap: Option[mutable.Map[String, Long]] = None,
-      lastFileId: Long = UNKNOWN_FILE_ID): Option[Content] = {
+      maxFileId: Long = UNKNOWN_FILE_ID): Option[Content] = {
     if (files.nonEmpty) {
-      Some(Content(Directory.fromLeafFiles(files, fileNameToIdMap, lastFileId)))
+      Some(Content(Directory.fromLeafFiles(files, fileNameToIdMap, maxFileId)))
     } else {
       None
     }
@@ -217,19 +217,19 @@ object Directory {
    * Create a Content object from a specified list of leaf files. Any files not listed here will
    * NOT be part of the returned object.
    * fileNameToIdMap, if specified, is used to assign file id to existing files. For any new file
-   * a new file id is generated (according to lastFileId) and gets added to fileNameToIdMap.
+   * a new file id is generated (according to maxFileId) and gets added to fileNameToIdMap.
    * Pre-requisite: files list should be non-empty.
    * Pre-requisite: all files must be leaf files.
    *
    * @param files List of leaf files.
    * @param fileNameToIdMap Mapping of full file paths to assigned file ids.
-   * @param lastFileId Last assigned file id.
+   * @param maxFileId Largest assigned file id value.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
       files: Seq[FileStatus],
       fileNameToIdMap: Option[mutable.Map[String, Long]] = None,
-      lastFileId: Long = UNKNOWN_FILE_ID): Directory = {
+      maxFileId: Long = UNKNOWN_FILE_ID): Directory = {
     require(
       files.nonEmpty,
       s"Empty files list found while creating a ${Directory.getClass.getName}.")
@@ -243,7 +243,7 @@ object Directory {
 
     // Hashmap from directory path to Directory object, used below for quick access from path.
     val pathToDirectory = HashMap[Path, Directory]()
-    var lastId = lastFileId
+    var maxId = maxFileId
     for ((dirPath, files) <- leafDirToChildrenFiles) {
       val allFiles = fileNameToIdMap match {
         case Some(map) =>
@@ -253,9 +253,9 @@ object Directory {
               val id = map.getOrElse(
                 fullPath,
                 {
-                  lastId += 1
-                  map.put(fullPath, lastId)
-                  lastId
+                  maxId += 1
+                  map.put(fullPath, maxId)
+                  maxId
                 })
 
               FileInfo(f, id)}
@@ -296,7 +296,7 @@ object Directory {
     }
 
     if(fileNameToIdMap.isDefined) {
-      fileNameToIdMap.get.put(IndexConstants.LAST_FILE_ID_KEY, lastId)
+      fileNameToIdMap.get.put(IndexConstants.MAX_FILE_ID, maxId)
     }
     pathToDirectory(getRoot(files.head.getPath))
   }
@@ -430,7 +430,7 @@ object SparkPlan {
       rawPlan: String, // null for now
       sql: String, // null for now
       fingerprint: LogicalPlanFingerprint,
-      lastFileId: Long = UNKNOWN_FILE_ID)
+      properties: Map[String, String])
 }
 
 // IndexLogEntry-specific Source that uses SparkPlan as a plan.
@@ -538,16 +538,8 @@ case class IndexLogEntry(
     fileNameToIdMap.toMap
   }
 
-  def lastFileId: Long = {
-    source.plan.properties.lastFileId
-  }
-
-  def withLastFileId(lastId: Long, map: Map[String, Long]): IndexLogEntry = {
-    copy(
-      source = source.copy(
-        plan = source.plan.copy(
-          properties = source.plan.properties.copy(
-            lastFileId = lastId))))
+  def maxFileId: Long = {
+    source.plan.properties.properties.getOrElse(MAX_FILE_ID, DEFAULT_MAX_FILE_ID).toLong
   }
 
   override def hashCode(): Int = {

@@ -65,7 +65,8 @@ class JoinIndexRankerTest extends SparkFunSuite {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signClass", "sign(plan)")))))
+        LogicalPlanFingerprint.Properties(Seq(Signature("signClass", "sign(plan)")))),
+      Map())
 
     val entry = IndexLogEntry(
       name,

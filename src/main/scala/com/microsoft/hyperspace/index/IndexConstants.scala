@@ -96,5 +96,6 @@ object IndexConstants {
   val OPTIMIZE_MODES = Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL)
 
   val UNKNOWN_FILE_ID: Long = -1L
-  private[hyperspace] val LAST_FILE_ID_KEY = ""
+  private[hyperspace] val MAX_FILE_ID = "maxFileId"
+  private[hyperspace] val DEFAULT_MAX_FILE_ID = UNKNOWN_FILE_ID.toString
 }

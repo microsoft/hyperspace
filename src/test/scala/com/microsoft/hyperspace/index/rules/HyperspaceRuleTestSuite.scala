@@ -49,7 +49,8 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
               Map())),
           null,
           null,
-          LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
+          LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))),
+          Map())
 
         val indexFiles = getIndexDataFilesPaths(name).map { path =>
           new FileStatus(10, false, 1, 10, 10, path)

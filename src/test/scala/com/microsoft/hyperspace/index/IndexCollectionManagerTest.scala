@@ -43,7 +43,8 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
             Seq(),
             null,
             null,
-            LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
+            LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))),
+            Map())
 
           val entry = IndexLogEntry(
             indexPath.toString,
@@ -95,7 +96,8 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
         Seq(),
         null,
         null,
-        LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
+        LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))),
+        Map())
 
       val entry = IndexLogEntry(
         str,

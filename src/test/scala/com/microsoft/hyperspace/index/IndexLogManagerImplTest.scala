@@ -70,7 +70,8 @@ class IndexLogManagerImplTest
         null,
         null,
         LogicalPlanFingerprint(
-          LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature"))))))),
+          LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature")))),
+        Map()))),
     Map())
 
   private def getEntry(state: String): LogEntry = {

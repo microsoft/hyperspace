@@ -54,7 +54,7 @@ class RefreshIncrementalAction(
 
   override val fileNameToIdMap = {
     val map = mutable.HashMap[String, Long]()
-    map.put(IndexConstants.LAST_FILE_ID_KEY, previousIndexLogEntry.lastFileId)
+    map.put(IndexConstants.MAX_FILE_ID, previousIndexLogEntry.maxFileId)
     map ++= previousIndexLogEntry.fileNameToIdMap
   }
 

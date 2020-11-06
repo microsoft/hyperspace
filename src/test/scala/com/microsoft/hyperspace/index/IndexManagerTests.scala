@@ -37,7 +37,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
   private var df: DataFrame = _
-  private var expectedLastFileId: Long = _
+  private var expectedMaxFileId: Long = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -48,7 +48,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       sampleParquetDataLocation,
       Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     df = spark.read.parquet(sampleParquetDataLocation)
-    expectedLastFileId = df.inputFiles.length - 1 // fileId starts from 0
+    expectedMaxFileId = df.inputFiles.length - 1 // fileId starts from 0
   }
 
   after {
@@ -96,13 +96,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     // Verify if indexes returned match the actual created indexes.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -116,13 +116,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -144,13 +144,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -177,13 +177,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
       df,
-      expectedLastFileId)
+      expectedMaxFileId)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -506,7 +506,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig: IndexConfig,
       schema: StructType,
       df: DataFrame,
-      lastFileId: Long,
+      maxFileId: Long,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
 
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
@@ -543,7 +543,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(
               Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))),
-          lastFileId)
+          Map(IndexConstants.MAX_FILE_ID -> maxFileId.toString))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,
