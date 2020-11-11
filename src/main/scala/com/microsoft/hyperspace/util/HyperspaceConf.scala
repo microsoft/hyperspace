@@ -71,6 +71,14 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  def joinV2RuleEnabled(spark: SparkSession): Boolean = {
+    spark.sessionState.conf
+      .getConfString(
+        IndexConstants.JOIN_V2_RULE_ENABLED,
+        IndexConstants.JOIN_V2_RULE_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
   /**
    * Returns the config value whose key matches the first key given multiple keys. If no keys are
    * matched, the given default value is returned.

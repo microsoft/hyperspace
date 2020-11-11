@@ -19,7 +19,7 @@ package com.microsoft
 import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule, JoinIndexRuleV2}
 
 package object hyperspace {
   // The order of Hyperspace index rules does matter here, because by our current design, once an
@@ -32,7 +32,8 @@ package object hyperspace {
   // We therefore choose to put JoinIndexRule before FilterIndexRule to give join indexes
   // higher priority, because join indexes typically result in higher performance improvement
   // compared to filter indexes.
-  private val hyperspaceOptimizationRuleBatch = JoinIndexRule :: FilterIndexRule :: Nil
+  private val hyperspaceOptimizationRuleBatch =
+    JoinIndexRuleV2 :: JoinIndexRule :: FilterIndexRule :: Nil
 
   /**
    * Hyperspace-specific implicit class on SparkSession.

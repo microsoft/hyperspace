@@ -94,4 +94,8 @@ object IndexConstants {
   val OPTIMIZE_MODE_QUICK = "quick"
   val OPTIMIZE_MODE_FULL = "full"
   val OPTIMIZE_MODES = Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL)
+
+  // Config to enable JoinIndexRuleV2, which is turned off by default.
+  val JOIN_V2_RULE_ENABLED = "spark.hyperspace.rule.joinV2.enabled"
+  val JOIN_V2_RULE_ENABLED_DEFAULT = "false"
 }

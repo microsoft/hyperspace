@@ -18,6 +18,8 @@ package com.microsoft.hyperspace
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.MockEventLogger.reset
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
@@ -74,6 +76,17 @@ object TestUtils {
   def logManager(systemPath: Path, indexName: String): IndexLogManager = {
     val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
     IndexLogManagerFactoryImpl.create(indexPath)
+  }
+
+  /** Returns base relation paths for a logical plan. */
+  def basePaths(plan: LogicalPlan): Seq[Path] = {
+    plan
+      .collectLeaves()
+      .collect {
+        case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
+          location.rootPaths
+      }
+      .flatten
   }
 }
 

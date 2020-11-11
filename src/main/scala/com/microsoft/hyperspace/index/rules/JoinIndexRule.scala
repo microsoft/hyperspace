@@ -24,14 +24,14 @@ import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.index.rules.RuleUtils.isPlanModified
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -149,21 +149,6 @@ object JoinIndexRule
    */
   private def isPlanLinear(plan: LogicalPlan): Boolean =
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
-
-  /**
-   * Check if the candidate plan is already modified by Hyperspace or not.
-   * This can be determined by an identifier in options field of HadoopFsRelation.
-   *
-   * @param plan Logical plan.
-   * @return true if the relation in the plan is modified by Hyperspace.
-   */
-  private def isPlanModified(plan: LogicalPlan): Boolean = {
-    plan.find {
-      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-        RuleUtils.isIndexApplied(fsRelation)
-      case _ => false
-    }.isDefined
-  }
 
   /**
    * Requirements to support join optimizations using join indexes are as follows:
@@ -424,7 +409,7 @@ object JoinIndexRule
    * @param condition Join condition
    * @return Sequence of simple conditions from original condition
    */
-  private def extractConditions(condition: Expression): Seq[Expression] = condition match {
+  private[rules] def extractConditions(condition: Expression): Seq[Expression] = condition match {
     case EqualTo(_: AttributeReference, _: AttributeReference) =>
       Seq(condition)
     case And(left, right) =>

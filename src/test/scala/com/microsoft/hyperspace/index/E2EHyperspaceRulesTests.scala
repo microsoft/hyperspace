@@ -25,9 +25,10 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
+import com.microsoft.hyperspace.TestUtils.basePaths
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule, JoinIndexRuleV2}
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
@@ -575,6 +576,50 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         spark.enableHyperspace()
         val dfWithHyperspaceEnabled = query()
         checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+      }
+    }
+  }
+
+  test("Verify JoinIndexRuleV2 prefers lower level SMJ over higher level SMJ.") {
+    // Test Setup:
+    //      SMJ2(t1c1 = t2c1)
+    //     /   \
+    //   t1    SMJ1(t2c2 = t2c2)
+    //        /   \
+    //       t2   t2
+    // When V2 is run, this should optimize indexes for t2 for lower level SMJ for predicate
+    // t2c2 = t2c2. For higher level SMJ, only t1 gets optimized.
+    withSQLConf("spark.hyperspace.rule.joinV2.enabled" -> "true") {
+      withTempPathAsString { testPath =>
+        // Setup. Create data.
+        import spark.implicits._
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.parquet(testPath)
+
+        // Create index.
+        val indexConfig1 = IndexConfig("index1", Seq("c1"), Seq("c2", "c3"))
+        val indexConfig2 = IndexConfig("index2", Seq("c2"), Seq("c1", "c3"))
+        hyperspace.createIndex(df, indexConfig1)
+        hyperspace.createIndex(df, indexConfig2)
+
+        // Create a join query.
+        val t1 = spark.read.parquet(testPath)
+        val t2 = spark.read.parquet(testPath)
+        val t3 = spark.read.parquet(testPath)
+
+        def query(): DataFrame = {
+          val inner = t2.join(t3, t2("c2") === t3("c2")).select(t2("c1"), t3("c3"))
+          t1.join(inner, t1("c1") === inner("c1")).select(t1("c1"), inner("c3"))
+        }
+        // To keep other rules from interfering the test, we have added just JoinIndexRuleV2.
+        spark.sessionState.experimentalMethods.extraOptimizations :+= JoinIndexRuleV2
+        val expectedPaths = getIndexFilesPath("index1") ++
+          getIndexFilesPath("index2") ++ getIndexFilesPath("index2")
+        assert(basePaths(query().queryExecution.optimizedPlan) == expectedPaths)
       }
     }
   }
