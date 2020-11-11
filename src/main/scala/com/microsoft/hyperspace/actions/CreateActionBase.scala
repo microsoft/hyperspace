@@ -133,8 +133,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
-    // Make sure a unique file id is already assigned to each source data file.
-    assert(fileNameToIdMap.size > df.inputFiles.length)
+    // If adding lineage, make sure a unique file id is already assigned to each source data file.
+    assert(!indexLineageEnabled(spark) || fileNameToIdMap.size > df.inputFiles.length)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
