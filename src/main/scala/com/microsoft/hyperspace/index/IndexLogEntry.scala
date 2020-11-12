@@ -94,16 +94,14 @@ object Content {
    * NOT be part of the returned object.
    *
    * @param files List of leaf files.
-   * @param fileNameToIdMap Mapping of full file paths to assigned file ids.
-   * @param maxFileId Largest assigned file id value.
+   * @param fileIdTracker FileIdTracker to keep mapping of full file paths to assigned file ids.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
       files: Seq[FileStatus],
-      fileNameToIdMap: Option[mutable.Map[String, Long]] = None,
-      maxFileId: Long = UNKNOWN_FILE_ID): Option[Content] = {
+      fileIdTracker: Option[FileIdTracker] = None): Option[Content] = {
     if (files.nonEmpty) {
-      Some(Content(Directory.fromLeafFiles(files, fileNameToIdMap, maxFileId)))
+      Some(Content(Directory.fromLeafFiles(files, fileIdTracker)))
     } else {
       None
     }
@@ -216,20 +214,18 @@ object Directory {
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
    * NOT be part of the returned object.
-   * fileNameToIdMap, if specified, is used to assign file id to existing files. For any new file
-   * a new file id is generated (according to maxFileId) and gets added to fileNameToIdMap.
+   * fileIdTracker, if specified, is used to keep track of file ids. For a new source data file,
+   * fileIdTracker generates and assigns a new unique file id.
    * Pre-requisite: files list should be non-empty.
    * Pre-requisite: all files must be leaf files.
    *
    * @param files List of leaf files.
-   * @param fileNameToIdMap Mapping of full file paths to assigned file ids.
-   * @param maxFileId Largest assigned file id value.
+   * @param fileIdTracker FileIdTracker to keep mapping of full file paths to assigned file ids.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
       files: Seq[FileStatus],
-      fileNameToIdMap: Option[mutable.Map[String, Long]] = None,
-      maxFileId: Long = UNKNOWN_FILE_ID): Directory = {
+      fileIdTracker: Option[FileIdTracker] = None): Directory = {
     require(
       files.nonEmpty,
       s"Empty files list found while creating a ${Directory.getClass.getName}.")
@@ -245,28 +241,19 @@ object Directory {
     val pathToDirectory = HashMap[Path, Directory]()
 
     // add size hint for performance improvement.
-    if(fileNameToIdMap.isDefined) {
-      fileNameToIdMap.get.sizeHint(files.length)
+    if(fileIdTracker.isInstanceOf) {
+      fileIdTracker.get.addSizeHint(files.length)
     }
 
-    var maxId = maxFileId
     for ((dirPath, files) <- leafDirToChildrenFiles) {
-      val allFiles = fileNameToIdMap match {
-        case Some(map) =>
+      val allFiles = fileIdTracker match {
+        case Some(tracker) =>
           files.map {
             f =>
-              val fullPath = f.getPath.toString
-              val id = map.getOrElse(
-                fullPath,
-                {
-                  maxId += 1
-                  map.put(fullPath, maxId)
-                  maxId
-                })
-
-              FileInfo(f, id)}
-        case None =>
-          files.map(FileInfo(_))
+              val id = tracker.addFile(f)
+              FileInfo(f, id)
+          }
+        case None => files.map(FileInfo(_))
       }
 
       if (pathToDirectory.contains(dirPath)) {
@@ -301,9 +288,6 @@ object Directory {
       }
     }
 
-    if(fileNameToIdMap.isDefined) {
-      fileNameToIdMap.get.put(IndexConstants.MAX_FILE_ID, maxId)
-    }
     pathToDirectory(getRoot(files.head.getPath))
   }
 
@@ -557,4 +541,28 @@ object IndexLogEntry {
   val VERSION: String = "0.1"
 
   def schemaString(schema: StructType): String = schema.json
+}
+
+class FileIdTracker(private val startId: Long) {
+  private var maxId: Long = startId
+  private var fileNameToIdMap: mutable.HashMap[String, Long] = mutable.HashMap()
+
+  def getMaxFileId: Long = maxId
+
+  def getFileNameToIdMap: HashMap[String, Long] = fileNameToIdMap
+
+  def addSizeHint(size: Int): Unit = fileNameToIdMap.sizeHint(size)
+
+  def addFileIds(map: Map[String, Long]): Unit = fileNameToIdMap ++= map
+
+  def addFile(file: FileStatus): Long = {
+    val fullPath = file.getPath.toString
+    fileNameToIdMap.getOrElse(
+      fullPath,
+      {
+        maxId += 1
+        fileNameToIdMap.put(fullPath, maxId)
+        maxId
+      })
+  }
 }

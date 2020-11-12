@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
@@ -40,9 +38,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
-  protected val fileNameToIdMap = mutable.HashMap[String, Long]()
-
-  final def maxFileId: Long = fileNameToIdMap.getOrElse(IndexConstants.MAX_FILE_ID, -1L)
+  protected val fileIdTracker = new FileIdTracker(-1L)
 
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
@@ -78,7 +74,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           null,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))),
-          Map(IndexConstants.MAX_FILE_ID -> maxFileId.toString))
+          Map(IndexConstants.MAX_FILE_ID -> fileIdTracker.getMaxFileId.toString))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -113,8 +109,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
-          Hdfs.Properties(Content.fromLeafFiles(files, Some(fileNameToIdMap), maxFileId).get)
-        assert(maxFileId != IndexConstants.UNKNOWN_FILE_ID)
+          Hdfs.Properties(Content.fromLeafFiles(files, Some(fileIdTracker)).get)
+        assert(fileIdTracker.getMaxFileId != IndexConstants.UNKNOWN_FILE_ID)
 
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
@@ -134,7 +130,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val numBuckets = numBucketsForIndex(spark)
 
     // If adding lineage, make sure a unique file id is already assigned to each source data file.
-    assert(!indexLineageEnabled(spark) || fileNameToIdMap.size > df.inputFiles.length)
+    assert(
+      !indexLineageEnabled(spark) || fileIdTracker.getFileNameToIdMap.size >= df.inputFiles.length)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
@@ -205,9 +202,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val lineageDF = fileNameToIdMap.toSeq.map { kv =>
-        (kv._1.replace("file:/", "file:///"), kv._2)
-      }.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
+      val lineageDF = fileIdTracker.getFileNameToIdMap.toSeq
+        .map { kv =>
+          (kv._1.replace("file:/", "file:///"), kv._2)
+        }
+        .toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 
       df.withColumn(dataPathColumn, input_file_name())
         .join(lineageDF.hint("broadcast"), dataPathColumn)

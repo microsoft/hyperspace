@@ -52,10 +52,10 @@ class RefreshIncrementalAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
-  override val fileNameToIdMap = {
-    val map = mutable.HashMap[String, Long]()
-    map.put(IndexConstants.MAX_FILE_ID, previousIndexLogEntry.maxFileId)
-    map ++= previousIndexLogEntry.fileNameToIdMap
+  override val fileIdTracker = {
+    val tracker = new FileIdTracker(previousIndexLogEntry.maxFileId)
+    tracker.addFileIds(previousIndexLogEntry.fileNameToIdMap)
+    tracker
   }
 
   final override def op(): Unit = {
