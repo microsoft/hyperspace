@@ -390,7 +390,7 @@ case class IndexLogEntry(
     derivedDataset: CoveringIndex,
     content: Content,
     source: Source,
-    extra: Map[String, String])
+    properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
   def schema: StructType =
