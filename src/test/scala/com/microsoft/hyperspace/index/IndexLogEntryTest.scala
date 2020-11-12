@@ -172,7 +172,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |      "kind" : "Spark"
          |    }
          |  },
-         |  "extra" : { },
+         |  "properties" : { },
          |  "version" : "0.1",
          |  "id" : 0,
          |  "state" : "ACTIVE",
@@ -607,7 +607,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
           ),
           subDirs = Seq(
             Directory("c",
-            files = Seq(FileInfo("f7", 100L, 100L)))
+              files = Seq(FileInfo("f7", 100L, 100L)))
           )
         )
       )
