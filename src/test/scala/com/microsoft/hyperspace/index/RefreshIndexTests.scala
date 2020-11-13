@@ -90,8 +90,10 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
           val ixLogJson =
             FileUtils.readContents(ixLogPath.getFileSystem(new Configuration), ixLogPath)
-          val fileNameToIdMap = JsonUtils.fromJson[IndexLogEntry](ixLogJson).fileNameToIdMap
-          val fileId = fileNameToIdMap.get(deletedFile.toString)
+          val fileId = JsonUtils
+            .fromJson[IndexLogEntry](ixLogJson)
+            .fileIdTracker
+            .getFileId(deletedFile.toString)
           assert(fileId.nonEmpty)
 
           // Validate only index records whose lineage is the deleted file are removed.

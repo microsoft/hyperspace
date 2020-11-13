@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.functions.{input_file_name, udf}
+import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -38,7 +38,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
-  protected val fileIdTracker = new FileIdTracker(-1L)
+  protected val fileIdTracker = new FileIdTracker(IndexConstants.DEFAULT_MAX_FILE_ID.toLong)
 
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
@@ -110,7 +110,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, Some(fileIdTracker)).get)
-        assert(fileIdTracker.getMaxFileId != IndexConstants.UNKNOWN_FILE_ID)
+        assert(fileIdTracker.getMaxFileId != IndexConstants.DEFAULT_MAX_FILE_ID.toLong)
 
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName

@@ -124,12 +124,9 @@ private[actions] abstract class RefreshActionBase(
               // keeps its id. This will not cause an issue as the file will show as
               // deleted/appended and its index entries will be fixed during refresh.
               val filePath = f.getPath.toString
-              previousIndexLogEntry.fileNameToIdMap.get(filePath) match {
-                case Some(id) =>
-                  FileInfo(filePath, f.getLen, f.getModificationTime, id)
-                case _ =>
-                  FileInfo(filePath, f.getLen, f.getModificationTime)
-              }
+              previousIndexLogEntry.fileIdTracker.getFileId(filePath)
+                .map(FileInfo(filePath, f.getLen, f.getModificationTime, _))
+                .getOrElse(FileInfo(filePath, f.getLen, f.getModificationTime))
             }
       }
       .flatten
