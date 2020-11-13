@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -82,12 +82,23 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
-      if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
+      lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn(spark) &&
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
-      } else {
-        // For append-only Hybrid Scan, deleted files are not allowed.
-        deletedCnt == 0 && commonCnt > 0
+
+      // For append-only Hybrid Scan, deleted files are not allowed.
+      lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
+        commonCnt > 0
+
+      val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
+      if (isCandidate) {
+        // If there is no change in source dataset, the index will be applied by
+        // transformPlanToUseIndexOnlyScan.
+        entry.setTagValue(
+          plan,
+          IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+          !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
       }
+      isCandidate
     }
 
     if (hybridScanEnabled) {
@@ -157,7 +168,14 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    val transformed = if (HyperspaceConf.hybridScanEnabled(spark)) {
+    // If there is no change in source data files, the index can be applied by
+    // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
+    // This tag should always exist if Hybrid Scan is enabled.
+    lazy val hybridScanRequired = index.getTagValue(
+      getLogicalRelation(plan).get,
+      IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+
+    val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
     } else {
       transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
