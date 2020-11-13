@@ -38,7 +38,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
-  protected val fileIdTracker = new FileIdTracker(IndexConstants.DEFAULT_MAX_FILE_ID.toLong)
+  protected val fileIdTracker = new FileIdTracker
 
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)

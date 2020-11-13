@@ -524,9 +524,9 @@ case class IndexLogEntry(
 
   @JsonIgnore
   lazy val fileIdTracker: FileIdTracker = {
-    val fileNameToIdMap = mutable.HashMap[String, Long]()
-    sourceFileInfoSet.foreach(f => fileNameToIdMap.put(f.name, f.id))
-    FileIdTracker(maxFileId, fileNameToIdMap)
+    val tracker = new FileIdTracker
+    tracker.addFileIds(sourceFileInfoSet)
+    tracker
   }
 
   def maxFileId: Long = {
@@ -580,11 +580,9 @@ object IndexLogEntry {
 /**
  * Provides functionality to generate unqiue file ids for source data files
  * and track them.
- *
- * @param lastId Last assigned id. New ids will be greater than this value.
  */
-class FileIdTracker(private val lastId: Long) {
-  private var maxId: Long = lastId
+class FileIdTracker {
+  private var maxId: Long = DEFAULT_MAX_FILE_ID.toLong
   private val fileNameToIdMap: mutable.HashMap[String, Long] = mutable.HashMap()
 
   def getMaxFileId: Long = maxId
@@ -595,7 +593,14 @@ class FileIdTracker(private val lastId: Long) {
 
   def setSizeHint(size: Int): Unit = fileNameToIdMap.sizeHint(size)
 
-  def addFileIds(map: HashMap[String, Long]): Unit = fileNameToIdMap ++= map
+  // FileInfo's 'name' contains the full path to the file.
+  def addFileIds(files: Set[FileInfo]): Unit = {
+    setSizeHint(files.size)
+    files.foreach { f =>
+      fileNameToIdMap.put(f.name, f.id)
+      maxId = Math.max(maxId, f.id)
+    }
+  }
 
   /**
    * Try to add file path to fileNameToIdMap. If the file is already in
@@ -603,7 +608,7 @@ class FileIdTracker(private val lastId: Long) {
    * to current maxId, and update fileNameToIdMap.
    *
    * @param file FileStatus to be lookedup in fileNameToIdMap.
-   * @return assigned id to given file.
+   * @return assigned id to the given file.
    */
   def addFile(file: FileStatus): Long = {
     val fullPath = file.getPath.toString
@@ -613,13 +618,5 @@ class FileIdTracker(private val lastId: Long) {
         maxId += 1
         maxId
       })
-  }
-}
-
-object FileIdTracker {
-  def apply(lastId: Long, map: HashMap[String, Long]): FileIdTracker = {
-    val tracker = new FileIdTracker(lastId)
-    tracker.addFileIds(map)
-    tracker
   }
 }
