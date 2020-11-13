@@ -17,8 +17,8 @@
 package com.microsoft.hyperspace.index
 
 object IndexLogEntryTags {
-  // INDEX_HYBRIDSCAN_REQUIRED_TAG indicates if Hybrid Scan is required for this index or not.
+  // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for this index or not.
   // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
-  val INDEX_HYBRIDSCAN_REQUIRED_TAG: IndexLogEntryTag[Boolean] =
+  val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
 }

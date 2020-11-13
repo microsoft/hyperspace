@@ -495,23 +495,29 @@ case class IndexLogEntry(
   @JsonIgnore
   private val tags: mutable.Map[(LogicalPlan, IndexLogEntryTag[_]), Any] = mutable.Map.empty
 
-  def setTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], value: T): Unit =
+  def setTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], value: T): Unit = {
     tags((plan, tag)) = value
+  }
 
-  def getTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Option[T] =
+  def getTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Option[T] = {
     tags.get((plan, tag)).map(_.asInstanceOf[T])
+  }
 
-  def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit =
+  def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((plan, tag))
+  }
 
-  def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit =
+  def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
     tags((null, tag)) = value
+  }
 
-  def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] =
+  def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] = {
     tags.get((null, tag)).map(_.asInstanceOf[T])
+  }
 
-  def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit =
+  def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((null, tag))
+  }
 }
 
 // A tag of a `IndexLogEntry`, which defines name and type.

@@ -91,11 +91,11 @@ object RuleUtils {
 
       val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
-        // If there is no change in source dataset, the index can be applied by
+        // If there is no change in source dataset, the index will be applied by
         // transformPlanToUseIndexOnlyScan.
         entry.setTagValue(
           plan,
-          IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG,
+          IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
           !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
       }
       isCandidate
@@ -173,7 +173,7 @@ object RuleUtils {
     // This tag should always exist if Hybrid Scan is enabled.
     lazy val hybridScanRequired = index.getTagValue(
       getLogicalRelation(plan).get,
-      IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG).get
+      IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
