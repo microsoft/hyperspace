@@ -54,13 +54,13 @@ object JoinIndexRanker {
     indexPairs.sortWith {
       case ((left1, left2), (right1, right2)) =>
         lazy val leftCommonBytes = left1
-          .getTagValue(leftPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG)
+          .getTagValue(leftPlan, IndexLogEntryTags.COMMON_BYTES)
           .get +
-          left2.getTagValue(leftPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG).get
+          left2.getTagValue(leftPlan, IndexLogEntryTags.COMMON_BYTES).get
         lazy val rightCommonBytes = right1
-          .getTagValue(rightPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG)
+          .getTagValue(rightPlan, IndexLogEntryTags.COMMON_BYTES)
           .get +
-          right2.getTagValue(rightPlan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG).get
+          right2.getTagValue(rightPlan, IndexLogEntryTags.COMMON_BYTES).get
 
         if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
           if (!hybridScanEnabled || (leftCommonBytes == rightCommonBytes)) {

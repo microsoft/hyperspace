@@ -46,8 +46,7 @@ object FilterIndexRanker {
       case _ =>
         if (hybridScanEnabled) {
           Some(
-            candidates.maxBy(
-              _.getTagValue(plan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG).getOrElse(0L)))
+            candidates.maxBy(_.getTagValue(plan, IndexLogEntryTags.COMMON_BYTES).getOrElse(0L)))
         } else {
           // TODO: Add ranking algorithm to sort candidates.
           //  See https://github.com/microsoft/hyperspace/issues/52

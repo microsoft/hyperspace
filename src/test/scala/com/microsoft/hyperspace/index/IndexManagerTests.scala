@@ -489,7 +489,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     assert(indexFiles.forall(_.getName.startsWith("part-0")))
     assert(indexLog.state.equals("ACTIVE"))
     // Check all files belong to the provided index versions only.
-    assert(indexFiles.map(_.getParent.getName).toSet.equals(indexVersions))
+    assert(indexFiles.map(_.getParent.getName).toSet === indexVersions)
   }
 
   private def expectedIndex(
@@ -513,7 +513,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _) =>
             val files = location.allFiles
-            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files))
+            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")

@@ -16,17 +16,13 @@
 
 package com.microsoft.hyperspace.index
 
-// A tag of a `IndexLogEntry`, which defines name and type.
-case class IndexLogEntryTag[T](name: String)
-
 object IndexLogEntryTags {
-  // INDEX_HYBRIDSCAN_REQUIRED_TAG indicates if Hybrid Scan is required for this index or not.
+  // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for this index or not.
   // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
-  val INDEX_HYBRIDSCAN_REQUIRED_TAG: IndexLogEntryTag[Boolean] =
-    IndexLogEntryTag[Boolean]("hybridScanRequired")
+  val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
+  IndexLogEntryTag[Boolean]("hybridScanRequired")
 
-  // INDEX_COMMON_BYTES_TAG stores overlapping bytes of index source files and given relation.
+  // COMMON_BYTES stores overlapping bytes of index source files and given relation.
   // This is set in getCandidateIndexes and utilized in rank functions.
-  val INDEX_COMMON_BYTES_TAG: IndexLogEntryTag[Long] = IndexLogEntryTag[Long]("commonBytes")
-
+  val COMMON_BYTES: IndexLogEntryTag[Long] = IndexLogEntryTag[Long]("commonBytes")
 }

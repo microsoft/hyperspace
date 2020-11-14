@@ -61,7 +61,7 @@ object RankerTestHelper {
     }
     // This tag is originally set in getCandidateIndex, for Hybrid Scan.
     // Set tag for testing rank algorithms.
-    entry.setTagValue(plan, IndexLogEntryTags.INDEX_COMMON_BYTES_TAG, commonBytes)
+    entry.setTagValue(plan, IndexLogEntryTags.COMMON_BYTES, commonBytes)
     entry.state = Constants.States.ACTIVE
     entry
   }

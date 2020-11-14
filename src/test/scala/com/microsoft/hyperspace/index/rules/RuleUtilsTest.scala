@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.{FileInfo, IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags, LogicalPlanFingerprint, Signature}
 import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -145,7 +145,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
               assert(indexes.length === 1)
               assert(indexes.head.name === "index1")
               assert(
-                indexes.head.getTagValue(plan, IndexLogEntryTags.INDEX_HYBRIDSCAN_REQUIRED_TAG)
+                indexes.head.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
                   === expectedHybridScanTag)
             } else {
               assert(indexes.isEmpty)
@@ -298,12 +298,21 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
       "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
     withSQLConf(INDEX_HYBRID_SCAN_ENABLED -> "false") {
+      val fingerprint = LogicalPlanFingerprint(
+        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature"))))
       val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-      val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq("f1"))
-      val entry3 = entry1.withAppendedAndDeletedFiles(Seq("f2"), Seq())
+      val entry2 =
+        entry1.copyWithUpdate(fingerprint, Seq(), Seq(FileInfo("file:/dir/f1", 1, 1)))
+      val entry3 =
+        entry1.copyWithUpdate(fingerprint, Seq(FileInfo("file:/dir/f2", 1, 1)), Seq())
+      // IndexLogEntry.withAppendedAndDeletedFiles doesn't copy LogEntry's fields.
+      // Thus, set the 'state' to ACTIVE manually so that these entries are considered
+      // in RuleUtils.getCandidateIndexes.
+      entry2.state = "ACTIVE"
+      entry3.state = "ACTIVE"
       val usableIndexes =
         RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
-      assert(usableIndexes.equals(Seq(entry1)))
+      assert(usableIndexes === Seq(entry1))
     }
   }
 
