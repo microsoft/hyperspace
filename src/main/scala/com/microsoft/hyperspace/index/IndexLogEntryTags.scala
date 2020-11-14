@@ -20,7 +20,7 @@ object IndexLogEntryTags {
   // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for this index or not.
   // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
-  IndexLogEntryTag[Boolean]("hybridScanRequired")
+    IndexLogEntryTag[Boolean]("hybridScanRequired")
 
   // COMMON_BYTES stores overlapping bytes of index source files and given relation.
   // This is set in getCandidateIndexes and utilized in rank functions.
