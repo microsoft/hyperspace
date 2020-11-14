@@ -18,8 +18,8 @@ package com.microsoft.hyperspace.util
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
+import org.apache.spark.util.hyperspace.Utils
 
 /**
  * Useful json functions used around the Hyperspace codebase.
@@ -40,6 +40,6 @@ object JsonUtils {
   }
 
   def jsonToMap(json: String): Map[String, Any] = {
-    objectMapper.readValue[Map[String, Any]](json)
+    fromJson[Map[String, Any]](json)
   }
 }
