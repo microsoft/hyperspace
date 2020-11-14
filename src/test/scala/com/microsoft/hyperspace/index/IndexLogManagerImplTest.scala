@@ -46,10 +46,10 @@ class IndexLogManagerImplTest
         subDirs = Seq(
           Directory(
             "dir1",
-            Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L))),
+            Seq(FileInfo("1.json", 100L, 200L, 1L), FileInfo("2.json", 100L, 200L, 2L))),
           Directory(
             "dir2",
-            Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)))))),
+            Seq(FileInfo("1.json", 100L, 200L, 3L), FileInfo("2.json", 100L, 200L, 4L)))))),
     Source(
       SparkPlan(SparkPlan.Properties(
         Seq(Relation(
@@ -60,10 +60,10 @@ class IndexLogManagerImplTest
             subDirs = Seq(
               Directory(
                 "dir1",
-                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L))),
+                Seq(FileInfo("1.json", 100L, 200L, 5L), FileInfo("2.json", 100L, 200L, 6L))),
               Directory(
                 "dir2",
-                Seq(FileInfo("1.json", 100L, 200L), FileInfo("2.json", 100L, 200L)))))))),
+                Seq(FileInfo("1.json", 100L, 200L, 7L), FileInfo("2.json", 100L, 200L, 8L)))))))),
           "schema",
           "type",
           Map())),

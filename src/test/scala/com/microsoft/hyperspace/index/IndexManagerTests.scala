@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
@@ -28,7 +29,7 @@ import com.microsoft.hyperspace.TestUtils.{copyWithState, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -37,7 +38,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
   private var df: DataFrame = _
-  private var expectedMaxFileId: Long = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -48,7 +48,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       sampleParquetDataLocation,
       Seq("Date", "RGUID", "Query", "imprs", "clicks"))
     df = spark.read.parquet(sampleParquetDataLocation)
-    expectedMaxFileId = df.inputFiles.length - 1 // fileId starts from 0
   }
 
   after {
@@ -95,14 +94,12 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     val expectedIndex1 = expectedIndex(
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     // Verify if indexes returned match the actual created indexes.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -115,14 +112,12 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     val expectedIndex1 = expectedIndex(
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -143,14 +138,12 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     val expectedIndex1 = expectedIndex(
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -176,14 +169,12 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     val expectedIndex1 = expectedIndex(
       indexConfig1,
       StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     val expectedIndex2 = expectedIndex(
       indexConfig2,
       StructType(Seq(StructField("Query", StringType), StructField("imprs", IntegerType))),
-      df,
-      expectedMaxFileId)
+      df)
 
     // Verify expected list of indexes before delete.
     verifyIndexes(Seq(expectedIndex1, expectedIndex2))
@@ -506,9 +497,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       indexConfig: IndexConfig,
       schema: StructType,
       df: DataFrame,
-      maxFileId: Long,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
 
+    val fileIdTracker = getFileIdTracker(indexConfig)
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = df.queryExecution.optimizedPlan.collect {
@@ -524,7 +515,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               _,
               _) =>
             val files = location.allFiles
-            val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
+            val sourceDataProperties =
+              Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
             val fileFormatName = fileFormat match {
               case d: DataSourceRegister => d.shortName
               case other => throw HyperspaceException(s"Unsupported file format $other")
@@ -553,8 +545,10 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
           Content.fromDirectory(
-            PathUtils.makeAbsolute(new Path(s"$systemPath/${indexConfig.indexName}" +
-              s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"))),
+            PathUtils.makeAbsolute(
+              new Path(s"$systemPath/${indexConfig.indexName}" +
+                s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
+            fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state
@@ -572,5 +566,15 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     spark.read
       .parquet(s"$systemPath/index/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version")
       .count()
+  }
+
+  private def getFileIdTracker(indexConfig: IndexConfig): FileIdTracker = {
+    val ixLogPath = PathUtils.makeAbsolute(
+      s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
+    val ixLogJson =
+      FileUtils.readContents(ixLogPath.getFileSystem(new Configuration), ixLogPath)
+    JsonUtils
+      .fromJson[IndexLogEntry](ixLogJson)
+      .fileIdTracker
   }
 }

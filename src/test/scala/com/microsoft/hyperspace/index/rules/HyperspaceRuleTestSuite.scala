@@ -63,7 +63,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               10)),
-          Content.fromLeafFiles(indexFiles).get,
+          Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

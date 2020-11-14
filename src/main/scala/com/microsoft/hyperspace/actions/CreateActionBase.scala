@@ -83,7 +83,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets)),
-          Content.fromDirectory(absolutePath),
+          Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -108,7 +108,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
-          Hdfs.Properties(Content.fromLeafFiles(files, Some(fileIdTracker)).get)
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         assert(fileIdTracker.getMaxFileId != IndexConstants.INITIAL_FILE_ID)
 
         val fileFormatName = fileFormat match {

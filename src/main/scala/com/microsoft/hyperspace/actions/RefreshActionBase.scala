@@ -122,12 +122,8 @@ private[actions] abstract class RefreshActionBase(
               // For each file, if it already has a file id, add that id to its corresponding
               // FileInfo. Note that if content of an existing file is changed, it is treated
               // as a new file (i.e. its current file id is no longer valid).
-              val filePath = f.getPath.toString
-              val size = f.getLen
-              val timestamp = f.getModificationTime
-              previousIndexLogEntry.fileIdTracker.getFileId(filePath, size, timestamp)
-                .map(FileInfo(filePath, size, timestamp, _))
-                .getOrElse(FileInfo(filePath, size, timestamp))
+              val id = previousIndexLogEntry.fileIdTracker.addFile(f)
+              FileInfo(f, id)
             }
       }
       .flatten

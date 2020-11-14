@@ -23,12 +23,12 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{LongType, StructType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -82,7 +82,6 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
-
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
 
@@ -113,8 +112,16 @@ object RuleUtils {
               _,
               _,
               _) =>
-            location.allFiles.map(f =>
-              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+            location.allFiles.map(
+              f =>
+              // For a given file, file id is only meaningful in the context of a given
+              // index. At this point, we dont know which index, if any, would be picked.
+              // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
+                FileInfo(
+                  f.getPath.toString,
+                  f.getLen,
+                  f.getModificationTime,
+                  IndexConstants.UNKNOWN_FILE_ID))
         }
       assert(filesByRelations.length == 1)
       // index.deletedFiles and index.appendedFiles should be non-empty until Hybrid Scan
@@ -172,9 +179,8 @@ object RuleUtils {
     // If there is no change in source data files, the index can be applied by
     // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
-    lazy val hybridScanRequired = index.getTagValue(
-      getLogicalRelation(plan).get,
-      IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+    lazy val hybridScanRequired =
+      index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
@@ -274,7 +280,7 @@ object RuleUtils {
             _,
             _) =>
         val curFiles = location.allFiles
-          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+          .map(f => FileInfo(f, index.fileIdTracker.addFile(f)))
 
         val (filesDeleted, filesAppended) =
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
