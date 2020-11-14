@@ -35,8 +35,7 @@ class IndexTests extends SparkFunSuite {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))),
-      Map())
+        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
 
     val entry = IndexLogEntry(
       config.indexName,

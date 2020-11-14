@@ -97,5 +97,5 @@ object IndexConstants {
 
   private[hyperspace] val UNKNOWN_FILE_ID: Long = -1L
   private[hyperspace] val MAX_FILE_ID = "maxFileId"
-  private[hyperspace] val DEFAULT_MAX_FILE_ID = "-1"
+  private[hyperspace] val INITIAL_FILE_ID = -1L
 }

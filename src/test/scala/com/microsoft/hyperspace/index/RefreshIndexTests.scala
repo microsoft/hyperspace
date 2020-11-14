@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
@@ -93,7 +93,10 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val fileId = JsonUtils
             .fromJson[IndexLogEntry](ixLogJson)
             .fileIdTracker
-            .getFileId(deletedFile.toString)
+            .getFileId(
+              deletedFile.getPath.toString,
+              deletedFile.getLen,
+              deletedFile.getModificationTime)
           assert(fileId.nonEmpty)
 
           // Validate only index records whose lineage is the deleted file are removed.
@@ -219,8 +222,8 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     // Replace a source data file with a new file with same name but different properties.
     val deletedFile = deleteOneDataFile(nonPartitionedDataPath)
     val sourcePath = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.head)
-    val fs = deletedFile.getFileSystem(new Configuration)
-    fs.copyToLocalFile(sourcePath, deletedFile)
+    val fs = deletedFile.getPath.getFileSystem(new Configuration)
+    fs.copyToLocalFile(sourcePath, deletedFile.getPath)
 
     {
       // Check the index log entry before refresh.
@@ -244,14 +247,14 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(indexLogEntry.appendedFiles.isEmpty)
 
       val files = indexLogEntry.relations.head.data.properties.content.files
-      assert(files.exists(_.equals(deletedFile)))
+      assert(files.exists(_.equals(deletedFile.getPath)))
       assert(
         getIndexFilesCount(indexLogEntry, version = 1) == indexLogEntry.content.fileInfos.size)
     }
 
     // Modify the file again.
     val sourcePath2 = new Path(spark.read.parquet(nonPartitionedDataPath).inputFiles.last)
-    fs.copyToLocalFile(sourcePath2, deletedFile)
+    fs.copyToLocalFile(sourcePath2, deletedFile.getPath)
 
     new RefreshIncrementalAction(
       spark,
@@ -266,7 +269,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
       assert(indexLogEntry.appendedFiles.isEmpty)
       assert(logManager(systemPath, indexConfig.indexName).getLatestId().get == 5)
       val files = indexLogEntry.relations.head.data.properties.content.files
-      assert(files.exists(_.equals(deletedFile)))
+      assert(files.exists(_.equals(deletedFile.getPath)))
       assert(
         getIndexFilesCount(indexLogEntry, version = 2) == indexLogEntry.content.fileInfos.size)
     }
@@ -401,9 +404,9 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
    *
    * @param path Path to the parent folder containing data files.
    * @param isPartitioned Is data folder partitioned or not.
-   * @return Path to the deleted file.
+   * @return Deleted file's FileStatus.
    */
-  private def deleteOneDataFile(path: String, isPartitioned: Boolean = false): Path = {
+  private def deleteOneDataFile(path: String, isPartitioned: Boolean = false): FileStatus = {
     val dataPath = if (isPartitioned) s"$path/*/*" else path
     TestUtils.deleteFiles(dataPath, "*parquet", 1).head
   }

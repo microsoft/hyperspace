@@ -214,9 +214,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       LogicalPlanFingerprint(
         LogicalPlanFingerprint
           .Properties(Seq(Signature("provider", "signatureValue")))
-      ),
-      Map(IndexConstants.MAX_FILE_ID -> "2")
-    )
+      ))
 
     val expected = IndexLogEntry(
       "indexName",

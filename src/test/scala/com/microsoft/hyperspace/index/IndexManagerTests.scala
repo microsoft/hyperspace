@@ -542,8 +542,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           null,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(
-              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))),
-          Map(IndexConstants.MAX_FILE_ID -> maxFileId.toString))
+              Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
 
         val entry = IndexLogEntry(
           indexConfig.indexName,

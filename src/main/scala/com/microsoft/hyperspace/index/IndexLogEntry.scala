@@ -32,7 +32,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexConstants.{DEFAULT_MAX_FILE_ID, MAX_FILE_ID, UNKNOWN_FILE_ID}
+import com.microsoft.hyperspace.index.IndexConstants.{INITIAL_FILE_ID, MAX_FILE_ID, UNKNOWN_FILE_ID}
 import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
@@ -96,7 +96,7 @@ object Content {
    * NOT be part of the returned object.
    *
    * @param files List of leaf files.
-   * @param fileIdTracker FileIdTracker to keep mapping of full file paths to assigned file ids.
+   * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
@@ -222,8 +222,9 @@ object Directory {
    * Pre-requisite: all files must be leaf files.
    *
    * @param files List of leaf files.
-   * @param fileIdTracker FileIdTracker to keep mapping of full file paths to assigned file ids.
-   *                      Any new file gets added to fileIdTracker along along with its id.
+   * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
+   *                      Note: If a new leaf file is discovered, the input fileIdTracker gets
+    *                     updated by adding it to the files it is tracking.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
@@ -420,8 +421,7 @@ object SparkPlan {
       relations: Seq[Relation],
       rawPlan: String, // null for now
       sql: String, // null for now
-      fingerprint: LogicalPlanFingerprint,
-      properties: Map[String, String])
+      fingerprint: LogicalPlanFingerprint)
 }
 
 // IndexLogEntry-specific Source that uses SparkPlan as a plan.
@@ -529,10 +529,6 @@ case class IndexLogEntry(
     tracker
   }
 
-  def maxFileId: Long = {
-    source.plan.properties.properties.getOrElse(MAX_FILE_ID, DEFAULT_MAX_FILE_ID).toLong
-  }
-
   override def hashCode(): Int = {
     config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
   }
@@ -578,42 +574,42 @@ object IndexLogEntry {
 }
 
 /**
- * Provides functionality to generate unqiue file ids for source data files
+ * Provides functionality to generate unique file ids for source data files
  * and track them.
  */
 class FileIdTracker {
-  private var maxId: Long = DEFAULT_MAX_FILE_ID.toLong
-  private val fileNameToIdMap: mutable.HashMap[String, Long] = mutable.HashMap()
+  private var maxId: Long = INITIAL_FILE_ID
+  private val fileToIdMap: mutable.HashMap[(String, Long, Long), Long] = mutable.HashMap()
 
   def getMaxFileId: Long = maxId
 
-  def getFileNameToIdMap: HashMap[String, Long] = fileNameToIdMap
+  def getFileToIdMap: HashMap[(String, Long, Long), Long] = fileToIdMap
 
-  def getFileId(filePath: String): Option[Long] = fileNameToIdMap.get(filePath)
+  def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
+    fileToIdMap.get((path, size, modifiedTime))
 
-  def setSizeHint(size: Int): Unit = fileNameToIdMap.sizeHint(size)
+  def setSizeHint(size: Int): Unit = fileToIdMap.sizeHint(size)
 
   // FileInfo's 'name' contains the full path to the file.
   def addFileIds(files: Set[FileInfo]): Unit = {
     setSizeHint(files.size)
     files.foreach { f =>
-      fileNameToIdMap.put(f.name, f.id)
+      fileToIdMap.put((f.name, f.size, f.modifiedTime), f.id)
       maxId = Math.max(maxId, f.id)
     }
   }
 
   /**
-   * Try to add file path to fileNameToIdMap. If the file is already in
+   * Try to add file path to fileToIdMap. If the file is already in
    * the map then return its id. Otherwise, generate a new id, according
-   * to current maxId, and update fileNameToIdMap.
+   * to current maxId, and update fileToIdMap.
    *
-   * @param file FileStatus to be lookedup in fileNameToIdMap.
+   * @param file FileStatus to lookup in fileToIdMap.
    * @return assigned id to the given file.
    */
   def addFile(file: FileStatus): Long = {
-    val fullPath = file.getPath.toString
-    fileNameToIdMap.getOrElseUpdate(
-      fullPath,
+    fileToIdMap.getOrElseUpdate(
+      (file.getPath.toString, file.getLen, file.getModificationTime),
       {
         maxId += 1
         maxId

@@ -73,8 +73,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           null,
           null,
           LogicalPlanFingerprint(
-            LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))),
-          Map(IndexConstants.MAX_FILE_ID -> fileIdTracker.getMaxFileId.toString))
+            LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -110,7 +109,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, Some(fileIdTracker)).get)
-        assert(fileIdTracker.getMaxFileId != IndexConstants.DEFAULT_MAX_FILE_ID.toLong)
+        assert(fileIdTracker.getMaxFileId != IndexConstants.INITIAL_FILE_ID)
 
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
@@ -131,7 +130,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // If adding lineage, make sure a unique file id is already assigned to each source data file.
     assert(
-      !indexLineageEnabled(spark) || fileIdTracker.getFileNameToIdMap.size >= df.inputFiles.length)
+      !indexLineageEnabled(spark) || fileIdTracker.getFileToIdMap.size >= df.inputFiles.length)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
@@ -190,21 +189,19 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
 
       // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a
-      // Long data type value. fileNameToIdMap is already populated with unique file ids
-      // which Hyperspace has assigned to source data files. Therefore, by joining
-      // fileNameToIdMap content with index records, each index record gets its source
-      // data file id as its lineage value. The normalized path of source data file
-      // for each record is the join key.
-      // Example:
+      // Long data type value. Each source data file has a unique file id, assigned by
+      // Hyperspace. We populate lineage column by joining these file ids with index records.
+      // The normalized path of source data file for each record is the join key.
+      // Path normalization example:
       // - Original raw path (output of input_file_name() udf, before normalization):
       //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet
-      // - Normalized path used in join:
+      // - Normalized path (used in join):
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val lineageDF = fileIdTracker.getFileNameToIdMap.toSeq
+      val lineageDF = fileIdTracker.getFileToIdMap.toSeq
         .map { kv =>
-          (kv._1.replace("file:/", "file:///"), kv._2)
+          (kv._1._1.replace("file:/", "file:///"), kv._2)
         }
         .toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 

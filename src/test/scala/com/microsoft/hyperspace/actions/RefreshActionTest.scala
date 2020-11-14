@@ -70,8 +70,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))),
-      Map())
+        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
 
     val entry = IndexLogEntry(
       "index1",
