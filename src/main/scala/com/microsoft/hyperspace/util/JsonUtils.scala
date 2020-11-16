@@ -36,10 +36,10 @@ object JsonUtils {
   }
 
   def fromJson[T: Manifest](json: String): T = {
-    objectMapper.readValue[Map[String, Any]](json)
+    objectMapper.readValue[T](json)
   }
 
   def jsonToMap(json: String): Map[String, Any] = {
-    fromJson[Map[String, Any]](json)
+    objectMapper.readValue[Map[String, Any]](json)
   }
 }
