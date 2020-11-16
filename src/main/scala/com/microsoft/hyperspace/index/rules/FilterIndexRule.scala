@@ -48,7 +48,7 @@ object FilterIndexRule
     // Currently, this rule replaces a relation with an index when:
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
-    plan transformDown {
+    val ret = plan transformDown {
       case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, fsRelation) =>
         try {
           val candidateIndexes =
@@ -81,6 +81,7 @@ object FilterIndexRule
             originalPlan
         }
     }
+    spark.sharedState.cacheManager.useCachedData(ret)
   }
 
   /**

@@ -30,6 +30,7 @@ import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.index.rules.FilterIndexRule.spark
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
@@ -55,39 +56,42 @@ object JoinIndexRule
     with Logging
     with HyperspaceEventLogging
     with ActiveSparkSession {
-  def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
-    case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
-      try {
-        getBestIndexPair(l, r, condition)
-          .map {
-            case (lIndex, rIndex) =>
-              val updatedPlan =
-                join
-                  .copy(
-                    left =
-                      RuleUtils.transformPlanToUseIndex(spark, lIndex, l, useBucketSpec = true),
-                    right =
-                      RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
+  def apply(plan: LogicalPlan): LogicalPlan = {
+    val ret = plan transformUp {
+      case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
+        try {
+          getBestIndexPair(l, r, condition)
+            .map {
+              case (lIndex, rIndex) =>
+                val updatedPlan =
+                  join
+                    .copy(
+                      left =
+                        RuleUtils.transformPlanToUseIndex(spark, lIndex, l, useBucketSpec = true),
+                      right =
+                        RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
 
-              logEvent(
-                HyperspaceIndexUsageEvent(
-                  AppInfo(
-                    sparkContext.sparkUser,
-                    sparkContext.applicationId,
-                    sparkContext.appName),
-                  Seq(lIndex, rIndex),
-                  join.toString,
-                  updatedPlan.toString,
-                  "Join index rule applied."))
+                logEvent(
+                  HyperspaceIndexUsageEvent(
+                    AppInfo(
+                      sparkContext.sparkUser,
+                      sparkContext.applicationId,
+                      sparkContext.appName),
+                    Seq(lIndex, rIndex),
+                    join.toString,
+                    updatedPlan.toString,
+                    "Join index rule applied."))
 
-              updatedPlan
-          }
-          .getOrElse(join)
-      } catch {
-        case e: Exception =>
-          logWarning("Non fatal exception in running join index rule: " + e.getMessage)
-          join
-      }
+                updatedPlan
+            }
+            .getOrElse(join)
+        } catch {
+          case e: Exception =>
+            logWarning("Non fatal exception in running join index rule: " + e.getMessage)
+            join
+        }
+    }
+    spark.sharedState.cacheManager.useCachedData(ret)
   }
 
   /**
@@ -315,14 +319,10 @@ object JoinIndexRule
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
-    val lIndexes = RuleUtils.getCandidateIndexes(
-      spark,
-      lUsable,
-      RuleUtils.getLogicalRelation(left).get)
-    val rIndexes = RuleUtils.getCandidateIndexes(
-      spark,
-      rUsable,
-      RuleUtils.getLogicalRelation(right).get)
+    val lIndexes =
+      RuleUtils.getCandidateIndexes(spark, lUsable, RuleUtils.getLogicalRelation(left).get)
+    val rIndexes =
+      RuleUtils.getCandidateIndexes(spark, rUsable, RuleUtils.getLogicalRelation(right).get)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 

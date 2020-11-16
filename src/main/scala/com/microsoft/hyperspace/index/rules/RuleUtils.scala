@@ -19,12 +19,13 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StringType, StructType}
 
@@ -171,9 +172,8 @@ object RuleUtils {
     // If there is no change in source data files, the index can be applied by
     // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
-    lazy val hybridScanRequired = index.getTagValue(
-      getLogicalRelation(plan).get,
-      IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+    lazy val hybridScanRequired =
+      index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
@@ -236,7 +236,16 @@ object RuleUtils {
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-        baseRelation.copy(relation = relation, output = updatedOutput)
+        val indexRel = baseRelation.copy(relation = relation, output = updatedOutput)
+
+        if (spark.sharedState.cacheManager.lookupCachedData(indexRel).isEmpty) {
+          // scalastyle:off
+          println("New cachhing index: " + indexRel)
+          val qe = spark.sessionState.executePlan(indexRel)
+          val indexDf = new Dataset[Row](spark, indexRel, RowEncoder(qe.analyzed.schema))
+          spark.sharedState.cacheManager.cacheQuery(indexDf)
+        }
+        indexRel
     }
   }
 
