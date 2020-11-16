@@ -22,10 +22,6 @@ import java.io.File
  * This class is used to expose package private methods from org.apache.spark.util.Utils.
  */
 object Utils {
-  def classIsLoadable(className: String): Boolean = {
-    org.apache.spark.util.Utils.classIsLoadable(className)
-  }
-
   def classForName(className: String): Class[_] = {
     org.apache.spark.util.Utils.classForName(className)
   }
