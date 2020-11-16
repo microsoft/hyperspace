@@ -102,14 +102,12 @@ class CachingIndexCollectionManager(
     super.optimize(indexName, mode)
   }
 
-  override def cache(indexName: String): Unit = {
-    clearCache()
-    super.cache(indexName)
+  override def cache(indexName: String, withBucketSpec: Boolean): Unit = {
+    super.cache(indexName, withBucketSpec)
   }
 
-  override def uncache(indexName: String): Unit = {
-    clearCache()
-    super.uncache(indexName)
+  override def uncache(indexName: String, withBucketSpec: Boolean): Unit = {
+    super.uncache(indexName, withBucketSpec)
   }
 }
 

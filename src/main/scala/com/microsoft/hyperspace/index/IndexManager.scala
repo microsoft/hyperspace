@@ -76,8 +76,8 @@ trait IndexManager {
    */
   def optimize(indexName: String, mode: String): Unit
 
-  def cache(indexName: String): Unit
-  def uncache(indexName: String): Unit
+  def cache(indexName: String, withBucketSpec: Boolean): Unit
+  def uncache(indexName: String, withBucketSpec: Boolean): Unit
 
   /**
    * Cancel api to bring back index from an inconsistent state to the last known stable state.

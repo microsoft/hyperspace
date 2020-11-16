@@ -89,7 +89,7 @@ class IndexCollectionManager(
     }
   }
 
-  override def cache(indexName: String): Unit = {
+  override def cache(indexName: String, withBucketSpec: Boolean): Unit = {
     withLogManager(indexName) { logManager =>
       val indexLogEntry = logManager.getLatestLog().get.asInstanceOf[IndexLogEntry]
       val df = {
@@ -107,12 +107,12 @@ class IndexCollectionManager(
         spark,
         indexLogEntry,
         df.queryExecution.optimizedPlan,
-        false)
+        withBucketSpec)
       assert(indexLogEntry.getTagValue(IndexLogEntryTags.CACHE_REQUIRED).isEmpty)
     }
   }
 
-  override def uncache(indexName: String): Unit = {
+  override def uncache(indexName: String, withBucketSpec: Boolean): Unit = {
     withLogManager(indexName) { logManager =>
       val indexLogEntry = logManager.getLatestLog().get.asInstanceOf[IndexLogEntry]
       val df = {
@@ -130,7 +130,7 @@ class IndexCollectionManager(
         spark,
         indexLogEntry,
         df.queryExecution.optimizedPlan,
-        false)
+        withBucketSpec)
       assert(indexLogEntry.getTagValue(IndexLogEntryTags.UNCACHE_REQUIRED).isEmpty)
     }
   }

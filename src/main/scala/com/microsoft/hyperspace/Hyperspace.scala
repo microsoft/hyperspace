@@ -104,12 +104,12 @@ class Hyperspace(spark: SparkSession) {
     indexManager.optimize(indexName, OPTIMIZE_MODE_QUICK)
   }
 
-  def cache(indexName: String): Unit = {
-    indexManager.cache(indexName)
+  def cache(indexName: String, withBucketSpec: Boolean): Unit = {
+    indexManager.cache(indexName, withBucketSpec)
   }
 
-  def uncache(indexName: String): Unit = {
-    indexManager.uncache(indexName)
+  def uncache(indexName: String, withBucketSpec: Boolean): Unit = {
+    indexManager.uncache(indexName, withBucketSpec)
   }
 
   /**
