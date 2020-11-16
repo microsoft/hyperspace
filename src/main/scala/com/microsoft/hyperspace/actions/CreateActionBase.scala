@@ -116,7 +116,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-        assert(fileIdTracker.getFileToIdMap.nonEmpty)
 
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName

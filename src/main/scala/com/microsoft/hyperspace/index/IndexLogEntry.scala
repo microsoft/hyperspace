@@ -523,7 +523,7 @@ case class IndexLogEntry(
   @JsonIgnore
   lazy val fileIdTracker: FileIdTracker = {
     val tracker = new FileIdTracker
-    tracker.addFileIds(sourceFileInfoSet ++ content.fileInfos)
+    tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
     tracker
   }
 
@@ -596,11 +596,17 @@ class FileIdTracker {
   def setSizeHint(size: Int): Unit = fileToIdMap.sizeHint(size)
 
   // FileInfo's 'name' contains the full path to the file.
-  def addFileIds(files: Set[FileInfo]): Unit = {
+  def addFileInfo(files: Set[FileInfo]): Unit = {
     setSizeHint(files.size)
     files.foreach { f =>
-      fileToIdMap.put((f.name, f.size, f.modifiedTime), f.id)
-      maxId = Math.max(maxId, f.id)
+    val key = (f.name, f.size, f.modifiedTime)
+    fileToIdMap.get(key) match {
+      case Some(id) =>
+        assert(id == f.id)
+      case _ =>
+        fileToIdMap.put(key, f.id)
+        maxId = Math.max(maxId, f.id)
+      }
     }
   }
 

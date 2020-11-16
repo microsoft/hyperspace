@@ -95,6 +95,9 @@ object IndexConstants {
   val OPTIMIZE_MODE_FULL = "full"
   val OPTIMIZE_MODES = Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL)
 
+  // Default id used for a file which does not have an id or its id is not known.
   private[hyperspace] val UNKNOWN_FILE_ID: Long = -1L
+
+  // JSON property name used in index metadata to store whether lineage is enabled for an index.
   private[hyperspace] val LINEAGE_PROPERTY = "lineage"
 }
