@@ -38,7 +38,8 @@ class IndexLogManagerImplTest
       CoveringIndex.Properties(
         CoveringIndex.Properties.Columns(Seq("id"), Seq("name", "school")),
         "id INT name STRING school STRING",
-        100)),
+        100,
+        Map())),
     Content(
       Directory(
         "/root/log",

@@ -44,7 +44,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     HyperspaceConf.numBucketsForIndex(spark)
   }
 
-  protected def indexLineageEnabled(spark: SparkSession): Boolean = {
+  protected def hasLineage(spark: SparkSession): Boolean = {
     HyperspaceConf.indexLineageEnabled(spark)
   }
 
@@ -75,6 +75,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
+        val coveringIndexProperties = if (hasLineage(spark)) {
+          Map(IndexConstants.LINEAGE_PROPERTY -> "true")
+        } else {
+          Map[String, String]()
+        }
+
         IndexLogEntry(
           indexConfig.indexName,
           CoveringIndex(
@@ -82,7 +88,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               CoveringIndex.Properties
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(indexDataFrame.schema),
-              numBuckets)),
+              numBuckets,
+              coveringIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
@@ -109,7 +116,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-        assert(fileIdTracker.getMaxFileId != IndexConstants.INITIAL_FILE_ID)
+        assert(fileIdTracker.getFileToIdMap.nonEmpty)
 
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
@@ -130,7 +137,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // If adding lineage, make sure a unique file id is already assigned to each source data file.
     assert(
-      !indexLineageEnabled(spark) || fileIdTracker.getFileToIdMap.size >= df.inputFiles.length)
+      !hasLineage(spark) || fileIdTracker.getFileToIdMap.size >= df.inputFiles.length)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
@@ -177,9 +184,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val addLineage = indexLineageEnabled(spark)
 
-    val indexDF = if (addLineage) {
+    val indexDF = if (hasLineage(spark)) {
       // Lineage is captured using two sets of columns:
       // 1. DATA_FILE_ID_COLUMN column contains source data file id for each index record.
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
@@ -192,6 +198,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // Long data type value. Each source data file has a unique file id, assigned by
       // Hyperspace. We populate lineage column by joining these file ids with index records.
       // The normalized path of source data file for each record is the join key.
+      // We normalize paths by removing extra preceding `/` characters in them,
+      // similar to the way they are stored in Content in an IndexLogEntry instance.
       // Path normalization example:
       // - Original raw path (output of input_file_name() udf, before normalization):
       //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet

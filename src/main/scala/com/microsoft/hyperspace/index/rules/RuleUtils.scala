@@ -114,9 +114,9 @@ object RuleUtils {
               _) =>
             location.allFiles.map(
               f =>
-              // For a given file, file id is only meaningful in the context of a given
-              // index. At this point, we dont know which index, if any, would be picked.
-              // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
+                // For a given file, file id is only meaningful in the context of a given
+                // index. At this point, we do not know which index, if any, would be picked.
+                // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
                 FileInfo(
                   f.getPath.toString,
                   f.getLen,

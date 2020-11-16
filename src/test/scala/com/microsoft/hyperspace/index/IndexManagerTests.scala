@@ -543,7 +543,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
               CoveringIndex.Properties
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
-              IndexConstants.INDEX_NUM_BUCKETS_DEFAULT)),
+              IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
+              Map())),
           Content.fromDirectory(
             PathUtils.makeAbsolute(
               new Path(s"$systemPath/${indexConfig.indexName}" +

@@ -48,6 +48,8 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
 
+  override val fileIdTracker = previousIndexLogEntry.fileIdTracker
+
   // Refresh maintains the same number of buckets as the existing index to be consistent
   // throughout all index versions. For "full" refresh mode, we could allow to change configs
   // like num buckets or lineage column as it is newly building the index data. This might
@@ -58,7 +60,7 @@ private[actions] abstract class RefreshActionBase(
 
   // Refresh maintains the same lineage column config as the existing index.
   // See above getNumBucketsConfig for more detail.
-  override protected final def indexLineageEnabled(spark: SparkSession): Boolean = {
+  override protected final def hasLineage(spark: SparkSession): Boolean = {
     previousIndexLogEntry.hasLineageColumn
   }
 
@@ -122,7 +124,7 @@ private[actions] abstract class RefreshActionBase(
               // For each file, if it already has a file id, add that id to its corresponding
               // FileInfo. Note that if content of an existing file is changed, it is treated
               // as a new file (i.e. its current file id is no longer valid).
-              val id = previousIndexLogEntry.fileIdTracker.addFile(f)
+              val id = fileIdTracker.addFile(f)
               FileInfo(f, id)
             }
       }

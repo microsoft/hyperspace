@@ -91,7 +91,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |        "included" : [ "col2", "col3" ]
          |      },
          |      "schemaString" : "$schemaString",
-         |      "numBuckets" : 200
+         |      "numBuckets" : 200,
+         |      "properties" : {}
          |    },
          |    "kind" : "CoveringIndex"
          |  },
@@ -226,7 +227,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
           CoveringIndex.Properties
             .Columns(Seq("col1"), Seq("col2", "col3")),
           schema.json,
-          200)),
+          200,
+          Map())),
       Content(Directory("rootContentPath")),
       Source(SparkPlan(expectedSourcePlanProperties)),
       Map())

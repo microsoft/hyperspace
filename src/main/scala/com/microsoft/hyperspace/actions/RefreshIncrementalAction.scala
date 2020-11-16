@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.collection.mutable
-
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.functions.col
 
@@ -51,8 +49,6 @@ class RefreshIncrementalAction(
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
-
-  override val fileIdTracker = previousIndexLogEntry.fileIdTracker
 
   final override def op(): Unit = {
     logInfo(
@@ -106,7 +102,7 @@ class RefreshIncrementalAction(
     }
 
     // To handle deleted files, lineage column is required for the index.
-    if (deletedFiles.nonEmpty && !previousIndexLogEntry.hasLineageColumn) {
+    if (deletedFiles.nonEmpty && !hasLineage(spark)) {
       throw HyperspaceException(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
