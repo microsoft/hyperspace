@@ -17,16 +17,14 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
-import com.microsoft.hyperspace.index.rules.{FilterIndexCacheRule, RuleUtils}
+import com.microsoft.hyperspace.index.rules.RuleUtils
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -103,7 +101,7 @@ class IndexCollectionManager(
       }
 
       indexLogEntry.setTagValue(IndexLogEntryTags.CACHE_REQUIRED, true)
-      RuleUtils.transformPlanToUseIndex(
+      RuleUtils.transformPlanToUseIndexOnlyScan(
         spark,
         indexLogEntry,
         df.queryExecution.optimizedPlan,
@@ -126,7 +124,7 @@ class IndexCollectionManager(
       }
 
       indexLogEntry.setTagValue(IndexLogEntryTags.UNCACHE_REQUIRED, true)
-      RuleUtils.transformPlanToUseIndex(
+      RuleUtils.transformPlanToUseIndexOnlyScan(
         spark,
         indexLogEntry,
         df.queryExecution.optimizedPlan,

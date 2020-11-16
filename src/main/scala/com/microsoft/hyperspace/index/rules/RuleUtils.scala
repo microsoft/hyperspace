@@ -212,7 +212,7 @@ object RuleUtils {
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
    * @return Transformed logical plan that leverages an index.
    */
-  private def transformPlanToUseIndexOnlyScan(
+  private[hyperspace] def transformPlanToUseIndexOnlyScan(
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
