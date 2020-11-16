@@ -104,6 +104,14 @@ class Hyperspace(spark: SparkSession) {
     indexManager.optimize(indexName, OPTIMIZE_MODE_QUICK)
   }
 
+  def cache(indexName: String): Unit = {
+    indexManager.cache(indexName)
+  }
+
+  def uncache(indexName: String): Unit = {
+    indexManager.uncache(indexName)
+  }
+
   /**
    * Optimize index by changing the underlying index data layout (e.g., compaction).
    *

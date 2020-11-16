@@ -21,4 +21,10 @@ object IndexLogEntryTags {
   // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
+
+  val CACHE_REQUIRED: IndexLogEntryTag[Boolean] =
+    IndexLogEntryTag[Boolean]("cacheRequired")
+
+  val UNCACHE_REQUIRED: IndexLogEntryTag[Boolean] =
+    IndexLogEntryTag[Boolean]("uncacheRequired")
 }

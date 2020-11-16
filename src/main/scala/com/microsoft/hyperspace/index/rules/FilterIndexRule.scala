@@ -206,3 +206,31 @@ object ExtractFilterNode {
     case _ => None // plan does not match with any of filter index rule patterns
   }
 }
+
+object FilterIndexCacheRule
+  extends Rule[LogicalPlan]
+    with Logging
+    with HyperspaceEventLogging
+    with ActiveSparkSession {
+  override def apply(plan: LogicalPlan): LogicalPlan = {
+    val indexManager = Hyperspace
+      .getContext(spark)
+      .indexCollectionManager
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+    val rel = RuleUtils.getLogicalRelation(plan).get
+    // scalastyle:off
+    println(allIndexes.length)
+    val applied = rel.collect {
+      case baseRelation@LogicalRelation(rel: HadoopFsRelation, baseOutput, _, _) if RuleUtils.isIndexApplied(rel) =>
+        true
+    }
+    if (applied.nonEmpty && applied.head) {
+      plan
+    } else {
+      println("rel: " + rel)
+      println("plan: " + plan)
+      val candidateIndexes = RuleUtils.getCandidateIndexes(spark, allIndexes, rel)
+      RuleUtils.transformPlanToUseIndex(spark, candidateIndexes.head, plan, true)
+    }
+  }
+}

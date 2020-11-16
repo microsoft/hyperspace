@@ -17,12 +17,16 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.index.rules.{FilterIndexCacheRule, RuleUtils}
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -82,6 +86,52 @@ class IndexCollectionManager(
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
       new OptimizeAction(spark, logManager, dataManager, mode).run()
+    }
+  }
+
+  override def cache(indexName: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val indexLogEntry = logManager.getLatestLog().get.asInstanceOf[IndexLogEntry]
+      val df = {
+        val rels = indexLogEntry.relations
+        val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
+        spark.read
+          .schema(dataSchema)
+          .format(rels.head.fileFormat)
+          .options(rels.head.options)
+          .load(rels.head.rootPaths: _*)
+      }
+
+      indexLogEntry.setTagValue(IndexLogEntryTags.CACHE_REQUIRED, true)
+      RuleUtils.transformPlanToUseIndex(
+        spark,
+        indexLogEntry,
+        df.queryExecution.optimizedPlan,
+        false)
+      assert(indexLogEntry.getTagValue(IndexLogEntryTags.CACHE_REQUIRED).isEmpty)
+    }
+  }
+
+  override def uncache(indexName: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val indexLogEntry = logManager.getLatestLog().get.asInstanceOf[IndexLogEntry]
+      val df = {
+        val rels = indexLogEntry.relations
+        val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
+        spark.read
+          .schema(dataSchema)
+          .format(rels.head.fileFormat)
+          .options(rels.head.options)
+          .load(rels.head.rootPaths: _*)
+      }
+
+      indexLogEntry.setTagValue(IndexLogEntryTags.UNCACHE_REQUIRED, true)
+      RuleUtils.transformPlanToUseIndex(
+        spark,
+        indexLogEntry,
+        df.queryExecution.optimizedPlan,
+        false)
+      assert(indexLogEntry.getTagValue(IndexLogEntryTags.UNCACHE_REQUIRED).isEmpty)
     }
   }
 

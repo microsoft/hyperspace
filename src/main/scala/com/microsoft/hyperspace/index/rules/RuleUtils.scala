@@ -238,12 +238,28 @@ object RuleUtils {
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         val indexRel = baseRelation.copy(relation = relation, output = updatedOutput)
 
-        if (spark.sharedState.cacheManager.lookupCachedData(indexRel).isEmpty) {
-          // scalastyle:off
-          println("New cachhing index: " + indexRel)
-          val qe = spark.sessionState.executePlan(indexRel)
-          val indexDf = new Dataset[Row](spark, indexRel, RowEncoder(qe.analyzed.schema))
-          spark.sharedState.cacheManager.cacheQuery(indexDf)
+        if (index.getTagValue(IndexLogEntryTags.CACHE_REQUIRED).getOrElse(false)) {
+          if (spark.sharedState.cacheManager
+            .lookupCachedData(indexRel)
+            .isEmpty) {
+            // scalastyle:off
+            println("Caching index: " + indexRel)
+            val qe = spark.sessionState.executePlan(indexRel)
+            val indexDf = new Dataset[Row](spark, indexRel, RowEncoder(qe.analyzed.schema))
+            spark.sharedState.cacheManager.cacheQuery(indexDf)
+          }
+          index.unsetTagValue(IndexLogEntryTags.CACHE_REQUIRED)
+        }
+        if (index.getTagValue(IndexLogEntryTags.UNCACHE_REQUIRED).getOrElse(false)) {
+          if (spark.sharedState.cacheManager
+            .lookupCachedData(indexRel)
+            .nonEmpty) {
+            println("Uncaching index: " + indexRel)
+            val qe = spark.sessionState.executePlan(indexRel)
+            val indexDf = new Dataset[Row](spark, indexRel, RowEncoder(qe.analyzed.schema))
+            spark.sharedState.cacheManager.uncacheQuery(indexDf, cascade = false, blocking = false)
+          }
+          index.unsetTagValue(IndexLogEntryTags.UNCACHE_REQUIRED)
         }
         indexRel
     }
