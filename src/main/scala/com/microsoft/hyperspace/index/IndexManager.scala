@@ -76,6 +76,9 @@ trait IndexManager {
    */
   def optimize(indexName: String, mode: String): Unit
 
+  def cache(indexName: String, withBucketSpec: Boolean): Unit
+  def uncache(indexName: String, withBucketSpec: Boolean): Unit
+
   /**
    * Cancel api to bring back index from an inconsistent state to the last known stable state.
    * E.g. if operation fails during creation, thus in "CREATING" state, the index will not allow
