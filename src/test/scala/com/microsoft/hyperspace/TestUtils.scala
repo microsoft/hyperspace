@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, Path}
 
 import com.microsoft.hyperspace.MockEventLogger.reset
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
@@ -55,18 +55,17 @@ object TestUtils {
    * @param path Path to the folder containing files.
    * @param pattern File name pattern to delete.
    * @param numFilesToDelete Number of files to delete.
-   * @return Paths to the deleted file.
+   * @return Deleted files' FileStatus.
    */
-  def deleteFiles(path: String, pattern: String, numFilesToDelete: Int): Seq[Path] = {
+  def deleteFiles(path: String, pattern: String, numFilesToDelete: Int): Seq[FileStatus] = {
     val pathToDelete = new Path(path, pattern)
-    val fileNames = pathToDelete
+    val files = pathToDelete
       .getFileSystem(new Configuration)
       .globStatus(pathToDelete)
-      .map(_.getPath)
 
-    assert(fileNames.length >= numFilesToDelete)
-    val filesToDelete = fileNames.take(numFilesToDelete)
-    filesToDelete.foreach(FileUtils.delete(_))
+    assert(files.length >= numFilesToDelete)
+    val filesToDelete = files.take(numFilesToDelete)
+    filesToDelete.foreach(f => FileUtils.delete(f.getPath))
 
     filesToDelete
   }
