@@ -18,7 +18,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 
-package com.fasterxml.jackson.module.scala
+package com.fasterxml.jackson.hyperspace.module.scala
 
 import java.io.{File, InputStream, Reader}
 import java.net.URL
