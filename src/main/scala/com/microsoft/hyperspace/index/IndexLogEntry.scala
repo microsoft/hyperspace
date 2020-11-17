@@ -595,17 +595,34 @@ class FileIdTracker {
 
   def setSizeHint(size: Int): Unit = fileToIdMap.sizeHint(size)
 
-  // FileInfo's 'name' contains the full path to the file.
+  /**
+   * Add a set of FileInfos to the fileToIdMap. The assumption is
+   * that the each FileInfo already has a valid file id if an entry
+   * with that key already exists in the fileToIdMap, then it has
+   * the same file id (i.e. no new file id is generated and only
+   * maxId is updated according to the new entries).
+   *
+   * @param files Set of FileInfo instances to add to the fileToIdMap.
+   */
   def addFileInfo(files: Set[FileInfo]): Unit = {
     setSizeHint(files.size)
     files.foreach { f =>
-    val key = (f.name, f.size, f.modifiedTime)
-    fileToIdMap.get(key) match {
-      case Some(id) =>
-        assert(id == f.id)
-      case _ =>
-        fileToIdMap.put(key, f.id)
-        maxId = Math.max(maxId, f.id)
+      val key = (f.name, f.size, f.modifiedTime)
+      fileToIdMap.get(key) match {
+        case Some(id) =>
+          if (id != f.id) {
+            throw HyperspaceException(
+              "Adding file info with a conflicting id. " +
+                s"(existing id: $id, new id: ${f.id}, file: ${f.name}).")
+          }
+        case _ =>
+          if (f.id == IndexConstants.UNKNOWN_FILE_ID) {
+            throw HyperspaceException(
+              s"Can not add file info with unknown id. (file: ${f.name}).")
+          }
+
+          fileToIdMap.put(key, f.id)
+          maxId = Math.max(maxId, f.id)
       }
     }
   }
