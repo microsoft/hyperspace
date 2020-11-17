@@ -61,7 +61,8 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
           CoveringIndex.Properties
             .Columns(Seq("RGUID"), Seq("Date")),
           IndexLogEntry.schemaString(schema),
-          10)),
+          10,
+          Map())),
       Content(Directory(indexDir)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

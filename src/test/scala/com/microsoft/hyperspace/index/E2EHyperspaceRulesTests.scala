@@ -612,7 +612,8 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
     versions.flatMap { v =>
       Content
         .fromDirectory(
-          new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$v"))
+          new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$v"),
+          new FileIdTracker)
         .files
     }
   }

@@ -78,7 +78,7 @@ object IndexConstants {
     val HTML = "html"
   }
 
-  private[hyperspace] val DATA_FILE_NAME_COLUMN = "_data_file_name"
+  private[hyperspace] val DATA_FILE_NAME_ID = "_data_file_id"
   val INDEX_LINEAGE_ENABLED = "spark.hyperspace.index.lineage.enabled"
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
 
@@ -94,4 +94,10 @@ object IndexConstants {
   val OPTIMIZE_MODE_QUICK = "quick"
   val OPTIMIZE_MODE_FULL = "full"
   val OPTIMIZE_MODES = Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL)
+
+  // Default id used for a file which does not have an id or its id is not known.
+  private[hyperspace] val UNKNOWN_FILE_ID: Long = -1L
+
+  // JSON property name used in index metadata to store whether lineage is enabled for an index.
+  private[hyperspace] val LINEAGE_PROPERTY = "lineage"
 }

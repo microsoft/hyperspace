@@ -49,6 +49,7 @@ class RefreshIncrementalAction(
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
+
   final override def op(): Unit = {
     logInfo(
       "Refresh index is updating index by removing index entries " +
@@ -71,8 +72,7 @@ class RefreshIncrementalAction(
       val refreshDF =
         spark.read
           .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-          .filter(
-            !col(IndexConstants.DATA_FILE_NAME_COLUMN).isin(deletedFiles.map(_.name): _*))
+          .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedFiles.map(_.id): _*))
 
       // Write refreshed data using Append mode if there are index data files from appended files.
       val writeMode = if (appendedFiles.nonEmpty) {
@@ -102,7 +102,7 @@ class RefreshIncrementalAction(
     }
 
     // To handle deleted files, lineage column is required for the index.
-    if (deletedFiles.nonEmpty && !previousIndexLogEntry.hasLineageColumn(spark)) {
+    if (deletedFiles.nonEmpty && !hasLineage(spark)) {
       throw HyperspaceException(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
