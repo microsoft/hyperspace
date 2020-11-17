@@ -607,21 +607,21 @@ class FileIdTracker {
   def addFileInfo(files: Set[FileInfo]): Unit = {
     setSizeHint(files.size)
     files.foreach { f =>
+      if (f.id == IndexConstants.UNKNOWN_FILE_ID) {
+        throw HyperspaceException(
+          s"Cannot add file info with unknown id. (file: ${f.name}).")
+      }
+
       val key = (f.name, f.size, f.modifiedTime)
-      fileToIdMap.get(key) match {
+      fileToIdMap.put(key, f.id) match {
         case Some(id) =>
           if (id != f.id) {
             throw HyperspaceException(
               "Adding file info with a conflicting id. " +
                 s"(existing id: $id, new id: ${f.id}, file: ${f.name}).")
           }
-        case _ =>
-          if (f.id == IndexConstants.UNKNOWN_FILE_ID) {
-            throw HyperspaceException(
-              s"Can not add file info with unknown id. (file: ${f.name}).")
-          }
 
-          fileToIdMap.put(key, f.id)
+        case None =>
           maxId = Math.max(maxId, f.id)
       }
     }

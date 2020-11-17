@@ -431,12 +431,12 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
   }
 
   private def getFileIdTracker(indexConfig: IndexConfig): FileIdTracker = {
-    val ixLogPath = PathUtils.makeAbsolute(
+    val indexLogPath = PathUtils.makeAbsolute(
       s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
-    val ixLogJson =
-      FileUtils.readContents(ixLogPath.getFileSystem(new Configuration), ixLogPath)
+    val indexLogJson =
+      FileUtils.readContents(indexLogPath.getFileSystem(new Configuration), indexLogPath)
     JsonUtils
-      .fromJson[IndexLogEntry](ixLogJson)
+      .fromJson[IndexLogEntry](indexLogJson)
       .fileIdTracker
   }
 }
