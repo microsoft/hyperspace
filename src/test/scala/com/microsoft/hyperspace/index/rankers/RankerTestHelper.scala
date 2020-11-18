@@ -52,7 +52,8 @@ object RankerTestHelper {
           CoveringIndex.Properties
             .Columns(indexCols.map(_.name), includedCols.map(_.name)),
           IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-          numBuckets)),
+          numBuckets,
+          Map())),
       Content(Directory(name)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

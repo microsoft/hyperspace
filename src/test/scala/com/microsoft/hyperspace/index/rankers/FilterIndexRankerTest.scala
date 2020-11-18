@@ -57,8 +57,8 @@ class FilterIndexRankerTest extends HyperspaceSuite {
     "rank() should return the index with the largest common bytes of source files" +
       "if HybridScan is enabled") {
 
-    val fileList1 = Seq(FileInfo("a", 1, 1), FileInfo("b", 1, 1))
-    val fileList2 = Seq(FileInfo("c", 1, 1), FileInfo("d", 1, 1))
+    val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 1, 1, 3))
+    val fileList2 = Seq(FileInfo("c", 1, 1, 2), FileInfo("d", 1, 1, 4))
 
     val ind1 =
       RankerTestHelper.createIndex(

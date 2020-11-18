@@ -75,8 +75,8 @@ class JoinIndexRankerTest extends HyperspaceSuite {
   }
 
   test("rank() should prefer the largest common bytes if HybridScan is enabled") {
-    val fileList1 = Seq(FileInfo("a", 1, 1), FileInfo("b", 2, 1))
-    val fileList2 = Seq(FileInfo("c", 1, 1), FileInfo("d", 1, 1))
+    val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 2, 1, 2))
+    val fileList2 = Seq(FileInfo("c", 1, 1, 3), FileInfo("d", 1, 1, 4))
     val l_10 = RankerTestHelper.createIndex("l1", Seq(t1c1), Seq(t1c2), 10, fileList1, dummy)
     val l_20 = RankerTestHelper.createIndex("l2", Seq(t1c1), Seq(t1c2), 20, fileList2, dummy)
     val r_10 = RankerTestHelper.createIndex("r1", Seq(t2c1), Seq(t2c2), 10, fileList1, dummy)
