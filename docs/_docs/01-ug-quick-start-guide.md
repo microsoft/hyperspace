@@ -27,7 +27,7 @@ For your Maven project, add the following lines to your `pom.xml` file:
 <dependency>
     <groupId>com.microsoft.hyperspace</groupId>
     <artifactId>hyperspace-core_2.11</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -37,7 +37,7 @@ For your Maven project, add the following lines to your `pom.xml` file:
 <dependency>
     <groupId>com.microsoft.hyperspace</groupId>
     <artifactId>hyperspace-core_2.12</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -45,7 +45,7 @@ For your Maven project, add the following lines to your `pom.xml` file:
 For you SBT project, add the following line to your `build.sbt` file:
 
 ```
-libraryDependencies += "com.microsoft.hyperspace" %% "hyperspace-core" % "0.2.0"
+libraryDependencies += "com.microsoft.hyperspace" %% "hyperspace-core" % "0.3.0"
 ```
 
 ### Run with an interactive shell
@@ -55,7 +55,7 @@ To use Hyperspace with a Spark's interactive shell, you need to download/install
 Start the Spark Scala shell as follows:
 
 ```
-./bin/spark-shell --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.2.0
+./bin/spark-shell --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.3.0
 ```
 
 #### PySpark
@@ -67,7 +67,7 @@ pip install pyspark==2.4.2
 
 Then, run PySpark with the Hyperspace package:
 ```
-pyspark --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.2.0
+pyspark --packages com.microsoft.hyperspace:hyperspace-core_2.11:0.3.0
 ```
 
 ## Hyperspace APIs

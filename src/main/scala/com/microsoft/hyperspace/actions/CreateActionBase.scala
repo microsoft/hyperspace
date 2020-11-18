@@ -19,8 +19,7 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.{input_file_name, udf}
+import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -39,11 +38,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       .getOrElse(dataManager.getPath(0))
   }
 
+  protected val fileIdTracker = new FileIdTracker
+
   protected def numBucketsForIndex(spark: SparkSession): Int = {
     HyperspaceConf.numBucketsForIndex(spark)
   }
 
-  protected def indexLineageEnabled(spark: SparkSession): Boolean = {
+  protected def hasLineage(spark: SparkSession): Boolean = {
     HyperspaceConf.indexLineageEnabled(spark)
   }
 
@@ -74,6 +75,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
+        val coveringIndexProperties = if (hasLineage(spark)) {
+          Map(IndexConstants.LINEAGE_PROPERTY -> "true")
+        } else {
+          Map[String, String]()
+        }
+
         IndexLogEntry(
           indexConfig.indexName,
           CoveringIndex(
@@ -81,8 +88,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               CoveringIndex.Properties
                 .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
               IndexLogEntry.schemaString(indexDataFrame.schema),
-              numBuckets)),
-          Content.fromDirectory(absolutePath),
+              numBuckets,
+              coveringIndexProperties)),
+          Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
@@ -106,7 +114,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
+        val sourceDataProperties =
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+
         val fileFormatName = fileFormat match {
           case d: DataSourceRegister => d.shortName
           case other => throw HyperspaceException(s"Unsupported file format: $other")
@@ -169,34 +179,40 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
-    val addLineage = indexLineageEnabled(spark)
 
-    val indexDF = if (addLineage) {
+    val indexDF = if (hasLineage(spark)) {
       // Lineage is captured using two sets of columns:
-      // 1. DATA_FILE_NAME_COLUMN column contains source data filename for each index record.
+      // 1. DATA_FILE_ID_COLUMN column contains source data file id for each index record.
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
       val missingPartitionColumns = getPartitionColumns(df).filter(
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
 
-      // File path value in DATA_FILE_NAME_COLUMN column is stored as String. We normalize
-      // path values in this column by removing extra preceding `/` characters in the path
-      // and store it the same way paths are stored in Content in an IndexLogEntry instance.
-      // Normalizing path values in DATA_FILE_NAME_COLUMN column keeps path representation
-      // unified in Hyperspace (between index lineage and index metadata) and helps performance
-      // by avoiding the need to fix paths (i.e. removing extra `/` characters) each time
-      // value of DATA_FILE_NAME_COLUMN column is read.
-      // Here is an example of normalization:
+      // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a
+      // Long data type value. Each source data file has a unique file id, assigned by
+      // Hyperspace. We populate lineage column by joining these file ids with index records.
+      // The normalized path of source data file for each record is the join key.
+      // We normalize paths by removing extra preceding `/` characters in them,
+      // similar to the way they are stored in Content in an IndexLogEntry instance.
+      // Path normalization example:
       // - Original raw path (output of input_file_name() udf, before normalization):
       //    + file:///C:/hyperspace/src/test/part-00003.snappy.parquet
-      // - Normalized path to be stored in DATA_FILE_NAME_COLUMN column:
+      // - Normalized path (used in join):
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
-      val absolutePath: UserDefinedFunction = udf(
-        (filePath: String) => filePath.replace("file:///", "file:/"))
+      import spark.implicits._
+      val dataPathColumn = "_data_path"
+      val lineageDF = fileIdTracker.getFileToIdMap.toSeq
+        .map { kv =>
+          (kv._1._1.replace("file:/", "file:///"), kv._2)
+        }
+        .toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 
-      df.select(allIndexColumns.head, allIndexColumns.tail: _*)
-        .withColumn(IndexConstants.DATA_FILE_NAME_COLUMN, absolutePath(input_file_name()))
+      df.withColumn(dataPathColumn, input_file_name())
+        .join(lineageDF.hint("broadcast"), dataPathColumn)
+        .select(
+          allIndexColumns.head,
+          allIndexColumns.tail :+ IndexConstants.DATA_FILE_NAME_ID: _*)
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }

@@ -92,7 +92,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: join rule, appended data should be shuffled with indexed columns " +
-      "and merged by BucketUnion") {
+      "and merged by BucketUnion.") {
     val df1 = spark.read.format(fileFormat).load(sampleDataFormatAppend)
     val df2 = spark.read.format(fileFormat).load(sampleDataFormatAppend2)
     def joinQuery(): DataFrame = {
@@ -190,7 +190,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: filter rule and non-parquet format," +
-      "appended data should be shuffled and merged by Union") {
+      "appended data should be shuffled and merged by Union.") {
     val df = spark.read.format(fileFormat2).load(sampleDataFormat2Append)
     def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
@@ -264,7 +264,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Delete-only: index relation should have additional filter for deleted files") {
+  test("Delete-only: index relation should have additional filter for deleted files.") {
     // Test for both file format
     Seq(
       (sampleDataFormatDelete, "index_ParquetDelete", "parquet"),
@@ -295,7 +295,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
                 Not(In(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
               // Check new filter condition on lineage column.
-              assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+              assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
               val deleted = deletedFileNames.map(_.toString)
               assert(deleted.length === 2)
               assert(deleted.distinct.length === deleted.length)
@@ -326,8 +326,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test(
-    "Delete-only: join rule, deleted files should be excluded from each index data relation.") {
+  test("Delete-only: join rule, deleted files should be excluded from each index data relation.") {
     val df1 = spark.read.format(fileFormat).load(sampleDataFormatDelete)
     val df2 = spark.read.format(fileFormat).load(sampleDataFormatDelete3)
     def joinQuery(): DataFrame = {
@@ -356,7 +355,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
               Not(In(attr, deletedFileNames)),
               LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
             val deleted = deletedFileNames.map(_.toString)
             assert(deleted.length === 2)
             assert(deleted.distinct.length === deleted.length)
@@ -390,7 +389,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Delete-only: filter rule, number of delete files threshold") {
+  test("Delete-only: filter rule, number of delete files threshold.") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       setupIndexAndChangeData(
@@ -453,7 +452,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
           // Check new filter condition on lineage column.
           val colName = left.toString
           val deletedFile = right.toString
-          assert(colName.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+          assert(colName.contains(IndexConstants.DATA_FILE_NAME_ID))
           assert(!df.inputFiles.contains(deletedFile))
           assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
           assert(fsRelation.location.inputFiles.length === 4)
@@ -489,7 +488,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
             // Check filter pushed down properly.
             val filterStr = dataFilters.toString
             assert(filterStr.contains(" <= 2000)"))
-            if (filterStr.contains(IndexConstants.DATA_FILE_NAME_COLUMN)) {
+            if (filterStr.contains(IndexConstants.DATA_FILE_NAME_ID)) {
               assert(deletedFilesList.flatten.forall(filterStr.contains(_)))
               assert(!deletePushDownFilterFound)
               deletePushDownFilterFound = true
@@ -497,7 +496,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
             p
           case _: ShuffleExchangeExec =>
             // Make sure there is no shuffle.
-            fail("ShuffleExchangeExec node found")
+            fail("ShuffleExchangeExec node found.")
         }
 
         assert(execNodes.count(_.isInstanceOf[UnionExec]) === 1)
@@ -545,7 +544,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
                 Not(InSet(attr, deletedFileNames)),
                 LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
             // Check new filter condition on lineage column.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
             // This node should be df2 - Filter-Not-InSet with 2 deleted files.
             assert(deletedFileNames.size === 2)
             val deleted = deletedFileNames.map(_.toString).toSeq
@@ -564,7 +563,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
             val colName = left.toString
             val deletedFile = right.toString
             // This node should be df1 - Filter-Not with 1 deleted files.
-            assert(colName.contains(IndexConstants.DATA_FILE_NAME_COLUMN))
+            assert(colName.contains(IndexConstants.DATA_FILE_NAME_ID))
             assert(!df1.inputFiles.contains(deletedFile))
             assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
             assert(fsRelation.location.inputFiles.length === 4)
@@ -614,7 +613,7 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
               val filterStr = dataFilters.toString
               assert(filterStr.contains(" >= 2000)") && filterStr.contains(" <= 4000)"))
               // Check deleted files.
-              if (filterStr.contains(IndexConstants.DATA_FILE_NAME_COLUMN)) {
+              if (filterStr.contains(IndexConstants.DATA_FILE_NAME_ID)) {
                 deletedFiles = deletedFiles.filterNot(filterStr.contains(_))
                 deleteFilesPushDownFilterCnt += 1
               }

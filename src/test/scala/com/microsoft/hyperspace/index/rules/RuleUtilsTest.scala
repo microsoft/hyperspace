@@ -302,9 +302,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature"))))
       val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
       val entry2 =
-        entry1.copyWithUpdate(fingerprint, Seq(), Seq(FileInfo("file:/dir/f1", 1, 1)))
+        entry1.copyWithUpdate(fingerprint, Seq(), Seq(FileInfo("file:/dir/f1", 1, 1, 1L)))
       val entry3 =
-        entry1.copyWithUpdate(fingerprint, Seq(FileInfo("file:/dir/f2", 1, 1)), Seq())
+        entry1.copyWithUpdate(fingerprint, Seq(FileInfo("file:/dir/f2", 1, 1, 2L)), Seq())
       // IndexLogEntry.withAppendedAndDeletedFiles doesn't copy LogEntry's fields.
       // Thus, set the 'state' to ACTIVE manually so that these entries are considered
       // in RuleUtils.getCandidateIndexes.
