@@ -20,17 +20,18 @@ import java.io.FileNotFoundException
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{HashMap, ListBuffer}
+import scala.collection.mutable
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.{PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -52,7 +53,8 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
     rec(
       new Path(root.name),
       root,
-      (f, prefix) => FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime)).toSet
+      (f, prefix) =>
+        FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
   }
 
   private def rec[T](
@@ -74,6 +76,7 @@ object Content {
    *
    * @param path Starting directory path under which the files will be considered part of the
    *             Directory object.
+   * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
    * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
@@ -83,20 +86,24 @@ object Content {
    */
   def fromDirectory(
       path: Path,
+      fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromDirectory(path, pathFilter, throwIfNotExists))
+    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, throwIfNotExists))
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
    * NOT be part of the returned object.
    *
    * @param files List of leaf files.
+   * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(files: Seq[FileStatus]): Option[Content] = {
+  def fromLeafFiles(
+      files: Seq[FileStatus],
+      fileIdTracker: FileIdTracker): Option[Content] = {
     if (files.nonEmpty) {
-      Some(Content(Directory.fromLeafFiles(files)))
+      Some(Content(Directory.fromLeafFiles(files, fileIdTracker)))
     } else {
       None
     }
@@ -174,6 +181,7 @@ object Directory {
    *
    * @param path Starting directory path under which the files will be considered part of the
    *             Directory object.
+   * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
    * @param throwIfNotExists If true, throw FileNotFoundException if path is not found. If set to
@@ -182,13 +190,14 @@ object Directory {
    */
   def fromDirectory(
       path: Path,
+      fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Directory = {
     val fs = path.getFileSystem(new Configuration)
     val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists, fs)
 
     if (leafFiles.nonEmpty) {
-      fromLeafFiles(leafFiles)
+      fromLeafFiles(leafFiles, fileIdTracker)
     } else {
       // leafFiles is empty either because the directory doesn't exist on disk or this directory
       // and all its subdirectories, if present, are empty. In both cases, create an empty
@@ -208,14 +217,21 @@ object Directory {
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
-   * NOT be part of the returned object
+   * NOT be part of the returned object.
+   * fileIdTracker is used to keep track of file ids. For a new source data file, FileIdTracker
+   * generates a new unique file id and assigns it to the file.
    * Pre-requisite: files list should be non-empty.
    * Pre-requisite: all files must be leaf files.
    *
    * @param files List of leaf files.
+   * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
+   *                      Note: If a new leaf file is discovered, the input fileIdTracker gets
+    *                     updated by adding it to the files it is tracking.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(files: Seq[FileStatus]): Directory = {
+  def fromLeafFiles(
+      files: Seq[FileStatus],
+      fileIdTracker: FileIdTracker): Directory = {
     require(
       files.nonEmpty,
       s"Empty files list found while creating a ${Directory.getClass.getName}.")
@@ -230,9 +246,11 @@ object Directory {
     // Hashmap from directory path to Directory object, used below for quick access from path.
     val pathToDirectory = HashMap[Path, Directory]()
 
+    // Set size hint for performance improvement.
+    fileIdTracker.setSizeHint(files.length)
+
     for ((dirPath, files) <- leafDirToChildrenFiles) {
-      val allFiles = ListBuffer[FileInfo]()
-      allFiles.appendAll(files.map(FileInfo(_)))
+      val allFiles = files.map(f => FileInfo(f, fileIdTracker.addFile(f)))
 
       if (pathToDirectory.contains(dirPath)) {
         // Map already contains this directory. Just append the files to its existing list.
@@ -295,12 +313,26 @@ object Directory {
 }
 
 // modifiedTime is an Epoch time in milliseconds. (ms since 1970-01-01T00:00:00.000 UTC).
-case class FileInfo(name: String, size: Long, modifiedTime: Long)
+// id is a unique identifier generated by Hyperspace, for each unique combination of
+// file's name, size and modifiedTime.
+case class FileInfo(name: String, size: Long, modifiedTime: Long, id: Long) {
+  override def equals(o: Any): Boolean = o match {
+    case that: FileInfo =>
+      name.equals(that.name) &&
+      size.equals(that.size) &&
+      modifiedTime.equals(that.modifiedTime)
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    name.hashCode + size.hashCode + modifiedTime.hashCode
+  }
+}
 
 object FileInfo {
-  def apply(s: FileStatus): FileInfo = {
+  def apply(s: FileStatus, id: Long): FileInfo = {
     require(s.isFile, s"${FileInfo.getClass.getName} is applicable for files, not directories.")
-    FileInfo(s.getPath.getName, s.getLen, s.getModificationTime)
+    FileInfo(s.getPath.toString, s.getLen, s.getModificationTime, id)
   }
 }
 
@@ -309,7 +341,11 @@ case class CoveringIndex(properties: CoveringIndex.Properties) {
   val kind = "CoveringIndex"
 }
 object CoveringIndex {
-  case class Properties(columns: Properties.Columns, schemaString: String, numBuckets: Int)
+  case class Properties(columns: Properties.Columns,
+    schemaString: String,
+    numBuckets: Int,
+    properties: Map[String, String])
+
   object Properties {
     case class Columns(indexed: Seq[String], included: Seq[String])
   }
@@ -344,6 +380,7 @@ object Hdfs {
 
   /**
    * Hdfs file properties.
+   *
    * @param content Content object representing Hdfs file based data source.
    * @param update Captures any updates since 'content' was created.
    */
@@ -390,7 +427,7 @@ case class IndexLogEntry(
     derivedDataset: CoveringIndex,
     content: Content,
     source: Source,
-    extra: Map[String, String])
+    properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
   def schema: StructType =
@@ -448,8 +485,10 @@ case class IndexLogEntry(
                   properties = relations.head.data.properties.copy(
                     update = Some(
                       Update(
-                        appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus)),
-                        deletedFiles = Content.fromLeafFiles(deleted.map(toFileStatus))))))))))))
+                        appendedFiles =
+                          Content.fromLeafFiles(appended.map(toFileStatus), fileIdTracker),
+                        deletedFiles =
+                          Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
   }
 
   def bucketSpec: BucketSpec =
@@ -483,19 +522,131 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
-  def hasLineageColumn(spark: SparkSession): Boolean = {
-    ResolverUtils
-      .resolve(spark, IndexConstants.DATA_FILE_NAME_COLUMN, schema.fieldNames)
-      .isDefined
+  def hasLineageColumn: Boolean =
+    derivedDataset.properties.properties.getOrElse(
+      IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT).toBoolean
+
+  @JsonIgnore
+  lazy val fileIdTracker: FileIdTracker = {
+    val tracker = new FileIdTracker
+    tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
+    tracker
   }
 
   override def hashCode(): Int = {
     config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
   }
+
+  /**
+   * A mutable map for holding auxiliary information of this index log entry while applying rules.
+   */
+  @JsonIgnore
+  private val tags: mutable.Map[(LogicalPlan, IndexLogEntryTag[_]), Any] = mutable.Map.empty
+
+  def setTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], value: T): Unit = {
+    tags((plan, tag)) = value
+  }
+
+  def getTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Option[T] = {
+    tags.get((plan, tag)).map(_.asInstanceOf[T])
+  }
+
+  def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
+    tags.remove((plan, tag))
+  }
+
+  def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
+    tags((null, tag)) = value
+  }
+
+  def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] = {
+    tags.get((null, tag)).map(_.asInstanceOf[T])
+  }
+
+  def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
+    tags.remove((null, tag))
+  }
 }
+
+// A tag of a `IndexLogEntry`, which defines name and type.
+case class IndexLogEntryTag[T](name: String)
 
 object IndexLogEntry {
   val VERSION: String = "0.1"
 
   def schemaString(schema: StructType): String = schema.json
+}
+
+/**
+ * Provides functionality to generate unique file ids for files.
+ */
+class FileIdTracker {
+  private var maxId: Long = -1L
+
+  // Combination of file properties, used as key, to identify a
+  // unique file for which an id is generated.
+  type key = (
+    String, // Full path.
+      Long, // Size.
+      Long  // Modified time.
+    )
+  private val fileToIdMap: mutable.HashMap[key, Long] = mutable.HashMap()
+
+  def getMaxFileId: Long = maxId
+
+  def getFileToIdMap: HashMap[key, Long] = fileToIdMap
+
+  def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
+    fileToIdMap.get((path, size, modifiedTime))
+
+  def setSizeHint(size: Int): Unit = fileToIdMap.sizeHint(size)
+
+  /**
+   * Add a set of FileInfos to the fileToIdMap. The assumption is
+   * that the each FileInfo already has a valid file id if an entry
+   * with that key already exists in the fileToIdMap, then it has
+   * the same file id (i.e. no new file id is generated and only
+   * maxId is updated according to the new entries).
+   *
+   * @param files Set of FileInfo instances to add to the fileToIdMap.
+   */
+  def addFileInfo(files: Set[FileInfo]): Unit = {
+    setSizeHint(files.size)
+    files.foreach { f =>
+      if (f.id == IndexConstants.UNKNOWN_FILE_ID) {
+        throw HyperspaceException(
+          s"Cannot add file info with unknown id. (file: ${f.name}).")
+      }
+
+      val key = (f.name, f.size, f.modifiedTime)
+      fileToIdMap.put(key, f.id) match {
+        case Some(id) =>
+          if (id != f.id) {
+            throw HyperspaceException(
+              "Adding file info with a conflicting id. " +
+                s"(existing id: $id, new id: ${f.id}, file: ${f.name}).")
+          }
+
+        case None =>
+          maxId = Math.max(maxId, f.id)
+      }
+    }
+  }
+
+  /**
+   * Try to add file properties to fileToIdMap. If the file is already in
+   * the map then return its current id. Otherwise, generate a new id,
+   * according to current maxId, and update fileToIdMap.
+   *
+   * @param file FileStatus to lookup in fileToIdMap.
+   * @return Assigned id to the given file.
+   */
+  def addFile(file: FileStatus): Long = {
+    fileToIdMap.getOrElseUpdate(
+      (file.getPath.toString, file.getLen, file.getModificationTime),
+      {
+        maxId += 1
+        maxId
+      })
+  }
 }

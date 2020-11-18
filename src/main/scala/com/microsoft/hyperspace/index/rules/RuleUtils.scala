@@ -23,12 +23,12 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex, PartitionSpec}
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.sql.types.{LongType, StructType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -82,12 +82,23 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
-      if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
+      lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
-      } else {
-        // For append-only Hybrid Scan, deleted files are not allowed.
-        deletedCnt == 0 && commonCnt > 0
+
+      // For append-only Hybrid Scan, deleted files are not allowed.
+      lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
+        commonCnt > 0
+
+      val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
+      if (isCandidate) {
+        // If there is no change in source dataset, the index will be applied by
+        // transformPlanToUseIndexOnlyScan.
+        entry.setTagValue(
+          plan,
+          IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+          !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
       }
+      isCandidate
     }
 
     if (hybridScanEnabled) {
@@ -101,8 +112,16 @@ object RuleUtils {
               _,
               _,
               _) =>
-            location.allFiles.map(f =>
-              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+            location.allFiles.map(
+              f =>
+                // For a given file, file id is only meaningful in the context of a given
+                // index. At this point, we do not know which index, if any, would be picked.
+                // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
+                FileInfo(
+                  f.getPath.toString,
+                  f.getLen,
+                  f.getModificationTime,
+                  IndexConstants.UNKNOWN_FILE_ID))
         }
       assert(filesByRelations.length == 1)
       indexes.filter(index =>
@@ -148,15 +167,22 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    val transformed =
-      if (HyperspaceConf.hybridScanEnabled(spark) || index.hasSourceUpdate) {
-        // In case the index has appended files and/or deleted files which are updated by quick
-        // refresh mode, we should handle them in query time by using Hybrid Scan.
-        // Because quick refresh doesn't update index data, but just metadata in IndexLogEntry.
-        transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
-      } else {
-        transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
-      }
+    // If there is no change in source data files, the index can be applied by
+    // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
+    // This tag should always exist if Hybrid Scan is enabled.
+    val hybridScanRequired = HyperspaceConf.hybridScanEnabled(spark) &&
+      index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+
+    // In case the index has appended files and/or deleted files which are updated by quick
+    // refresh mode, we should handle them in query time by using Hybrid Scan.
+    // Because quick refresh doesn't update index data, but just metadata in IndexLogEntry.
+    lazy val quickRefreshedIndex = index.hasSourceUpdate
+
+    val transformed = if (hybridScanRequired || quickRefreshedIndex) {
+      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
+    } else {
+      transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
+    }
     assert(!transformed.equals(plan))
     transformed
   }
@@ -256,8 +282,8 @@ object RuleUtils {
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
             val curFiles = location.allFiles
-              .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
-            if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
+              .map(f => FileInfo(f, index.fileIdTracker.addFile(f)))
+            if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
               val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
               val filesAppended = nonExist.map(f => new Path(f.name))
               if (exist.length < index.sourceFileInfoSet.size) {
@@ -304,7 +330,7 @@ object RuleUtils {
         val newSchema = StructType(
           index.schema.filter(s =>
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
-              IndexConstants.DATA_FILE_NAME_COLUMN))))
+              IndexConstants.DATA_FILE_NAME_ID))))
 
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = HadoopFsRelation(
@@ -321,11 +347,11 @@ object RuleUtils {
         if (filesDeleted.isEmpty) {
           baseRelation.copy(relation = relation, output = updatedOutput)
         } else {
-          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)()
-          val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
+          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_ID, LongType)()
+          val deletedFileIds = filesDeleted.map(f => Literal(f.id)).toArray
           val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
-          val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileNames)), rel)
+          val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }
     }

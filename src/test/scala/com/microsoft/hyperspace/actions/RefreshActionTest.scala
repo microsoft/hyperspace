@@ -79,7 +79,8 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
           CoveringIndex.Properties
             .Columns(Seq("clicks"), Seq()),
           "schema",
-          10)),
+          10,
+          Map())),
       Content(Directory("dirPath")),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

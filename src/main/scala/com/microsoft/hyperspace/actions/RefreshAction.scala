@@ -36,9 +36,9 @@ class RefreshAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
-  final override def op(): Unit = {
-    write(spark, df, indexConfig)
-  }
+  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+
+  final override def op(): Unit = write(spark, df, indexConfig)
 
   /**
    * Validate index is in active state for refreshing and there are some changes in

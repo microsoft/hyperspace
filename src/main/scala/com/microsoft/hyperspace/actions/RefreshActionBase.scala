@@ -48,6 +48,8 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val previousIndexLogEntry = previousLogEntry.asInstanceOf[IndexLogEntry]
 
+  override val fileIdTracker = previousIndexLogEntry.fileIdTracker
+
   // Refresh maintains the same number of buckets as the existing index to be consistent
   // throughout all index versions. For "full" refresh mode, we could allow to change configs
   // like num buckets or lineage column as it is newly building the index data. This might
@@ -58,8 +60,8 @@ private[actions] abstract class RefreshActionBase(
 
   // Refresh maintains the same lineage column config as the existing index.
   // See above getNumBucketsConfig for more detail.
-  override protected final def indexLineageEnabled(spark: SparkSession): Boolean = {
-    previousIndexLogEntry.hasLineageColumn(spark)
+  override protected final def hasLineage(spark: SparkSession): Boolean = {
+    previousIndexLogEntry.hasLineageColumn
   }
 
   // Reconstruct a df from schema
@@ -77,8 +79,6 @@ private[actions] abstract class RefreshActionBase(
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
     IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
   }
-
-  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override val transientState: String = REFRESHING
 
@@ -120,7 +120,13 @@ private[actions] abstract class RefreshActionBase(
             _) =>
           location
             .allFiles()
-            .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+            .map { f =>
+              // For each file, if it already has a file id, add that id to its corresponding
+              // FileInfo. Note that if content of an existing file is changed, it is treated
+              // as a new file (i.e. its current file id is no longer valid).
+              val id = fileIdTracker.addFile(f)
+              FileInfo(f, id)
+            }
       }
       .flatten
       .toSet
