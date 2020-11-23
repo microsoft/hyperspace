@@ -21,11 +21,15 @@ import org.apache.spark.sql.internal.SQLConf
 object IndexConstants {
   val INDEXES_DIR = "indexes"
 
-  // Constants related to Spark configuration.
+  // Config used for setting the system path, which is considered as a "root" path for Hyperspace;
+  // e.g, indexes are created under the system path.
   val INDEX_SYSTEM_PATH = "spark.hyperspace.system.path"
-  val INDEX_CREATION_PATH = "spark.hyperspace.index.creation.path"
-  val INDEX_SEARCH_PATHS = "spark.hyperspace.index.search.paths"
-  val INDEX_NUM_BUCKETS = "spark.hyperspace.index.num.buckets"
+
+  // Config used to set the number of buckets for the index.
+  val INDEX_NUM_BUCKETS_LEGACY = "spark.hyperspace.index.num.buckets"
+  val INDEX_NUM_BUCKETS = "spark.hyperspace.index.numBuckets"
+  // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
+  val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
 
   // This config enables Hybrid scan on mutable dataset at query time.
   // Currently, this config allows to perform Hybrid scan on append-only dataset.
@@ -56,9 +60,6 @@ object IndexConstants {
   // See https://github.com/microsoft/hyperspace/issues/185
   val INDEX_RELATION_IDENTIFIER: (String, String) = "indexRelation" -> "true"
 
-  // Default number of buckets is set the default value of "spark.sql.shuffle.partitions".
-  val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
-
   val INDEX_CACHE_EXPIRY_DURATION_SECONDS =
     "spark.hyperspace.index.cache.expiryDurationInSeconds"
   val INDEX_CACHE_EXPIRY_DURATION_SECONDS_DEFAULT = "300"
@@ -77,7 +78,7 @@ object IndexConstants {
     val HTML = "html"
   }
 
-  private[hyperspace] val DATA_FILE_NAME_COLUMN = "_data_file_name"
+  private[hyperspace] val DATA_FILE_NAME_ID = "_data_file_id"
   val INDEX_LINEAGE_ENABLED = "spark.hyperspace.index.lineage.enabled"
   val INDEX_LINEAGE_ENABLED_DEFAULT = "false"
 
@@ -93,4 +94,10 @@ object IndexConstants {
   val OPTIMIZE_MODE_QUICK = "quick"
   val OPTIMIZE_MODE_FULL = "full"
   val OPTIMIZE_MODES = Seq(OPTIMIZE_MODE_QUICK, OPTIMIZE_MODE_FULL)
+
+  // Default id used for a file which does not have an id or its id is not known.
+  private[hyperspace] val UNKNOWN_FILE_ID: Long = -1L
+
+  // JSON property name used in index metadata to store whether lineage is enabled for an index.
+  private[hyperspace] val LINEAGE_PROPERTY = "lineage"
 }

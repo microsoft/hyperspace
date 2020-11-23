@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexCollectionManager, IndexConfig, IndexConstants}
+import com.microsoft.hyperspace.index.{FileInfo, IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags, LogicalPlanFingerprint, Signature}
 import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -133,7 +133,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
             hybridScanDeleteEnabled: Boolean,
-            expectCandidateIndex: Boolean): Unit = {
+            expectCandidateIndex: Boolean,
+            expectedHybridScanTag: Option[Boolean]): Unit = {
           withSQLConf(
             "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
             "spark.hyperspace.index.hybridscan.delete.enabled" ->
@@ -141,8 +142,11 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             val indexes = RuleUtils
               .getCandidateIndexes(spark, allIndexes, plan)
             if (expectCandidateIndex) {
-              assert(indexes.length == 1)
-              assert(indexes.head.name == "index1")
+              assert(indexes.length === 1)
+              assert(indexes.head.name === "index1")
+              assert(
+                indexes.head.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
+                  === expectedHybridScanTag)
             } else {
               assert(indexes.isEmpty)
             }
@@ -157,12 +161,14 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = true)
+            expectCandidateIndex = true,
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = true)
+            expectCandidateIndex = true,
+            expectedHybridScanTag = Some(false))
         }
 
         // Scenario #1: Append new files.
@@ -174,12 +180,14 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false)
+            expectCandidateIndex = false,
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = true)
+            expectCandidateIndex = true,
+            expectedHybridScanTag = Some(true))
         }
 
         // Scenario #2: Delete 1 file.
@@ -191,17 +199,20 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false)
+            expectCandidateIndex = false,
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false)
+            expectCandidateIndex = false,
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
-            expectCandidateIndex = true)
+            expectCandidateIndex = true,
+            expectedHybridScanTag = Some(true))
         }
 
         // Scenario #3: Replace all files.
@@ -213,12 +224,14 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false)
+            expectCandidateIndex = false,
+            expectedHybridScanTag = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
-            expectCandidateIndex = false)
+            expectCandidateIndex = false,
+            expectedHybridScanTag = None)
         }
       }
     }
@@ -285,9 +298,13 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
       "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
     withSQLConf(INDEX_HYBRID_SCAN_ENABLED -> "false") {
+      val fingerprint = LogicalPlanFingerprint(
+        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature"))))
       val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-      val entry2 = entry1.withAppendedAndDeletedFiles(Seq(), Seq(FileInfo("file:/dir/f1", 1, 1)))
-      val entry3 = entry1.withAppendedAndDeletedFiles(Seq(FileInfo("file:/dir/f2", 1, 1)), Seq())
+      val entry2 =
+        entry1.copyWithUpdate(fingerprint, Seq(), Seq(FileInfo("file:/dir/f1", 1, 1, 1L)))
+      val entry3 =
+        entry1.copyWithUpdate(fingerprint, Seq(FileInfo("file:/dir/f2", 1, 1, 2L)), Seq())
       // IndexLogEntry.withAppendedAndDeletedFiles doesn't copy LogEntry's fields.
       // Thus, set the 'state' to ACTIVE manually so that these entries are considered
       // in RuleUtils.getCandidateIndexes.

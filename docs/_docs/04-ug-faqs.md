@@ -127,6 +127,6 @@ lead into skew when saving index records on disk. Bucketing is further
 optimization that Spark uses to organize data so that it avoids expensive 
 exchanges (shuffles) during operations such as Join. User can override 
 number of buckets used for index creation by changing the 
-"spark.hyperspace.index.num.buckets" configuration in the Spark session. For
+"spark.hyperspace.index.numBuckets" configuration in the Spark session. For
 a full list of configuration you can tweak, please see 
 [Configurations](https://microsoft.github.io/hyperspace/docs/ug-configuration/).

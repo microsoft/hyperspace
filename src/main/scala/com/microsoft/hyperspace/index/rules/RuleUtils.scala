@@ -23,12 +23,12 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.sql.types.{LongType, StructType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntry, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -82,12 +82,23 @@ object RuleUtils {
       val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
-      if (hybridScanDeleteEnabled && entry.hasLineageColumn(spark)) {
+      lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
-      } else {
-        // For append-only Hybrid Scan, deleted files are not allowed.
-        deletedCnt == 0 && commonCnt > 0
+
+      // For append-only Hybrid Scan, deleted files are not allowed.
+      lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
+        commonCnt > 0
+
+      val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
+      if (isCandidate) {
+        // If there is no change in source dataset, the index will be applied by
+        // transformPlanToUseIndexOnlyScan.
+        entry.setTagValue(
+          plan,
+          IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+          !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
       }
+      isCandidate
     }
 
     if (hybridScanEnabled) {
@@ -101,8 +112,16 @@ object RuleUtils {
               _,
               _,
               _) =>
-            location.allFiles.map(f =>
-              FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+            location.allFiles.map(
+              f =>
+                // For a given file, file id is only meaningful in the context of a given
+                // index. At this point, we do not know which index, if any, would be picked.
+                // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
+                FileInfo(
+                  f.getPath.toString,
+                  f.getLen,
+                  f.getModificationTime,
+                  IndexConstants.UNKNOWN_FILE_ID))
         }
       assert(filesByRelations.length == 1)
       // index.deletedFiles and index.appendedFiles should be non-empty until Hybrid Scan
@@ -118,21 +137,6 @@ object RuleUtils {
         index =>
           index.created && index.deletedFiles.isEmpty && index.appendedFiles.isEmpty &&
             signatureValid(index))
-    }
-  }
-
-  /**
-   * Extract the LogicalRelation node if the given logical plan is linear.
-   *
-   * @param logicalPlan given logical plan to extract LogicalRelation from.
-   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
-   */
-  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
-    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
-    if (lrs.length == 1) {
-      Some(lrs.head)
-    } else {
-      None // logicalPlan is non-linear or it has no LogicalRelation.
     }
   }
 
@@ -172,13 +176,34 @@ object RuleUtils {
     // Check pre-requisite.
     assert(getLogicalRelation(plan).isDefined)
 
-    val transformed = if (HyperspaceConf.hybridScanEnabled(spark)) {
+    // If there is no change in source data files, the index can be applied by
+    // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
+    // This tag should always exist if Hybrid Scan is enabled.
+    lazy val hybridScanRequired =
+      index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+
+    val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
     } else {
       transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
     }
     assert(!transformed.equals(plan))
     transformed
+  }
+
+  /**
+   * Extract the LogicalRelation node if the given logical plan is linear.
+   *
+   * @param logicalPlan given logical plan to extract LogicalRelation from.
+   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
+   */
+  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
+    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
+    if (lrs.length == 1) {
+      Some(lrs.head)
+    } else {
+      None // logicalPlan is non-linear or it has no LogicalRelation.
+    }
   }
 
   /**
@@ -254,12 +279,12 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val curFileSet = location.allFiles
-          .map(f => FileInfo(f.getPath.toString, f.getLen, f.getModificationTime))
+        val curFiles = location.allFiles
+          .map(f => FileInfo(f, index.fileIdTracker.addFile(f)))
 
         val (filesDeleted, filesAppended) =
-          if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn(spark)) {
-            val (exist, nonExist) = curFileSet.partition(index.sourceFileInfoSet.contains)
+          if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
+            val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
             val filesAppended = nonExist.map(f => new Path(f.name))
             if (exist.length < index.sourceFileInfoSet.size) {
               (index.sourceFileInfoSet -- exist, filesAppended)
@@ -270,13 +295,12 @@ object RuleUtils {
             // Append-only implementation of getting appended files for efficiency.
             // It is guaranteed that there is no deleted files via the condition
             // 'deletedCnt == 0 && commonCnt > 0' in isHybridScanCandidate function.
-            (
-              Nil,
-              curFileSet.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
+            (Nil, curFiles.filterNot(index.sourceFileInfoSet.contains).map(f => new Path(f.name)))
           }
 
         val filesToRead = {
-          if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty) {
+          if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty ||
+              location.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -285,14 +309,15 @@ object RuleUtils {
             // In case there are both deleted and appended files, we cannot handle the appended
             // files along with deleted files as source files do not have the lineage column which
             // is required for excluding the index data from deleted files.
+            // If the source relation is partitioned, we cannot read the appended files with the
+            // index data as the schema of partitioned files are not equivalent to the index data.
             unhandledAppendedFiles = filesAppended
             index.content.files
           } else {
             // If BucketSpec of index data isn't used (e.g., in the case of FilterIndex currently)
             // and the source format is parquet, we could read the appended files along
             // with the index data.
-            val files = index.content.files ++ filesAppended
-            files
+            index.content.files ++ filesAppended
           }
         }
 
@@ -302,7 +327,7 @@ object RuleUtils {
         val newSchema = StructType(
           index.schema.filter(s =>
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
-              IndexConstants.DATA_FILE_NAME_COLUMN))))
+              IndexConstants.DATA_FILE_NAME_ID))))
 
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = HadoopFsRelation(
@@ -319,11 +344,11 @@ object RuleUtils {
         if (filesDeleted.isEmpty) {
           baseRelation.copy(relation = relation, output = updatedOutput)
         } else {
-          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_COLUMN, StringType)()
-          val deletedFileNames = filesDeleted.map(f => Literal(f.name)).toArray
+          val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_ID, LongType)()
+          val deletedFileIds = filesDeleted.map(f => Literal(f.id)).toArray
           val rel =
             baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
-          val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileNames)), rel)
+          val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }
     }
@@ -381,22 +406,51 @@ object RuleUtils {
       filesAppended: Seq[Path]): LogicalPlan = {
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
-      case baseRelation @ LogicalRelation(fsRelation: HadoopFsRelation, baseOutput, _, _) =>
+      case baseRelation @ LogicalRelation(
+            fsRelation @ HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            baseOutput,
+            _,
+            _) =>
+        val options = extractBasePath(location.partitionSpec)
+          .map { basePath =>
+            // Set "basePath" so that partitioned columns are also included in the output schema.
+            Map("basePath" -> basePath)
+          }
+          .getOrElse(Map())
+
+        val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
         // Set the same output schema with the index plan to merge them using BucketUnion.
-        val updatedOutput =
-          baseOutput.filter(attr => indexSchema.fieldNames.contains(attr.name))
-        val newLocation =
-          new InMemoryFileIndex(spark, filesAppended, Map(), None)
-        val newRelation =
-          fsRelation.copy(
-            location = newLocation,
-            dataSchema = StructType(indexSchema.filter(baseRelation.schema.contains(_))),
-            options =
-              fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
+        // Include partition columns for data loading.
+        val partitionColumns = location.partitionSchema.map(_.name)
+        val updatedSchema = StructType(baseRelation.schema.filter(col =>
+          indexSchema.contains(col) || location.partitionSchema.contains(col)))
+        val updatedOutput = baseOutput.filter(attr =>
+          indexSchema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+        val newRelation = fsRelation.copy(
+          location = newLocation,
+          dataSchema = updatedSchema,
+          options =
+            fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
         baseRelation.copy(relation = newRelation, output = updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended
+  }
+
+  private def extractBasePath(partitionSpec: PartitionSpec): Option[String] = {
+    if (partitionSpec == PartitionSpec.emptySpec) {
+      None
+    } else {
+      // For example, we could have the following in PartitionSpec:
+      //   - partition columns = "col1", "col2"
+      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+      // , and going up the same number of directory levels as the number of partition columns
+      // will compute the base path. Note that PartitionSpec.partitions will always contain
+      // all the partitions in the path, so "partitions.head" is taken as an initial value.
+      val basePath = partitionSpec.partitionColumns
+        .foldLeft(partitionSpec.partitions.head.path)((path, _) => path.getParent)
+      Some(basePath.toString)
+    }
   }
 
   /**

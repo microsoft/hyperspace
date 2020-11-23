@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -76,6 +76,8 @@ class OptimizeAction(
     IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
   }
 
+  override val fileIdTracker = previousIndexLogEntry.fileIdTracker
+
   final override val transientState: String = OPTIMIZING
 
   final override val finalState: String = ACTIVE
@@ -92,7 +94,8 @@ class OptimizeAction(
       repartitionedDf,
       indexDataPath.toString,
       logEntry.asInstanceOf[IndexLogEntry].numBuckets,
-      indexConfig.indexedColumns)
+      indexConfig.indexedColumns,
+      SaveMode.Overwrite)
   }
 
   override def validate(): Unit = {
@@ -133,14 +136,14 @@ class OptimizeAction(
     // Update `previousIndexLogEntry` to keep `filesToIngore` files and append to it
     // the list of newly created index files.
     val absolutePath = PathUtils.makeAbsolute(indexDataPath)
-    val newContent = Content.fromDirectory(absolutePath)
+    val newContent = Content.fromDirectory(absolutePath, fileIdTracker)
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {
         val fs = new Path(filesToIgnore.head.name).getFileSystem(new Configuration)
         val filesToIgnoreStatuses =
           filesToIgnore.map(fileInfo => fs.getFileStatus(new Path(fileInfo.name)))
 
-        Directory.fromLeafFiles(filesToIgnoreStatuses)
+        Directory.fromLeafFiles(filesToIgnoreStatuses, fileIdTracker)
       }
       val mergedContent = Content(newContent.root.merge(filesToIgnoreDirectory))
       previousIndexLogEntry.copy(content = mergedContent)
