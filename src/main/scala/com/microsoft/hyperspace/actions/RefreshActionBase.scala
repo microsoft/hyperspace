@@ -125,7 +125,7 @@ private[actions] abstract class RefreshActionBase(
               // FileInfo. Note that if content of an existing file is changed, it is treated
               // as a new file (i.e. its current file id is no longer valid).
               val id = fileIdTracker.addFile(f)
-              FileInfo(f, id)
+              FileInfo(f, id, asFullPath = true)
             }
       }
       .flatten
