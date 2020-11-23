@@ -23,7 +23,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.index.{Content, Hdfs, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
 import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
 
@@ -46,10 +46,13 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
    * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
-  override def createRelation(logicalRelation: LogicalRelation): Option[Relation] = {
+  override def createRelation(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Relation] = {
     logicalRelation.relation match {
       case HadoopFsRelation(
           location: PartitioningAwareFileIndex,
@@ -61,7 +64,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties = Hdfs.Properties(Content.fromLeafFiles(files).get)
+        val sourceDataProperties =
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
         // "path" key in options can incur multiple data read unexpectedly.
         val opts = options - "path"

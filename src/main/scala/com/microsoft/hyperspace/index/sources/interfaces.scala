@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.sources
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
-import com.microsoft.hyperspace.index.Relation
+import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 
 /**
  * ::Experimental::
@@ -40,6 +40,7 @@ trait SourceProvider
  * @since 0.3.0
  */
 trait SourceProviderBuilder {
+
   /**
    * Builds a [[SourceProvider]].
    *
@@ -57,6 +58,7 @@ trait SourceProviderBuilder {
  * @since 0.3.0
  */
 trait FileBasedSourceProvider extends SourceProvider {
+
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
@@ -65,10 +67,13 @@ trait FileBasedSourceProvider extends SourceProvider {
    * If the given logical relation does not belong to this provider, None should be returned.
    *
    * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
-  def createRelation(logicalRelation: LogicalRelation): Option[Relation]
+  def createRelation(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Relation]
 
   /**
    * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.

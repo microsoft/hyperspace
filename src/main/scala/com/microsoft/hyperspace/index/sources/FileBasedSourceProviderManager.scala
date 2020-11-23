@@ -23,7 +23,7 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.Relation
+import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
 
 /**
@@ -47,12 +47,13 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * Runs createRelation() for each provider.
    *
    * @param logicalRelation Logical relation to create [[Relation]] from.
+   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] created from the given logical relation.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def createRelation(logicalRelation: LogicalRelation): Relation = {
-    run(p => p.createRelation(logicalRelation))
+  def createRelation(logicalRelation: LogicalRelation, fileIdTracker: FileIdTracker): Relation = {
+    run(p => p.createRelation(logicalRelation, fileIdTracker))
   }
 
   /**
