@@ -277,7 +277,7 @@ object RuleUtils {
             _) =>
         val (filesDeleted, filesAppended) =
           if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
-            // This index is refreshed as quick mode and validated with the latest signature.
+            // This index was refreshed in quick mode and validated with the latest signature.
             // So we could use deleted files and appended files in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
