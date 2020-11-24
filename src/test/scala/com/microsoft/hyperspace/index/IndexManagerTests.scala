@@ -480,8 +480,9 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify index maintenance (create, refresh) works with globbing patterns.") {
     withTempPathAsString { testPath =>
-      val globPath = new Path(testPath + "/*").toString
-      val p1 = testPath + "/1"
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath)
+      val globPath = absoluteTestPath + "/*"
+      val p1 = absoluteTestPath + "/1"
       import spark.implicits._
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -497,15 +498,11 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
       // Check if latest log file contains data source as globbing pattern.
       var index = latestIndexLogEntry(systemPath, indexConfig.indexName)
-      assert(
-        index.relations.head.rootPaths.head.equals(PathUtils.makeAbsolute(globPath).toString))
-      assert(
-        index.relations.head.data.properties.content.files
-          .forall(_.toString.startsWith(PathUtils.makeAbsolute(p1).toString)))
+      assert(index.relations.head.rootPaths.head.equals(globPath))
+      assert(index.relations.head.data.properties.content.files.forall(_.toString.startsWith(p1)))
 
       // Append data to a new directory which matches the globbing pattern.
-      val p2 = testPath + "/2"
-      import spark.implicits._
+      val p2 = absoluteTestPath + "/2"
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
         .limit(3)
@@ -515,22 +512,93 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       // Refresh index and check if files from both directories are present.
       hyperspace.refreshIndex(indexConfig.indexName, "incremental")
       index = latestIndexLogEntry(systemPath, indexConfig.indexName)
-      assert(
-        index.relations.head.rootPaths.head.equals(PathUtils.makeAbsolute(globPath).toString))
-      assert(
-        index.relations.head.data.properties.content.files
-          .exists(_.toString.startsWith(PathUtils.makeAbsolute(p1).toString)))
-      assert(
-        index.relations.head.data.properties.content.files
-          .exists(_.toString.startsWith(PathUtils.makeAbsolute(p2).toString)))
+      assert(index.relations.head.rootPaths.head.equals(globPath))
+      assert(index.relations.head.data.properties.content.files.exists(_.toString.startsWith(p1)))
+      assert(index.relations.head.data.properties.content.files.exists(_.toString.startsWith(p2)))
     }
   }
 
-  test("Verify createIndex fails for globbing patterns when config is set incorrectly.") {}
+  test("Verify createIndex fails for globbing patterns when config is set incorrectly.") {
+    withTempPathAsString { testPath =>
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath)
+      val globPath = absoluteTestPath + "/1/*"
+      val p1 = absoluteTestPath + "/2/1"
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(p1)
 
-  test("Verify createIndex works for globbing patterns with multiple paths.") {}
+      // Create index where globbing pattern config doesn't match with actual data being indexed.
+      val df =
+        spark.read.option("spark.hyperspace.source.globbingPattern", globPath).parquet(p1)
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
+      val ex = intercept[HyperspaceException] {
+        hyperspace.createIndex(df, indexConfig)
+      }
+      assert(
+        ex.msg.contains("Some glob patterns do not match with available root paths of the " +
+          "source data."))
+    }
+  }
 
-  test("Verify refreshIndex works for globbing patterns.") {}
+  test("Verify createIndex works for globbing patterns with multiple paths.") {
+    withTempPathAsString { testPath =>
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath)
+      val globPath1 = absoluteTestPath + "/1/*"
+      val globPath2 = absoluteTestPath + "/2/*"
+      val p1 = absoluteTestPath + "/1/1"
+      val p2 = absoluteTestPath + "/2/1"
+
+      // Store some data in p1 and p2 paths.
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(p1)
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(p2)
+
+      // Create index with globbing pattern.
+      val df =
+        spark.read
+          .option("spark.hyperspace.source.globbingPattern", s"$globPath1,$globPath2")
+          .parquet(globPath1, globPath2)
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
+      hyperspace.createIndex(df, indexConfig)
+
+      // Check if latest log file contains data source as globbing pattern.
+      var index = latestIndexLogEntry(systemPath, indexConfig.indexName)
+      assert(index.relations.head.rootPaths.equals(Seq(globPath1, globPath2)))
+      assert(index.relations.head.data.properties.content.files.forall(path =>
+        path.toString.startsWith(p1) || path.toString.startsWith(p2)))
+
+      // Append data to a new directory which matches the globbing pattern.
+      val p3 = absoluteTestPath + "/1/3"
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .parquet(p3)
+
+      // Refresh index and check if files from both directories are present.
+      hyperspace.refreshIndex(indexConfig.indexName, "incremental")
+      index = latestIndexLogEntry(systemPath, indexConfig.indexName)
+      assert(index.relations.head.rootPaths.equals(Seq(globPath1, globPath2)))
+      assert(
+        index.relations.head.data.properties.content.files.forall(path =>
+          path.toString.startsWith(p1) || path.toString.startsWith(p2) || path.toString
+            .startsWith(p3)))
+      assert(index.relations.head.data.properties.content.files.exists(_.toString.startsWith(p1)))
+      assert(index.relations.head.data.properties.content.files.exists(_.toString.startsWith(p2)))
+      assert(index.relations.head.data.properties.content.files.exists(_.toString.startsWith(p3)))
+    }
+  }
 
   private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
     val newIndexLocation = s"$systemPath/$indexName"
