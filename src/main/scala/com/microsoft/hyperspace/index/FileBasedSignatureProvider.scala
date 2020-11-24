@@ -55,7 +55,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
           _,
           _,
           _) =>
-        fingerprint ++= location.allFiles.sortBy(_.hashCode).foldLeft("")(
+        fingerprint ++= location.allFiles.sortBy(_.getPath.toString).foldLeft("")(
           (accumulate: String, fileStatus: FileStatus) =>
             HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus)))
       case _ =>
