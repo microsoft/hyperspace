@@ -97,13 +97,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
+  final protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case p: LogicalRelation =>
         Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 
-  protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
+  final protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =
