@@ -16,9 +16,11 @@
 
 package com.microsoft.hyperspace.index.rankers
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
  * Ranker class for Join rule indexes.
@@ -40,26 +42,31 @@ object JoinIndexRanker {
    * the index with larger and usable index data for each index, so as to minimize the amount of
    * data for on-the-fly shuffle or merge.
    *
+   * @param spark SparkSession.
+   * @param leftChild Logical relation of left child of the join.
+   * @param rightChild Logical relation of right child of the join.
    * @param indexPairs Index pairs for left and right side of the join. All index pairs are
    *                   compatible with each other.
-   * @param hybridScanEnabled HybridScan config.
    * @return Rearranged index pairs according to their ranking. The first is the best.
    */
   def rank(
-      leftPlan: LogicalPlan,
-      rightPlan: LogicalPlan,
-      indexPairs: Seq[(IndexLogEntry, IndexLogEntry)],
-      hybridScanEnabled: Boolean): Seq[(IndexLogEntry, IndexLogEntry)] = {
+      spark: SparkSession,
+      leftChild: LogicalPlan,
+      rightChild: LogicalPlan,
+      indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
+    val defaultBuckets = spark.conf.get("spark.sql.shuffle.partitions", "200").toInt
     indexPairs.sortWith {
+
       case ((left1, left2), (right1, right2)) =>
-        // These common bytes was calculated and tagged in getCandidateIndexes.
+        // These common bytes were calculated and tagged in getCandidateIndexes.
         // The value is the summation of common source files of the given plan and each index.
         lazy val leftCommonBytes = left1
-          .getTagValue(leftPlan, IndexLogEntryTags.COMMON_BYTES)
-          .get + left2.getTagValue(leftPlan, IndexLogEntryTags.COMMON_BYTES).get
+          .getTagValue(leftChild, IndexLogEntryTags.COMMON_BYTES)
+          .get + left2.getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES).get
         lazy val rightCommonBytes = right1
-          .getTagValue(rightPlan, IndexLogEntryTags.COMMON_BYTES)
-          .get + right2.getTagValue(rightPlan, IndexLogEntryTags.COMMON_BYTES).get
+          .getTagValue(leftChild, IndexLogEntryTags.COMMON_BYTES)
+          .get + right2.getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES).get
 
         if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
           if (!hybridScanEnabled || (leftCommonBytes == rightCommonBytes)) {
@@ -71,14 +78,18 @@ object JoinIndexRanker {
             leftCommonBytes > rightCommonBytes
           }
         } else if (left1.numBuckets == left2.numBuckets) {
-          // If one index pair has the same number of buckets, pick the one to avoid shuffling.
-          // This condition is prior to "more common bytes" condition for Hybrid Scan.
           true
         } else if (right1.numBuckets == right2.numBuckets) {
           false
+        } else if (left1.numBuckets == defaultBuckets || left2.numBuckets == defaultBuckets) {
+          true
+        } else if (right1.numBuckets == defaultBuckets || right2.numBuckets == defaultBuckets) {
+          false
+        } else if (!hybridScanEnabled) {
+          true
         } else {
           // Pick the pair with "more common bytes" if both pairs have different number of buckets.
-          !hybridScanEnabled || leftCommonBytes > rightCommonBytes
+          leftCommonBytes > rightCommonBytes
         }
     }
   }

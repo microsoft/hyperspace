@@ -18,11 +18,9 @@ package com.microsoft.hyperspace.index
 
 object IndexLogEntryTags {
   // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for this index or not.
-  // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
 
   // COMMON_BYTES stores overlapping bytes of index source files and given relation.
-  // This is set in getCandidateIndexes and utilized in rank functions.
   val COMMON_BYTES: IndexLogEntryTag[Long] = IndexLogEntryTag[Long]("commonBytes")
 }

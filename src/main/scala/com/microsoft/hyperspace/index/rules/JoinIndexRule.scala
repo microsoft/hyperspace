@@ -326,10 +326,10 @@ object JoinIndexRule
       indexPairs =>
         JoinIndexRanker
           .rank(
+            spark,
             RuleUtils.getLogicalRelation(left).get,
             RuleUtils.getLogicalRelation(right).get,
-            indexPairs,
-            HyperspaceConf.hybridScanEnabled(spark))
+            indexPairs)
           .head)
   }
 

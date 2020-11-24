@@ -22,10 +22,11 @@ import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{FileInfo, HyperspaceSuite}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
+import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
 import com.microsoft.hyperspace.util.FileUtils
 
-class JoinIndexRankerTest extends HyperspaceSuite {
+class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
   override val systemPath = new Path("src/test/resources/JoinRankerTest")
   var dummy: LogicalPlan = _
 
@@ -39,55 +40,57 @@ class JoinIndexRankerTest extends HyperspaceSuite {
     dummy = df.queryExecution.optimizedPlan
   }
 
+  before {
+    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "false")
+  }
+
+  after {
+    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "false")
+  }
+
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
   val t2c1 = AttributeReference("t2c1", IntegerType)()
   val t2c2 = AttributeReference("t2c2", StringType)()
 
   test("rank() should prefer equal-bucket index pairs over unequal-bucket") {
-    val l_10 =
-      RankerTestHelper.createIndex("l1", Seq(t1c1), Seq(t1c2), numBuckets = 10, plan = dummy)
-    val l_20 =
-      RankerTestHelper.createIndex("l2", Seq(t1c1), Seq(t1c2), numBuckets = 20, plan = dummy)
-    val r_20 =
-      RankerTestHelper.createIndex("r1", Seq(t2c1), Seq(t2c2), numBuckets = 20, plan = dummy)
+    val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, writeLog = false)
+    val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), dummy, 20, writeLog = false)
+    val r_20 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), dummy, 20, writeLog = false)
 
     val indexPairs = Seq((l_10, r_20), (l_20, r_20))
 
     val expectedOrder = Seq((l_20, r_20), (l_10, r_20))
-    val actualOrder =
-      JoinIndexRanker.rank(dummy, dummy, indexPairs, hybridScanEnabled = false)
+    val actualOrder = JoinIndexRanker.rank(spark, dummy, dummy, indexPairs)
     assert(actualOrder.equals(expectedOrder))
   }
 
   test("rank() should prefer higher number of buckets if multiple equal-bucket index pairs found") {
-    val l_10 = RankerTestHelper.createIndex("l1", Seq(t1c1), Seq(t1c2), 10, plan = dummy)
-    val l_20 = RankerTestHelper.createIndex("l2", Seq(t1c1), Seq(t1c2), 20, plan = dummy)
-    val r_10 = RankerTestHelper.createIndex("r1", Seq(t2c1), Seq(t2c2), 10, plan = dummy)
-    val r_20 = RankerTestHelper.createIndex("r2", Seq(t2c1), Seq(t2c2), 20, plan = dummy)
+    val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, writeLog = false)
+    val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), dummy, 20, writeLog = false)
+    val r_10 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), dummy, 10, writeLog = false)
+    val r_20 = createIndexLogEntry("r2", Seq(t2c1), Seq(t2c2), dummy, 20, writeLog = false)
 
     val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
 
     val expectedOrder = Seq((l_20, r_20), (l_10, r_10), (l_10, r_20))
-    val actualOrder =
-      JoinIndexRanker.rank(dummy, dummy, indexPairs, hybridScanEnabled = false)
+    val actualOrder = JoinIndexRanker.rank(spark, dummy, dummy, indexPairs)
     assert(actualOrder.equals(expectedOrder))
   }
 
   test("rank() should prefer the largest common bytes if HybridScan is enabled") {
     val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 2, 1, 2))
     val fileList2 = Seq(FileInfo("c", 1, 1, 3), FileInfo("d", 1, 1, 4))
-    val l_10 = RankerTestHelper.createIndex("l1", Seq(t1c1), Seq(t1c2), 10, fileList1, dummy)
-    val l_20 = RankerTestHelper.createIndex("l2", Seq(t1c1), Seq(t1c2), 20, fileList2, dummy)
-    val r_10 = RankerTestHelper.createIndex("r1", Seq(t2c1), Seq(t2c2), 10, fileList1, dummy)
-    val r_20 = RankerTestHelper.createIndex("r2", Seq(t2c1), Seq(t2c2), 20, fileList2, dummy)
+    val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, fileList1, false)
+    val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), dummy, 20, fileList2, false)
+    val r_10 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), dummy, 10, fileList1, false)
+    val r_20 = createIndexLogEntry("r2", Seq(t2c1), Seq(t2c2), dummy, 20, fileList2, false)
 
     {
-      // Test original algorithm.
+      // Test rank algorithm without Hybrid Scan.
       val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
       val expectedOrder = Seq((l_20, r_20), (l_10, r_10), (l_10, r_20))
-      val actualOrder =
-        JoinIndexRanker.rank(dummy, dummy, indexPairs, hybridScanEnabled = false)
+      val actualOrder = JoinIndexRanker.rank(spark, dummy, dummy, indexPairs)
       assert(actualOrder.equals(expectedOrder))
     }
 
@@ -95,22 +98,21 @@ class JoinIndexRankerTest extends HyperspaceSuite {
       // Test if hybridScanEnabled is true.
       val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
       val expectedOrder = Seq((l_10, r_10), (l_20, r_20), (l_10, r_20))
-      val actualOrder =
-        JoinIndexRanker.rank(dummy, dummy, indexPairs, hybridScanEnabled = true)
+      spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "true")
+      val actualOrder = JoinIndexRanker.rank(spark, dummy, dummy, indexPairs)
       assert(actualOrder.equals(expectedOrder))
     }
 
     {
       // If both indexes have the same number of source files, follow the original algorithm.
-      val l_10 = RankerTestHelper.createIndex("l1", Seq(t1c1), Seq(t1c2), 10, fileList1, dummy)
-      val l_20 = RankerTestHelper.createIndex("l2", Seq(t1c1), Seq(t1c2), 20, fileList1, dummy)
-      val r_10 = RankerTestHelper.createIndex("r1", Seq(t2c1), Seq(t2c2), 10, fileList1, dummy)
-      val r_20 = RankerTestHelper.createIndex("r2", Seq(t2c1), Seq(t2c2), 20, fileList1, dummy)
+      val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, fileList1, false)
+      val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), dummy, 20, fileList1, false)
+      val r_10 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), dummy, 10, fileList1, false)
+      val r_20 = createIndexLogEntry("r2", Seq(t2c1), Seq(t2c2), dummy, 20, fileList1, false)
 
       val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
       val expectedOrder = Seq((l_20, r_20), (l_10, r_10), (l_10, r_20))
-      val actualOrder =
-        JoinIndexRanker.rank(dummy, dummy, indexPairs, hybridScanEnabled = true)
+      val actualOrder = JoinIndexRanker.rank(spark, dummy, dummy, indexPairs)
       assert(actualOrder.equals(expectedOrder))
     }
   }

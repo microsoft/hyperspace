@@ -32,6 +32,7 @@ object FilterIndexRanker {
    * so that we could minimize the amount of data to merge with index data.
    * Otherwise, return the head of the given index list.
    *
+   * @param plan Logical relation of the filter.
    * @param candidates List of all indexes that fully cover logical plan.
    * @param hybridScanEnabled HybridScan config.
    * @return Top-most index which is expected to maximize performance gain

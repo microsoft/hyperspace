@@ -22,10 +22,11 @@ import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{FileInfo, HyperspaceSuite}
+import com.microsoft.hyperspace.index.FileInfo
+import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
 import com.microsoft.hyperspace.util.FileUtils
 
-class FilterIndexRankerTest extends HyperspaceSuite {
+class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
   override val systemPath = new Path("src/test/resources/FilterRankerTest")
   var dummy: LogicalPlan = _
 
@@ -45,9 +46,9 @@ class FilterIndexRankerTest extends HyperspaceSuite {
   val t2c2 = AttributeReference("t2c2", StringType)()
 
   test("rank() should return the head of the list by default") {
-    val ind1 = RankerTestHelper.createIndex("ind1", Seq(t1c1), Seq(t1c2))
-    val ind2 = RankerTestHelper.createIndex("ind2", Seq(t1c1), Seq(t1c2))
-    val ind3 = RankerTestHelper.createIndex("ind3", Seq(t2c1), Seq(t2c2))
+    val ind1 = createIndexLogEntry("ind1", Seq(t1c1), Seq(t1c2), dummy, writeLog = false)
+    val ind2 = createIndexLogEntry("ind2", Seq(t1c1), Seq(t1c2), dummy, writeLog = false)
+    val ind3 = createIndexLogEntry("ind3", Seq(t2c1), Seq(t2c2), dummy, writeLog = false)
 
     val indexes = Seq(ind1, ind2, ind3)
     assert(FilterIndexRanker.rank(dummy, indexes, hybridScanEnabled = false).get.equals(ind1))
@@ -60,25 +61,27 @@ class FilterIndexRankerTest extends HyperspaceSuite {
     val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 1, 1, 3))
     val fileList2 = Seq(FileInfo("c", 1, 1, 2), FileInfo("d", 1, 1, 4))
 
-    val ind1 =
-      RankerTestHelper.createIndex(
-        "ind1",
-        Seq(t1c1),
-        Seq(t1c2),
-        inputFiles = fileList1,
-        plan = dummy)
-    val ind2 = RankerTestHelper.createIndex(
+    val ind1 = createIndexLogEntry(
+      "ind1",
+      Seq(t1c1),
+      Seq(t1c2),
+      dummy,
+      inputFiles = fileList1,
+      writeLog = false)
+    val ind2 = createIndexLogEntry(
       "ind2",
       Seq(t1c1),
       Seq(t1c2),
+      dummy,
       inputFiles = fileList1 ++ fileList2,
-      plan = dummy)
-    val ind3 = RankerTestHelper.createIndex(
+      writeLog = false)
+    val ind3 = createIndexLogEntry(
       "ind3",
       Seq(t2c1),
       Seq(t1c2),
+      dummy,
       inputFiles = fileList2,
-      plan = dummy)
+      writeLog = false)
 
     val indexes = Seq(ind1, ind2, ind3)
     assert(FilterIndexRanker.rank(dummy, indexes, hybridScanEnabled = true).get === ind2)
