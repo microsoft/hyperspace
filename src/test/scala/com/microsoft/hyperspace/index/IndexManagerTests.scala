@@ -25,7 +25,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.TestUtils.{copyWithState, logManager}
+import com.microsoft.hyperspace.TestUtils.{copyWithState, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
@@ -257,7 +257,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   test("Verify incremental refresh (append-only) should index only newly appended data.") {
     withTempPathAsString { testPath =>
       // Setup. Create sample data and index.
-      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
       import spark.implicits._
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -289,7 +289,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify quick optimize rebuild of index after index incremental refresh.") {
     withTempPathAsString { testPath =>
-      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
       import spark.implicits._
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -332,7 +332,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     // during refresh operations.
     withTempPathAsString { testPath =>
       withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "900") {
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         val smallData = SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -369,7 +369,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   test("Verify optimize is a no-op if no small files found.") {
     withTempPathAsString { testPath =>
       withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "1") {
-        val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+        val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         SampleData.testData
           .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -421,7 +421,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify optimize is no-op if each bucket has a single index file.") {
     withTempPathAsString { testPath =>
-      val indexConfig = IndexConfig(s"index", Seq("RGUID"), Seq("imprs"))
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
       import spark.implicits._
       SampleData.testData
         .toDF("Date", "RGUID", "Query", "imprs", "clicks")
@@ -477,6 +477,60 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       }
     }
   }
+
+  test("Verify index maintenance (create, refresh) works with globbing patterns.") {
+    withTempPathAsString { testPath =>
+      val globPath = new Path(testPath + "/*").toString
+      val p1 = testPath + "/1"
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(p1)
+
+      // Create index with globbing pattern.
+      val df =
+        spark.read.option("spark.hyperspace.source.globbingPattern", globPath).parquet(globPath)
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
+      hyperspace.createIndex(df, indexConfig)
+
+      // Check if latest log file contains data source as globbing pattern.
+      var index = latestIndexLogEntry(systemPath, indexConfig.indexName)
+      assert(
+        index.relations.head.rootPaths.head.equals(PathUtils.makeAbsolute(globPath).toString))
+      assert(
+        index.relations.head.data.properties.content.files
+          .forall(_.toString.startsWith(PathUtils.makeAbsolute(p1).toString)))
+
+      // Append data to a new directory which matches the globbing pattern.
+      val p2 = testPath + "/2"
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .parquet(p2)
+
+      // Refresh index and check if files from both directories are present.
+      hyperspace.refreshIndex(indexConfig.indexName, "incremental")
+      index = latestIndexLogEntry(systemPath, indexConfig.indexName)
+      assert(
+        index.relations.head.rootPaths.head.equals(PathUtils.makeAbsolute(globPath).toString))
+      assert(
+        index.relations.head.data.properties.content.files
+          .exists(_.toString.startsWith(PathUtils.makeAbsolute(p1).toString)))
+      assert(
+        index.relations.head.data.properties.content.files
+          .exists(_.toString.startsWith(PathUtils.makeAbsolute(p2).toString)))
+    }
+  }
+
+  test("Verify createIndex fails for globbing patterns when config is set incorrectly.") {}
+
+  test("Verify createIndex works for globbing patterns with multiple paths.") {}
+
+  test("Verify refreshIndex works for globbing patterns.") {}
 
   private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
     val newIndexLocation = s"$systemPath/$indexName"
