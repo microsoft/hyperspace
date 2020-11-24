@@ -410,7 +410,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
     fs.listStatus(absolutePath)
       .toSeq
       .filter(f => DataPathFilter.accept(f.getPath))
-      .map(f => FileInfo(f, fileIdTracker.addFile(f)))
+      .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
   }
 
   private def getLatestStableLog(indexName: String): IndexLogEntry = {
