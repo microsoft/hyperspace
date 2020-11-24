@@ -131,8 +131,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
           if isSupportedFileFormat(format) =>
-        val result = location.allFiles.foldLeft("") { (acc: String, f: FileStatus) =>
-          HashingUtils.md5Hex(acc + fingerprint(f))
+        val result = location.allFiles.sortBy(_.getPath.toString).foldLeft("") {
+          (acc: String, f: FileStatus) =>
+            HashingUtils.md5Hex(acc + fingerprint(f))
         }
         Some(result)
       case _ => None
