@@ -175,13 +175,14 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
     // Check pre-requisite.
-    assert(getLogicalRelation(plan).isDefined)
+    val logicalRelation = getLogicalRelation(plan)
+    assert(logicalRelation.isDefined)
 
     // If there is no change in source data files, the index can be applied by
     // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
     lazy val hybridScanRequired =
-      index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+      index.getTagValue(logicalRelation.get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     val transformed = if (HyperspaceConf.hybridScanEnabled(spark) && hybridScanRequired) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
