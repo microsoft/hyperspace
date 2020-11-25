@@ -71,6 +71,20 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  def fileBasedSourceBuilders(spark: SparkSession): String = {
+    spark.sessionState.conf
+      .getConfString(
+        "spark.hyperspace.index.sources.fileBasedBuilders",
+        "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder")
+  }
+
+  def supportedFileFormatsForDefaultFileBasedSource(spark: SparkSession): String = {
+    spark.sessionState.conf
+      .getConfString(
+        "spark.hyperspace.index.sources.defaultFileBasedSource.supportedFileFormats",
+        "avro,csv,json,orc,parquet,text")
+  }
+
   /**
    * Returns the config value whose key matches the first key given multiple keys. If no keys are
    * matched, the given default value is returned.
