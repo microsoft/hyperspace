@@ -32,7 +32,15 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    spark.conf.set("spark.hyperspace.index.sources.fileBasedBuilders",
+      "com.microsoft.hyperspace.index.sources.delta.DeltaLakeFileBasedSourceBuilder," +
+      "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder")
     hyperspace = new Hyperspace(spark)
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    spark.conf.unset("spark.hyperspace.index.sources.fileBasedBuilders")
   }
 
   before {

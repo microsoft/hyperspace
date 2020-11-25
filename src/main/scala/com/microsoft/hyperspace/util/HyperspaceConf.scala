@@ -75,8 +75,7 @@ object HyperspaceConf {
     spark.sessionState.conf
       .getConfString(
         "spark.hyperspace.index.sources.fileBasedBuilders",
-        "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder," +
-          "com.microsoft.hyperspace.index.sources.delta.DeltaLakeFileBasedSourceBuilder")
+        "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder")
   }
 
   def supportedFileFormatsForDefaultFileBasedSource(spark: SparkSession): String = {
