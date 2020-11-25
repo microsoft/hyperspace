@@ -250,7 +250,7 @@ object Directory {
     fileIdTracker.setSizeHint(files.length)
 
     for ((dirPath, files) <- leafDirToChildrenFiles) {
-      val allFiles = files.map(f => FileInfo(f, fileIdTracker.addFile(f)))
+      val allFiles = files.map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
 
       if (pathToDirectory.contains(dirPath)) {
         // Map already contains this directory. Just append the files to its existing list.
@@ -330,9 +330,13 @@ case class FileInfo(name: String, size: Long, modifiedTime: Long, id: Long) {
 }
 
 object FileInfo {
-  def apply(s: FileStatus, id: Long): FileInfo = {
+  def apply(s: FileStatus, id: Long, asFullPath: Boolean): FileInfo = {
     require(s.isFile, s"${FileInfo.getClass.getName} is applicable for files, not directories.")
-    FileInfo(s.getPath.toString, s.getLen, s.getModificationTime, id)
+    if (asFullPath) {
+      FileInfo(s.getPath.toString, s.getLen, s.getModificationTime, id)
+    } else {
+      FileInfo(s.getPath.getName, s.getLen, s.getModificationTime, id)
+    }
   }
 }
 

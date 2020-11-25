@@ -282,7 +282,7 @@ object RuleUtils {
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
             val curFiles = location.allFiles
-              .map(f => FileInfo(f, index.fileIdTracker.addFile(f)))
+              .map(f => FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
             if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
               val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
               val filesAppended = nonExist.map(f => new Path(f.name))
