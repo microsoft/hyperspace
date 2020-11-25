@@ -293,7 +293,7 @@ object RuleUtils {
             _,
             _) =>
         val curFiles = location.allFiles
-          .map(f => FileInfo(f, index.fileIdTracker.addFile(f)))
+          .map(f => FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
 
         val (filesDeleted, filesAppended) =
           if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
