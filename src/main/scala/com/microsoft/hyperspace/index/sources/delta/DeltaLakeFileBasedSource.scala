@@ -20,18 +20,16 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
 import com.microsoft.hyperspace.util.PathUtils
 
 /**
- * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
+ * Delta Lake file-based source provider.
  *
  * This source can support relations that meet the following criteria:
- *   - The relation is [[HadoopFsRelation]] with [[PartitioningAwareFileIndex]] as file index.
- *   - Its file format implements [[DataSourceRegister]].
+ *   - The relation is [[HadoopFsRelation]] with [[TahoeLogFileIndex]] as file index.
  */
 class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
   val DELTA_FORMAT_STR = "delta"
@@ -111,6 +109,12 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
     }
   }
 
+  /**
+   * Retrieves all input files from the given [[LogicalRelation]].
+   *
+   * @param logicalRelation Logical relation to retrieve input files from.
+   * @return List of [[FileStatus]] for the given relation.
+   */
   override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
     logicalRelation.relation match {
       case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
@@ -132,6 +136,12 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
     }
   }
 
+  /**
+   * Constructs the basePath for the given [[FileIndex]].
+   *
+   * @param location Partitioned data location.
+   * @return basePath to read the given partitioned location.
+   */
   override def partitionBasePath(location: FileIndex): Option[String] = {
     location match {
       case d: TahoeLogFileIndex =>
@@ -141,6 +151,15 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
     }
   }
 
+  /**
+   * Returns list of pairs of (file path, file id) to build lineage column.
+   *
+   * File paths should be the same format with "input_file_name()" of the given relation type.
+   *
+   * @param logicalRelation Logical relation to check the relation type.
+   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
+   * @return List of pairs of (file path, file id).
+   */
   override def lineagePairs(
       logicalRelation: LogicalRelation,
       fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {

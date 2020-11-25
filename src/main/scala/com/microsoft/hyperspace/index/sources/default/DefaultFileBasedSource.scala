@@ -46,7 +46,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
    * @param logicalRelation logical relation to derive [[Relation]] from.
-   * @param fileIdTracker   [[FileIdTracker]] to use when populating the data of [[Relation]].
+   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -151,6 +151,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       fileStatus.getPath.toString
   }
 
+  /**
+   * Retrieves all input files from the given [[LogicalRelation]].
+   *
+   * @param logicalRelation Logical relation to retrieve input files from.
+   * @return List of [[FileStatus]] for the given relation.
+   */
   override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
@@ -159,6 +165,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     }
   }
 
+  /**
+   * Constructs the basePath for the given [[FileIndex]].
+   *
+   * @param location Partitioned data location.
+   * @return basePath to read the given partitioned location.
+   */
   override def partitionBasePath(location: FileIndex): Option[String] = {
     location match {
       case p: PartitioningAwareFileIndex =>
@@ -176,6 +188,15 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     }
   }
 
+  /**
+   * Returns list of pairs of (file path, file id) to build lineage column.
+   *
+   * File paths should be the same format with "input_file_name()" of the given relation type.
+   *
+   * @param logicalRelation Logical relation to check the relation type.
+   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
+   * @return List of pairs of (file path, file id).
+   */
   override def lineagePairs(
       logicalRelation: LogicalRelation,
       fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
