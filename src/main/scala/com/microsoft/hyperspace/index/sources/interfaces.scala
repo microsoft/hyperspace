@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.sources
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 
@@ -104,4 +104,11 @@ trait FileBasedSourceProvider extends SourceProvider {
   def signature(logicalRelation: LogicalRelation): Option[String]
 
   def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]]
+
+  def partitionBasePath(location: FileIndex): Option[String]
+
+  def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]]
+
 }

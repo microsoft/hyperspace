@@ -64,8 +64,6 @@ object IndexConstants {
     "spark.hyperspace.index.cache.expiryDurationInSeconds"
   val INDEX_CACHE_EXPIRY_DURATION_SECONDS_DEFAULT = "300"
 
-  val DELTA_FORMAT_STR = "delta"
-
   // Operation Log constants
   val HYPERSPACE_LOG = "_hyperspace_log"
   val INDEX_VERSION_DIRECTORY_PREFIX = "v__"

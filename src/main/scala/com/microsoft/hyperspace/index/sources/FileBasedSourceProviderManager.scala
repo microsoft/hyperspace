@@ -20,7 +20,7 @@ import scala.util.{Success, Try}
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -82,6 +82,16 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
 
   def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
     run(p => p.allFiles(logicalRelation))
+  }
+
+  def partitionBasePath(location: FileIndex): String = {
+    run(p => p.partitionBasePath(location))
+  }
+
+  def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
+    run(p => p.lineagePairs(logicalRelation, fileIdTracker))
   }
 
   /**

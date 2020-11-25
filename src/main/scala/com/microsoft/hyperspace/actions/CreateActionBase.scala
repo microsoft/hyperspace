@@ -24,7 +24,6 @@ import org.apache.spark.sql.functions.input_file_name
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index.rules.DeltaLakeRuleUtils
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
@@ -175,17 +174,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val isDeltaLakeSource =
-        DeltaLakeRuleUtils.isDeltaLakeSource(df.queryExecution.optimizedPlan)
-      val lineageDF = fileIdTracker.getFileToIdMap.toSeq
-        .map { kv =>
-          if (isDeltaLakeSource) {
-            (kv._1._1, kv._2)
-          } else {
-            (kv._1._1.replace("file:/", "file:///"), kv._2)
-          }
-        }
-        .toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
+      val relation = df.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation]
+      val lineagePairs =
+        Hyperspace.getContext(spark).sourceProviderManager.lineagePairs(relation, fileIdTracker)
+      val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 
       df.withColumn(dataPathColumn, input_file_name())
         .join(lineageDF.hint("broadcast"), dataPathColumn)

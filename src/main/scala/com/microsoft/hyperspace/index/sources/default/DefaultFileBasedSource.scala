@@ -20,7 +20,7 @@ import java.util.Locale
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
@@ -46,7 +46,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
    * @param logicalRelation logical relation to derive [[Relation]] from.
-   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
+   * @param fileIdTracker   [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -156,6 +156,37 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
         Some(location.allFiles)
       case _ => None
+    }
+  }
+
+  override def partitionBasePath(location: FileIndex): Option[String] = {
+    location match {
+      case p: PartitioningAwareFileIndex =>
+        // For example, we could have the following in PartitionSpec:
+        //   - partition columns = "col1", "col2"
+        //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+        // , and going up the same number of directory levels as the number of partition columns
+        // will compute the base path. Note that PartitionSpec.partitions will always contain
+        // all the partitions in the path, so "partitions.head" is taken as an initial value.
+        val basePath = p.partitionSpec.partitionColumns
+          .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
+        Some(basePath.toString)
+      case _ =>
+        None
+    }
+  }
+
+  override def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
+          if isSupportedFileFormat(format) =>
+        Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+          (kv._1._1.replace("file:/", "file:///"), kv._2)
+        })
+      case _ =>
+        None
     }
   }
 }

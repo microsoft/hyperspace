@@ -16,17 +16,15 @@
 
 package com.microsoft.hyperspace.index.sources.delta
 
-import java.util.Locale
-
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
-import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -36,6 +34,7 @@ import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, Hyperspa
  *   - Its file format implements [[DataSourceRegister]].
  */
 class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
+  val DELTA_FORMAT_STR = "delta"
 
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
@@ -89,7 +88,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    *         Otherwise, None.
    */
   override def refreshRelation(relation: Relation): Option[Relation] = {
-    if (relation.fileFormat.equals(IndexConstants.DELTA_FORMAT_STR)) {
+    if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
       Some(relation.copy(options = relation.options - "versionAsOf" - "timestampAsOf"))
     } else {
       None
@@ -130,6 +129,28 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
           }
         Some(files)
       case _ => None
+    }
+  }
+
+  override def partitionBasePath(location: FileIndex): Option[String] = {
+    location match {
+      case d: TahoeLogFileIndex =>
+        Some(d.path.toString)
+      case _ =>
+        None
+    }
+  }
+
+  override def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
+        Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+          (kv._1._1, kv._2)
+        })
+      case _ =>
+        None
     }
   }
 }
