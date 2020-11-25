@@ -70,18 +70,18 @@ private[actions] abstract class RefreshActionBase(
     val latestRelation =
       Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
+    val df = spark.read
+      .schema(dataSchema)
+      .format(latestRelation.fileFormat)
+      .options(latestRelation.options)
+    // Due to the difference in how the "path" option is set: https://github.com/apache/spark/
+    // blob/ef1441b56c5cab02335d8d2e4ff95cf7e9c9b9ca/sql/core/src/main/scala/org/apache/spark/
+    // sql/DataFrameReader.scala#L197
+    // load() with a single parameter needs to be handled differently.
     if (latestRelation.rootPaths.size == 1) {
-      spark.read
-        .schema(dataSchema)
-        .format(latestRelation.fileFormat)
-        .options(latestRelation.options)
-        .load(latestRelation.rootPaths.head)
+      df.load(latestRelation.rootPaths.head)
     } else {
-      spark.read
-        .schema(dataSchema)
-        .format(latestRelation.fileFormat)
-        .options(latestRelation.options)
-        .load(latestRelation.rootPaths: _*)
+      df.load(latestRelation.rootPaths: _*)
     }
   }
 

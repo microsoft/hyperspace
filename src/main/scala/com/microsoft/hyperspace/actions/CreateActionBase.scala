@@ -175,8 +175,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val isDeltaLakeSource = DeltaLakeRuleUtils.isDeltaLakeSource(df.queryExecution.optimizedPlan)
-        val lineageDF = fileIdTracker.getFileToIdMap.toSeq
+      val isDeltaLakeSource =
+        DeltaLakeRuleUtils.isDeltaLakeSource(df.queryExecution.optimizedPlan)
+      val lineageDF = fileIdTracker.getFileToIdMap.toSeq
         .map { kv =>
           if (isDeltaLakeSource) {
             (kv._1._1, kv._2)
