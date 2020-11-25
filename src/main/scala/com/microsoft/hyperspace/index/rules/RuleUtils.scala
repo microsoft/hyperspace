@@ -24,10 +24,12 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{LongType, StructType}
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
@@ -105,24 +107,23 @@ object RuleUtils {
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
-      val filesByRelations = plan
-        .collect {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-              _,
-              _,
-              _) =>
-            location.allFiles.map(
-              f =>
-                // For a given file, file id is only meaningful in the context of a given
-                // index. At this point, we do not know which index, if any, would be picked.
-                // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
-                FileInfo(
-                  f.getPath.toString,
-                  f.getLen,
-                  f.getModificationTime,
-                  IndexConstants.UNKNOWN_FILE_ID))
-        }
+      val filesByRelations = plan.collect {
+        case rel: LogicalRelation =>
+          Hyperspace
+            .getContext(spark)
+            .sourceProviderManager
+            .allFiles(rel)
+            .map { f =>
+              // For a given file, file id is only meaningful in the context of a given
+              // index. At this point, we do not know which index, if any, would be picked.
+              // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
+              FileInfo(
+                f.getPath.toString,
+                f.getLen,
+                f.getModificationTime,
+                IndexConstants.UNKNOWN_FILE_ID)
+            }
+      }
       assert(filesByRelations.length == 1)
       // index.deletedFiles and index.appendedFiles should be non-empty until Hybrid Scan
       // handles the lists properly. Otherwise, as the source file list of each index entry
@@ -265,7 +266,8 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    val isParquetSourceFormat = index.relations.head.fileFormat.equals("parquet")
+    val fileFormat = index.relations.head.fileFormat
+    val isParquetSourceFormat = fileFormat.equals("parquet") || fileFormat.equals("delta")
     var unhandledAppendedFiles: Seq[Path] = Nil
 
     // Get transformed plan with index data and appended files if applicable.
@@ -275,11 +277,14 @@ object RuleUtils {
       // can be transformed to 'Project -> Filter -> Logical Relation'. Thus, with transformDown,
       // it will be matched again and transformed recursively which causes stack overflow exception.
       case baseRelation @ LogicalRelation(
-            _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _ @HadoopFsRelation(location: FileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
-        val curFiles = location.allFiles
+        val curFiles = Hyperspace
+          .getContext(spark)
+          .sourceProviderManager
+          .allFiles(baseRelation)
           .map(f => FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
 
         val (filesDeleted, filesAppended) =
@@ -407,11 +412,11 @@ object RuleUtils {
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
       case baseRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            fsRelation @ HadoopFsRelation(location: FileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
-        val options = extractBasePath(location.partitionSpec)
+        val options = extractBasePath(location)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -437,19 +442,24 @@ object RuleUtils {
     planForAppended
   }
 
-  private def extractBasePath(partitionSpec: PartitionSpec): Option[String] = {
-    if (partitionSpec == PartitionSpec.emptySpec) {
+  private def extractBasePath(location: FileIndex): Option[String] = {
+    if (location.partitionSchema.isEmpty) {
       None
     } else {
-      // For example, we could have the following in PartitionSpec:
-      //   - partition columns = "col1", "col2"
-      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
-      // , and going up the same number of directory levels as the number of partition columns
-      // will compute the base path. Note that PartitionSpec.partitions will always contain
-      // all the partitions in the path, so "partitions.head" is taken as an initial value.
-      val basePath = partitionSpec.partitionColumns
-        .foldLeft(partitionSpec.partitions.head.path)((path, _) => path.getParent)
-      Some(basePath.toString)
+      location match {
+        case p: PartitioningAwareFileIndex =>
+          // For example, we could have the following in PartitionSpec:
+          //   - partition columns = "col1", "col2"
+          //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+          // , and going up the same number of directory levels as the number of partition columns
+          // will compute the base path. Note that PartitionSpec.partitions will always contain
+          // all the partitions in the path, so "partitions.head" is taken as an initial value.
+          val basePath = p.partitionSpec.partitionColumns
+            .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
+          Some(basePath.toString)
+        case d: TahoeLogFileIndex =>
+          Some(d.path.toString)
+      }
     }
   }
 

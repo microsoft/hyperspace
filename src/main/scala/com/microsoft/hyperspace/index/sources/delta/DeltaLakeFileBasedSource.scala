@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.sources.default
+package com.microsoft.hyperspace.index.sources.delta
 
 import java.util.Locale
 
-import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
+import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -34,19 +35,12 @@ import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, Hyperspa
  *   - The relation is [[HadoopFsRelation]] with [[PartitioningAwareFileIndex]] as file index.
  *   - Its file format implements [[DataSourceRegister]].
  */
-class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
-  private val supportedFormats: CacheWithTransform[String, Set[String]] =
-    new CacheWithTransform[String, Set[String]]({ () =>
-      HyperspaceConf.supportedFileFormatsForDefaultFileBasedSource(spark)
-    }, { formats =>
-      formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
-    })
+class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
 
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
    * @param logicalRelation logical relation to derive [[Relation]] from.
-   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -54,53 +48,37 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       logicalRelation: LogicalRelation,
       fileIdTracker: FileIdTracker): Option[Relation] = {
     logicalRelation.relation match {
-      case HadoopFsRelation(
-          location: PartitioningAwareFileIndex,
-          _,
-          dataSchema,
-          _,
-          fileFormat,
-          options) if isSupportedFileFormat(fileFormat) =>
-        val files = location.allFiles
+      case HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, _, options) =>
+        val files = location
+          .getSnapshot(stalenessAcceptable = false)
+          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+          .files
+          .map { f =>
+            new FileStatus(
+              /* length */ f.size,
+              /* isDir */ false,
+              /* blockReplication */ 0,
+              /* blockSize */ 1,
+              /* modificationTime */ f.modificationTime,
+              new Path(location.path, f.path))
+          }
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-        val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
-        // "path" key in options can incur multiple data read unexpectedly.
-        val opts = options - "path"
+        val fileFormatName = "delta"
+        // "path" key in options can incur multiple data read unexpectedly and keep
+        // the table version info as metadata.
+        val opts = options - "path" + ("versionAsOf" -> location.tableVersion.toString)
         Some(
           Relation(
-            location.rootPaths.map(_.toString),
+            Seq(PathUtils.makeAbsolute(location.path).toString),
             Hdfs(sourceDataProperties),
             dataSchema.json,
             fileFormatName,
             opts))
       case _ => None
     }
-  }
-
-  /**
-   * Returns true if the given [[FileFormat]] is supported, false otherwise.
-   *
-   * @param format [[FileFormat]] object.
-   * @return true if the given [[FileFormat]] is supported, false otherwise.
-   */
-  private def isSupportedFileFormat(format: FileFormat): Boolean = {
-    format match {
-      case d: DataSourceRegister if isSupportedFileFormatName(d.shortName) => true
-      case _ => false
-    }
-  }
-
-  /**
-   * Returns true if the given format name is supported, false otherwise.
-   *
-   * @param name File format name (e.g, parquet, csv, json, etc.).
-   * @return true if the given format name is supported, false otherwise.
-   */
-  private def isSupportedFileFormatName(name: String): Boolean = {
-    supportedFormats.load().contains(name.toLowerCase(Locale.ROOT))
   }
 
   /**
@@ -111,9 +89,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    *         Otherwise, None.
    */
   override def refreshRelation(relation: Relation): Option[Relation] = {
-    if (isSupportedFileFormatName(relation.fileFormat)) {
-      // No change is needed because rootPaths will be pointing to the latest source files.
-      Some(relation)
+    if (relation.fileFormat.equals(IndexConstants.DELTA_FORMAT_STR)) {
+      Some(relation.copy(options = relation.options - "versionAsOf" - "timestampAsOf"))
     } else {
       None
     }
@@ -121,7 +98,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
 
   /**
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
-   * using all the files found in [[PartitioningAwareFileIndex]].
+   * using version info and table name.
    *
    * @param logicalRelation logical relation to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
@@ -129,40 +106,37 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    */
   override def signature(logicalRelation: LogicalRelation): Option[String] = {
     logicalRelation.relation match {
-      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
-          if isSupportedFileFormat(format) =>
-        val result = location.allFiles.sortBy(_.getPath.toString).foldLeft("") {
-          (acc: String, f: FileStatus) =>
-            HashingUtils.md5Hex(acc + fingerprint(f))
-        }
-        Some(result)
+      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+        Some(location.tableVersion + location.path.toString)
       case _ => None
     }
   }
 
-  /**
-   * Fingerprints a file.
-   *
-   * @param fileStatus file status.
-   * @return the fingerprint of a file.
-   */
-  private def fingerprint(fileStatus: FileStatus): String = {
-    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
-      fileStatus.getPath.toString
-  }
-
   override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
     logicalRelation.relation match {
-      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-        Some(location.allFiles)
+      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+        val files = location
+          .getSnapshot(stalenessAcceptable = false)
+          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+          .files
+          .map { f =>
+            new FileStatus(
+              /* length */ f.size,
+              /* isDir */ false,
+              /* blockReplication */ 0,
+              /* blockSize */ 1,
+              /* modificationTime */ f.modificationTime,
+              new Path(location.path, f.path))
+          }
+        Some(files)
       case _ => None
     }
   }
 }
 
 /**
- * Builder for building [[DefaultFileBasedSource]].
+ * Builder for building [[DeltaLakeFileBasedSource]].
  */
-class DefaultFileBasedSourceBuilder extends SourceProviderBuilder {
-  override def build(spark: SparkSession): SourceProvider = new DefaultFileBasedSource(spark)
+class DeltaLakeFileBasedSourceBuilder extends SourceProviderBuilder {
+  override def build(spark: SparkSession): SourceProvider = new DeltaLakeFileBasedSource(spark)
 }

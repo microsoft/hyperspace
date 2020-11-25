@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources
 
 import scala.util.{Success, Try}
 
+import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.util.hyperspace.Utils
@@ -47,7 +48,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * Runs createRelation() for each provider.
    *
    * @param logicalRelation Logical relation to create [[Relation]] from.
-   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] created from the given logical relation.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
@@ -78,6 +78,10 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    */
   def signature(logicalRelation: LogicalRelation): String = {
     run(p => p.signature(logicalRelation))
+  }
+
+  def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
+    run(p => p.allFiles(logicalRelation))
   }
 
   /**

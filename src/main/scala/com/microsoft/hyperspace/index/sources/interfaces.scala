@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index.sources
 
+import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
@@ -101,4 +102,6 @@ trait FileBasedSourceProvider extends SourceProvider {
    *         Otherwise, None.
    */
   def signature(logicalRelation: LogicalRelation): Option[String]
+
+  def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]]
 }
