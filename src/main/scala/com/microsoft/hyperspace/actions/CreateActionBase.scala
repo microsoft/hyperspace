@@ -47,7 +47,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     HyperspaceConf.indexLineageEnabled(spark)
   }
 
-  final protected def getIndexLogEntry(
+  protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
@@ -97,13 +97,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  final protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
+  protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
       case p: LogicalRelation =>
         Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 
-  final protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
+  protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =

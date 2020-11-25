@@ -26,7 +26,7 @@ import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
  * A trait that a data source should implement so that an index can be created/managed and
  * utilized for the data source.
  *
- * @since 0.3.0
+ * @since 0.4.0
  */
 trait SourceProvider
 
@@ -37,7 +37,7 @@ trait SourceProvider
  *
  * The reason for having a builder is to inject [[SparkSession]] to the source provider if needed.
  *
- * @since 0.3.0
+ * @since 0.4.0
  */
 trait SourceProviderBuilder {
 
@@ -55,7 +55,7 @@ trait SourceProviderBuilder {
  * A trait that a data source should implement so that an index can be created/managed and
  * utilized for the data source.
  *
- * @since 0.3.0
+ * @since 0.4.0
  */
 trait FileBasedSourceProvider extends SourceProvider {
 
