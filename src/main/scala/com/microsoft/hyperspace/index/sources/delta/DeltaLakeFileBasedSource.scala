@@ -37,7 +37,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
-   * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param logicalRelation Logical relation to derive [[Relation]] from.
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -97,7 +97,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
    * using version info and table name.
    *
-   * @param logicalRelation logical relation to compute signature from.
+   * @param logicalRelation Logical relation to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */

@@ -67,7 +67,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    *
    * If the given logical relation does not belong to this provider, None should be returned.
    *
-   * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param logicalRelation Logical relation to derive [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.

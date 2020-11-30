@@ -45,7 +45,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
-   * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param logicalRelation Logical relation to derive [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
@@ -123,7 +123,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
    * using all the files found in [[PartitioningAwareFileIndex]].
    *
-   * @param logicalRelation logical relation to compute signature from.
+   * @param logicalRelation Logical relation to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -143,8 +143,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   /**
    * Fingerprints a file.
    *
-   * @param fileStatus file status.
-   * @return the fingerprint of a file.
+   * @param fileStatus File status.
+   * @return The fingerprint of a file.
    */
   private def fingerprint(fileStatus: FileStatus): String = {
     fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
