@@ -127,7 +127,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         // "path" key in options can incur multiple data read unexpectedly.
         val opts = options - "path"
 
-        // If user provided a globbing pattern, set rootPaths to this pattern. Else, use file index.
+        // If user provided a globbing pattern, set rootPaths to globbing pattern.
+        // Else, use file index to identify rootPaths.
         val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
           case Some(pattern) =>
             // Validate if globbing pattern matches actual source paths.
