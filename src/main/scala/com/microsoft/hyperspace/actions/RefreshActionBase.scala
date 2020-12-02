@@ -20,7 +20,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
 
@@ -66,13 +66,15 @@ private[actions] abstract class RefreshActionBase(
 
   // Reconstruct a df from schema
   protected lazy val df = {
-    val rels = previousIndexLogEntry.relations
-    val dataSchema = DataType.fromJson(rels.head.dataSchemaJson).asInstanceOf[StructType]
+    val relations = previousIndexLogEntry.relations
+    val latestRelation =
+      Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
+    val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
     spark.read
       .schema(dataSchema)
-      .format(rels.head.fileFormat)
-      .options(rels.head.options)
-      .load(rels.head.rootPaths: _*)
+      .format(latestRelation.fileFormat)
+      .options(latestRelation.options)
+      .load(latestRelation.rootPaths: _*)
   }
 
   protected lazy val indexConfig: IndexConfig = {

@@ -16,18 +16,14 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.functions.input_file_name
-import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
@@ -67,7 +63,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val relations = sourceRelations(df)
+        val relations = sourceRelations(spark, df)
         // Currently we only support to create an index on a LogicalRelation.
         assert(relations.size == 1)
 
@@ -101,59 +97,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  protected def sourceRelations(df: DataFrame): Seq[Relation] =
+  protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(
-          HadoopFsRelation(
-            location: PartitioningAwareFileIndex,
-            _,
-            dataSchema,
-            _,
-            fileFormat,
-            options),
-          _,
-          _,
-          _) =>
-        val files = location.allFiles
-        // Note that source files are currently fingerprinted when the optimized plan is
-        // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties =
-          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-
-        val fileFormatName = fileFormat match {
-          case d: DataSourceRegister => d.shortName
-          case other => throw HyperspaceException(s"Unsupported file format: $other")
-        }
-        // "path" key in options can incur multiple data read unexpectedly.
-        val opts = options - "path"
-
-        // If user provided a globbing pattern, set rootPaths to globbing pattern.
-        // Else, use file index to identify rootPaths.
-        val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
-          case Some(pattern) =>
-            // Validate if globbing pattern matches actual source paths.
-            // This logic is picked from the globbing logic at:
-            // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
-            // spark/sql/execution/datasources/DataSource.scala#L540
-            val globPaths = pattern.split(",").map(_.trim).map { path =>
-              val hdfsPath = new Path(path)
-              val fs = hdfsPath.getFileSystem(new Configuration)
-              val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
-              qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
-            }.toMap
-
-            val globPathValues = globPaths.values.flatten.toSet
-            if (!location.rootPaths.forall(globPathValues.contains)) {
-              throw HyperspaceException("Some glob patterns do not match with available root " +
-                s"paths of the source data. Please check if option $GLOBBING_PATTERN_KEY matches " +
-                "with the provided paths.")
-            }
-            globPaths.keySet.toSeq
-
-          case _ => location.rootPaths.map(_.toString)
-        }
-
-        Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json, fileFormatName, opts)
+      case p: LogicalRelation =>
+        Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
