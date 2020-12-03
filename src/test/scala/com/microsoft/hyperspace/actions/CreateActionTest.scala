@@ -38,7 +38,7 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
 
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
-    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(spark, df)
   }
 
   override def beforeAll(): Unit = {
