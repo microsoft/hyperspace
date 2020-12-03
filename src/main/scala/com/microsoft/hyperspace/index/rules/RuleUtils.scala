@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
-import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
 object RuleUtils {
 
@@ -411,7 +411,7 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val options = extractBasePath(location.partitionSpec)
+        val options = PathUtils.extractBasePath(location.partitionSpec)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -435,22 +435,6 @@ object RuleUtils {
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended
-  }
-
-  private def extractBasePath(partitionSpec: PartitionSpec): Option[String] = {
-    if (partitionSpec == PartitionSpec.emptySpec) {
-      None
-    } else {
-      // For example, we could have the following in PartitionSpec:
-      //   - partition columns = "col1", "col2"
-      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
-      // , and going up the same number of directory levels as the number of partition columns
-      // will compute the base path. Note that PartitionSpec.partitions will always contain
-      // all the partitions in the path, so "partitions.head" is taken as an initial value.
-      val basePath = partitionSpec.partitionColumns
-        .foldLeft(partitionSpec.partitions.head.path)((path, _) => path.getParent)
-      Some(basePath.toString)
-    }
   }
 
   /**

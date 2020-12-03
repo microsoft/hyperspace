@@ -478,6 +478,41 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test("Verify incremental refresh index properly adds hive-partition columns.") {
+    withTempPathAsString { testPath =>
+      import spark.implicits._
+      val (testData, appendData) = SampleData.testData.partition(_._1 != "2019-10-03")
+      assert(testData.nonEmpty)
+      assert(appendData.nonEmpty)
+      testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .parquet(testPath)
+
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, IndexConfig("indexName", Seq("clicks"), Seq("Date")))
+
+      // Check if partition columns are correctly stored in index contents.
+      val indexDf1 = spark.read.parquet(s"$systemPath/indexName").where("Date != '2019-10-03'")
+      assert(testData.size == indexDf1.count())
+
+      // Append data creating new partition and refresh index.
+      appendData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .mode("append")
+        .parquet(testPath)
+      hyperspace.refreshIndex("indexName", "incremental")
+
+      // Check if partition columns are correctly stored in index contents.
+      val indexDf2 = spark.read.parquet(s"$systemPath/indexName").where("Date = '2019-10-03'")
+      assert(appendData.size == indexDf2.count())
+    }
+  }
+
+
   private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
     val newIndexLocation = s"$systemPath/$indexName"
     val indexPath = PathUtils.makeAbsolute(newIndexLocation)

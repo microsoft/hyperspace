@@ -25,7 +25,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
+import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -67,8 +67,19 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
+
+        // Store basePath of hive-partitioned data sources, if applicable.
+        val basePath = PathUtils.extractBasePath(location.partitionSpec())
+
         // "path" key in options can incur multiple data read unexpectedly.
-        val opts = options - "path"
+        // Since "options" is case-insensitive map, it will change any previous entries of
+        // "basePath" to lowercase "basepath", making it unusable.
+        // Remove lowercase "basepath" and add proper cased "basePath".
+        val opts = basePath match {
+          case Some(path) => Map("basePath" -> path) ++ options - "path" - "basepath"
+          case _ => options - "path" - "basepath"
+        }
+
         Some(
           Relation(
             location.rootPaths.map(_.toString),
