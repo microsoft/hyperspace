@@ -73,7 +73,11 @@ class OptimizeAction(
 
   private lazy val indexConfig: IndexConfig = {
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+    // pouriap changed this one
+//    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+
+    // TODO Revisit for handling index files with heterogeneous schema.
+    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, IncludedColumns(ddColumns.included))
   }
 
   override val fileIdTracker = previousIndexLogEntry.fileIdTracker

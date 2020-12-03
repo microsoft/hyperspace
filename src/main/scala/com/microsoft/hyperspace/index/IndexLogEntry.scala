@@ -508,7 +508,8 @@ case class IndexLogEntry(
 
   def numBuckets: Int = derivedDataset.properties.numBuckets
 
-  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
+//  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns) // pouriap changed
+  def config: IndexConfig = IndexConfig(name, indexedColumns, IncludedColumns(includedColumns))
 
   def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
 
