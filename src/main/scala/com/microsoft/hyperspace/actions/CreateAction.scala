@@ -66,8 +66,6 @@ class CreateAction(
   private def isValidIndexSchema(config: IndexConfig, schema: StructType): Boolean = {
     // Resolve index config columns from available column names present in the schema.
     ResolverUtils
-    // pouriap changed
-//      .resolve(spark, config.indexedColumns ++ config.includedColumns, schema.fieldNames)
       .resolve(
         spark,
         config.indexedColumns ++ config.includedColumns.include ++ config.includedColumns.exclude,

@@ -29,13 +29,11 @@ case class IndexConfig(
     indexName: String,
     indexedColumns: Seq[String],
     includedColumns: IncludedColumns) {
-//    includedColumns: Seq[String] = Seq()) { // pouriap changed
   if (indexName.isEmpty || indexedColumns.isEmpty) {
     throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")
   }
 
   val lowerCaseIndexedColumns = toLowerCase(indexedColumns)
-//  val lowerCaseIncludedColumnsSet = lowerCaseIncludedColumns.toSet  // pouriap changed
   val lowerCaseIncludedColumnsIncludeSet = includedColumns.lowerCaseIncludeColumns.toSet
   val lowerCaseIncludedColumnsExcludeSet = includedColumns.lowerCaseExcludeColumns.toSet
 
@@ -43,16 +41,11 @@ case class IndexConfig(
     throw new IllegalArgumentException("Duplicate indexed column names are not allowed.")
   }
 
-//  if (lowerCaseIncludedColumnsSet.size < lowerCaseIncludedColumns.size) { // pouriap changed
-//    throw new IllegalArgumentException("Duplicate included column names are not allowed.")
-//  }
-
   if (lowerCaseIncludedColumnsIncludeSet.size < includedColumns.lowerCaseIncludeColumns.size) {
     throw new IllegalArgumentException("Duplicate included column names are not allowed.")
   }
 
   for (indexedColumn <- lowerCaseIndexedColumns) {
-//    if (lowerCaseIncludedColumns.contains(indexedColumn)) { // pouriap changed
     if (lowerCaseIncludedColumnsIncludeSet.contains(indexedColumn)) {
       throw new IllegalArgumentException(
         "Duplicate column names in indexed/included columns are not allowed.")
@@ -64,30 +57,23 @@ case class IndexConfig(
       case IndexConfig(thatIndexName, thatIndexedColumns, thatIncludedColumns) =>
         indexName.equalsIgnoreCase(thatIndexName) &&
           lowerCaseIndexedColumns.equals(toLowerCase(thatIndexedColumns)) &&
-//          lowerCaseIncludedColumnsSet.equals(toLowerCase(thatIncludedColumns).toSet) // pouriap
           includedColumns.equals(thatIncludedColumns)
       case _ => false
     }
   }
 
   override def hashCode(): Int = {
-//    lowerCaseIndexedColumns.hashCode + lowerCaseIncludedColumnsSet.hashCode
     lowerCaseIndexedColumns.hashCode + includedColumns.hashCode()
   }
 
   override def toString: String = {
     val indexedColumnNames = lowerCaseIndexedColumns.mkString(", ")
-//    val includedColumnNames = lowerCaseIncludedColumns.mkString(", ") // pouriap
     val includedColumnsString = includedColumns.toString
     s"[indexName: $indexName; indexedColumns: $indexedColumnNames; " +
       s"includedColumns: $includedColumnsString]"
   }
 
   private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
-
-//  // pouriap added
-//  private def toLowerCase(includedColumns: IncludedColumns): IncludedColumns =
-//    IncludedColumns(toLowerCase(includedColumns.include), toLowerCase(includedColumns.exclude))
 }
 
 /**
@@ -114,7 +100,6 @@ object IndexConfig {
   class Builder {
 
     private[this] var indexedColumns: Seq[String] = Seq()
-//    private[this] var includedColumns: Seq[String] = Seq() // pouriap changed
     private[this] var includedColumnsInclude: Seq[String] = Seq()
     private[this] var includedColumnsExclude: Seq[String] = Seq()
     private[this] var indexName: String = ""
@@ -202,7 +187,7 @@ object IndexConfig {
       IndexConfig(
         indexName,
         indexedColumns,
-        IncludedColumns(includedColumnsInclude, includedColumnsExclude)) // pouriap changed
+        IncludedColumns(includedColumnsInclude, includedColumnsExclude))
     }
   }
 
@@ -214,7 +199,6 @@ object IndexConfig {
   def builder(): Builder = new Builder
 }
 
-// pouriap added
 case class IncludedColumns(include: Seq[String] = Nil, exclude: Seq[String] = Nil) {
   lazy val lowerCaseIncludeColumns = toLowerCase(include)
   lazy val lowerCaseExcludeColumns = toLowerCase(exclude)

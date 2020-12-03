@@ -79,12 +79,13 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val indexConfig: IndexConfig = {
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    // pouriap changed this one
-//    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
 
     // TODO Revisit for handling merged/heterogeneous schema among files plus
     //  potential changes made by user to included columns.
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, IncludedColumns(ddColumns.included))
+    IndexConfig(
+      previousIndexLogEntry.name,
+      ddColumns.indexed,
+      IncludedColumns(ddColumns.included))
   }
 
   final override val transientState: String = REFRESHING

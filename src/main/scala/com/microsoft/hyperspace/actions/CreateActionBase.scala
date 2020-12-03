@@ -123,28 +123,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         SaveMode.Overwrite)
   }
 
-//  private def resolveConfig(  // pouriap changed
-//      df: DataFrame,
-//      indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
-//    val spark = df.sparkSession
-//    val dfColumnNames = df.schema.fieldNames
-//    val indexedColumns = indexConfig.indexedColumns
-//    val includedColumns = indexConfig.includedColumns
-//    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
-//    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
-//
-//    (resolvedIndexedColumns, resolvedIncludedColumns) match {
-//      case (Some(indexed), Some(included)) => (indexed, included)
-//      case _ =>
-//        val unresolvedColumns = (indexedColumns ++ includedColumns)
-//          .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
-//          .collect { case c if c._2.isEmpty => c._1 }
-//        throw HyperspaceException(
-//          s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
-//            s"from available source columns '${dfColumnNames.mkString(",")}'")
-//    }
-//  }
-
   private def resolveConfig(
       df: DataFrame,
       indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
@@ -165,7 +143,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         }
 
         // Prioritize 'include' to 'exclude'.
-        if(includeColumns.nonEmpty) {
+        if (includeColumns.nonEmpty) {
           return (indexed, include)
         } else if (excludeColumns.nonEmpty) {
           val columns = dfColumnNames.filterNot(exclude.contains(_))
