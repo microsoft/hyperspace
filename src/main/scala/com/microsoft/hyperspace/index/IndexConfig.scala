@@ -34,19 +34,22 @@ case class IndexConfig(
   }
 
   val lowerCaseIndexedColumns = toLowerCase(indexedColumns)
-  val lowerCaseIncludedColumnsIncludeSet = includedColumns.lowerCaseIncludeColumns.toSet
-  val lowerCaseIncludedColumnsExcludeSet = includedColumns.lowerCaseExcludeColumns.toSet
+  val lowerCaseIncludedColumnsIncludeSet = includedColumns.lowerCaseIncludeColumnsSet
+  val lowerCaseIncludedColumnsExcludeSet = includedColumns.lowerCaseExcludeColumnsSet
 
   if (lowerCaseIndexedColumns.toSet.size < lowerCaseIndexedColumns.size) {
     throw new IllegalArgumentException("Duplicate indexed column names are not allowed.")
   }
 
-  if (lowerCaseIncludedColumnsIncludeSet.size < includedColumns.lowerCaseIncludeColumns.size) {
-    throw new IllegalArgumentException("Duplicate included column names are not allowed.")
+  if (lowerCaseIncludedColumnsIncludeSet.size < includedColumns.lowerCaseIncludeColumns.size ||
+      lowerCaseIncludedColumnsExcludeSet.size < includedColumns.lowerCaseExcludeColumns.size) {
+    throw new IllegalArgumentException(
+      "Duplicate include or exclude column names in included columns are not allowed.")
   }
 
   for (indexedColumn <- lowerCaseIndexedColumns) {
-    if (lowerCaseIncludedColumnsIncludeSet.contains(indexedColumn)) {
+    if (lowerCaseIncludedColumnsIncludeSet.contains(indexedColumn) ||
+        lowerCaseIncludedColumnsExcludeSet.contains(indexedColumn)) {
       throw new IllegalArgumentException(
         "Duplicate column names in indexed/included columns are not allowed.")
     }
@@ -82,7 +85,6 @@ case class IndexConfig(
  */
 object IndexConfig {
 
-  // Added for backward compatibility.
   def apply(indexName: String, indexedColumns: Seq[String]): IndexConfig = {
     IndexConfig(indexName, indexedColumns, IncludedColumns())
   }
@@ -202,18 +204,20 @@ object IndexConfig {
 case class IncludedColumns(include: Seq[String] = Nil, exclude: Seq[String] = Nil) {
   lazy val lowerCaseIncludeColumns = toLowerCase(include)
   lazy val lowerCaseExcludeColumns = toLowerCase(exclude)
+  lazy val lowerCaseIncludeColumnsSet = lowerCaseIncludeColumns.toSet
+  lazy val lowerCaseExcludeColumnsSet = lowerCaseExcludeColumns.toSet
 
   override def equals(that: Any): Boolean = {
     that match {
       case IncludedColumns(thatInclude, thatExclude) =>
-        lowerCaseIncludeColumns.equals(toLowerCase(thatInclude).toSet) &&
-          lowerCaseExcludeColumns.equals(toLowerCase(thatExclude).toSet)
+        lowerCaseIncludeColumnsSet.equals(toLowerCase(thatInclude).toSet) &&
+          lowerCaseExcludeColumnsSet.equals(toLowerCase(thatExclude).toSet)
       case _ => false
     }
   }
 
   override def hashCode(): Int = {
-    lowerCaseIncludeColumns.hashCode + lowerCaseExcludeColumns.hashCode
+    lowerCaseIncludeColumnsSet.hashCode + lowerCaseExcludeColumnsSet.hashCode
   }
 
   override def toString: String = {
