@@ -16,12 +16,23 @@
 
 package org.apache.spark.sql.hyperspace
 
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 package object utils {
   implicit class DataFrameUtils(df: DataFrame) {
     def showString(numRows: Int, truncate: Int, vertical: Boolean = false): String = {
       df.showString(numRows, truncate, vertical)
     }
+  }
+
+  // This implementation is picked directly from:
+  // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/spark/sql/
+  //  Dataset.scala#L76-L80
+  def logicalPlanToDataFrame(sparkSession: SparkSession, logicalPlan: LogicalPlan): DataFrame = {
+    val qe = sparkSession.sessionState.executePlan(logicalPlan)
+    qe.assertAnalyzed()
+    new Dataset[Row](sparkSession, qe, RowEncoder(qe.analyzed.schema))
   }
 }
