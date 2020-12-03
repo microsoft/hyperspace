@@ -173,12 +173,12 @@ object RuleUtils {
     val hybridScanRequired = HyperspaceConf.hybridScanEnabled(spark) &&
       index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
-    // In case the index has appended files and/or deleted files which are updated by quick
-    // refresh mode, we should handle them in query time by using Hybrid Scan.
-    // Because quick refresh doesn't update index data, but just metadata in IndexLogEntry.
-    lazy val quickRefreshedIndex = index.hasSourceUpdate
+    // If the index has appended files and/or deleted files, which means the current index data
+    // is outdated, Hybrid Scan should be used to handle the newly updated source files.
+    // Added `lazy` to avoid constructing sets for appended/deleted files unless necessary.
+    lazy val isSourceUpdated = index.hasSourceUpdate
 
-    val transformed = if (hybridScanRequired || quickRefreshedIndex) {
+    val transformed = if (hybridScanRequired || isSourceUpdated) {
       transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
     } else {
       transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
@@ -277,8 +277,8 @@ object RuleUtils {
             _) =>
         val (filesDeleted, filesAppended) =
           if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
-            // This index was refreshed in quick mode and validated with the latest signature.
-            // So we could use deleted files and appended files in IndexLogEntry.
+            // If the index contains the source update info, we need to handle
+            // appendedFiles and deletedFiles in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
             val curFiles = location.allFiles

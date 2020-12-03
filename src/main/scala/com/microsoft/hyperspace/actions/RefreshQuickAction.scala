@@ -36,8 +36,8 @@ class RefreshQuickAction(
     extends RefreshActionBase(spark, logManager, dataManager) {
   final override def op(): Unit = {
     logInfo(
-      "Refresh index is updating metadata only with " + deletedFiles.size + " of" +
-        "deleted files and " + appendedFiles.size + " of appended files.")
+      s"Refresh index is updating metadata only with ${deletedFiles.size} of deleted" +
+        s"files and ${appendedFiles.size} of appended files.")
   }
 
   /**
