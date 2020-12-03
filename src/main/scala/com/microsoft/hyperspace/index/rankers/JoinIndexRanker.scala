@@ -39,8 +39,8 @@ object JoinIndexRanker {
    * assuming there is no resource constraint.
    *
    * If hybridScanEnabled is true, rank algorithm follows the algorithm above, but we prioritize
-   * the index with larger and usable index data for each index, so as to minimize the amount of
-   * data for on-the-fly shuffle or merge.
+   * the index with larger and usable index data for each join child plan, so as to minimize the
+   * amount of data for on-the-fly shuffle or merge.
    *
    * @param spark SparkSession.
    * @param leftChild Logical relation of left child of the join.
@@ -57,7 +57,6 @@ object JoinIndexRanker {
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     val defaultBuckets = spark.conf.get("spark.sql.shuffle.partitions", "200").toInt
     indexPairs.sortWith {
-
       case ((left1, left2), (right1, right2)) =>
         // These common bytes were calculated and tagged in getCandidateIndexes.
         // The value is the summation of common source files of the given plan and each index.

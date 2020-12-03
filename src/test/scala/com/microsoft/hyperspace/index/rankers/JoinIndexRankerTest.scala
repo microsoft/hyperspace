@@ -53,7 +53,7 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
   val t2c1 = AttributeReference("t2c1", IntegerType)()
   val t2c2 = AttributeReference("t2c2", StringType)()
 
-  test("rank() should prefer equal-bucket index pairs over unequal-bucket") {
+  test("rank() should prefer equal-bucket index pairs over unequal-bucket.") {
     val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, writeLog = false)
     val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), dummy, 20, writeLog = false)
     val r_20 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), dummy, 20, writeLog = false)
@@ -65,7 +65,8 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
     assert(actualOrder.equals(expectedOrder))
   }
 
-  test("rank() should prefer higher number of buckets if multiple equal-bucket index pairs found") {
+  test(
+    "rank() should prefer higher number of buckets if multiple equal-bucket index pairs found.") {
     val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, writeLog = false)
     val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), dummy, 20, writeLog = false)
     val r_10 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), dummy, 10, writeLog = false)
@@ -78,7 +79,7 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
     assert(actualOrder.equals(expectedOrder))
   }
 
-  test("rank() should prefer the largest common bytes if HybridScan is enabled") {
+  test("rank() should prefer the largest common bytes if HybridScan is enabled.") {
     val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 2, 1, 2))
     val fileList2 = Seq(FileInfo("c", 1, 1, 3), FileInfo("d", 1, 1, 4))
     val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), dummy, 10, fileList1, false)

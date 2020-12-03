@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.FileInfo
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
 import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
 import com.microsoft.hyperspace.util.FileUtils
 
@@ -45,18 +45,18 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
   val t2c1 = AttributeReference("t2c1", IntegerType)()
   val t2c2 = AttributeReference("t2c2", StringType)()
 
-  test("rank() should return the head of the list by default") {
+  test("rank() should return the head of the list by default.") {
     val ind1 = createIndexLogEntry("ind1", Seq(t1c1), Seq(t1c2), dummy, writeLog = false)
     val ind2 = createIndexLogEntry("ind2", Seq(t1c1), Seq(t1c2), dummy, writeLog = false)
     val ind3 = createIndexLogEntry("ind3", Seq(t2c1), Seq(t2c2), dummy, writeLog = false)
 
     val indexes = Seq(ind1, ind2, ind3)
-    assert(FilterIndexRanker.rank(dummy, indexes, hybridScanEnabled = false).get.equals(ind1))
+    assert(FilterIndexRanker.rank(spark, dummy, indexes).get.equals(ind1))
   }
 
   test(
     "rank() should return the index with the largest common bytes of source files" +
-      "if HybridScan is enabled") {
+      "if HybridScan is enabled.") {
 
     val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 1, 1, 3))
     val fileList2 = Seq(FileInfo("c", 1, 1, 2), FileInfo("d", 1, 1, 4))
@@ -84,7 +84,10 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
       writeLog = false)
 
     val indexes = Seq(ind1, ind2, ind3)
-    assert(FilterIndexRanker.rank(dummy, indexes, hybridScanEnabled = true).get === ind2)
-    assert(FilterIndexRanker.rank(dummy, indexes, hybridScanEnabled = false).get === ind1)
+
+    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "true")
+    assert(FilterIndexRanker.rank(spark, dummy, indexes).get === ind2)
+    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "false")
+    assert(FilterIndexRanker.rank(spark, dummy, indexes).get === ind1)
   }
 }

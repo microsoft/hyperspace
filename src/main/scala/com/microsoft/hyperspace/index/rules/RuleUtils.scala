@@ -78,10 +78,11 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      // Find the number of common files between the source relations & index source files.
+      // Find the number and total size of common files between the source relation and
+      // index source files.
       val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
         if (entry.sourceFileInfoSet.contains(f)) {
-          (res._1 + 1, res._2 + f.size) // count, bytes
+          (res._1 + 1, res._2 + f.size) // count, total bytes
         } else {
           res
         }
