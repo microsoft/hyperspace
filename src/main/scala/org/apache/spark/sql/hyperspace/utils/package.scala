@@ -16,12 +16,17 @@
 
 package org.apache.spark.sql.hyperspace
 
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 package object utils {
   implicit class DataFrameUtils(df: DataFrame) {
     def showString(numRows: Int, truncate: Int, vertical: Boolean = false): String = {
       df.showString(numRows, truncate, vertical)
     }
+  }
+
+  def logicalPlanToDataFrame(spark: SparkSession, logicalPlan: LogicalPlan): DataFrame = {
+    Dataset.ofRows(spark, logicalPlan)
   }
 }
