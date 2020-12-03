@@ -37,7 +37,7 @@ class RefreshQuickAction(
   final override def op(): Unit = {
     logInfo(
       s"Refresh index is updating metadata only with ${deletedFiles.size} of deleted" +
-        s"files and ${appendedFiles.size} of appended files.")
+        s" files and ${appendedFiles.size} of appended files.")
   }
 
   /**
