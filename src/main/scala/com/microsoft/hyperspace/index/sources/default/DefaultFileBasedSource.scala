@@ -59,17 +59,17 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       fileIdTracker: FileIdTracker): Option[Relation] = {
     logicalRelation.relation match {
       case HadoopFsRelation(
-      location: PartitioningAwareFileIndex,
-      _,
-      dataSchema,
-      _,
-      fileFormat,
-      options) if isSupportedFileFormat(fileFormat) =>
+          location: PartitioningAwareFileIndex,
+          _,
+          dataSchema,
+          _,
+          fileFormat,
+          options) if isSupportedFileFormat(fileFormat) =>
         val files = location.allFiles
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
-        Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
         // "path" key in options can incur multiple data read unexpectedly.
@@ -81,18 +81,23 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
             // This logic is picked from the globbing logic at:
             // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
             // spark/sql/execution/datasources/DataSource.scala#L540
-            val globPaths = pattern.split(",").map(_.trim).map { path =>
-              val hdfsPath = new Path(path)
-              val fs = hdfsPath.getFileSystem(new Configuration)
-              val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
-              qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
-            }.toMap
+            val fs = location.allFiles.head.getPath.getFileSystem(new Configuration)
+            val globPaths = pattern
+              .split(",")
+              .map(_.trim)
+              .map { path =>
+                val hdfsPath = new Path(path)
+                val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+                qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
+              }
+              .toMap
 
             val globPathValues = globPaths.values.flatten.toSet
             if (!location.rootPaths.forall(globPathValues.contains)) {
-              throw HyperspaceException("Some glob patterns do not match with available root " +
-                s"paths of the source data. Please check if option $GLOBBING_PATTERN_KEY matches " +
-                "with the provided paths.")
+              throw HyperspaceException(
+                "Some glob patterns do not match with available root " +
+                  s"paths of the source data. Please check if $pattern matches all of " +
+                  s"${location.rootPaths.mkString(",")}.")
             }
             globPaths.keySet.toSeq
 
