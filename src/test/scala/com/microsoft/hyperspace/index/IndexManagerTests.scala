@@ -480,6 +480,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
 
   test("Verify incremental refresh index properly adds hive-partition columns.") {
     withTempPathAsString { testPath =>
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath).toString
       import spark.implicits._
       val (testData, appendData) = SampleData.testData.partition(_._1 != "2019-10-03")
       assert(testData.nonEmpty)
@@ -491,11 +492,13 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         .parquet(testPath)
 
       val df = spark.read.parquet(testPath)
-      hyperspace.createIndex(df, IndexConfig("indexName", Seq("clicks"), Seq("Date")))
+      hyperspace.createIndex(df, IndexConfig("index", Seq("clicks"), Seq("Date")))
 
       // Check if partition columns are correctly stored in index contents.
-      val indexDf1 = spark.read.parquet(s"$systemPath/indexName").where("Date != '2019-10-03'")
+      val indexDf1 = spark.read.parquet(s"$systemPath/index").where("Date != '2019-10-03'")
       assert(testData.size == indexDf1.count())
+      val oldEntry = latestIndexLogEntry("index")
+      assert(oldEntry.relations.head.options("basePath").equals(absoluteTestPath))
 
       // Append data creating new partition and refresh index.
       appendData
@@ -504,22 +507,27 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
         .partitionBy("Date")
         .mode("append")
         .parquet(testPath)
-      hyperspace.refreshIndex("indexName", "incremental")
+      hyperspace.refreshIndex("index", "incremental")
 
       // Check if partition columns are correctly stored in index contents.
-      val indexDf2 = spark.read.parquet(s"$systemPath/indexName").where("Date = '2019-10-03'")
+      val indexDf2 = spark.read.parquet(s"$systemPath/index").where("Date = '2019-10-03'")
       assert(appendData.size == indexDf2.count())
+      val newEntry = latestIndexLogEntry("index")
+      assert(newEntry.relations.head.options("basePath").equals(absoluteTestPath))
     }
   }
 
-
-  private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
+  private def latestIndexLogEntry(indexName: String): IndexLogEntry = {
     val newIndexLocation = s"$systemPath/$indexName"
     val indexPath = PathUtils.makeAbsolute(newIndexLocation)
     val logManager = IndexLogManagerFactoryImpl.create(indexPath)
     val latestLog = logManager.getLatestLog()
     assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
-    val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+    latestLog.get.asInstanceOf[IndexLogEntry]
+  }
+
+  private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
+    val indexLog = latestIndexLogEntry(indexName)
     val indexFiles = indexLog.content.files
     assert(indexFiles.nonEmpty)
     assert(indexFiles.forall(_.getName.startsWith("part-0")))
