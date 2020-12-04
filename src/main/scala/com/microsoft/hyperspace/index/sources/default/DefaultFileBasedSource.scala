@@ -69,7 +69,10 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
         // Store basePath of hive-partitioned data sources, if applicable.
-        val basePath = PathUtils.extractBasePath(location.partitionSpec())
+        val basePath = options.get("basePath") match {
+          case None => PathUtils.extractBasePath(location.partitionSpec())
+          case p => p
+        }
 
         // "path" key in options can incur multiple data read unexpectedly.
         // Since "options" is case-insensitive map, it will change any previous entries of
