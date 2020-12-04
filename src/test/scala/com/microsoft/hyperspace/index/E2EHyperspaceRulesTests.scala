@@ -728,13 +728,13 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
         // Check appended file is added to relation node or not.
         val nodes = planWithHybridScan.collect {
           case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-            // Verify appended file is included or not.
-            assert(
-              fsRelation.location.inputFiles
-                .count(_.contains(absoluteTestPath.toUri.toString)) === 3)
-            // Verify number of index data files.
-            assert(fsRelation.location.inputFiles.count(_.contains("index")) === 4)
-            assert(fsRelation.location.inputFiles.length === 7)
+            // Verify old data files are not present but newly appended files are included.
+            val p1UriPath = new Path(p1).toUri.getPath
+            val p2UriPath = new Path(p2).toUri.getPath
+            assert(!fsRelation.location.inputFiles.exists(_.contains(p1UriPath)))
+            assert(fsRelation.location.inputFiles.exists(_.contains(p2UriPath)))
+            // Verify index data files are present.
+            assert(fsRelation.location.inputFiles.exists(_.contains("index")))
             p
         }
         // Filter Index and Parquet format source file can be handled with 1 LogicalRelation.
