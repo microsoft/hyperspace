@@ -455,13 +455,19 @@ case class IndexLogEntry(
     relations.head.data.properties.update
   }
 
+  def hasSourceUpdate: Boolean = {
+    sourceUpdate.isDefined && (appendedFiles.nonEmpty || deletedFiles.nonEmpty)
+  }
+
   // FileInfo's 'name' contains the full path to the file.
-  def appendedFiles: Set[FileInfo] = {
+  @JsonIgnore
+  lazy val appendedFiles: Set[FileInfo] = {
     sourceUpdate.flatMap(_.appendedFiles).map(_.fileInfos).getOrElse(Set())
   }
 
   // FileInfo's 'name' contains the full path to the file.
-  def deletedFiles: Set[FileInfo] = {
+  @JsonIgnore
+  lazy val deletedFiles: Set[FileInfo] = {
     sourceUpdate.flatMap(_.deletedFiles).map(_.fileInfos).getOrElse(Set())
   }
 

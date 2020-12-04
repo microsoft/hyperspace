@@ -22,7 +22,7 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
-import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -71,6 +71,8 @@ class IndexCollectionManager(
         new RefreshIncrementalAction(spark, logManager, dataManager).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager).run()
+      } else if (mode.equalsIgnoreCase(REFRESH_MODE_QUICK)) {
+        new RefreshQuickAction(spark, logManager, dataManager).run()
       } else {
         throw HyperspaceException(s"Unsupported refresh mode '$mode' found.")
       }
