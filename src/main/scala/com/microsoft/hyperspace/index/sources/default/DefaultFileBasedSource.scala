@@ -18,12 +18,16 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
-import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileStatus, Path}
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
+import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
 import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
 
@@ -83,13 +87,37 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           case _ => options - "path" - "basepath"
         }
 
+        val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
+          case Some(pattern) =>
+            // Validate if globbing pattern matches actual source paths.
+            // This logic is picked from the globbing logic at:
+            // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
+            // spark/sql/execution/datasources/DataSource.scala#L540
+            val fs = location.allFiles.head.getPath.getFileSystem(new Configuration)
+            val globPaths = pattern
+              .split(",")
+              .map(_.trim)
+              .map { path =>
+                val hdfsPath = new Path(path)
+                val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+                qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
+              }
+              .toMap
+
+            val globPathValues = globPaths.values.flatten.toSet
+            if (!location.rootPaths.forall(globPathValues.contains)) {
+              throw HyperspaceException(
+                "Some glob patterns do not match with available root " +
+                  s"paths of the source data. Please check if $pattern matches all of " +
+                  s"${location.rootPaths.mkString(",")}.")
+            }
+            globPaths.keySet.toSeq
+
+          case _ => location.rootPaths.map(_.toString)
+        }
+
         Some(
-          Relation(
-            location.rootPaths.map(_.toString),
-            Hdfs(sourceDataProperties),
-            dataSchema.json,
-            fileFormatName,
-            opts))
+          Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json, fileFormatName, opts))
       case _ => None
     }
   }

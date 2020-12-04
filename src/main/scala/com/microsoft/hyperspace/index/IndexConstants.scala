@@ -101,4 +101,11 @@ object IndexConstants {
 
   // JSON property name used in index metadata to store whether lineage is enabled for an index.
   private[hyperspace] val LINEAGE_PROPERTY = "lineage"
+
+  // Hyperspace allows users to use globbing patterns to create indexes on. E.g. if user wants to
+  // create an index on "/temp/*/*", they can do so by setting this key to "/temp/*/*". If not set,
+  // Hyperspace assumes the actual folder names were picked for indexing instead of the wildcards.
+  // To provide multiple paths in the globbing pattern, separate them with commas, e.g.
+  // "/temp/1/*, /temp/2/*"
+  val GLOBBING_PATTERN_KEY = "spark.hyperspace.source.globbingPattern"
 }
