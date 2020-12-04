@@ -171,7 +171,7 @@ object RuleUtils {
     // If there is no change in source data files, the index can be applied by
     // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
-    val hybridScanRequired =
+    val hybridScanRequired = HyperspaceConf.hybridScanEnabled(spark) &&
       index.getTagValue(logicalRelation.get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     // If the index has appended files and/or deleted files, which means the current index data
