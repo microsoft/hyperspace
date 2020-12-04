@@ -72,25 +72,25 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           }
         }
 
-        assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
+        assert(verifyIndexUsage(query().queryExecution.optimizedPlan, "deltaIndex"))
 
         // Create a new version by deleting entries.
         val deltaTable = DeltaTable.forPath(dataPath)
         deltaTable.delete("clicks > 2000")
 
         // The index should not be applied for the updated version.
-        assert(!verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex"))
+        assert(!verifyIndexUsage(query().queryExecution.optimizedPlan, "deltaIndex"))
 
         // The index should be applied for the version at index creation.
-        assert(verifyIndexUse(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
+        assert(verifyIndexUsage(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
 
         hyperspace.refreshIndex("deltaIndex")
 
         // The index should be applied for the updated version.
-        assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex/v__=1"))
+        assert(verifyIndexUsage(query().queryExecution.optimizedPlan, "deltaIndex/v__=1"))
 
         // The index should not be applied for the version at index creation.
-        assert(!verifyIndexUse(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
+        assert(!verifyIndexUsage(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
       }
     }
   }
@@ -118,7 +118,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           }
         }
 
-        assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex", false))
+        assert(verifyIndexUsage(query().queryExecution.optimizedPlan, "deltaIndex", false))
 
         // Create a new version by deleting entries.
         val deltaTable = DeltaTable.forPath(dataPath)
@@ -128,7 +128,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           "spark.hyperspace.index.hybridscan.enabled" -> "true",
           "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
           // The index should be applied for the updated version.
-          assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex", true))
+          assert(verifyIndexUsage(query().queryExecution.optimizedPlan, "deltaIndex", true))
 
           // Append data.
           dfFromSample
@@ -139,13 +139,13 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
             .save(dataPath)
 
           // The index should be applied for the updated version.
-          assert(verifyIndexUse(query().queryExecution.optimizedPlan, "deltaIndex", true))
+          assert(verifyIndexUsage(query().queryExecution.optimizedPlan, "deltaIndex", true))
         }
       }
     }
   }
 
-  def verifyIndexUse(
+  def verifyIndexUsage(
       plan: LogicalPlan,
       indexName: String,
       isHybridScan: Boolean = false): Boolean = {
