@@ -78,8 +78,8 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      // Find the number and total size of common files between the source relation and
-      // index source files.
+      // Find the number of common files between the source relation and index source files.
+      // The total size of common files are collected and tagged for candidate.
       val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
         if (entry.sourceFileInfoSet.contains(f)) {
           (res._1 + 1, res._2 + f.size) // count, total bytes
@@ -88,14 +88,6 @@ object RuleUtils {
         }
       }
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-      entry.setTagValue(IndexLogEntryTags.COMMON_BYTES, commonBytes)
-
-      // If there is no change in source dataset, this index can be applied by
-      // transformPlanToUseIndexOnlyScan.
-      entry.setTagValue(
-        IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
-        !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
-
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
         commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
 
@@ -105,6 +97,8 @@ object RuleUtils {
 
       val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
+        entry.setTagValue(IndexLogEntryTags.COMMON_BYTES, commonBytes)
+
         // If there is no change in source dataset, the index will be applied by
         // transformPlanToUseIndexOnlyScan.
         entry.setTagValue(
@@ -291,7 +285,9 @@ object RuleUtils {
             _) =>
         val (filesDeleted, filesAppended) =
           if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
-            // If the index contains the source update info, we need to handle
+            // If the index contains the source update info, it means the index was validated
+            // with the latest signature including appended files and deleted files, but
+            // index data is not updated with those files. Therefore, we need to handle
             // appendedFiles and deletedFiles in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
