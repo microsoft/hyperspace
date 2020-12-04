@@ -84,6 +84,7 @@ object IndexConstants {
 
   val REFRESH_MODE_INCREMENTAL = "incremental"
   val REFRESH_MODE_FULL = "full"
+  val REFRESH_MODE_QUICK = "quick"
 
   /**
    * Optimize threshold. It is a threshold of size of index files in bytes. Files with size

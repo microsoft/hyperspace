@@ -436,6 +436,178 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     testDifferentMode(displayMode)
   }
 
+  test("Testing default display mode when optimized plan is materialized") {
+    val df = spark.read.parquet(sampleParquetDataLocation)
+    val indexConfig = IndexConfig("joinIndex", Seq("Col1"), Seq("Col2"))
+    hyperspace.createIndex(df, indexConfig)
+
+    val defaultDisplayMode = new PlainTextMode(getHighlightConf("", ""))
+
+    // Constructing expected output for given query from explain API
+    val expectedOutput = new StringBuilder
+
+    // The format of the explain output looks as follows:
+    // scalastyle:off filelinelengthchecker
+    /**
+     *=============================================================
+     *Plan with indexes:
+     *=============================================================
+     * SortMergeJoin [Col1#11], [Col1#21], Inner
+     * <----:- *(1) Project [Col1#11, Col2#12]---->
+     * <----:  +- *(1) Filter isnotnull(Col1#11)---->
+     * <----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
+     * <----+- *(2) Project [Col1#21, Col2#22]---->
+     *    <----+- *(2) Filter isnotnull(Col1#21)---->
+     *       <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
+     *
+     *=============================================================
+     *Plan without indexes:
+     *=============================================================
+     * SortMergeJoin [Col1#11], [Col1#21], Inner
+     * <----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->
+     * <----:  +- Exchange hashpartitioning(Col1#11, 200)---->
+     * <----:     +- *(1) Project [Col1#11, Col2#12]---->
+     * <----:        +- *(1) Filter isnotnull(Col1#11)---->
+     * <----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/sampleparquet], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->
+     * <----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->
+     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->
+     *
+     *=============================================================
+     *Indexes used:
+     *=============================================================
+     *joinIndex:src/test/resources/indexLocation/joinIndex/v__=0
+     *
+     * =============================================================
+     * Physical operator stats:
+     * =============================================================
+     * +------------------+-------------------+------------------+----------+
+     * | Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|
+     * +------------------+-------------------+------------------+----------+
+     * |           *Filter|                  1|                 2|         1|
+     * |     *InputAdapter|                  4|                 2|        -2|
+     * |          *Project|                  1|                 2|         1|
+     * |   *ReusedExchange|                  1|                 0|        -1|
+     * |     *Scan parquet|                  1|                 2|         1|
+     * |  *ShuffleExchange|                  1|                 0|        -1|
+     * |             *Sort|                  2|                 0|        -2|
+     * |*WholeStageCodegen|                  4|                 3|        -1|
+     * |     SortMergeJoin|                  1|                 1|         0|
+     * +------------------+-------------------+------------------+----------+
+     */
+    // scalastyle:on filelinelengthchecker
+
+    val joinIndexFilePath = getIndexFilesPath("joinIndex")
+
+    val joinIndexPath = getIndexRootPath("joinIndex")
+
+    // scalastyle:off filelinelengthchecker
+    expectedOutput
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("Plan with indexes:")
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("SortMergeJoin [Col1#11], [Col1#21], Inner")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:- *(1) Project [Col1#11, Col2#12]---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
+      .append(defaultDisplayMode.newLine)
+      .append(s"<----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----+- *(2) Project [Col1#21, Col2#22]---->")
+      .append(defaultDisplayMode.newLine)
+      .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
+      .append(defaultDisplayMode.newLine)
+      .append(s"      <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
+      .append(defaultDisplayMode.newLine)
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("Plan without indexes:")
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("SortMergeJoin [Col1#11], [Col1#21], Inner")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200)---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:     +- *(1) Project [Col1#11, Col2#12]---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----:        +- *(1) Filter isnotnull(Col1#11)---->")
+      .append(defaultDisplayMode.newLine)
+      .append(s"<----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]") +
+        ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->")
+      .append(defaultDisplayMode.newLine)
+      .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
+      .append(defaultDisplayMode.newLine)
+      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->")
+      .append(defaultDisplayMode.newLine)
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("Indexes used:")
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append(s"joinIndex:$joinIndexPath")
+      .append(defaultDisplayMode.newLine)
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("Physical operator stats:")
+      .append(defaultDisplayMode.newLine)
+      .append("=============================================================")
+      .append(defaultDisplayMode.newLine)
+      .append("+------------------+-------------------+------------------+----------+")
+      .append(defaultDisplayMode.newLine)
+      .append("| Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|")
+      .append(defaultDisplayMode.newLine)
+      .append("+------------------+-------------------+------------------+----------+")
+      .append(defaultDisplayMode.newLine)
+      .append("|           *Filter|                  1|                 2|         1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|     *InputAdapter|                  4|                 2|        -2|")
+      .append(defaultDisplayMode.newLine)
+      .append("|          *Project|                  1|                 2|         1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|   *ReusedExchange|                  1|                 0|        -1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|     *Scan parquet|                  1|                 2|         1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|  *ShuffleExchange|                  1|                 0|        -1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|             *Sort|                  2|                 0|        -2|")
+      .append(defaultDisplayMode.newLine)
+      .append("|*WholeStageCodegen|                  4|                 3|        -1|")
+      .append(defaultDisplayMode.newLine)
+      .append("|     SortMergeJoin|                  1|                 1|         0|")
+      .append(defaultDisplayMode.newLine)
+      .append("+------------------+-------------------+------------------+----------+")
+      .append(defaultDisplayMode.newLine)
+      .append(defaultDisplayMode.newLine)
+    // scalastyle:on filelinelengthchecker
+
+    val selfJoinDf = df.join(df, df("Col1") === df("Col1"))
+
+    // Materialize the lazily evaluated optimized plan before plan comparison.
+    spark.enableHyperspace()
+    selfJoinDf.queryExecution.optimizedPlan
+    spark.disableHyperspace()
+
+    verifyExplainOutput(selfJoinDf, expectedOutput.toString(), verbose = true) { df =>
+      df
+    }
+  }
+
   private def testDifferentMode(displayMode: DisplayMode): Unit = {
     val df = spark.read.parquet(sampleParquetDataLocation)
     val indexConfig = IndexConfig("filterIndex", Seq("Col2"), Seq("Col1"))
