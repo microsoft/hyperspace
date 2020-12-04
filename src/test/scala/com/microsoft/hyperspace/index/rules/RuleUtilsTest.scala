@@ -294,28 +294,6 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     }
   }
 
-  test(
-    "RuleUtils.getCandidateIndexes: Verify indexes with non-empty 'deletedFiles' or " +
-      "'appendedFiles' are not usable indexes if hybrid scan is disabled.") {
-    withSQLConf(INDEX_HYBRID_SCAN_ENABLED -> "false") {
-      val fingerprint = LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature"))))
-      val entry1 = createIndexLogEntry("t1iTest", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-      val entry2 =
-        entry1.copyWithUpdate(fingerprint, Seq(), Seq(FileInfo("file:/dir/f1", 1, 1, 1L)))
-      val entry3 =
-        entry1.copyWithUpdate(fingerprint, Seq(FileInfo("file:/dir/f2", 1, 1, 2L)), Seq())
-      // IndexLogEntry.withAppendedAndDeletedFiles doesn't copy LogEntry's fields.
-      // Thus, set the 'state' to ACTIVE manually so that these entries are considered
-      // in RuleUtils.getCandidateIndexes.
-      entry2.state = "ACTIVE"
-      entry3.state = "ACTIVE"
-      val usableIndexes =
-        RuleUtils.getCandidateIndexes(spark, Seq(entry1, entry2, entry3), t1ProjectNode)
-      assert(usableIndexes === Seq(entry1))
-    }
-  }
-
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
     val r = RuleUtils.getLogicalRelation(plan)
     assert(r.isDefined)
