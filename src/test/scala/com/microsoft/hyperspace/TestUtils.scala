@@ -74,6 +74,13 @@ object TestUtils {
     val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
     IndexLogManagerFactoryImpl.create(indexPath)
   }
+
+  def latestIndexLogEntry(systemPath: Path, indexName: String): IndexLogEntry = {
+    logManager(systemPath, indexName)
+      .getLatestStableLog()
+      .get
+      .asInstanceOf[IndexLogEntry]
+  }
 }
 
 /**
