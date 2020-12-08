@@ -50,7 +50,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     FileUtils.delete(systemPath)
   }
 
-  test("getIndexStat() on a fresh index returns correct result.") {
+  test("getIndexStats() on a fresh index returns correct result.") {
     Seq(true, false).foreach { enableLineage =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig.indexName) {
@@ -62,7 +62,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "getIndexStat() on an index refreshed in incremental or quick mode returns correct result.") {
+    "getIndexStats() on an index refreshed in incremental or quick mode returns correct result.") {
     Seq("incremental", "quick").foreach { mode =>
       withTempPathAsString { testPath =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
@@ -89,13 +89,35 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("getIndexStats() on an index with multiple active versions returns correct result.") {
+    withTempPathAsString { testPath =>
+      withIndex(indexConfig.indexName) {
+        SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+        val df = spark.read.parquet(testPath)
+        hyperspace.createIndex(df, indexConfig)
+
+        import spark.implicits._
+        for (_ <- 1 to 2) {
+          SampleData.testData
+            .take(3)
+            .toDF(dataColumns: _*)
+            .write
+            .mode("append")
+            .parquet(testPath)
+
+          hyperspace.refreshIndex(indexConfig.indexName, "incremental")
+        }
+        validateIndexStats(indexConfig.indexName)
+      }
+    }
+  }
+
   private def validateIndexStats(indexName: String): Unit = {
     val indexStatsDF = hyperspace.getIndexStats(indexName)
     assert(indexStatsDF.count() == 1)
 
     import spark.implicits._
     val indexStats = indexStatsDF.as[IndexStatistics].collect()(0)
-
     val log = logManager(systemPath, indexName).getLatestStableLog()
     assert(log.isDefined)
     val entry = log.get.asInstanceOf[IndexLogEntry]

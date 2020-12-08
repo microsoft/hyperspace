@@ -248,7 +248,6 @@ private[hyperspace] case class IndexStatistics(
     includedColumns: Seq[String],
     numBuckets: Int,
     schema: String,
-    indexLocation: String,
     state: String,
     kind: String,
     hasLineage: Boolean,
@@ -259,7 +258,8 @@ private[hyperspace] case class IndexStatistics(
     numAppendedFiles: Int,
     sizeAppendedFiles: Long,
     numDeletedFiles: Int,
-    sizeDeletedFiles: Long)
+    sizeDeletedFiles: Long,
+    indexRootPaths: Seq[String])
 
 private[hyperspace] object IndexStatistics {
   def apply(spark: SparkSession, entry: IndexLogEntry): IndexStatistics = {
@@ -270,7 +270,6 @@ private[hyperspace] object IndexStatistics {
       indexSummary.includedColumns,
       indexSummary.numBuckets,
       indexSummary.schema,
-      indexSummary.indexLocation,
       indexSummary.state,
       entry.derivedDataset.kind,
       entry.hasLineageColumn,
@@ -281,6 +280,26 @@ private[hyperspace] object IndexStatistics {
       entry.appendedFiles.size,
       entry.appendedFiles.map(_.size).sum,
       entry.deletedFiles.size,
-      entry.deletedFiles.map(_.size).sum)
+      entry.deletedFiles.map(_.size).sum,
+      getIndexRootPaths(entry))
+  }
+
+  /**
+   * Extract top-most index directories which contain index files. Each index directory
+   * contains index files created for an active version of index.
+   *
+   * @param entry Index log entry.
+   * @return List of paths to index directories for all active versions of index.
+   */
+  private def getIndexRootPaths(entry: IndexLogEntry): Seq[String] = {
+    var root = entry.content.root
+    var prefix = entry.content.root.name
+    while (root.subDirs.size == 1 &&
+           !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
+      prefix += s"/${root.subDirs.head.name}"
+      root = root.subDirs.head
+    }
+
+    root.subDirs.map(d => prefix + s"/${d.name}")
   }
 }
