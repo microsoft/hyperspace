@@ -22,6 +22,7 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
+import com.microsoft.hyperspace.actions.Constants.States.DOESNOTEXIST
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 
 class IndexCollectionManager(
@@ -108,6 +109,19 @@ class IndexCollectionManager(
       .map(_.get)
       .filter(index => states.isEmpty || states.contains(index.state))
       .map(toIndexLogEntry)
+  }
+
+  override def getIndexStats(indexName: String): DataFrame = {
+    getLogManager(indexName).fold(
+      throw HyperspaceException(s"Index with name $indexName could not be found")) {
+      _.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
+        case Some(l) =>
+          import spark.implicits._
+          Seq(IndexStatistics(spark, toIndexLogEntry(l))).toDF()
+        case None =>
+          throw HyperspaceException(s"No latest stable log found for index $indexName.")
+      }
+    }
   }
 
   private def indexLogManagers: Seq[IndexLogManager] = {
@@ -204,5 +218,69 @@ private[hyperspace] object IndexSummary {
       indexDirPath = new Path(indexDirPath, root.name)
     }
     indexDirPath.toString
+  }
+}
+
+/**
+ * Case class representing index metadata and index statistics from latest index version.
+ *
+ * @param name index name.
+ * @param indexedColumns indexed columns.
+ * @param includedColumns included columns.
+ * @param numBuckets number of buckets.
+ * @param schema index schema json.
+ * @param indexLocation index location.
+ * @param state index state.
+ * @param kind index kind.
+ * @param hasLineage lineage enabled on index.
+ * @param numIndexFiles total number of index files.
+ * @param sizeIndexFiles total size of index files.
+ * @param numSourceFiles total number of source data files.
+ * @param sizeSourceFiles total size of source data files.
+ * @param numAppendedFiles total number of appended source data files.
+ * @param sizeAppendedFiles total size of appended source data files.
+ * @param numDeletedFiles total number of deleted source data files.
+ * @param sizeDeletedFiles total size of deleted source data files.
+ */
+private[hyperspace] case class IndexStatistics(
+    name: String,
+    indexedColumns: Seq[String],
+    includedColumns: Seq[String],
+    numBuckets: Int,
+    schema: String,
+    indexLocation: String,
+    state: String,
+    kind: String,
+    hasLineage: Boolean,
+    numIndexFiles: Int,
+    sizeIndexFiles: Long,
+    numSourceFiles: Int,
+    sizeSourceFiles: Long,
+    numAppendedFiles: Int,
+    sizeAppendedFiles: Long,
+    numDeletedFiles: Int,
+    sizeDeletedFiles: Long)
+
+private[hyperspace] object IndexStatistics {
+  def apply(spark: SparkSession, entry: IndexLogEntry): IndexStatistics = {
+    val indexSummary = IndexSummary(spark, entry)
+    IndexStatistics(
+      indexSummary.name,
+      indexSummary.indexedColumns,
+      indexSummary.includedColumns,
+      indexSummary.numBuckets,
+      indexSummary.schema,
+      indexSummary.indexLocation,
+      indexSummary.state,
+      entry.derivedDataset.kind,
+      entry.hasLineageColumn,
+      entry.content.fileInfos.size,
+      entry.content.fileInfos.map(_.size).sum,
+      entry.sourceFileInfoSet.size,
+      entry.sourceFileInfoSet.map(_.size).sum,
+      entry.appendedFiles.size,
+      entry.appendedFiles.map(_.size).sum,
+      entry.deletedFiles.size,
+      entry.deletedFiles.map(_.size).sum)
   }
 }

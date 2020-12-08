@@ -96,4 +96,12 @@ trait IndexManager {
    * @return all indexes that match any of the given states
    */
   def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry]
+
+  /**
+   * Get index metadata and detailed index statistics for a given index.
+   *
+   * @param indexName Name of the index to get stats for.
+   * @return Index metadata and statistics as a [[DataFrame]].
+   */
+  def getIndexStats(indexName: String): DataFrame
 }

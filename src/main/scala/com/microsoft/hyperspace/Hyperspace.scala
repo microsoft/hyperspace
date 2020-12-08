@@ -153,6 +153,16 @@ class Hyperspace(spark: SparkSession) {
       implicit redirectFunc: String => Unit = print): Unit = {
     redirectFunc(PlanAnalyzer.explainString(df, spark, indexManager.indexes, verbose))
   }
+
+  /**
+   * Get index metadata and detailed index statistics for a given index.
+   *
+   * @param indexName Name of the index to get stats for.
+   * @return Index metadata and statistics as a [[DataFrame]].
+   */
+  def getIndexStats(indexName: String): DataFrame = {
+    indexManager.getIndexStats(indexName)
+  }
 }
 
 object Hyperspace {
