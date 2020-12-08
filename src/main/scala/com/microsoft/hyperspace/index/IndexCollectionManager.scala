@@ -110,6 +110,13 @@ class IndexCollectionManager(
       .map(toIndexLogEntry)
   }
 
+  override private[hyperspace] def getLatestStableLog(indexName: String): Option[IndexLogEntry] = {
+    getLogManager(indexName) match {
+      case Some(logManager) => logManager.getLatestStableLog().map(toIndexLogEntry)
+      case None => throw HyperspaceException(s"Index with name $indexName could not be found")
+    }
+  }
+
   private def indexLogManagers: Seq[IndexLogManager] = {
     val rootPath = PathResolver(conf).systemPath
     val fs = fileSystemFactory.create(rootPath)

@@ -96,4 +96,6 @@ trait IndexManager {
    * @return all indexes that match any of the given states
    */
   def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry]
+
+  private[hyperspace] def getLatestStableLog(indexName: String): Option[IndexLogEntry]
 }

@@ -20,7 +20,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
-import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
+import com.microsoft.hyperspace.index.plananalysis.{IndexConditionAnalyzer, PlanAnalyzer}
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
 class Hyperspace(spark: SparkSession) {
@@ -152,6 +152,15 @@ class Hyperspace(spark: SparkSession) {
   def explain(df: DataFrame, verbose: Boolean = false)(
       implicit redirectFunc: String => Unit = print): Unit = {
     redirectFunc(PlanAnalyzer.explainString(df, spark, indexManager.indexes, verbose))
+  }
+
+  def whyNot(df: DataFrame, indexName: String)(
+      implicit redirectFunc: String => Unit = print): Unit = {
+    indexManager.getLatestStableLog(indexName) match {
+      case Some(indexLogEntry) =>
+        redirectFunc(IndexConditionAnalyzer.whyNotString(spark, df, indexLogEntry))
+      case None => throw HyperspaceException(s"No stable version of $indexName.")
+    }
   }
 }
 

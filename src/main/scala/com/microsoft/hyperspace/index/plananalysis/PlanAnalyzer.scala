@@ -48,7 +48,7 @@ object PlanAnalyzer {
       spark: SparkSession,
       indexes: DataFrame,
       verbose: Boolean): String = {
-    val displayMode = getDisplayMode(spark)
+    val displayMode = PlanAnalyzerUtils.getDisplayMode(spark)
     // Create a new df from the original df's logical plan. This ensures a deterministic optimized
     // plan creation when running Hyperspace rules.
     val df = logicalPlanToDataFrame(spark, originalDf.queryExecution.logical)
@@ -130,32 +130,6 @@ object PlanAnalyzer {
   }
 
   /**
-   * Gets paths of all file source nodes in given plan.
-   *
-   * @param sparkPlan spark plan.
-   * @return paths of all file source nodes in given plan.
-   */
-  private def getPaths(sparkPlan: SparkPlan): Seq[String] = {
-    val usedPaths = new ListBuffer[String]
-    sparkPlan.foreach {
-      case FileSourceScanExec(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _,
-          _,
-          _,
-          _) =>
-        usedPaths += location.rootPaths.head.getParent.toString
-      case other =>
-        other.subqueries.foreach { subQuery =>
-          getPaths(subQuery).flatMap(path => usedPaths += path)
-        }
-    }
-    usedPaths
-  }
-
-  /**
    * Initializes context for analyzing plan for explain API.
    *
    * @param spark sparkSession.
@@ -169,14 +143,15 @@ object PlanAnalyzer {
       df: DataFrame,
       hyperspaceState: Boolean,
       displayMode: DisplayMode): PlanContext = {
-    val (originalPlan, planQueue) = withHyperspaceState(spark, hyperspaceState) {
-      val nodes = new mutable.Queue[SparkPlan]
-      val originalPlan = spark.sessionState
-        .executePlan(df.queryExecution.optimizedPlan)
-        .executedPlan
-      constructSparkPlanQueue(originalPlan, nodes)
-      (originalPlan, nodes)
-    }
+    val (originalPlan, planQueue) =
+      PlanAnalyzerUtils.withHyperspaceState(spark, hyperspaceState) {
+        val nodes = new mutable.Queue[SparkPlan]
+        val originalPlan = spark.sessionState
+          .executePlan(df.queryExecution.optimizedPlan)
+          .executedPlan
+        constructSparkPlanQueue(originalPlan, nodes)
+        (originalPlan, nodes)
+      }
 
     new PlanContext(originalPlan, planQueue, displayMode)
   }
@@ -215,7 +190,8 @@ object PlanAnalyzer {
       spark: SparkSession,
       indexes: DataFrame,
       bufferStream: BufferStream): Unit = {
-    val usedIndexes = indexes.filter(indexes("indexLocation").isin(getPaths(plan): _*))
+    val usedIndexes =
+      indexes.filter(indexes("indexLocation").isin(PlanAnalyzerUtils.getPaths(plan): _*))
     usedIndexes.collect().foreach { row =>
       bufferStream
         .write(row.getAs("name").toString)
@@ -314,53 +290,6 @@ object PlanAnalyzer {
         constructSparkPlanQueue(subquery, resultQueue)
       }
     }
-  }
-
-  private def getDisplayMode(sparkSession: SparkSession): DisplayMode = {
-    val displayMode =
-      sparkSession.conf
-        .get(IndexConstants.DISPLAY_MODE, IndexConstants.DisplayMode.PLAIN_TEXT)
-    val highlightTags = Map(
-      IndexConstants.HIGHLIGHT_BEGIN_TAG -> sparkSession.conf
-        .get(IndexConstants.HIGHLIGHT_BEGIN_TAG, ""),
-      IndexConstants.HIGHLIGHT_END_TAG -> sparkSession.conf
-        .get(IndexConstants.HIGHLIGHT_END_TAG, ""))
-    displayMode match {
-      case IndexConstants.DisplayMode.PLAIN_TEXT => new PlainTextMode(highlightTags)
-      case IndexConstants.DisplayMode.HTML => new HTMLMode(highlightTags)
-      case IndexConstants.DisplayMode.CONSOLE => new ConsoleMode(highlightTags)
-      case _ =>
-        throw HyperspaceException(s"Display mode: $displayMode not supported.")
-    }
-  }
-
-  /**
-   * Executes given body function in expected Hyperspace state for given spark session and restores
-   * back to original state.
-   *
-   * @param spark spark session.
-   * @param desiredState desired Hyperspace state.
-   * @param f function to execute in the given Hyperspace state.
-   */
-  private def withHyperspaceState[T](spark: SparkSession, desiredState: Boolean)(f: => T): T = {
-    // Figure outs initial Hyperspace state and enable/disable Hyperspace if needed.
-    val isHyperspaceEnabled = spark.isHyperspaceEnabled()
-    if (desiredState) {
-      spark.enableHyperspace()
-    } else {
-      spark.disableHyperspace()
-    }
-
-    val result = f
-
-    // Restores initial Hyperspace state on given spark session.
-    if (isHyperspaceEnabled) {
-      spark.enableHyperspace()
-    } else {
-      spark.disableHyperspace()
-    }
-
-    result
   }
 
   /**
