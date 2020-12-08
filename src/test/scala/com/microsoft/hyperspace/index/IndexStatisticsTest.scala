@@ -91,23 +91,25 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
 
   test("getIndexStats() on an index with multiple active versions returns correct result.") {
     withTempPathAsString { testPath =>
-      withIndex(indexConfig.indexName) {
-        SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-        val df = spark.read.parquet(testPath)
-        hyperspace.createIndex(df, indexConfig)
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+          val df = spark.read.parquet(testPath)
+          hyperspace.createIndex(df, indexConfig)
 
-        import spark.implicits._
-        for (_ <- 1 to 2) {
-          SampleData.testData
-            .take(3)
-            .toDF(dataColumns: _*)
-            .write
-            .mode("append")
-            .parquet(testPath)
+          import spark.implicits._
+          for (_ <- 1 to 2) {
+            SampleData.testData
+              .take(3)
+              .toDF(dataColumns: _*)
+              .write
+              .mode("append")
+              .parquet(testPath)
 
-          hyperspace.refreshIndex(indexConfig.indexName, "incremental")
+            hyperspace.refreshIndex(indexConfig.indexName, "incremental")
+          }
+          validateIndexStats(indexConfig.indexName)
         }
-        validateIndexStats(indexConfig.indexName)
       }
     }
   }
