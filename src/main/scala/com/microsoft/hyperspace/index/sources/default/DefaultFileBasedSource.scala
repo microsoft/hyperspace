@@ -221,7 +221,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   /**
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
-   * File paths should be the same format with "input_file_name()" of the given relation type.
+   * File paths should be the same format as "input_file_name()" of the given relation type.
+   * For [[DefaultFileBasedSource]], each file path should be in this format:
+   *   `file:///path/to/file`
    *
    * @param logicalRelation Logical relation to check the relation type.
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).

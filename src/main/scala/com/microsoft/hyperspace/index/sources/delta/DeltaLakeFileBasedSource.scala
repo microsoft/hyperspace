@@ -32,7 +32,17 @@ import com.microsoft.hyperspace.util.PathUtils
  *   - The relation is [[HadoopFsRelation]] with [[TahoeLogFileIndex]] as file index.
  */
 class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
-  val DELTA_FORMAT_STR = "delta"
+  private val DELTA_FORMAT_STR = "delta"
+
+  private def toFileStatus(fileSize: Long, modificationTime: Long, path: Path): FileStatus = {
+    new FileStatus(
+      /* length */ fileSize,
+      /* isDir */ false,
+      /* blockReplication */ 0,
+      /* blockSize */ 1,
+      /* modificationTime */  modificationTime,
+      path)
+  }
 
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
@@ -122,14 +132,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
           .getSnapshot(stalenessAcceptable = false)
           .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
           .files
-          .map { f =>
-            new FileStatus(
-              /* length */ f.size,
-              /* isDir */ false,
-              /* blockReplication */ 0,
-              /* blockSize */ 1,
-              /* modificationTime */ f.modificationTime,
-              new Path(location.path, f.path))
+          .map { f => toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
           }
         Some(files)
       case _ => None
@@ -154,7 +157,9 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   /**
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
-   * File paths should be the same format with "input_file_name()" of the given relation type.
+   * File paths should be the same format as "input_file_name()" of the given relation type.
+   * For [[DeltaLakeFileBasedSource]], each file path should be in this format:
+   *   `file:/path/to/file`
    *
    * @param logicalRelation Logical relation to check the relation type.
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
