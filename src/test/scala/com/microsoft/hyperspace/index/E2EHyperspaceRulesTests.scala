@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
-import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
+import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.PathUtils
@@ -680,6 +680,66 @@ class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
             checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
           }
         }
+      }
+    }
+  }
+
+  test("Hybrid scan works well with modified data when globbing pattern is used.") {
+    withTempPathAsString { testPath =>
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath)
+      val globPath = absoluteTestPath + "/*"
+      val p1 = absoluteTestPath + "/1"
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(p1)
+
+      // Create index with globbing pattern.
+      val df = spark.read.option(GLOBBING_PATTERN_KEY, globPath).parquet(globPath)
+      val indexConfig = IndexConfig("index", Seq("clicks"), Seq("query"))
+      hyperspace.createIndex(df, indexConfig)
+
+      // Append data to a new directory which matches the globbing pattern.
+      val p2 = absoluteTestPath + "/2"
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(3)
+        .write
+        .parquet(p2)
+
+      val df2 = spark.read.parquet(globPath)
+      def filterQuery: DataFrame = df2.filter(df2("clicks") <= 2000).select(df2("query"))
+      val baseQuery = filterQuery
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+      spark.enableHyperspace()
+
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+        val filter = filterQuery
+        assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+      }
+
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+        val filter = filterQuery
+        val planWithHybridScan = filter.queryExecution.optimizedPlan
+        assert(!basePlan.equals(planWithHybridScan))
+
+        // Check appended file is added to relation node or not.
+        val nodes = planWithHybridScan.collect {
+          case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+            // Verify old data files are not present but newly appended files are included.
+            val p1UriPath = new Path(p1).toUri.getPath
+            val p2UriPath = new Path(p2).toUri.getPath
+            assert(!fsRelation.location.inputFiles.exists(_.contains(p1UriPath)))
+            assert(fsRelation.location.inputFiles.exists(_.contains(p2UriPath)))
+            // Verify index data files are present.
+            assert(fsRelation.location.inputFiles.exists(_.contains("index")))
+            p
+        }
+        // Filter Index and Parquet format source file can be handled with 1 LogicalRelation.
+        assert(nodes.length === 1)
+        checkAnswer(baseQuery, filter)
       }
     }
   }
