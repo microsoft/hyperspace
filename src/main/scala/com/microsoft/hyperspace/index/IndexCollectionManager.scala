@@ -295,10 +295,10 @@ private[hyperspace] object IndexStatistics {
     var prefix = entry.content.root.name
     while (root.subDirs.size == 1 &&
            !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
-      prefix += s"/${root.subDirs.head.name}"
+      prefix += s"${root.subDirs.head.name}/"
       root = root.subDirs.head
     }
 
-    root.subDirs.map(d => prefix + s"/${d.name}")
+    root.subDirs.map(d => prefix + s"${d.name}")
   }
 }

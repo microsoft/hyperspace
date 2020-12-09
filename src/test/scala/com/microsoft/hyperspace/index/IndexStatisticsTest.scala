@@ -147,7 +147,6 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
       .select("indexRootPaths")
       .map(r => r(0).asInstanceOf[Seq[String]])
       .collect()(0)
-      .map(new Path(_).toString)
       .toSet
 
     assert(expectedPaths === actualPaths)
