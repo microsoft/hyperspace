@@ -113,7 +113,7 @@ class IndexCollectionManager(
 
   override def getIndexStats(indexName: String): DataFrame = {
     getLogManager(indexName).fold(
-      throw HyperspaceException(s"Index with name $indexName could not be found")) {
+      throw HyperspaceException(s"Index with name $indexName could not be found.")) {
       _.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
         case Some(l) =>
           import spark.implicits._
@@ -224,23 +224,22 @@ private[hyperspace] object IndexSummary {
 /**
  * Case class representing index metadata and index statistics from latest index version.
  *
- * @param name index name.
- * @param indexedColumns indexed columns.
- * @param includedColumns included columns.
- * @param numBuckets number of buckets.
- * @param schema index schema json.
- * @param indexLocation index location.
- * @param state index state.
- * @param kind index kind.
- * @param hasLineage lineage enabled on index.
- * @param numIndexFiles total number of index files.
- * @param sizeIndexFiles total size of index files.
- * @param numSourceFiles total number of source data files.
- * @param sizeSourceFiles total size of source data files.
- * @param numAppendedFiles total number of appended source data files.
- * @param sizeAppendedFiles total size of appended source data files.
- * @param numDeletedFiles total number of deleted source data files.
- * @param sizeDeletedFiles total size of deleted source data files.
+ * @param name Index name.
+ * @param indexedColumns Indexed columns.
+ * @param includedColumns Included columns.
+ * @param numBuckets Number of buckets.
+ * @param schema Index schema json.
+ * @param state Index state.
+ * @param kind Index kind.
+ * @param hasLineage Lineage enabled on index.
+ * @param numIndexFiles Total number of index files.
+ * @param sizeIndexFiles Total size of index files.
+ * @param numSourceFiles Total number of source data files.
+ * @param sizeSourceFiles Total size of source data files.
+ * @param numAppendedFiles Total number of appended source data files.
+ * @param sizeAppendedFiles Total size of appended source data files.
+ * @param numDeletedFiles Total number of deleted source data files.
+ * @param sizeDeletedFiles Total size of deleted source data files.
  */
 private[hyperspace] case class IndexStatistics(
     name: String,

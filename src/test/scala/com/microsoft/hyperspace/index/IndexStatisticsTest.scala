@@ -16,12 +16,13 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, SampleData, TestUtils}
 import com.microsoft.hyperspace.TestUtils.logManager
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/indexStatsTest")
@@ -55,7 +56,9 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig.indexName) {
           hyperspace.createIndex(dataDF, indexConfig)
-          validateIndexStats(indexConfig.indexName)
+          validateIndexStats(
+            indexConfig.indexName,
+            Seq(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX + "=0"))
         }
       }
     }
@@ -71,7 +74,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
             val df = spark.read.parquet(testPath)
             hyperspace.createIndex(df, indexConfig)
 
-            // modify source content.
+            // Modify source content.
             import spark.implicits._
             TestUtils.deleteFiles(testPath, "*parquet", 1).head
             SampleData.testData
@@ -82,7 +85,11 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
               .parquet(testPath)
 
             hyperspace.refreshIndex(indexConfig.indexName, mode)
-            validateIndexStats(indexConfig.indexName)
+
+            val version = if (mode.equals("quick")) 0 else 1
+            validateIndexStats(
+              indexConfig.indexName,
+              Seq(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX + s"=$version"))
           }
         }
       }
@@ -98,7 +105,8 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
           hyperspace.createIndex(df, indexConfig)
 
           import spark.implicits._
-          for (_ <- 1 to 2) {
+          var expectedVersions = Seq(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX + "=0")
+          for (i <- 1 to 2) {
             SampleData.testData
               .take(3)
               .toDF(dataColumns: _*)
@@ -107,14 +115,15 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
               .parquet(testPath)
 
             hyperspace.refreshIndex(indexConfig.indexName, "incremental")
+            expectedVersions :+= IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX + s"=$i"
           }
-          validateIndexStats(indexConfig.indexName)
+          validateIndexStats(indexConfig.indexName, expectedVersions)
         }
       }
     }
   }
 
-  private def validateIndexStats(indexName: String): Unit = {
+  private def validateIndexStats(indexName: String, expectedIndexPaths: Seq[String]): Unit = {
     val indexStatsDF = hyperspace.getIndexStats(indexName)
     assert(indexStatsDF.count() == 1)
 
@@ -124,5 +133,23 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     assert(log.isDefined)
     val entry = log.get.asInstanceOf[IndexLogEntry]
     assert(indexStats.equals(IndexStatistics(spark, entry)))
+
+    // Verify index root paths.
+    val indexPath = new Path(s"$systemPath/$indexName")
+    val expectedPaths = indexPath
+      .getFileSystem(new Configuration())
+      .listStatus(indexPath)
+      .filter(f => f.isDirectory && expectedIndexPaths.contains(f.getPath.getName))
+      .map(p => PathUtils.makeAbsolute(p.getPath))
+      .toSet
+
+    val actualPaths = indexStatsDF
+      .select("indexRootPaths")
+      .map(r => r(0).asInstanceOf[Seq[String]])
+      .collect()(0)
+      .map(p => PathUtils.makeAbsolute(p))
+      .toSet
+
+    assert(expectedPaths === actualPaths)
   }
 }
