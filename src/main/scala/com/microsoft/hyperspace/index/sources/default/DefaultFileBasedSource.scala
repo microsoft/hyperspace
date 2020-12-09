@@ -18,16 +18,14 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
-import scala.util.{Success, Try}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}

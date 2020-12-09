@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.util
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
-import org.apache.spark.sql.execution.datasources.PartitionSpec
 
 object PathUtils {
   def makeAbsolute(path: String): Path = makeAbsolute(new Path(path))
