@@ -40,7 +40,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
       /* isDir */ false,
       /* blockReplication */ 0,
       /* blockSize */ 1,
-      /* modificationTime */  modificationTime,
+      /* modificationTime */ modificationTime,
       path)
   }
 
@@ -61,13 +61,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
           .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
           .files
           .map { f =>
-            new FileStatus(
-              /* length */ f.size,
-              /* isDir */ false,
-              /* blockReplication */ 0,
-              /* blockSize */ 1,
-              /* modificationTime */ f.modificationTime,
-              new Path(location.path, f.path))
+            toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
           }
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
@@ -132,7 +126,8 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
           .getSnapshot(stalenessAcceptable = false)
           .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
           .files
-          .map { f => toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
+          .map { f =>
+            toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
           }
         Some(files)
       case _ => None
