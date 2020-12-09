@@ -210,7 +210,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    */
   override def partitionBasePath(location: FileIndex): Option[String] = {
     location match {
-      case p: PartitioningAwareFileIndex =>
+      case p: PartitioningAwareFileIndex if p.partitionSpec.partitions.nonEmpty =>
         // For example, we could have the following in PartitionSpec:
         //   - partition columns = "col1", "col2"
         //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
