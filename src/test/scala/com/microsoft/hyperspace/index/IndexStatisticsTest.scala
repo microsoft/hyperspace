@@ -140,14 +140,14 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
       .getFileSystem(new Configuration())
       .listStatus(indexPath)
       .filter(f => f.isDirectory && expectedIndexPaths.contains(f.getPath.getName))
-      .map(p => PathUtils.makeAbsolute(p.getPath))
+      .map(_.getPath)
       .toSet
 
     val actualPaths = indexStatsDF
       .select("indexRootPaths")
       .map(r => r(0).asInstanceOf[Seq[String]])
       .collect()(0)
-      .map(p => PathUtils.makeAbsolute(p))
+      .map(new Path(_))
       .toSet
 
     assert(expectedPaths === actualPaths)
