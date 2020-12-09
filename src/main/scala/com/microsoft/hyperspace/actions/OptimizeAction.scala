@@ -93,7 +93,7 @@ class OptimizeAction(
     repartitionedDf.write.saveWithBuckets(
       repartitionedDf,
       indexDataPath.toString,
-      logEntry.asInstanceOf[IndexLogEntry].numBuckets,
+      numBuckets,
       indexConfig.indexedColumns,
       SaveMode.Overwrite)
   }
