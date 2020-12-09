@@ -18,8 +18,9 @@ package com.microsoft.hyperspace.index.sources
 
 import scala.util.{Success, Try}
 
+import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -78,6 +79,45 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    */
   def signature(logicalRelation: LogicalRelation): String = {
     run(p => p.signature(logicalRelation))
+  }
+
+  /**
+   * Runs allFiles() for each provider.
+   *
+   * @param logicalRelation Logical relation to retrieve all input files.
+   * @return List of all input files.
+   * @throws HyperspaceException if multiple providers returns [[Some]] or
+   *                             if no providers return [[Some]].
+   */
+  def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
+    run(p => p.allFiles(logicalRelation))
+  }
+
+  /**
+   * Runs partitionBasePath() for each provider.
+   *
+   * @param location Partitioned location.
+   * @return basePath string to read the given partitioned location.
+   * @throws HyperspaceException if multiple providers returns [[Some]] or
+   *                             if no providers return [[Some]].
+   */
+  def partitionBasePath(location: FileIndex): String = {
+    run(p => p.partitionBasePath(location))
+  }
+
+  /**
+   * Runs lineagePairs() for each provider.
+   *
+   * @param logicalRelation Logical Relation to check the relation type.
+   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
+   * @return List of (file path, file id).
+   * @throws HyperspaceException if multiple providers returns [[Some]] or
+   *                             if no providers return [[Some]].
+   */
+  def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
+    run(p => p.lineagePairs(logicalRelation, fileIdTracker))
   }
 
   /**

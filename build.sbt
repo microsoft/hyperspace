@@ -30,6 +30,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources(),
+  "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
@@ -39,6 +40,11 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
   "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
 )
+
+assemblyMergeStrategy in assembly := {
+  case PathList("run-tests.py") => MergeStrategy.first
+  case x => (assemblyMergeStrategy in assembly).value(x)
+}
 
 scalacOptions ++= Seq(
   "-target:jvm-1.8"

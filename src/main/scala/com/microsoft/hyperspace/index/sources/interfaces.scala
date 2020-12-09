@@ -16,8 +16,9 @@
 
 package com.microsoft.hyperspace.index.sources
 
+import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 
@@ -66,7 +67,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    *
    * If the given logical relation does not belong to this provider, None should be returned.
    *
-   * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param logicalRelation Logical relation to derive [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
@@ -96,9 +97,39 @@ trait FileBasedSourceProvider extends SourceProvider {
    *
    * If the given logical relation does not belong to this provider, None should be returned.
    *
-   * @param logicalRelation logical relation to compute signature from.
+   * @param logicalRelation Logical relation to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
   def signature(logicalRelation: LogicalRelation): Option[String]
+
+  /**
+   * Retrieves all input files from the given [[LogicalRelation]].
+   *
+   * @param logicalRelation Logical relation to retrieve input files from.
+   * @return List of [[FileStatus]] for the given relation.
+   */
+  def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]]
+
+  /**
+   * Constructs the basePath for the given [[FileIndex]].
+   *
+   * @param location Partitioned data location.
+   * @return basePath to read the given partitioned location.
+   */
+  def partitionBasePath(location: FileIndex): Option[String]
+
+  /**
+   * Returns list of pairs of (file path, file id) to build lineage column.
+   *
+   * File paths should be the same format with "input_file_name()" of the given relation type.
+   *
+   * @param logicalRelation Logical relation to check the relation type.
+   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
+   * @return List of pairs of (file path, file id).
+   */
+  def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]]
+
 }
