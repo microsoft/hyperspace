@@ -18,18 +18,20 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
+import scala.util.{Success, Try}
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
+import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -49,7 +51,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
-   * @param logicalRelation logical relation to derive [[Relation]] from.
+   * @param logicalRelation Logical relation to derive [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
@@ -73,16 +75,11 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
         // Store basePath of hive-partitioned data sources, if applicable.
-        val basePath = options.get("basePath") match {
-          case None => PathUtils.extractBasePath(location.partitionSpec())
-          case p => p
-        }
-
         // "path" key in options can incur multiple data read unexpectedly.
         // Since "options" is case-insensitive map, it will change any previous entries of
         // "basePath" to lowercase "basepath", making it unusable.
         // Remove lowercase "basepath" and add proper cased "basePath".
-        val opts = basePath match {
+        val opts = options.get("basePath").orElse(partitionBasePath(location)) match {
           case Some(path) => Map("basePath" -> path) ++ options - "path" - "basepath"
           case _ => options - "path" - "basepath"
         }
@@ -165,7 +162,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
    * using all the files found in [[PartitioningAwareFileIndex]].
    *
-   * @param logicalRelation logical relation to compute signature from.
+   * @param logicalRelation Logical relation to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -185,12 +182,74 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   /**
    * Fingerprints a file.
    *
-   * @param fileStatus file status.
-   * @return the fingerprint of a file.
+   * @param fileStatus File status.
+   * @return The fingerprint of a file.
    */
   private def fingerprint(fileStatus: FileStatus): String = {
     fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
       fileStatus.getPath.toString
+  }
+
+  /**
+   * Retrieves all input files from the given [[LogicalRelation]].
+   *
+   * @param logicalRelation Logical relation to retrieve input files from.
+   * @return List of [[FileStatus]] for the given relation.
+   */
+  override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+        Some(location.allFiles)
+      case _ => None
+    }
+  }
+
+  /**
+   * Constructs the basePath for the given [[FileIndex]].
+   *
+   * @param location Partitioned data location.
+   * @return basePath to read the given partitioned location.
+   */
+  override def partitionBasePath(location: FileIndex): Option[String] = {
+    location match {
+      case p: PartitioningAwareFileIndex =>
+        // For example, we could have the following in PartitionSpec:
+        //   - partition columns = "col1", "col2"
+        //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+        // , and going up the same number of directory levels as the number of partition columns
+        // will compute the base path. Note that PartitionSpec.partitions will always contain
+        // all the partitions in the path, so "partitions.head" is taken as an initial value.
+        val basePath = p.partitionSpec.partitionColumns
+          .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
+        Some(basePath.toString)
+      case _ =>
+        None
+    }
+  }
+
+  /**
+   * Returns list of pairs of (file path, file id) to build lineage column.
+   *
+   * File paths should be the same format as "input_file_name()" of the given relation type.
+   * For [[DefaultFileBasedSource]], each file path should be in this format:
+   *   `file:///path/to/file`
+   *
+   * @param logicalRelation Logical relation to check the relation type.
+   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
+   * @return List of pairs of (file path, file id).
+   */
+  override def lineagePairs(
+      logicalRelation: LogicalRelation,
+      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
+          if isSupportedFileFormat(format) =>
+        Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+          (kv._1._1.replace("file:/", "file:///"), kv._2)
+        })
+      case _ =>
+        None
+    }
   }
 }
 

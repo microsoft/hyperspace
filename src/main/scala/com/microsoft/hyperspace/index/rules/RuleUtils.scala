@@ -28,9 +28,10 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{LongType, StructType}
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
-import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
 
@@ -105,24 +106,23 @@ object RuleUtils {
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
-      val filesByRelations = plan
-        .collect {
-          case LogicalRelation(
-              HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-              _,
-              _,
-              _) =>
-            location.allFiles.map(
-              f =>
-                // For a given file, file id is only meaningful in the context of a given
-                // index. At this point, we do not know which index, if any, would be picked.
-                // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
-                FileInfo(
-                  f.getPath.toString,
-                  f.getLen,
-                  f.getModificationTime,
-                  IndexConstants.UNKNOWN_FILE_ID))
-        }
+      val filesByRelations = plan.collect {
+        case rel: LogicalRelation =>
+          Hyperspace
+            .getContext(spark)
+            .sourceProviderManager
+            .allFiles(rel)
+            .map { f =>
+              // For a given file, file id is only meaningful in the context of a given
+              // index. At this point, we do not know which index, if any, would be picked.
+              // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
+              FileInfo(
+                f.getPath.toString,
+                f.getLen,
+                f.getModificationTime,
+                IndexConstants.UNKNOWN_FILE_ID)
+            }
+      }
       assert(filesByRelations.length == 1)
       indexes.filter(index =>
         index.created && isHybridScanCandidate(index, filesByRelations.flatten))
@@ -165,13 +165,14 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
     // Check pre-requisite.
-    assert(getLogicalRelation(plan).isDefined)
+    val logicalRelation = getLogicalRelation(plan)
+    assert(logicalRelation.isDefined)
 
     // If there is no change in source data files, the index can be applied by
     // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
     val hybridScanRequired = HyperspaceConf.hybridScanEnabled(spark) &&
-      index.getTagValue(getLogicalRelation(plan).get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+      index.getTagValue(logicalRelation.get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     // If the index has appended files and/or deleted files, which means the current index data
     // is outdated, Hybrid Scan should be used to handle the newly updated source files.
@@ -261,7 +262,8 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    val isParquetSourceFormat = index.relations.head.fileFormat.equals("parquet")
+    val fileFormat = index.relations.head.fileFormat
+    val isParquetSourceFormat = fileFormat.equals("parquet") || fileFormat.equals("delta")
     var unhandledAppendedFiles: Seq[Path] = Nil
 
     // Get transformed plan with index data and appended files if applicable.
@@ -271,7 +273,7 @@ object RuleUtils {
       // can be transformed to 'Project -> Filter -> Logical Relation'. Thus, with transformDown,
       // it will be matched again and transformed recursively which causes stack overflow exception.
       case baseRelation @ LogicalRelation(
-            _ @HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            _ @HadoopFsRelation(location: FileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
@@ -281,7 +283,10 @@ object RuleUtils {
             // appendedFiles and deletedFiles in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
-            val curFiles = location.allFiles
+            val curFiles = Hyperspace
+              .getContext(spark)
+              .sourceProviderManager
+              .allFiles(baseRelation)
               .map(f => FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
             if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
               val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
@@ -410,11 +415,11 @@ object RuleUtils {
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
       case baseRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+            fsRelation @ HadoopFsRelation(location: FileIndex, _, _, _, _, _),
             baseOutput,
             _,
             _) =>
-        val options = PathUtils.extractBasePath(location.partitionSpec)
+        val options = extractBasePath(spark, location)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -438,6 +443,14 @@ object RuleUtils {
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended
+  }
+
+  private def extractBasePath(spark: SparkSession, location: FileIndex): Option[String] = {
+    if (location.partitionSchema.isEmpty) {
+      None
+    } else {
+      Some(Hyperspace.getContext(spark).sourceProviderManager.partitionBasePath(location))
+    }
   }
 
   /**
