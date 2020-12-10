@@ -132,6 +132,12 @@ trait FileBasedSourceProvider extends SourceProvider {
       logicalRelation: LogicalRelation,
       fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]]
 
+  /**
+   * Returns whether the given relation has parquet source files or not.
+   *
+   * @param logicalRelation Logical Relation to check the source file format.
+   * @return True if source files in the given relation are parquet.
+   */
   def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean]
 
 }

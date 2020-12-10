@@ -120,6 +120,12 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     run(p => p.lineagePairs(logicalRelation, fileIdTracker))
   }
 
+  /**
+   * Returns whether the given relation has parquet source files or not.
+   *
+   * @param logicalRelation Logical Relation to check the source file format.
+   * @return True if source files in the given relation are parquet.
+   */
   def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Boolean = {
     run(p => p.hasParquetAsSourceFormat(logicalRelation))
   }
