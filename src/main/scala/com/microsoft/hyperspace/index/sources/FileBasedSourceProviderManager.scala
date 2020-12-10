@@ -120,6 +120,10 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     run(p => p.lineagePairs(logicalRelation, fileIdTracker))
   }
 
+  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Boolean = {
+    run(p => p.hasParquetAsSourceFormat(logicalRelation))
+  }
+
   /**
    * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
    * [[Option]] for each provider built. This function ensures that only one provider returns

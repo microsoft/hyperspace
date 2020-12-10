@@ -172,6 +172,15 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
         None
     }
   }
+
+  override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
+        Some(true)
+      case _ =>
+        None
+    }
+  }
 }
 
 /**

@@ -132,4 +132,6 @@ trait FileBasedSourceProvider extends SourceProvider {
       logicalRelation: LogicalRelation,
       fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]]
 
+  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean]
+
 }

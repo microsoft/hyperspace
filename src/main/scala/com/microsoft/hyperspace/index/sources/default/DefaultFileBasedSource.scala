@@ -242,6 +242,17 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         None
     }
   }
+
+  override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
+        if isSupportedFileFormat(format) =>
+        val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
+        Some(fileFormatName.equals("parquet"))
+      case _ =>
+        None
+    }
+  }
 }
 
 /**
