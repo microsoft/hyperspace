@@ -70,11 +70,19 @@ private[actions] abstract class RefreshActionBase(
     val latestRelation =
       Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
-    spark.read
+    val df = spark.read
       .schema(dataSchema)
       .format(latestRelation.fileFormat)
       .options(latestRelation.options)
-      .load(latestRelation.rootPaths: _*)
+    // Due to the difference in how the "path" option is set: https://github.com/apache/spark/
+    // blob/ef1441b56c5cab02335d8d2e4ff95cf7e9c9b9ca/sql/core/src/main/scala/org/apache/spark/
+    // sql/DataFrameReader.scala#L197
+    // load() with a single parameter needs to be handled differently.
+    if (latestRelation.rootPaths.size == 1) {
+      df.load(latestRelation.rootPaths.head)
+    } else {
+      df.load(latestRelation.rootPaths: _*)
+    }
   }
 
   protected lazy val indexConfig: IndexConfig = {
@@ -113,25 +121,15 @@ private[actions] abstract class RefreshActionBase(
    * Build Set[FileInfo] to compare the source file list with the previous index version.
    */
   protected lazy val currentFiles: Set[FileInfo] = {
-    df.queryExecution.optimizedPlan
-      .collect {
-        case LogicalRelation(
-            HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-            _,
-            _,
-            _) =>
-          location
-            .allFiles()
-            .map { f =>
-              // For each file, if it already has a file id, add that id to its corresponding
-              // FileInfo. Note that if content of an existing file is changed, it is treated
-              // as a new file (i.e. its current file id is no longer valid).
-              val id = fileIdTracker.addFile(f)
-              FileInfo(f, id, asFullPath = true)
-            }
-      }
-      .flatten
-      .toSet
+    val curFiles = df.queryExecution.optimizedPlan.collect {
+      case relation: LogicalRelation =>
+        Hyperspace
+          .getContext(spark)
+          .sourceProviderManager
+          .allFiles(relation)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
+    }
+    curFiles.head.toSet
   }
 
   /**
