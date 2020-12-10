@@ -240,6 +240,7 @@ private[hyperspace] object IndexSummary {
  * @param sizeAppendedFiles Total size of appended source data files.
  * @param numDeletedFiles Total number of deleted source data files.
  * @param sizeDeletedFiles Total size of deleted source data files.
+ * @param indexContentPaths Path(s) to directories containing index files for latest version.
  */
 private[hyperspace] case class IndexStatistics(
     name: String,
@@ -258,7 +259,7 @@ private[hyperspace] case class IndexStatistics(
     sizeAppendedFiles: Long,
     numDeletedFiles: Int,
     sizeDeletedFiles: Long,
-    indexRootPaths: Seq[String])
+    indexContentPaths: Seq[String])
 
 private[hyperspace] object IndexStatistics {
   def apply(spark: SparkSession, entry: IndexLogEntry): IndexStatistics = {
@@ -280,17 +281,20 @@ private[hyperspace] object IndexStatistics {
       entry.appendedFiles.map(_.size).sum,
       entry.deletedFiles.size,
       entry.deletedFiles.map(_.size).sum,
-      getIndexRootPaths(entry))
+      getIndexContentDirectoryPaths(entry))
   }
 
   /**
-   * Extract top-most index directories which contain index files. Each index directory
-   * contains index files created for an active version of index.
+   * Extract top-most index directories which contain existing index files for
+   * the latest version of index. When refreshing index, depending on the mode,
+   * index files for the latest version of index may reside in multiple directories.
+   * This function extracts paths to top-level directories which
+   * contain those index files.
    *
    * @param entry Index log entry.
-   * @return List of paths to index directories for all active versions of index.
+   * @return List of directory paths containing index files for latest index version.
    */
-  private def getIndexRootPaths(entry: IndexLogEntry): Seq[String] = {
+  private def getIndexContentDirectoryPaths(entry: IndexLogEntry): Seq[String] = {
     var root = entry.content.root
     var prefix = entry.content.root.name
     while (root.subDirs.size == 1 &&
@@ -299,6 +303,6 @@ private[hyperspace] object IndexStatistics {
       root = root.subDirs.head
     }
 
-    root.subDirs.map(d => prefix + s"${d.name}")
+    root.subDirs.map(d => s"$prefix${d.name}")
   }
 }
