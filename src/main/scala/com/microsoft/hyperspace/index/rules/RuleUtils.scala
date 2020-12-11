@@ -58,6 +58,11 @@ object RuleUtils {
     val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
+      val signatureMatchTag = entry.getTagValue(plan, IndexLogEntryTags.IS_SIGNATURE_MATCH)
+      if (signatureMatchTag.isDefined) {
+        return signatureMatchTag.get
+      }
+
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
       val sourcePlanSignature = sourcePlanSignatures.head
@@ -66,8 +71,13 @@ object RuleUtils {
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
           .signature(plan)) match {
-        case Some(s) => s.equals(sourcePlanSignature.value)
-        case None => false
+        case Some(s) =>
+          val result = s.equals(sourcePlanSignature.value)
+          entry.setTagValue(plan, IndexLogEntryTags.IS_SIGNATURE_MATCH, result)
+          result
+        case None =>
+          entry.setTagValue(plan, IndexLogEntryTags.IS_SIGNATURE_MATCH, false)
+          false
       }
     }
 
@@ -78,6 +88,12 @@ object RuleUtils {
       // TODO: As in [[PlanSignatureProvider]], Source plan signature comparison is required to
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
+
+      val isHybridScanCandidateTag =
+        entry.getTagValue(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
+      if (isHybridScanCandidateTag.isDefined) {
+        return isHybridScanCandidateTag.get
+      }
 
       // Find the number of common files between the source relations & index source files.
       val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
@@ -99,6 +115,7 @@ object RuleUtils {
           IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
           !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
       }
+      entry.setTagValue(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE, isCandidate)
       isCandidate
     }
 
@@ -124,6 +141,7 @@ object RuleUtils {
             }
       }
       assert(filesByRelations.length == 1)
+      IndexLogEntryTags.resetHybridScanTagsIfNeeded(spark, plan, indexes)
       indexes.filter(index =>
         index.created && isHybridScanCandidate(index, filesByRelations.flatten))
     } else {
