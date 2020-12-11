@@ -79,6 +79,12 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
+      // Check if tagged values exist.
+      if (entry.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).isDefined &&
+          entry.getTagValue(plan, IndexLogEntryTags.COMMON_BYTES).isDefined) {
+        return true
+      }
+
       // Find the number of common files between the source relation and index source files.
       // The total size of common files are collected and tagged for candidate.
       val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
