@@ -103,5 +103,5 @@ trait IndexManager {
    * @param indexName Name of the index to get stats for.
    * @return Index metadata and statistics as a [[DataFrame]].
    */
-  def getIndexStats(indexName: String): DataFrame
+  def index(indexName: String): DataFrame
 }

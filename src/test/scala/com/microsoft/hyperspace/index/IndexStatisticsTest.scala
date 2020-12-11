@@ -22,7 +22,7 @@ import org.apache.spark.sql.{DataFrame, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, SampleData, TestUtils}
 import com.microsoft.hyperspace.TestUtils.logManager
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.util.FileUtils
 
 class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/indexStatsTest")
@@ -51,7 +51,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     FileUtils.delete(systemPath)
   }
 
-  test("getIndexStats() on a fresh index returns correct result.") {
+  test("index() on a fresh index returns correct result.") {
     Seq(true, false).foreach { enableLineage =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig.indexName) {
@@ -63,7 +63,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
   }
 
   test(
-    "getIndexStats() on an index refreshed in incremental or quick mode returns correct result.") {
+    "index() on an index refreshed in incremental or quick mode returns correct result.") {
     Seq("incremental", "quick").foreach { mode =>
       withTempPathAsString { testPath =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
@@ -97,7 +97,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("getIndexStats() on an index with multiple active versions returns correct result.") {
+  test("index() on an index whose files reside in multiple directories returns correct result.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
@@ -123,7 +123,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
   }
 
   private def validateIndexStats(indexName: String, expectedIndexVersions: Seq[Int]): Unit = {
-    val indexStatsDF = hyperspace.getIndexStats(indexName)
+    val indexStatsDF = hyperspace.index(indexName)
     assert(indexStatsDF.count() == 1)
 
     import spark.implicits._
@@ -131,7 +131,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     val log = logManager(systemPath, indexName).getLatestStableLog()
     assert(log.isDefined)
     val entry = log.get.asInstanceOf[IndexLogEntry]
-    assert(indexStats.equals(IndexStatistics(spark, entry)))
+    assert(indexStats.equals(IndexStatistics(spark, entry, extended = true)))
 
     // Verify index root paths.
     val expectedIndexPaths =

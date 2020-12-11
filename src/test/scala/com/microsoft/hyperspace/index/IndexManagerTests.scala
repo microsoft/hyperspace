@@ -63,16 +63,25 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     Seq(true, false).foreach { enableLineage =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig1.indexName) {
-          import spark.implicits._
           hyperspace.createIndex(df, indexConfig1)
-          val actual = hyperspace.indexes.as[IndexSummary].collect().head
+          val columns = hyperspace.indexes.collect().head
+          assert(columns.length == IndexStatistics.INDEX_SUMMARY_COLUMNS.length)
+          val actual = getIndexStatistics(
+            columns.getAs[String]("name"),
+            columns.getAs[Seq[String]]("indexedColumns"),
+            columns.getAs[Seq[String]]("includedColumns"),
+            columns.getAs[Int]("numBuckets"),
+            columns.getAs[String]("schema"),
+            columns.getAs[String]("indexLocation"),
+            columns.getAs[String]("state"))
+
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
           if (enableLineage) {
             expectedSchema =
               expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType, false))
           }
-          val expected = new IndexSummary(
+          val expected = getIndexStatistics(
             indexConfig1.indexName,
             indexConfig1.indexedColumns,
             indexConfig1.includedColumns,
@@ -81,9 +90,40 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             s"$systemPath/${indexConfig1.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Constants.States.ACTIVE)
+
           assert(actual.equals(expected))
         }
       }
+    }
+
+    // Create an IndexStatistics instance without extended members.
+    def getIndexStatistics(
+        name: String,
+        indexedColumns: Seq[String],
+        includedColumns: Seq[String],
+        buckets: Int,
+        schema: String,
+        location: String,
+        state: String): IndexStatistics = {
+      new IndexStatistics(
+        name,
+        indexedColumns,
+        includedColumns,
+        buckets,
+        schema,
+        location,
+        state,
+        "",
+        false,
+        0,
+        0L,
+        0,
+        0L,
+        0,
+        0L,
+        0,
+        0L,
+        Nil)
     }
   }
 

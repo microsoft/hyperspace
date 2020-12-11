@@ -98,8 +98,11 @@ class IndexCollectionManager(
     import spark.implicits._
     getIndexes()
       .filter(!_.state.equals(Constants.States.DOESNOTEXIST))
-      .map(IndexSummary(spark, _))
+      .map(IndexStatistics(spark, _))
       .toDF()
+      .select(
+        IndexStatistics.INDEX_SUMMARY_COLUMNS.head,
+        IndexStatistics.INDEX_SUMMARY_COLUMNS.tail: _*)
   }
 
   override def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
@@ -111,13 +114,13 @@ class IndexCollectionManager(
       .map(toIndexLogEntry)
   }
 
-  override def getIndexStats(indexName: String): DataFrame = {
+  override def index(indexName: String): DataFrame = {
     getLogManager(indexName).fold(
       throw HyperspaceException(s"Index with name $indexName could not be found.")) {
       _.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
         case Some(l) =>
           import spark.implicits._
-          Seq(IndexStatistics(spark, toIndexLogEntry(l))).toDF()
+          Seq(IndexStatistics(spark, toIndexLogEntry(l), extended = true)).toDF()
         case None =>
           throw HyperspaceException(s"No latest stable log found for index $indexName.")
       }
@@ -167,61 +170,6 @@ object IndexCollectionManager {
 }
 
 /**
- * Case class representing index summary
- *
- * TODO: Finalize about adding these: data location, signatures, file lists etc.
- *
- * @param name index name
- * @param indexedColumns indexed columns
- * @param includedColumns included columns
- * @param numBuckets number of buckets
- * @param schema index schema json
- * @param indexLocation index location
- * @param state index state
- */
-private[hyperspace] case class IndexSummary(
-    name: String,
-    indexedColumns: Seq[String],
-    includedColumns: Seq[String],
-    numBuckets: Int,
-    schema: String,
-    indexLocation: String,
-    state: String)
-
-private[hyperspace] object IndexSummary {
-  def apply(spark: SparkSession, entry: IndexLogEntry): IndexSummary = {
-    IndexSummary(
-      entry.name,
-      entry.derivedDataset.properties.columns.indexed,
-      entry.derivedDataset.properties.columns.included,
-      entry.numBuckets,
-      entry.derivedDataset.properties.schemaString,
-      indexDirPath(entry),
-      entry.state)
-  }
-
-  /**
-   * This method extracts the most top-level (or top-most) index directory which
-   * has either
-   * - at least one leaf file, or
-   * - more than one subdirectories, or
-   * - no files and no subdirectories (this case will not happen for real index scenarios).
-   *
-   * @param entry Index log entry.
-   * @return Path to the first leaf directory starting from the root.
-   */
-  private def indexDirPath(entry: IndexLogEntry): String = {
-    var root = entry.content.root
-    var indexDirPath = new Path(entry.content.root.name)
-    while (root.files.isEmpty && root.subDirs.size == 1) {
-      root = root.subDirs.head
-      indexDirPath = new Path(indexDirPath, root.name)
-    }
-    indexDirPath.toString
-  }
-}
-
-/**
  * Case class representing index metadata and index statistics from latest index version.
  *
  * @param name Index name.
@@ -229,6 +177,7 @@ private[hyperspace] object IndexSummary {
  * @param includedColumns Included columns.
  * @param numBuckets Number of buckets.
  * @param schema Index schema json.
+ * @param indexLocation Path to parent directory containing index files for all versions.
  * @param state Index state.
  * @param kind Index kind.
  * @param hasLineage Lineage enabled on index.
@@ -248,6 +197,7 @@ private[hyperspace] case class IndexStatistics(
     includedColumns: Seq[String],
     numBuckets: Int,
     schema: String,
+    indexLocation: String,
     state: String,
     kind: String,
     hasLineage: Boolean,
@@ -262,26 +212,60 @@ private[hyperspace] case class IndexStatistics(
     indexContentPaths: Seq[String])
 
 private[hyperspace] object IndexStatistics {
-  def apply(spark: SparkSession, entry: IndexLogEntry): IndexStatistics = {
-    val indexSummary = IndexSummary(spark, entry)
-    IndexStatistics(
-      indexSummary.name,
-      indexSummary.indexedColumns,
-      indexSummary.includedColumns,
-      indexSummary.numBuckets,
-      indexSummary.schema,
-      indexSummary.state,
-      entry.derivedDataset.kind,
-      entry.hasLineageColumn,
-      entry.content.fileInfos.size,
-      entry.content.fileInfos.map(_.size).sum,
-      entry.sourceFileInfoSet.size,
-      entry.sourceFileInfoSet.map(_.size).sum,
-      entry.appendedFiles.size,
-      entry.appendedFiles.map(_.size).sum,
-      entry.deletedFiles.size,
-      entry.deletedFiles.map(_.size).sum,
-      getIndexContentDirectoryPaths(entry))
+  val INDEX_SUMMARY_COLUMNS: Seq[String] = Seq(
+    "name",
+    "indexedColumns",
+    "includedColumns",
+    "numBuckets",
+    "schema",
+    "indexLocation",
+    "state")
+
+  def apply(
+      spark: SparkSession,
+      entry: IndexLogEntry,
+      extended: Boolean = false): IndexStatistics = {
+    if (extended) {
+      IndexStatistics(
+        entry.name,
+        entry.derivedDataset.properties.columns.indexed,
+        entry.derivedDataset.properties.columns.included,
+        entry.numBuckets,
+        entry.derivedDataset.properties.schemaString,
+        indexDirPath(entry),
+        entry.state,
+        entry.derivedDataset.kind,
+        entry.hasLineageColumn,
+        entry.content.fileInfos.size,
+        entry.content.fileInfos.map(_.size).sum,
+        entry.sourceFileInfoSet.size,
+        entry.sourceFileInfoSet.map(_.size).sum,
+        entry.appendedFiles.size,
+        entry.appendedFiles.map(_.size).sum,
+        entry.deletedFiles.size,
+        entry.deletedFiles.map(_.size).sum,
+        getIndexContentDirectoryPaths(entry))
+    } else {
+      IndexStatistics(
+        entry.name,
+        entry.derivedDataset.properties.columns.indexed,
+        entry.derivedDataset.properties.columns.included,
+        entry.numBuckets,
+        entry.derivedDataset.properties.schemaString,
+        indexDirPath(entry),
+        entry.state,
+        "",
+        false,
+        0,
+        0L,
+        0,
+        0L,
+        0,
+        0L,
+        0,
+        0L,
+        Nil)
+    }
   }
 
   /**
@@ -304,5 +288,25 @@ private[hyperspace] object IndexStatistics {
     }
 
     root.subDirs.map(d => s"$prefix${d.name}")
+  }
+
+  /**
+   * This method extracts the most top-level (or top-most) index directory which
+   * has either
+   * - at least one leaf file, or
+   * - more than one subdirectories, or
+   * - no files and no subdirectories (this case will not happen for real index scenarios).
+   *
+   * @param entry Index log entry.
+   * @return Path to the first leaf directory starting from the root.
+   */
+  private def indexDirPath(entry: IndexLogEntry): String = {
+    var root = entry.content.root
+    var indexDirPath = new Path(entry.content.root.name)
+    while (root.files.isEmpty && root.subDirs.size == 1) {
+      root = root.subDirs.head
+      indexDirPath = new Path(indexDirPath, root.name)
+    }
+    indexDirPath.toString
   }
 }
