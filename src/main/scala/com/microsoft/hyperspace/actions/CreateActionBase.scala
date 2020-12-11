@@ -99,7 +99,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df: DataFrame): Option[(String, String)] = {
     val relation = df.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation]
     if (Hyperspace.getContext(spark).sourceProviderManager.hasParquetAsSourceFormat(relation)) {
-      Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT -> "true")
+      Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true")
     } else {
       None
     }
