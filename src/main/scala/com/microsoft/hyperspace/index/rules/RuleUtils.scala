@@ -449,7 +449,7 @@ object RuleUtils {
     if (location.partitionSchema.isEmpty) {
       None
     } else {
-      Some(Hyperspace.getContext(spark).sourceProviderManager.partitionBasePath(location))
+      Hyperspace.getContext(spark).sourceProviderManager.partitionBasePath(location)
     }
   }
 

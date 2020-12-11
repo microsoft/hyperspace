@@ -77,7 +77,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         // Since "options" is case-insensitive map, it will change any previous entries of
         // "basePath" to lowercase "basepath", making it unusable.
         // Remove lowercase "basepath" and add proper cased "basePath".
-        val opts = options.get("basePath").orElse(partitionBasePath(location)) match {
+        val opts = options.get("basePath").orElse {
+          partitionBasePath(location) match {
+            case Some(Some(path)) => Some(path)
+            case _ => None
+          }
+        } match {
           case Some(path) => Map("basePath" -> path) ++ options - "path" - "basepath"
           case _ => options - "path" - "basepath"
         }
@@ -208,7 +213,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @param location Partitioned data location.
    * @return basePath to read the given partitioned location.
    */
-  override def partitionBasePath(location: FileIndex): Option[String] = {
+  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
       case p: PartitioningAwareFileIndex if p.partitionSpec.partitions.nonEmpty =>
         // For example, we could have the following in PartitionSpec:
@@ -219,9 +224,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         // all the partitions in the path, so "partitions.head" is taken as an initial value.
         val basePath = p.partitionSpec.partitionColumns
           .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
-        Some(basePath.toString)
-      case _ =>
-        None
+        Some(Some(basePath.toString))
+      case _ => None
     }
   }
 
