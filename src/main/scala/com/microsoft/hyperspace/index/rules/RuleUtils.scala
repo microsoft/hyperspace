@@ -419,7 +419,10 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val options = extractBasePath(spark, location)
+        val options = Hyperspace
+          .getContext(spark)
+          .sourceProviderManager
+          .partitionBasePath(location)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -443,14 +446,6 @@ object RuleUtils {
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended
-  }
-
-  private def extractBasePath(spark: SparkSession, location: FileIndex): Option[String] = {
-    if (location.partitionSchema.isEmpty) {
-      None
-    } else {
-      Hyperspace.getContext(spark).sourceProviderManager.partitionBasePath(location)
-    }
   }
 
   /**

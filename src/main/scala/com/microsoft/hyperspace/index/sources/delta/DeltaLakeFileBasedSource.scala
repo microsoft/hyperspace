@@ -142,8 +142,9 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    */
   override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
-      case d: TahoeLogFileIndex =>
+      case d: TahoeLogFileIndex if d.partitionSchema.nonEmpty =>
         Some(Some(d.path.toString))
+      case _: TahoeLogFileIndex => Some(None)
       case _ =>
         None
     }

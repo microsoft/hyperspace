@@ -225,6 +225,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         val basePath = p.partitionSpec.partitionColumns
           .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
         Some(Some(basePath.toString))
+      case _: PartitioningAwareFileIndex => Some(None)
       case _ => None
     }
   }
