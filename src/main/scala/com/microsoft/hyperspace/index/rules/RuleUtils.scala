@@ -262,8 +262,6 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    val fileFormat = index.relations.head.fileFormat
-    val isParquetSourceFormat = fileFormat.equals("parquet") || fileFormat.equals("delta")
     var unhandledAppendedFiles: Seq[Path] = Nil
 
     // Get transformed plan with index data and appended files if applicable.
@@ -307,7 +305,7 @@ object RuleUtils {
           }
 
         val filesToRead = {
-          if (useBucketSpec || !isParquetSourceFormat || filesDeleted.nonEmpty ||
+          if (useBucketSpec || !index.hasParquetAsSourceFormat || filesDeleted.nonEmpty ||
               location.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
