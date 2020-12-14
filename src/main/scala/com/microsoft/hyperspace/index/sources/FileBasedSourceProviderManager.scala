@@ -121,6 +121,16 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Returns whether the given relation has parquet source files or not.
+   *
+   * @param logicalRelation Logical Relation to check the source file format.
+   * @return True if source files in the given relation are parquet.
+   */
+  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Boolean = {
+    run(p => p.hasParquetAsSourceFormat(logicalRelation))
+  }
+
+  /**
    * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
    * [[Option]] for each provider built. This function ensures that only one provider returns
    * [[Some]] when 'f' is executed.

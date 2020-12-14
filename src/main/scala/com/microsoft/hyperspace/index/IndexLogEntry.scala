@@ -526,9 +526,16 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
-  def hasLineageColumn: Boolean =
+  def hasLineageColumn: Boolean = {
     derivedDataset.properties.properties.getOrElse(
       IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT).toBoolean
+  }
+
+  def hasParquetAsSourceFormat: Boolean = {
+    relations.head.fileFormat.equals("parquet") ||
+      derivedDataset.properties.properties.getOrElse(
+        IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
+  }
 
   @JsonIgnore
   lazy val fileIdTracker: FileIdTracker = {
