@@ -133,7 +133,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     val entry = log.get.asInstanceOf[IndexLogEntry]
     assert(indexStats.equals(IndexStatistics(spark, entry, extended = true)))
 
-    // Verify index root paths.
+    // Verify index content directory paths.
     val expectedIndexPaths =
       expectedIndexVersions.map(i => s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$i")
 
