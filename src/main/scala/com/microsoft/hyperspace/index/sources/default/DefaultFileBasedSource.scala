@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
+import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
@@ -29,7 +30,7 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
+import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -72,8 +73,20 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
+        // Store basePath of hive-partitioned data sources, if applicable.
+        val basePath = options.get("basePath") match {
+          case None => PathUtils.extractBasePath(location.partitionSpec())
+          case p => p
+        }
+
         // "path" key in options can incur multiple data read unexpectedly.
-        val opts = options - "path"
+        // Since "options" is case-insensitive map, it will change any previous entries of
+        // "basePath" to lowercase "basepath", making it unusable.
+        // Remove lowercase "basepath" and add proper cased "basePath".
+        val opts = basePath match {
+          case Some(path) => Map("basePath" -> path) ++ options - "path" - "basepath"
+          case _ => options - "path" - "basepath"
+        }
 
         val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
           case Some(pattern) =>
@@ -93,7 +106,14 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
               .toMap
 
             val globPathValues = globPaths.values.flatten.toSet
-            if (!location.rootPaths.forall(globPathValues.contains)) {
+
+            // Root paths could be directories or leaf files. Make sure that all root paths either
+            // match the glob paths, in case of directories, or belong to glob paths, in case of
+            // files.
+            if (!location.rootPaths.forall(p =>
+                  globPathValues.exists(g =>
+                    FilenameUtils.equalsNormalized(p.toString, g.toString) ||
+                      FilenameUtils.directoryContains(g.toString, p.toString)))) {
               throw HyperspaceException(
                 "Some glob patterns do not match with available root " +
                   s"paths of the source data. Please check if $pattern matches all of " +

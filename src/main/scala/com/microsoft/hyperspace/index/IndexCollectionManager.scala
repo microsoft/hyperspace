@@ -21,7 +21,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions._
+import com.microsoft.hyperspace.actions.{RefreshIncrementalAction, _}
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 
 class IndexCollectionManager(
@@ -63,12 +63,25 @@ class IndexCollectionManager(
     }
   }
 
-  override def refresh(indexName: String, mode: String): Unit = {
+  override def refresh(
+      indexName: String,
+      mode: String,
+      scanPattern: Option[String] = None): Unit = {
     withLogManager(indexName) { logManager =>
       val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
       val dataManager = indexDataManagerFactory.create(indexPath)
+
+      if (scanPattern.isDefined && !mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
+        throw HyperspaceException(
+          "Scan Patterns are currently only supported for " +
+            s"$REFRESH_MODE_INCREMENTAL.")
+      }
+
       if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
-        new RefreshIncrementalAction(spark, logManager, dataManager).run()
+        scanPattern match {
+          case Some(pattern) => new RefreshScan(spark, logManager, dataManager, pattern).run()
+          case _ => new RefreshIncrementalAction(spark, logManager, dataManager).run()
+        }
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_QUICK)) {
