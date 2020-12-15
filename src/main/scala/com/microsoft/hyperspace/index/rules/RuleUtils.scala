@@ -71,7 +71,10 @@ object RuleUtils {
       }
     }
 
-    def isHybridScanCandidate(entry: IndexLogEntry, inputSourceFiles: Seq[FileInfo]): Boolean = {
+    def isHybridScanCandidate(
+        entry: IndexLogEntry,
+        inputSourceFiles: Seq[FileInfo],
+        totalInputBytes: Long): Boolean = {
       // TODO: Some threshold about the similarity of source data files - number of common files or
       //  total size of common files.
       //  See https://github.com/microsoft/hyperspace/issues/159
@@ -79,16 +82,29 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      // Find the number of common files between the source relations & index source files.
-      val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
+      // Find the number of common files between the source relation and index source files.
+      // The total size of common files are collected and tagged for candidate.
+      val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
+        if (entry.sourceFileInfoSet.contains(f)) {
+          (res._1 + 1, res._2 + f.size) // count, total bytes
+        } else {
+          res
+        }
+      }
+      val appendedBytesRatio = 1 - commonBytes / totalInputBytes.toFloat
+      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesTotalBytes.toFloat
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
-        commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
+        commonCnt > 0 &&
+        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
+        deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
+
 
       // For append-only Hybrid Scan, deleted files are not allowed.
       lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
-        commonCnt > 0
+        commonCnt > 0 &&
+        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
 
       val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
@@ -124,8 +140,10 @@ object RuleUtils {
             }
       }
       assert(filesByRelations.length == 1)
+      val inputSourceFiles = filesByRelations.flatten
+      val totalBytes = inputSourceFiles.map(_.size).sum
       indexes.filter(index =>
-        index.created && isHybridScanCandidate(index, filesByRelations.flatten))
+        index.created && isHybridScanCandidate(index, inputSourceFiles, totalBytes))
     } else {
       indexes.filter(index => index.created && signatureValid(index))
     }

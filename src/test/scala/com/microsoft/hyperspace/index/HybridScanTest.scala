@@ -79,6 +79,8 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
 
   before {
     spark.enableHyperspace()
+    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD, "0.9")
+    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD, "0.9")
   }
 
   after {
@@ -389,8 +391,9 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Delete-only: filter rule, number of delete files threshold.") {
+  test("Delete-only: filter rule, deleted files ratio threshold.") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
+    val sourceSize = FileUtils.getDirectorySize(new Path(sampleDataFormatDelete4))
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       setupIndexAndChangeData(
         fileFormat,
@@ -405,18 +408,22 @@ trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
       df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
     val basePlan = baseQuery.queryExecution.optimizedPlan
+    val afterDeleteSize = FileUtils.getDirectorySize(new Path(sampleDataFormatDelete4))
+    val deletedRatio = 1 - (afterDeleteSize / sourceSize.toFloat)
 
     withSQLConf(
       IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
       IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
+      withSQLConf(
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> (deletedRatio + 0.1).toString) {
         val filter = filterQuery
-        // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
+        // As ratio of deleted files is less than the threshold, the index can be applied.
         assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
       }
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
+      withSQLConf(
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> (deletedRatio - 0.1).toString) {
         val filter = filterQuery
-        // Since number of deletedFiles = 2, index should not be applied even with Hybrid scan.
+        // As ratio of deleted files is greater than the threshold, the index shouldn't be applied.
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
     }

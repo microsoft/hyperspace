@@ -46,13 +46,17 @@ object IndexConstants {
   val INDEX_HYBRID_SCAN_DELETE_ENABLED = "spark.hyperspace.index.hybridscan.delete.enabled"
   val INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT = "false"
 
-  // While the performance validation of Hybrid scan for delete files described above,
-  // we limit the number of deleted files to avoid regression from Hybrid scan.
-  // If the number of deleted files is larger than this config, the index is disabled and
-  // cannot be a candidate for Hybrid Scan.
-  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES =
-    "spark.hyperspace.index.hybridscan.delete.maxNumDeletedFiles"
-  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT = "30"
+  // If the ratio of deleted files to all source files of a candidate index is greater than this
+  // threshold, the index won't be applied even with Hybrid Scan.
+  val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD =
+    "spark.hyperspace.index.hybridscan.maxDeletedRatio"
+  val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD_DEFAULT = "0.3"
+
+  // If the ratio of newly appended files to all source files in the given relation is greater than
+  // this threshold, the index won't be applied even with Hybrid Scan.
+  val INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD =
+    "spark.hyperspace.index.hybridscan.maxAppendedRatio"
+  val INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD_DEFAULT = "0.3"
 
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.

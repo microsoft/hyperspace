@@ -48,12 +48,20 @@ object HyperspaceConf {
       .toLong
   }
 
-  def hybridScanDeleteMaxNumFiles(spark: SparkSession): Int = {
+  def hybridScanDeletedRatioThreshold(spark: SparkSession): Float = {
     spark.conf
       .get(
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES,
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT)
-      .toInt
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD,
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD_DEFAULT)
+      .toFloat
+  }
+
+  def hybridScanAppendedRatioThreshold(spark: SparkSession): Float = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD,
+        IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD_DEFAULT)
+      .toFloat
   }
 
   def numBucketsForIndex(spark: SparkSession): Int = {
