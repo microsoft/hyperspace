@@ -86,7 +86,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         }
 
         // "path" key in options can incur multiple data read unexpectedly.
-        val opts: Map[String, String] = caseSensitiveOptions - "path" ++ basePathOpt
+        val opts = caseSensitiveOptions - "path" ++ basePathOpt
 
         val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
           case Some(pattern) =>
