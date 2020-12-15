@@ -21,6 +21,7 @@ import java.util.Locale
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
@@ -72,20 +73,20 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
-        // Store basePath of hive-partitioned data sources, if applicable.
-        // "path" key in options can incur multiple data read unexpectedly.
-        // Since "options" is case-insensitive map, it will change any previous entries of
-        // "basePath" to lowercase "basepath", making it unusable.
-        // Remove lowercase "basepath" and add proper cased "basePath".
-        val opts = options.get("basePath").orElse {
-          partitionBasePath(location) match {
-            case Some(Some(path)) => Some(path)
-            case _ => None
-          }
-        } match {
-          case Some(path) => Map("basePath" -> path) ++ options - "path" - "basepath"
-          case _ => options - "path" - "basepath"
+        // Use case-sensitive map if the provided options are case insensitive.
+        val caseSensitiveOptions = options match {
+          case map: CaseInsensitiveMap[String] => map.originalMap
+          case map => map
         }
+
+        // Get basePath of hive-partitioned data sources, if applicable.
+        val basePathOpt = partitionBasePath(location) match {
+          case Some(Some(path)) => Map("basePath" -> path)
+          case _ => Map()
+        }
+
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts: Map[String, String] = caseSensitiveOptions - "path" ++ basePathOpt
 
         val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
           case Some(pattern) =>
