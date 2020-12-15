@@ -173,6 +173,21 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
         None
     }
   }
+
+  /**
+   * Returns whether the given relation has parquet source files or not.
+   *
+   * @param logicalRelation Logical Relation to check the source file format.
+   * @return True if source files in the given relation are parquet.
+   */
+  override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
+    logicalRelation.relation match {
+      case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
+        Some(true)
+      case _ =>
+        None
+    }
+  }
 }
 
 /**
