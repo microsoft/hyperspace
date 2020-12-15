@@ -21,8 +21,8 @@ import java.util.Locale
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
-import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
 
@@ -265,7 +265,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
     logicalRelation.relation match {
       case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-        if isSupportedFileFormat(format) =>
+          if isSupportedFileFormat(format) =>
         val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
         Some(fileFormatName.equals("parquet"))
       case _ =>
