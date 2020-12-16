@@ -17,13 +17,13 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.{DataFrame, QueryTest}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.util.PathUtils
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
 
 class RefreshScanTestsGlobData extends QueryTest with HyperspaceSuite {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
