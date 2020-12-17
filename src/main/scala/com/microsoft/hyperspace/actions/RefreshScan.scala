@@ -20,6 +20,7 @@ import scala.util.{Failure, Success, Try}
 
 import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.fs.Path
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -49,12 +50,12 @@ class RefreshScan(
       .load(newlyIndexedDataFiles: _*)
   }
 
-  def isMatch(path: String, scanPattern: String): Boolean = {
+  private def isMatch(path: String, scanPattern: String): Boolean = {
     val scanSplits = scanPattern.split(Path.SEPARATOR)
     scanSplits.nonEmpty && path.split(Path.SEPARATOR).contains(scanSplits.head)
   }
 
-  def resolve(path: String, scanPattern: String): String = {
+  private def resolve(path: String, scanPattern: String): String = {
     val scanSplits: Array[String] = scanPattern.split(Path.SEPARATOR)
     val pathSplits: Array[String] = path.split(Path.SEPARATOR)
     val splitPoint: Int = pathSplits.lastIndexOf(scanSplits.head)
@@ -84,9 +85,15 @@ class RefreshScan(
     relation.rootPaths.collect {
       case path if isMatch(path, scanPattern) => resolve(path, scanPattern)
     }
+  }
 
-    // Remove this after testing
-    // Seq("glob2/y=2023")
+  private def checkPathExists(path: String): Boolean = {
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val hdfsPath = new Path(path)
+    val fs = hdfsPath.getFileSystem(hadoopConf)
+    val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+    val globPath = SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
+    globPath.nonEmpty && globPath.forall(fs.exists)
   }
 
   override def logEntry: LogEntry = {
@@ -128,31 +135,35 @@ class RefreshScan(
   }
 
   override protected lazy val currentFiles: Set[FileInfo] = {
-    val relation = previousIndexLogEntry.relations.head
-    val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
-    val changedDf = spark.read
-      .schema(dataSchema)
-      .format(relation.fileFormat)
-      .options(relation.options)
-      .load(resolvedPaths: _*)
-    changedDf.queryExecution.optimizedPlan
-      .collect {
-        case LogicalRelation(
-            HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-            _,
-            _,
-            _) =>
-          location
-            .allFiles()
-            .map { f =>
-              // For each file, if it already has a file id, add that id to its corresponding
-              // FileInfo. Note that if content of an existing file is changed, it is treated
-              // as a new file (i.e. its current file id is no longer valid).
-              val id = fileIdTracker.addFile(f)
-              FileInfo(f, id, asFullPath = true)
-            }
-      }
-      .flatten
-      .toSet
+    resolvedPaths.filter(checkPathExists) match {
+      case Nil => Set.empty
+      case _ =>
+        val relation = previousIndexLogEntry.relations.head
+        val dataSchema = DataType.fromJson(relation.dataSchemaJson).asInstanceOf[StructType]
+        val changedDf = spark.read
+          .schema(dataSchema)
+          .format(relation.fileFormat)
+          .options(relation.options)
+          .load(resolvedPaths: _*)
+        changedDf.queryExecution.optimizedPlan
+          .collect {
+            case LogicalRelation(
+                HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
+                _,
+                _,
+                _) =>
+              location
+                .allFiles()
+                .map { f =>
+                  // For each file, if it already has a file id, add that id to its corresponding
+                  // FileInfo. Note that if content of an existing file is changed, it is treated
+                  // as a new file (i.e. its current file id is no longer valid).
+                  val id = fileIdTracker.addFile(f)
+                  FileInfo(f, id, asFullPath = true)
+                }
+          }
+          .flatten
+          .toSet
+    }
   }
 }
