@@ -51,57 +51,6 @@ class RefreshScanTestsPartitionedData extends QueryTest with HyperspaceSuite {
     clearCache()
   }
 
-  test("RefreshScan indexes eligible files with scan pattern provided.") {
-    withTempPathAsString { testPath =>
-      withIndex("index") {
-        val dataPath = new Path(PathUtils.makeAbsolute(testPath), "data").toString
-
-        // Create index.
-        partition1.write.partitionBy("c5").parquet(dataPath)
-        val df = spark.read.parquet(dataPath)
-        val indexConfig = IndexConfig("index", Seq("c1"), Seq("c5"))
-        hs.createIndex(df, indexConfig)
-
-        // Append another partition.
-        partition2.write.mode("append").partitionBy("c5").parquet(dataPath)
-
-        // Refresh index with scan pattern.
-        hs.refreshIndex("index", "incremental", Some("data/c5=2000"))
-
-        // Validate index contents.
-        val index = latestIndexLogEntry(systemPath, indexConfig.indexName)
-        val relation = index.relations.head
-        val indexedFiles = relation.data.properties.content.files
-        assert(relation.rootPaths.equals(Seq(dataPath)))
-        assert(indexedFiles.forall(path =>
-          path.toString.contains("data/c5=1000") || path.toString.contains("data/c5=2000")))
-        assert(indexedFiles.exists(_.toString.contains("data/c5=1000")))
-        assert(indexedFiles.exists(_.toString.contains("data/c5=2000")))
-
-        // Validate results.
-        val df2 = spark.read.parquet(dataPath)
-        def query: DataFrame = df2.filter("c1 = '2017-09-03'").select("c1", "c5")
-        spark.disableHyperspace()
-        val baseQuery = query
-        val basePlan = baseQuery.queryExecution.optimizedPlan
-
-        spark.enableHyperspace()
-        val queryWithHs = query
-        val planWithHs = queryWithHs.queryExecution.optimizedPlan
-        assert(!basePlan.equals(planWithHs))
-
-        val files = planWithHs.collect {
-          case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-            fsRelation.location.inputFiles
-        }.flatten
-
-        // Check data files are replaced by index files.
-        assert(files.nonEmpty && files.forall(_.contains("index")))
-        checkAnswer(baseQuery, queryWithHs)
-      }
-    }
-  }
-
   test("RefreshScan handles deleted files matching scan pattern.") {
     withTempPathAsString { testPath =>
       withIndex("index") {
@@ -150,6 +99,57 @@ class RefreshScanTestsPartitionedData extends QueryTest with HyperspaceSuite {
           assert(files.nonEmpty && files.forall(_.contains("index")))
           checkAnswer(baseQuery, queryWithHs)
         }
+      }
+    }
+  }
+
+  test("RefreshScan indexes eligible files with scan pattern provided.") {
+    withTempPathAsString { testPath =>
+      withIndex("index") {
+        val dataPath = new Path(PathUtils.makeAbsolute(testPath), "data").toString
+
+        // Create index.
+        partition1.write.partitionBy("c5").parquet(dataPath)
+        val df = spark.read.parquet(dataPath)
+        val indexConfig = IndexConfig("index", Seq("c1"), Seq("c5"))
+        hs.createIndex(df, indexConfig)
+
+        // Append another partition.
+        partition2.write.mode("append").partitionBy("c5").parquet(dataPath)
+
+        // Refresh index with scan pattern.
+        hs.refreshIndex("index", "incremental", Some("data/c5=2000"))
+
+        // Validate index contents.
+        val index = latestIndexLogEntry(systemPath, indexConfig.indexName)
+        val relation = index.relations.head
+        val indexedFiles = relation.data.properties.content.files
+        assert(relation.rootPaths.equals(Seq(dataPath)))
+        assert(indexedFiles.forall(path =>
+          path.toString.contains("data/c5=1000") || path.toString.contains("data/c5=2000")))
+        assert(indexedFiles.exists(_.toString.contains("data/c5=1000")))
+        assert(indexedFiles.exists(_.toString.contains("data/c5=2000")))
+
+        // Validate results.
+        val df2 = spark.read.parquet(dataPath)
+        def query: DataFrame = df2.filter("c1 = '2017-09-03'").select("c1", "c5")
+        spark.disableHyperspace()
+        val baseQuery = query
+        val basePlan = baseQuery.queryExecution.optimizedPlan
+
+        spark.enableHyperspace()
+        val queryWithHs = query
+        val planWithHs = queryWithHs.queryExecution.optimizedPlan
+        assert(!basePlan.equals(planWithHs))
+
+        val files = planWithHs.collect {
+          case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+            fsRelation.location.inputFiles
+        }.flatten
+
+        // Check data files are replaced by index files.
+        assert(files.nonEmpty && files.forall(_.contains("index")))
+        checkAnswer(baseQuery, queryWithHs)
       }
     }
   }
