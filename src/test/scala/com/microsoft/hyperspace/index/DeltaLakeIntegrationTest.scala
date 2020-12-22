@@ -22,7 +22,10 @@ import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources._
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
+import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
+import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_QUICK
+import com.microsoft.hyperspace.util.PathUtils
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/deltaLakeIntegrationTest")
@@ -96,6 +99,161 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Verify incremental refresh index properly adds hive-partition columns.") {
+    withTempPathAsString { testPath =>
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath).toString
+      import spark.implicits._
+      val (testData, appendData) = SampleData.testData.partition(_._1 != "2019-10-03")
+      assert(testData.nonEmpty)
+      assert(appendData.nonEmpty)
+      testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .format("delta")
+        .save(testPath)
+
+      val df = spark.read.format("delta").load(testPath)
+      hyperspace.createIndex(df, IndexConfig("index", Seq("clicks"), Seq("Date")))
+
+      withIndex("index") {
+        // Check if partition columns are correctly stored in index contents.
+        val indexDf1 = spark.read.parquet(s"$systemPath/index").where("Date != '2019-10-03'")
+        assert(testData.size == indexDf1.count())
+        val oldEntry = latestIndexLogEntry(systemPath, "index")
+        assert(oldEntry.relations.head.options("basePath").equals(absoluteTestPath))
+
+        // Append data creating new partition and refresh index.
+        appendData
+          .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+          .write
+          .partitionBy("Date")
+          .mode("append")
+          .format("delta")
+          .save(testPath)
+        hyperspace.refreshIndex("index", "incremental")
+
+        // Check if partition columns are correctly stored in index contents.
+        val indexDf2 = spark.read.parquet(s"$systemPath/index").where("Date = '2019-10-03'")
+        assert(appendData.size == indexDf2.count())
+        val newEntry = latestIndexLogEntry(systemPath, "index")
+        assert(newEntry.relations.head.options("basePath").equals(absoluteTestPath))
+      }
+    }
+  }
+
+  test(
+    "Verify JoinIndexRule utilizes indexes correctly after quick refresh when some file " +
+      "gets deleted and some appended to source data.") {
+    withTempPathAsString { testPath =>
+      // Setup. Create data.
+      val indexConfig = IndexConfig("index", Seq("c2"), Seq("c4"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .format("delta")
+        .save(testPath)
+
+      val df = spark.read.format("delta").load(testPath)
+      val oldFiles = df.inputFiles
+
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        // Create index.
+        hyperspace.createIndex(df, indexConfig)
+      }
+
+      withIndex("index") {
+        // Create a new version by deleting entries.
+        val deltaTable = DeltaTable.forPath(testPath)
+        deltaTable.delete("c1 = 2019-10-03")
+
+        // Append to original data.
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(3)
+          .write
+          .format("delta")
+          .mode("append")
+          .save(testPath)
+
+        // Refresh index.
+        hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_QUICK)
+
+        {
+          // Create a join query.
+          val leftDf = spark.read.format("delta").load(testPath)
+          val rightDf = spark.read.format("delta").load(testPath)
+
+          def query(): DataFrame = {
+            leftDf
+              .join(rightDf, leftDf("c2") === rightDf("c2"))
+              .select(leftDf("c2"), rightDf("c4"))
+          }
+
+          val appendedFiles = leftDf.inputFiles.diff(oldFiles)
+
+          // Verify indexes are used, and all index files are picked.
+          isIndexUsed(
+            query().queryExecution.optimizedPlan,
+            s"${indexConfig.indexName}/v__=0" +: appendedFiles: _*)
+
+          // Verify correctness of results.
+          spark.disableHyperspace()
+          val dfWithHyperspaceDisabled = query()
+          spark.enableHyperspace()
+          val dfWithHyperspaceEnabled = query()
+          checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+        }
+
+        // Append to original data again.
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(1)
+          .write
+          .mode("append")
+          .format("delta")
+          .save(testPath)
+
+        {
+          // Create a join query with updated dataset.
+          val leftDf = spark.read.format("delta").load(testPath)
+          val rightDf = spark.read.format("delta").load(testPath)
+
+          def query(): DataFrame = {
+            leftDf
+              .join(rightDf, leftDf("c2") === rightDf("c2"))
+              .select(leftDf("c2"), rightDf("c4"))
+          }
+
+          // Refreshed index as quick mode won't be applied with additional appended files.
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            spark.disableHyperspace()
+            val dfWithHyperspaceDisabled = query()
+            val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
+            spark.enableHyperspace()
+            val dfWithHyperspaceEnabled = query()
+            assert(basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
+          }
+
+          // Refreshed index as quick mode can be applied with Hybrid Scan config.
+          withSQLConf(
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+            spark.disableHyperspace()
+            val dfWithHyperspaceDisabled = query()
+            val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
+            spark.enableHyperspace()
+            val dfWithHyperspaceEnabled = query()
+            assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
+            checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+          }
+        }
+      }
+    }
+  }
+
   test("Verify Hybrid Scan on Delta Lake table.") {
     withTempPathAsString { dataPath =>
       import spark.implicits._
@@ -119,7 +277,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           }
         }
 
-        assert(isIndexUsed(query().queryExecution.optimizedPlan, "deltaIndex", false))
+        assert(isIndexUsed(query().queryExecution.optimizedPlan, "deltaIndex"))
 
         // Create a new version by deleting entries.
         val deltaTable = DeltaTable.forPath(dataPath)
@@ -129,7 +287,8 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           "spark.hyperspace.index.hybridscan.enabled" -> "true",
           "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
           // The index should be applied for the updated version.
-          assert(isIndexUsed(query().queryExecution.optimizedPlan, "deltaIndex", true))
+          assert(isIndexUsed(query().queryExecution.optimizedPlan, "deltaIndex"))
+          val prevInputFiles = spark.read.format("delta").load(dataPath).inputFiles
 
           // Append data.
           dfFromSample
@@ -139,17 +298,23 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
             .mode("append")
             .save(dataPath)
 
+          val appendedFiles = spark.read
+            .format("delta")
+            .load(dataPath)
+            .inputFiles
+            .toSet -- prevInputFiles
+
           // The index should be applied for the updated version.
-          assert(isIndexUsed(query().queryExecution.optimizedPlan, "deltaIndex", true))
+          assert(
+            isIndexUsed(
+              query().queryExecution.optimizedPlan,
+              "deltaIndex" +: appendedFiles.toSeq: _*))
         }
       }
     }
   }
 
-  def isIndexUsed(
-      plan: LogicalPlan,
-      indexPathSubStr: String,
-      isHybridScan: Boolean = false): Boolean = {
+  def isIndexUsed(plan: LogicalPlan, expectedPathsSubStr: String*): Boolean = {
     val rootPaths = plan.collect {
       case LogicalRelation(
           HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
@@ -158,10 +323,8 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           _) =>
         location.rootPaths
     }.flatten
-    if (!isHybridScan) {
-      rootPaths.nonEmpty && rootPaths.forall(_.toString.contains(indexPathSubStr))
-    } else {
-      rootPaths.nonEmpty && rootPaths.exists(_.toString.contains(indexPathSubStr))
-    }
+    rootPaths.nonEmpty && rootPaths.forall(p =>
+      expectedPathsSubStr.exists(p.toString.contains(_))) && expectedPathsSubStr.forall(p =>
+      rootPaths.exists(_.toString.contains(p)))
   }
 }

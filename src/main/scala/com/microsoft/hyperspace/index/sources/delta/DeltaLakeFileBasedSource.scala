@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources.delta
 
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 
@@ -68,9 +69,23 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = "delta"
+
+        // Use case-sensitive map if the provided options are case insensitive.
+        val caseSensitiveOptions = options match {
+          case map: CaseInsensitiveMap[String] => map.originalMap
+          case map => map
+        }
+
+        val basePathOpt = if (location.partitionSchema.isEmpty) {
+          None
+        } else {
+          partitionBasePath(location).map("basePath" -> _)
+        }
+
         // "path" key in options can incur multiple data read unexpectedly and keep
         // the table version info as metadata.
-        val opts = options - "path" + ("versionAsOf" -> location.tableVersion.toString)
+        val opts = caseSensitiveOptions - "path" +
+          ("versionAsOf" -> location.tableVersion.toString) ++ basePathOpt
         Some(
           Relation(
             Seq(PathUtils.makeAbsolute(location.path).toString),
@@ -92,6 +107,20 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   override def refreshRelation(relation: Relation): Option[Relation] = {
     if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
       Some(relation.copy(options = relation.options - "versionAsOf" - "timestampAsOf"))
+    } else {
+      None
+    }
+  }
+
+  /**
+   * Returns a file format name to read partial data for a given [[Relation]].
+   *
+   * @param relation [[Relation]] object to read partial data files.
+   * @return File format to read partial data files.
+   */
+  override def partialReadFileFormat(relation: Relation): Option[String] = {
+    if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
+      Some("parquet")
     } else {
       None
     }

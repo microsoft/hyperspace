@@ -70,6 +70,16 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Runs partialReadFileFormat() for each provider.
+   *
+   * @param relation [[Relation]] object to read partial data files.
+   * @return File format to read partial data files.
+   */
+  def partialReadFileFormat(relation: Relation): String = {
+    run(p => p.partialReadFileFormat(relation))
+  }
+
+  /**
    * Runs signature() for each provider.
    *
    * @param logicalRelation Logical relation to compute signature from.

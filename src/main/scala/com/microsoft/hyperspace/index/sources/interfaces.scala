@@ -90,6 +90,14 @@ trait FileBasedSourceProvider extends SourceProvider {
   def refreshRelation(relation: Relation): Option[Relation]
 
   /**
+   * Returns a file format name to read partial data for a given [[Relation]].
+   *
+   * @param relation [[Relation]] object to read partial data files.
+   * @return File format to read partial data files.
+   */
+  def partialReadFileFormat(relation: Relation): Option[String]
+
+  /**
    * Computes the signature using the given [[LogicalRelation]].
    *
    * This API is used when the signature of source needs to be computed, e.g., creating an index,

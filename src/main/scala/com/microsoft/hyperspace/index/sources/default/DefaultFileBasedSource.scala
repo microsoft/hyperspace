@@ -150,6 +150,21 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
+   * Returns a file format name to read partial data for a given [[Relation]].
+   *
+   * @param relation [[Relation]] object to read partial data files.
+   * @return File format to read partial data files.
+   */
+  override def partialReadFileFormat(relation: Relation): Option[String] = {
+    if (isSupportedFileFormatName(relation.fileFormat)) {
+      // Same as original file format.
+      Some(relation.fileFormat)
+    } else {
+      None
+    }
+  }
+
+  /**
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
    * using all the files found in [[PartitioningAwareFileIndex]].
    *
@@ -252,7 +267,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
     logicalRelation.relation match {
       case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-        if isSupportedFileFormat(format) =>
+          if isSupportedFileFormat(format) =>
         val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
         Some(fileFormatName.equals("parquet"))
       case _ =>
