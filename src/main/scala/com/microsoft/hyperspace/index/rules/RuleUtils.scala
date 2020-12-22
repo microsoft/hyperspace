@@ -92,7 +92,7 @@ object RuleUtils {
         }
       }
       val appendedBytesRatio = 1 - commonBytes / totalInputBytes.toFloat
-      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesTotalBytes.toFloat
+      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesBytes.toFloat
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
