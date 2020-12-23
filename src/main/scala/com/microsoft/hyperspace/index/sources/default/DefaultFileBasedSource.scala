@@ -24,6 +24,7 @@ import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.sources.DataSourceRegister
+import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
@@ -65,7 +66,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           _,
           fileFormat,
           options) if isSupportedFileFormat(fileFormat) =>
-        val files = location.allFiles
+        val files = filesFromIndex(location)
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
@@ -81,7 +82,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
             // This logic is picked from the globbing logic at:
             // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
             // spark/sql/execution/datasources/DataSource.scala#L540
-            val fs = location.allFiles.head.getPath.getFileSystem(new Configuration)
+            val fs = filesFromIndex(location).head.getPath.getFileSystem(new Configuration)
             val globPaths = pattern
               .split(",")
               .map(_.trim)
@@ -161,7 +162,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
           if isSupportedFileFormat(format) =>
-        val result = location.allFiles.sortBy(_.getPath.toString).foldLeft("") {
+        val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
           (acc: String, f: FileStatus) =>
             HashingUtils.md5Hex(acc + fingerprint(f))
         }
@@ -190,7 +191,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-        Some(location.allFiles)
+        Some(filesFromIndex(location))
       case _ => None
     }
   }
@@ -259,6 +260,31 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         None
     }
   }
+
+  private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =
+    try {
+      // keep the `asInstanceOf` to force casting or fallback because Databricks `InMemoryFileIndex`
+      // implementation does return a `SerializableFileStatus` instead of the
+      // standard API's `FileStatus`
+      index.allFiles.map(_.asInstanceOf[FileStatus])
+    } catch {
+      case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
+        val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
+        val clazz = Utils.classForName(dbClassName)
+        val lengthMethod = clazz.getMethod("length")
+        val isDirMethod = clazz.getMethod("isDir")
+        val modificationTimeMethod = clazz.getMethod("modificationTime")
+        val pathMethod = clazz.getMethod("path")
+        index.allFiles.asInstanceOf[Seq[_]].map { f =>
+          new FileStatus(
+            lengthMethod.invoke(f).asInstanceOf[Long],
+            isDirMethod.invoke(f).asInstanceOf[Boolean],
+            0,
+            0,
+            modificationTimeMethod.invoke(f).asInstanceOf[Long],
+            new Path(pathMethod.invoke(f).asInstanceOf[String]))
+        }
+    }
 }
 
 /**
