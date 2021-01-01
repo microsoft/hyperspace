@@ -25,10 +25,9 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.TestUtils.{copyWithState, latestIndexLogEntry, logManager}
+import com.microsoft.hyperspace.TestUtils.{copyWithState, getFileIdTracker, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
-import com.microsoft.hyperspace.index.RefreshIndexTests.getFileIdTracker
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
 
@@ -704,7 +703,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
 
-    val fileIdTracker = RefreshIndexTests.getFileIdTracker(indexConfig, systemPath)
+    val fileIdTracker = getFileIdTracker(systemPath, indexConfig)
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = df.queryExecution.optimizedPlan.collect {

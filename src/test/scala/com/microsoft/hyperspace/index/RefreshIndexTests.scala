@@ -21,27 +21,13 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{AnalysisException, QueryTest}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
-import com.microsoft.hyperspace.TestUtils.logManager
+import com.microsoft.hyperspace.TestUtils.{getFileIdTracker, logManager}
 import com.microsoft.hyperspace.actions.{RefreshIncrementalAction, RefreshQuickAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
-import com.microsoft.hyperspace.index.RefreshIndexTests.getFileIdTracker
 import com.microsoft.hyperspace.telemetry.RefreshIncrementalActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
-object RefreshIndexTests {
-
-  def getFileIdTracker(indexConfig: IndexConfig, systemPath: Path): FileIdTracker = {
-    val indexLogPath = PathUtils.makeAbsolute(
-      s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
-    val indexLogJson =
-      FileUtils.readContents(indexLogPath.getFileSystem(new Configuration), indexLogPath)
-    JsonUtils
-      .fromJson[IndexLogEntry](indexLogJson)
-      .fileIdTracker
-  }
-
-}
 /**
  * Unit E2E test cases for RefreshIndex.
  */
@@ -100,7 +86,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           }
 
           // Get deleted file's file id, used as lineage for its records.
-          val fileId = getFileIdTracker(indexConfig, systemPath).getFileId(
+          val fileId = getFileIdTracker(systemPath, indexConfig).getFileId(
             deletedFile.getPath.toString,
             deletedFile.getLen,
             deletedFile.getModificationTime)
@@ -292,7 +278,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val df = spark.read.parquet(testPath)
           hyperspace.createIndex(df, indexConfig)
 
-          val oldFiles = listFiles(testPath, getFileIdTracker(indexConfig, systemPath)).toSet
+          val oldFiles = listFiles(testPath, getFileIdTracker(systemPath, indexConfig)).toSet
 
           // Delete one source data file.
           deleteOneDataFile(testPath)
@@ -317,7 +303,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val indexLogEntry = getLatestStableLog(indexConfig.indexName)
           assert(indexLogEntry.appendedFiles.isEmpty)
 
-          val latestFiles = listFiles(testPath, getFileIdTracker(indexConfig, systemPath)).toSet
+          val latestFiles = listFiles(testPath, getFileIdTracker(systemPath, indexConfig)).toSet
           val indexSourceFiles = indexLogEntry.relations.head.data.properties.content.fileInfos
           val expectedDeletedFiles = oldFiles -- latestFiles
           val expectedAppendedFiles = latestFiles -- oldFiles
@@ -416,7 +402,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
           val df = spark.read.parquet(testPath)
           hyperspace.createIndex(df, indexConfig)
 
-          val oldFiles = listFiles(testPath, getFileIdTracker(indexConfig, systemPath)).toSet
+          val oldFiles = listFiles(testPath, getFileIdTracker(systemPath, indexConfig)).toSet
 
           // Delete one source data file.
           deleteOneDataFile(testPath)
@@ -440,7 +426,7 @@ class RefreshIndexTests extends QueryTest with HyperspaceSuite {
             .run()
 
           val indexLogEntry = getLatestStableLog(indexConfig.indexName)
-          val latestFiles = listFiles(testPath, getFileIdTracker(indexConfig, systemPath)).toSet
+          val latestFiles = listFiles(testPath, getFileIdTracker(systemPath, indexConfig)).toSet
           val expectedDeletedFiles = oldFiles -- latestFiles
           val expectedAppendedFiles = latestFiles -- oldFiles
 
