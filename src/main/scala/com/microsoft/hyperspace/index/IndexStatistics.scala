@@ -112,18 +112,7 @@ private[hyperspace] object IndexStatistics {
         entry.numBuckets,
         entry.derivedDataset.properties.schemaString,
         indexDirPath(entry),
-        entry.state,
-        "",
-        false,
-        0,
-        0L,
-        0,
-        0L,
-        0,
-        0L,
-        0,
-        0L,
-        Nil)
+        entry.state)
     }
   }
 
