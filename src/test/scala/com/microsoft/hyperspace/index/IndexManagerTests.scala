@@ -25,7 +25,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.TestUtils.{copyWithState, latestIndexLogEntry, logManager}
+import com.microsoft.hyperspace.TestUtils.{copyWithState, getFileIdTracker, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
@@ -743,7 +743,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
 
-    val fileIdTracker = getFileIdTracker(indexConfig)
+    val fileIdTracker = getFileIdTracker(systemPath, indexConfig)
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = df.queryExecution.optimizedPlan.collect {
@@ -813,13 +813,4 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       .count()
   }
 
-  private def getFileIdTracker(indexConfig: IndexConfig): FileIdTracker = {
-    val indexLogPath = PathUtils.makeAbsolute(
-      s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
-    val indexLogJson =
-      FileUtils.readContents(indexLogPath.getFileSystem(new Configuration), indexLogPath)
-    JsonUtils
-      .fromJson[IndexLogEntry](indexLogJson)
-      .fileIdTracker
-  }
 }
