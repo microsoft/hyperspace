@@ -17,6 +17,7 @@
 name := "hyperspace-core"
 
 sparkVersion := "2.4.2"
+lazy val deltaVersion = "0.6.1"
 
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
@@ -30,7 +31,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources(),
-  "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources(),
+  "io.delta" %% "delta-core" % deltaVersion % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
@@ -38,7 +39,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "test" classifier "tests",
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "test" classifier "tests",
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
+  "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests",
+  "io.delta" %% "delta-core" % deltaVersion % "test"
 )
 
 assemblyMergeStrategy in assembly := {
