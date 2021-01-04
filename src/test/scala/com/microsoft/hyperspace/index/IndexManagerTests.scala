@@ -66,7 +66,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           hyperspace.createIndex(df, indexConfig1)
           val columns = hyperspace.indexes.collect().head
           assert(columns.length == IndexStatistics.INDEX_SUMMARY_COLUMNS.length)
-          val actual = getIndexStatistics(
+          val actual = IndexStatistics(
             columns.getAs[String]("name"),
             columns.getAs[Seq[String]]("indexedColumns"),
             columns.getAs[Seq[String]]("includedColumns"),
@@ -81,7 +81,8 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             expectedSchema =
               expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType, false))
           }
-          val expected = getIndexStatistics(
+
+          val expected = IndexStatistics(
             indexConfig1.indexName,
             indexConfig1.indexedColumns,
             indexConfig1.includedColumns,
@@ -94,36 +95,6 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
           assert(actual.equals(expected))
         }
       }
-    }
-
-    // Create an IndexStatistics instance without extended members.
-    def getIndexStatistics(
-        name: String,
-        indexedColumns: Seq[String],
-        includedColumns: Seq[String],
-        buckets: Int,
-        schema: String,
-        location: String,
-        state: String): IndexStatistics = {
-      new IndexStatistics(
-        name,
-        indexedColumns,
-        includedColumns,
-        buckets,
-        schema,
-        location,
-        state,
-        "",
-        false,
-        0,
-        0L,
-        0,
-        0L,
-        0,
-        0L,
-        0,
-        0L,
-        Nil)
     }
   }
 

@@ -115,16 +115,17 @@ class IndexCollectionManager(
   }
 
   override def index(indexName: String): DataFrame = {
-    getLogManager(indexName).fold(
-      throw HyperspaceException(s"Index with name $indexName could not be found.")) {
-      _.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
+    var df: DataFrame = null
+    withLogManager(indexName) { logManager =>
+      logManager.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
         case Some(l) =>
           import spark.implicits._
-          Seq(IndexStatistics(spark, toIndexLogEntry(l), extended = true)).toDF()
+          df = Seq(IndexStatistics(spark, toIndexLogEntry(l), extended = true)).toDF()
         case None =>
           throw HyperspaceException(s"No latest stable log found for index $indexName.")
       }
     }
+    df
   }
 
   private def indexLogManagers: Seq[IndexLogManager] = {
@@ -151,7 +152,7 @@ class IndexCollectionManager(
   private def withLogManager(indexName: String)(f: IndexLogManager => Unit): Unit = {
     getLogManager(indexName) match {
       case Some(logManager) => f(logManager)
-      case None => throw HyperspaceException(s"Index with name $indexName could not be found")
+      case None => throw HyperspaceException(s"Index with name $indexName could not be found.")
     }
   }
 

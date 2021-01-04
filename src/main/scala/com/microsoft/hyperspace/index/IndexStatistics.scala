@@ -71,6 +71,15 @@ private[hyperspace] object IndexStatistics {
     "indexLocation",
     "state")
 
+  /**
+   * Create IndexStatistics instance for a given IndexLogEntry.
+   *
+   * @param spark Spark session.
+   * @param entry IndexLogEntry instance.
+   * @param extended If true, all IndexStatistics fields are included;
+   *                Otherwise only [[INDEX_SUMMARY_COLUMNS]] fields.
+   * @return IndexStatistics instance generated from entry.
+   */
   def apply(
       spark: SparkSession,
       entry: IndexLogEntry,
@@ -116,6 +125,47 @@ private[hyperspace] object IndexStatistics {
         0L,
         Nil)
     }
+  }
+
+  /**
+   * Create an IndexStatistics instance without extended members.
+   *
+   * @param name Index name.
+   * @param indexedColumns Indexed columns list.
+   * @param includedColumns Included columns list.
+   * @param buckets Number of buckets.
+   * @param schema Index schema.
+   * @param location Index files location.
+   * @param state Index state.
+   * @return IndexStatistics instance created from given values.
+   */
+  def apply(
+      name: String,
+      indexedColumns: Seq[String],
+      includedColumns: Seq[String],
+      buckets: Int,
+      schema: String,
+      location: String,
+      state: String): IndexStatistics = {
+    new IndexStatistics(
+      name,
+      indexedColumns,
+      includedColumns,
+      buckets,
+      schema,
+      location,
+      state,
+      "",
+      false,
+      0,
+      0L,
+      0,
+      0L,
+      0,
+      0L,
+      0,
+      0L,
+      Nil)
   }
 
   /**
