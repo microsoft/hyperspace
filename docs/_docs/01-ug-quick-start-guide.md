@@ -136,6 +136,21 @@ from hyperspace import IndexConfig
 hs.createIndex(df, IndexConfig("index", ["id"], ["name"]))
 ```
 
+##### Supporting Globbing Patterns on hyperspace (since 0.4.0)
+Hyperspace also provides creation and maintenance of indexes on data sources with globbing patterns. To support this, users must set `spark.hyperspace.source.globbingPattern` to the data source path at the time of index creation. For multiple paths, use comma separated values as shown in the below example.
+Scala:
+```scala
+val path = "tmp/1/*"
+val path2 = "tmp/2/*"
+val df = spark
+    .read
+    .option("spark.hyperspace.source.globbingPattern", s"$path,$path2")
+    .parquet(path, path2)
+
+val hs = new Hyperspace(spark)
+hs.createIndex(df, ...)
+```
+
 #### Getting information on the available indexes
 
 `Hyperspace.indexes` returns a `DataFrame` that captures the metadata of the available indexes, thus you can perform any `DataFrame` operations to display, filter, etc.:

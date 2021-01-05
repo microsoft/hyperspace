@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
@@ -25,11 +24,11 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
-import com.microsoft.hyperspace.TestUtils.{copyWithState, latestIndexLogEntry, logManager}
+import com.microsoft.hyperspace.TestUtils.{copyWithState, getFileIdTracker, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
-import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTests extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -63,16 +62,26 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
     Seq(true, false).foreach { enableLineage =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig1.indexName) {
-          import spark.implicits._
           hyperspace.createIndex(df, indexConfig1)
-          val actual = hyperspace.indexes.as[IndexSummary].collect().head
+          val columns = hyperspace.indexes.collect().head
+          assert(columns.length == IndexStatistics.INDEX_SUMMARY_COLUMNS.length)
+          val actual = IndexStatistics(
+            columns.getAs[String]("name"),
+            columns.getAs[Seq[String]]("indexedColumns"),
+            columns.getAs[Seq[String]]("includedColumns"),
+            columns.getAs[Int]("numBuckets"),
+            columns.getAs[String]("schema"),
+            columns.getAs[String]("indexLocation"),
+            columns.getAs[String]("state"))
+
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
           if (enableLineage) {
             expectedSchema =
               expectedSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType, false))
           }
-          val expected = new IndexSummary(
+
+          val expected = IndexStatistics(
             indexConfig1.indexName,
             indexConfig1.indexedColumns,
             indexConfig1.includedColumns,
@@ -81,6 +90,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
             s"$systemPath/${indexConfig1.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
             Constants.States.ACTIVE)
+
           assert(actual.equals(expected))
         }
       }
@@ -703,7 +713,7 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
 
-    val fileIdTracker = getFileIdTracker(indexConfig)
+    val fileIdTracker = getFileIdTracker(systemPath, indexConfig)
     LogicalPlanSignatureProvider.create().signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = df.queryExecution.optimizedPlan.collect {
@@ -773,13 +783,4 @@ class IndexManagerTests extends HyperspaceSuite with SQLHelper {
       .count()
   }
 
-  private def getFileIdTracker(indexConfig: IndexConfig): FileIdTracker = {
-    val indexLogPath = PathUtils.makeAbsolute(
-      s"$systemPath/${indexConfig.indexName}/${IndexConstants.HYPERSPACE_LOG}/latestStable")
-    val indexLogJson =
-      FileUtils.readContents(indexLogPath.getFileSystem(new Configuration), indexLogPath)
-    JsonUtils
-      .fromJson[IndexLogEntry](indexLogJson)
-      .fileIdTracker
-  }
 }
