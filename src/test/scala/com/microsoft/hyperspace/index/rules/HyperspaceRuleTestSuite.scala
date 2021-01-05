@@ -101,8 +101,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def getIndexRootPath(indexName: String): Path =
     new Path(systemPath, indexName)
 
-  def setIndexLogEntryTags(index: IndexLogEntry, plan: LogicalPlan, files: Seq[FileInfo]): Unit = {
-    // Set tag for testing rank algorithms.
+  def setCommonBytesTags(index: IndexLogEntry, plan: LogicalPlan, files: Seq[FileInfo]): Unit = {
     val commonBytes = files.foldLeft(0L) { (bytes, f) =>
       bytes + f.size
     }

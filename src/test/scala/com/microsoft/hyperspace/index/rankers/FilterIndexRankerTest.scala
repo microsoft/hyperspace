@@ -47,11 +47,11 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
 
   test("rank() should return the head of the list by default.") {
     val ind1 = createIndexLogEntry("ind1", Seq(t1c1), Seq(t1c2), tempPlan, writeLog = false)
-    setIndexLogEntryTags(ind1, tempPlan, Nil)
+    setCommonBytesTags(ind1, tempPlan, Nil)
     val ind2 = createIndexLogEntry("ind2", Seq(t1c1), Seq(t1c2), tempPlan, writeLog = false)
-    setIndexLogEntryTags(ind2, tempPlan, Nil)
+    setCommonBytesTags(ind2, tempPlan, Nil)
     val ind3 = createIndexLogEntry("ind3", Seq(t2c1), Seq(t2c2), tempPlan, writeLog = false)
-    setIndexLogEntryTags(ind3, tempPlan, Nil)
+    setCommonBytesTags(ind3, tempPlan, Nil)
 
     val indexes = Seq(ind1, ind2, ind3)
     assert(FilterIndexRanker.rank(spark, tempPlan, indexes).get.equals(ind1))
@@ -71,7 +71,7 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
       tempPlan,
       inputFiles = fileList1,
       writeLog = false)
-    setIndexLogEntryTags(ind1, tempPlan, fileList1)
+    setCommonBytesTags(ind1, tempPlan, fileList1)
     val ind2 = createIndexLogEntry(
       "ind2",
       Seq(t1c1),
@@ -79,7 +79,7 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
       tempPlan,
       inputFiles = fileList1 ++ fileList2,
       writeLog = false)
-    setIndexLogEntryTags(ind2, tempPlan, fileList1 ++ fileList2)
+    setCommonBytesTags(ind2, tempPlan, fileList1 ++ fileList2)
     val ind3 = createIndexLogEntry(
       "ind3",
       Seq(t2c1),
@@ -87,7 +87,7 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
       tempPlan,
       inputFiles = fileList2,
       writeLog = false)
-    setIndexLogEntryTags(ind3, tempPlan, fileList2)
+    setCommonBytesTags(ind3, tempPlan, fileList2)
 
     val indexes = Seq(ind1, ind2, ind3)
 
