@@ -39,8 +39,8 @@ object JoinIndexRanker {
    * assuming there is no resource constraint.
    *
    * If hybridScanEnabled is true, rank algorithm follows the algorithm above, but we prioritize
-   * the index with larger and usable index data for each join child plan, so as to minimize the
-   * amount of data for on-the-fly shuffle or merge.
+   * the index with larger common source data, so that we could minimize the amount of data
+   * for on-the-fly shuffle or merge.
    *
    * @param spark SparkSession.
    * @param leftChild Logical relation of left child of the join.
@@ -55,34 +55,33 @@ object JoinIndexRanker {
       rightChild: LogicalPlan,
       indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
-    val defaultBuckets = spark.conf.get("spark.sql.shuffle.partitions", "200").toInt
     indexPairs.sortWith {
-      case ((left1, left2), (right1, right2)) =>
+      case ((left1, right1), (left2, right2)) =>
         // These common bytes were calculated and tagged in getCandidateIndexes.
         // The value is the summation of common source files of the given plan and each index.
         lazy val leftCommonBytes = left1
           .getTagValue(leftChild, IndexLogEntryTags.COMMON_BYTES)
-          .get + left2.getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES).get
-        lazy val rightCommonBytes = right1
+          .getOrElse(0L) + right1
+          .getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES)
+          .getOrElse(0L)
+        lazy val rightCommonBytes = left2
           .getTagValue(leftChild, IndexLogEntryTags.COMMON_BYTES)
-          .get + right2.getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES).get
+          .getOrElse(0L) + right2
+          .getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES)
+          .getOrElse(0L)
 
-        if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
+        if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
           if (!hybridScanEnabled || (leftCommonBytes == rightCommonBytes)) {
-            left1.numBuckets > right1.numBuckets
+            left1.numBuckets > left2.numBuckets
           } else {
             // If both index pairs have the same number of buckets and Hybrid Scan is enabled,
             // pick the pair with more common bytes with the given source plan, so as to
             // reduce the overhead from handling appended and deleted files.
             leftCommonBytes > rightCommonBytes
           }
-        } else if (left1.numBuckets == left2.numBuckets) {
+        } else if (left1.numBuckets == right1.numBuckets) {
           true
-        } else if (right1.numBuckets == right2.numBuckets) {
-          false
-        } else if (left1.numBuckets == defaultBuckets || left2.numBuckets == defaultBuckets) {
-          true
-        } else if (right1.numBuckets == defaultBuckets || right2.numBuckets == defaultBuckets) {
+        } else if (left2.numBuckets == right2.numBuckets) {
           false
         } else if (!hybridScanEnabled) {
           true

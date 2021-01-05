@@ -72,11 +72,6 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           Map())
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
-        val commonBytes = inputFiles.foldLeft(0L) { (bytes, f) =>
-          bytes + f.size
-        }
-        // Set tag for testing rank algorithms.
-        indexLogEntry.setTagValue(plan, IndexLogEntryTags.COMMON_BYTES, commonBytes)
         indexLogEntry.state = Constants.States.ACTIVE
         if (writeLog) {
           assert(logManager.writeLog(0, indexLogEntry))
@@ -105,4 +100,12 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
 
   def getIndexRootPath(indexName: String): Path =
     new Path(systemPath, indexName)
+
+  def setIndexLogEntryTags(index: IndexLogEntry, plan: LogicalPlan, files: Seq[FileInfo]): Unit = {
+    // Set tag for testing rank algorithms.
+    val commonBytes = files.foldLeft(0L) { (bytes, f) =>
+      bytes + f.size
+    }
+    index.setTagValue(plan, IndexLogEntryTags.COMMON_BYTES, commonBytes)
+  }
 }

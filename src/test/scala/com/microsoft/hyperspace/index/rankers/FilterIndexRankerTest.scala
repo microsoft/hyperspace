@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.util.FileUtils
 
 class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
   override val systemPath = new Path("src/test/resources/FilterRankerTest")
-  var dummy: LogicalPlan = _
+  var tempPlan: LogicalPlan = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -37,7 +37,7 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
       new Path(systemPath, "dummy"),
       "dummy string")
     val df = spark.read.text(systemPath.toString)
-    dummy = df.queryExecution.optimizedPlan
+    tempPlan = df.queryExecution.optimizedPlan
   }
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -46,16 +46,19 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
   val t2c2 = AttributeReference("t2c2", StringType)()
 
   test("rank() should return the head of the list by default.") {
-    val ind1 = createIndexLogEntry("ind1", Seq(t1c1), Seq(t1c2), dummy, writeLog = false)
-    val ind2 = createIndexLogEntry("ind2", Seq(t1c1), Seq(t1c2), dummy, writeLog = false)
-    val ind3 = createIndexLogEntry("ind3", Seq(t2c1), Seq(t2c2), dummy, writeLog = false)
+    val ind1 = createIndexLogEntry("ind1", Seq(t1c1), Seq(t1c2), tempPlan, writeLog = false)
+    setIndexLogEntryTags(ind1, tempPlan, Nil)
+    val ind2 = createIndexLogEntry("ind2", Seq(t1c1), Seq(t1c2), tempPlan, writeLog = false)
+    setIndexLogEntryTags(ind2, tempPlan, Nil)
+    val ind3 = createIndexLogEntry("ind3", Seq(t2c1), Seq(t2c2), tempPlan, writeLog = false)
+    setIndexLogEntryTags(ind3, tempPlan, Nil)
 
     val indexes = Seq(ind1, ind2, ind3)
-    assert(FilterIndexRanker.rank(spark, dummy, indexes).get.equals(ind1))
+    assert(FilterIndexRanker.rank(spark, tempPlan, indexes).get.equals(ind1))
   }
 
   test(
-    "rank() should return the index with the largest common bytes of source files" +
+    "rank() should return the index with the largest common bytes of source files " +
       "if HybridScan is enabled.") {
 
     val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 1, 1, 3))
@@ -65,29 +68,32 @@ class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
       "ind1",
       Seq(t1c1),
       Seq(t1c2),
-      dummy,
+      tempPlan,
       inputFiles = fileList1,
       writeLog = false)
+    setIndexLogEntryTags(ind1, tempPlan, fileList1)
     val ind2 = createIndexLogEntry(
       "ind2",
       Seq(t1c1),
       Seq(t1c2),
-      dummy,
+      tempPlan,
       inputFiles = fileList1 ++ fileList2,
       writeLog = false)
+    setIndexLogEntryTags(ind2, tempPlan, fileList1 ++ fileList2)
     val ind3 = createIndexLogEntry(
       "ind3",
       Seq(t2c1),
       Seq(t1c2),
-      dummy,
+      tempPlan,
       inputFiles = fileList2,
       writeLog = false)
+    setIndexLogEntryTags(ind3, tempPlan, fileList2)
 
     val indexes = Seq(ind1, ind2, ind3)
 
     spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "true")
-    assert(FilterIndexRanker.rank(spark, dummy, indexes).get === ind2)
+    assert(FilterIndexRanker.rank(spark, tempPlan, indexes).get === ind2)
     spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "false")
-    assert(FilterIndexRanker.rank(spark, dummy, indexes).get === ind1)
+    assert(FilterIndexRanker.rank(spark, tempPlan, indexes).get === ind1)
   }
 }

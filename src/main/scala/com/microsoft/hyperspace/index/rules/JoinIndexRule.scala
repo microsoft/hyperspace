@@ -312,13 +312,14 @@ object JoinIndexRule
     val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
 
+    val leftRel = RuleUtils.getLogicalRelation(left).get
+    val rightRel = RuleUtils.getLogicalRelation(right).get
+
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
-    val lIndexes =
-      RuleUtils.getCandidateIndexes(spark, lUsable, RuleUtils.getLogicalRelation(left).get)
-    val rIndexes =
-      RuleUtils.getCandidateIndexes(spark, rUsable, RuleUtils.getLogicalRelation(right).get)
+    val lIndexes = RuleUtils.getCandidateIndexes(spark, lUsable, leftRel)
+    val rIndexes = RuleUtils.getCandidateIndexes(spark, rUsable, rightRel)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
@@ -327,8 +328,8 @@ object JoinIndexRule
         JoinIndexRanker
           .rank(
             spark,
-            RuleUtils.getLogicalRelation(left).get,
-            RuleUtils.getLogicalRelation(right).get,
+            leftRel,
+            rightRel,
             indexPairs)
           .head)
   }
