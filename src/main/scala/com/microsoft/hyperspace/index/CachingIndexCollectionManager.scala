@@ -37,16 +37,16 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param fileSystemFactory provides FileSystem instance
  */
 class CachingIndexCollectionManager(
-       spark: SparkSession,
-       indexCacheFactory: IndexCacheFactory,
-       indexLogManagerFactory: IndexLogManagerFactory,
-       indexDataManagerFactory: IndexDataManagerFactory,
-       fileSystemFactory: FileSystemFactory
-   ) extends IndexCollectionManager(
-      spark,
-      indexLogManagerFactory,
-      indexDataManagerFactory,
-      fileSystemFactory) {
+    spark: SparkSession,
+    indexCacheFactory: IndexCacheFactory,
+    indexLogManagerFactory: IndexLogManagerFactory,
+    indexDataManagerFactory: IndexDataManagerFactory,
+    fileSystemFactory: FileSystemFactory)
+  extends IndexCollectionManager(
+    spark,
+    indexLogManagerFactory,
+    indexDataManagerFactory,
+    fileSystemFactory) {
 
   private val indexCache: Cache[Seq[IndexLogEntry]] =
     indexCacheFactory.create(spark, IndexCacheType.CREATION_TIME_BASED)
@@ -121,14 +121,11 @@ object CachingIndexCollectionManager {
  * Cache entry is stale if it has been in the cache for some (configurable) time.
  * @param spark Spark session
  */
-class CreationTimeBasedIndexCache(
-       spark: SparkSession,
-       clock: Clock
-  ) extends Cache[Seq[IndexLogEntry]] {
+class CreationTimeBasedIndexCache(spark: SparkSession, systemClock: Clock)
+  extends Cache[Seq[IndexLogEntry]] {
 
   private var entries: Seq[IndexLogEntry] = Seq[IndexLogEntry]()
   private var lastCacheTime: Long = 0L
-  private val systemClock: Clock = clock
 
   /**
    * Returns cache entry with the following expiration policy:
@@ -160,7 +157,7 @@ class CreationTimeBasedIndexCache(
    */
   override def set(entry: Seq[IndexLogEntry]): Unit = {
     entries = entry
-    lastCacheTime = clock.getTime
+    lastCacheTime = systemClock.getTime
   }
 
   /**
