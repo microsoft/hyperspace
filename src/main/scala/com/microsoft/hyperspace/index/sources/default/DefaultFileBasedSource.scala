@@ -263,9 +263,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
 
   private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =
     try {
-      // keep the `asInstanceOf` to force casting or fallback because Databricks `InMemoryFileIndex`
-      // implementation does return a `SerializableFileStatus` instead of the
-      // standard API's `FileStatus`
+      // Keep the `asInstanceOf` to force casting or fallback because Databrick's
+      // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
+      // standard API's `FileStatus`.
       index.allFiles.map(_.asInstanceOf[FileStatus])
     } catch {
       case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
