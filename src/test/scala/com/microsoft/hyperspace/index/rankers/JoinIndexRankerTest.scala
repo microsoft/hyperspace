@@ -27,7 +27,7 @@ import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
 import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
 import com.microsoft.hyperspace.util.FileUtils
 
-class JoinIndexRankerTest extends HyperspaceRuleTestSuite with SQLHelper{
+class JoinIndexRankerTest extends HyperspaceRuleTestSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/JoinRankerTest")
   var leftPlan: LogicalPlan = _
   var rightPlan: LogicalPlan = _

@@ -66,7 +66,7 @@ object JoinIndexRanker {
         lazy val commonBytes1 =
           getCommonBytes(leftChild, left1) + getCommonBytes(rightChild, right1)
         lazy val commonBytes2 =
-          getCommonBytes(leftChild, left1) + getCommonBytes(rightChild, right1)
+          getCommonBytes(leftChild, left2) + getCommonBytes(rightChild, right2)
 
         if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
           if (!hybridScanEnabled || (commonBytes1 == commonBytes2)) {
