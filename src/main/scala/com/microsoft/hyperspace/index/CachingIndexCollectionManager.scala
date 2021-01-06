@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.yarn.util.Clock
+import org.apache.hadoop.yarn.util.SystemClock
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -35,12 +37,12 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param fileSystemFactory provides FileSystem instance
  */
 class CachingIndexCollectionManager(
-    spark: SparkSession,
-    indexCacheFactory: IndexCacheFactory,
-    indexLogManagerFactory: IndexLogManagerFactory,
-    indexDataManagerFactory: IndexDataManagerFactory,
-    fileSystemFactory: FileSystemFactory)
-    extends IndexCollectionManager(
+       spark: SparkSession,
+       indexCacheFactory: IndexCacheFactory,
+       indexLogManagerFactory: IndexLogManagerFactory,
+       indexDataManagerFactory: IndexDataManagerFactory,
+       fileSystemFactory: FileSystemFactory
+   ) extends IndexCollectionManager(
       spark,
       indexLogManagerFactory,
       indexDataManagerFactory,
@@ -119,9 +121,14 @@ object CachingIndexCollectionManager {
  * Cache entry is stale if it has been in the cache for some (configurable) time.
  * @param spark Spark session
  */
-class CreationTimeBasedIndexCache(spark: SparkSession) extends Cache[Seq[IndexLogEntry]] {
+class CreationTimeBasedIndexCache(
+       spark: SparkSession,
+       clock: Clock
+  ) extends Cache[Seq[IndexLogEntry]] {
+
   private var entries: Seq[IndexLogEntry] = Seq[IndexLogEntry]()
   private var lastCacheTime: Long = 0L
+  private val systemClock: Clock = clock
 
   /**
    * Returns cache entry with the following expiration policy:
@@ -132,7 +139,7 @@ class CreationTimeBasedIndexCache(spark: SparkSession) extends Cache[Seq[IndexLo
    */
   override def get(): Option[Seq[IndexLogEntry]] = {
     if (lastCacheTime > 0) {
-      val currentTime = System.currentTimeMillis()
+      val currentTime = systemClock.getTime
       val expiryDurationInSec = spark.sessionState.conf
         .getConfString(
           IndexConstants.INDEX_CACHE_EXPIRY_DURATION_SECONDS,
@@ -153,7 +160,7 @@ class CreationTimeBasedIndexCache(spark: SparkSession) extends Cache[Seq[IndexLo
    */
   override def set(entry: Seq[IndexLogEntry]): Unit = {
     entries = entry
-    lastCacheTime = System.currentTimeMillis()
+    lastCacheTime = clock.getTime
   }
 
   /**
