@@ -121,9 +121,11 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
       val df = spark.range(1, 5).toDF("id")
       val dataPath = tempPath.getAbsolutePath
       df.write.parquet(dataPath)
+      var expectedCommonSourceBytes = 0L
 
       withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
+        expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
           indexManager.create(readDf, IndexConfig("index1", Seq("id")))
         }
@@ -147,6 +149,10 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
               assert(
                 indexes.head.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
                   === expectedHybridScanTag)
+              assert(
+                !hybridScanEnabled || indexes.head
+                  .getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES) === Some(
+                  expectedCommonSourceBytes))
             } else {
               assert(indexes.isEmpty)
             }
@@ -191,7 +197,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         }
 
         // Scenario #2: Delete 1 file.
-        FileUtils.delete(new Path(readDf.inputFiles.head))
+        val deleteFilePath = new Path(readDf.inputFiles.head)
+        expectedCommonSourceBytes -= FileUtils.getDirectorySize(deleteFilePath)
+        FileUtils.delete(deleteFilePath)
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
