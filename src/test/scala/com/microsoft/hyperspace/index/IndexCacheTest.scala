@@ -158,7 +158,9 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
 
 class MockClock(startTime: Long = 1L) extends Clock {
   private var time: Long = startTime
+
   override def getTime: Long = time
+
   def moveTime(value: Long): Unit = {
     time = time + value
   }
