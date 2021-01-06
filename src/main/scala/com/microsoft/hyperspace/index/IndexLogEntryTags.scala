@@ -21,6 +21,7 @@ object IndexLogEntryTags {
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
 
-  // COMMON_BYTES stores overlapping bytes of index source files and given relation.
-  val COMMON_BYTES: IndexLogEntryTag[Long] = IndexLogEntryTag[Long]("commonSourceSizeInBytes")
+  // COMMON_SOURCE_SIZE_IN_BYTES stores overlapping bytes of index source files and given relation.
+  val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
+    IndexLogEntryTag[Long]("commonSourceSizeInBytes")
 }

@@ -105,6 +105,6 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
     val commonBytes = files.foldLeft(0L) { (bytes, f) =>
       bytes + f.size
     }
-    index.setTagValue(plan, IndexLogEntryTags.COMMON_BYTES, commonBytes)
+    index.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
   }
 }

@@ -49,7 +49,8 @@ object FilterIndexRanker {
       case _ =>
         if (HyperspaceConf.hybridScanEnabled(spark)) {
           Some(
-            candidates.maxBy(_.getTagValue(plan, IndexLogEntryTags.COMMON_BYTES).getOrElse(0L)))
+            candidates.maxBy(
+              _.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).getOrElse(0L)))
         } else {
           // TODO: Add ranking algorithm to sort candidates.
           //  See https://github.com/microsoft/hyperspace/issues/52

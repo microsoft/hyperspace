@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.rankers
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
@@ -26,7 +27,7 @@ import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
 import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
 import com.microsoft.hyperspace.util.FileUtils
 
-class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
+class JoinIndexRankerTest extends HyperspaceRuleTestSuite with SQLHelper{
   override val systemPath = new Path("src/test/resources/JoinRankerTest")
   var leftPlan: LogicalPlan = _
   var rightPlan: LogicalPlan = _
@@ -41,14 +42,6 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
 
     leftPlan = spark.read.text(dummyDataPath1.toString).queryExecution.optimizedPlan
     rightPlan = spark.read.text(dummyDataPath2.toString).queryExecution.optimizedPlan
-  }
-
-  before {
-    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "false")
-  }
-
-  after {
-    spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "false")
   }
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -106,9 +99,10 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite {
       // Test if hybridScanEnabled is true.
       val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
       val expectedOrder = Seq((l_10, r_10), (l_20, r_20), (l_10, r_20))
-      spark.conf.set(IndexConstants.INDEX_HYBRID_SCAN_ENABLED, "true")
-      val actualOrder = JoinIndexRanker.rank(spark, leftPlan, rightPlan, indexPairs)
-      assert(actualOrder.equals(expectedOrder))
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+        val actualOrder = JoinIndexRanker.rank(spark, leftPlan, rightPlan, indexPairs)
+        assert(actualOrder.equals(expectedOrder))
+      }
     }
 
     {

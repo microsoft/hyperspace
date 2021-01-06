@@ -55,39 +55,36 @@ object JoinIndexRanker {
       rightChild: LogicalPlan,
       indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
+    def getCommonBytes(logicalPlan: LogicalPlan, index: IndexLogEntry): Long = {
+      index.getTagValue(leftChild, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).getOrElse(0L)
+    }
+
     indexPairs.sortWith {
       case ((left1, right1), (left2, right2)) =>
         // These common bytes were calculated and tagged in getCandidateIndexes.
         // The value is the summation of common source files of the given plan and each index.
-        lazy val leftCommonBytes = left1
-          .getTagValue(leftChild, IndexLogEntryTags.COMMON_BYTES)
-          .getOrElse(0L) + right1
-          .getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES)
-          .getOrElse(0L)
-        lazy val rightCommonBytes = left2
-          .getTagValue(leftChild, IndexLogEntryTags.COMMON_BYTES)
-          .getOrElse(0L) + right2
-          .getTagValue(rightChild, IndexLogEntryTags.COMMON_BYTES)
-          .getOrElse(0L)
+        lazy val commonBytes1 =
+          getCommonBytes(leftChild, left1) + getCommonBytes(rightChild, right1)
+        lazy val commonBytes2 =
+          getCommonBytes(leftChild, left1) + getCommonBytes(rightChild, right1)
 
         if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
-          if (!hybridScanEnabled || (leftCommonBytes == rightCommonBytes)) {
+          if (!hybridScanEnabled || (commonBytes1 == commonBytes2)) {
             left1.numBuckets > left2.numBuckets
           } else {
             // If both index pairs have the same number of buckets and Hybrid Scan is enabled,
             // pick the pair with more common bytes with the given source plan, so as to
             // reduce the overhead from handling appended and deleted files.
-            leftCommonBytes > rightCommonBytes
+            commonBytes1 > commonBytes2
           }
         } else if (left1.numBuckets == right1.numBuckets) {
           true
         } else if (left2.numBuckets == right2.numBuckets) {
           false
-        } else if (!hybridScanEnabled) {
-          true
         } else {
-          // Pick the pair with "more common bytes" if both pairs have different number of buckets.
-          leftCommonBytes > rightCommonBytes
+          // At this point, both pairs have different number of buckets. If Hybrid Scan is enabled,
+          // pick the pair with "more common bytes", otherwise pick the first pair.
+          !hybridScanEnabled || commonBytes1 > commonBytes2
         }
     }
   }
