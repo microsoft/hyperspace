@@ -34,7 +34,10 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
       name: String,
       indexCols: Seq[AttributeReference],
       includedCols: Seq[AttributeReference],
-      plan: LogicalPlan): IndexLogEntry = {
+      plan: LogicalPlan,
+      numBuckets: Int = 10,
+      inputFiles: Seq[FileInfo] = Seq(),
+      writeLog: Boolean = true): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
@@ -43,7 +46,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
           Seq(
             Relation(
               Seq("dummy"),
-              Hdfs(Properties(Content(Directory("/")))),
+              Hdfs(Properties(Content(Directory("/", files = inputFiles)))),
               "schema",
               "format",
               Map())),
@@ -62,7 +65,7 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
               CoveringIndex.Properties
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-              10,
+              numBuckets,
               Map())),
           Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
           Source(SparkPlan(sourcePlanProperties)),
@@ -70,7 +73,9 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
         indexLogEntry.state = Constants.States.ACTIVE
-        assert(logManager.writeLog(0, indexLogEntry))
+        if (writeLog) {
+          assert(logManager.writeLog(0, indexLogEntry))
+        }
         indexLogEntry
 
       case None => throw HyperspaceException("Invalid plan for index dataFrame.")
@@ -95,4 +100,11 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
 
   def getIndexRootPath(indexName: String): Path =
     new Path(systemPath, indexName)
+
+  def setCommonBytesTags(index: IndexLogEntry, plan: LogicalPlan, files: Seq[FileInfo]): Unit = {
+    val commonBytes = files.foldLeft(0L) { (bytes, f) =>
+      bytes + f.size
+    }
+    index.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+  }
 }

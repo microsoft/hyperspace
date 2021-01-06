@@ -16,10 +16,14 @@
 
 package com.microsoft.hyperspace.index.rankers
 
-import com.microsoft.hyperspace.index.IndexLogEntry
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
- * Ranker class for Join rule indexes
+ * Ranker class for Join rule indexes.
  */
 object JoinIndexRanker {
 
@@ -27,29 +31,60 @@ object JoinIndexRanker {
    * Rearranges all available index options according to their cost. The first one is the best
    * with minimum cost.
    *
-   * Pick the one with least amount of shuffling and most number of buckets. When two indices have
-   * same number of buckets, there is zero shuffling. If number of buckets differ, one of the
-   * indices gets reshuffled into the number of buckets equal to the other. Secondly, more the
-   * number of buckets, better the parallelism achieved during join in general, assuming there is
-   * no resource constraint.
+   * If hybridScanEnabled is false, pick the one with least amount of shuffling and most number
+   * of buckets. When two indices have same number of buckets, there is zero shuffling.
+   * If number of buckets differ, one of the indices gets reshuffled into the number of buckets
+   * equal to the other.
+   * Secondly, more the number of buckets, better the parallelism achieved during join in general
+   * assuming there is no resource constraint.
    *
-   * @param indexPairs index pairs for left and right side of the join. All index pairs are
+   * If hybridScanEnabled is true, rank algorithm follows the algorithm above, but we prioritize
+   * the index with larger common source data, so that we could minimize the amount of data
+   * for on-the-fly shuffle or merge.
+   *
+   * @param spark SparkSession.
+   * @param leftChild Logical relation of left child of the join.
+   * @param rightChild Logical relation of right child of the join.
+   * @param indexPairs Index pairs for left and right side of the join. All index pairs are
    *                   compatible with each other.
-   * @return rearranged index pairs according to their ranking. The first is the best.
+   * @return Rearranged index pairs according to their ranking. The first is the best.
    */
   def rank(
+      spark: SparkSession,
+      leftChild: LogicalPlan,
+      rightChild: LogicalPlan,
       indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
+    def getCommonBytes(logicalPlan: LogicalPlan, index: IndexLogEntry): Long = {
+      index.getTagValue(leftChild, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).getOrElse(0L)
+    }
 
     indexPairs.sortWith {
-      case ((left1, left2), (right1, right2)) =>
-        if (left1.numBuckets == left2.numBuckets && right1.numBuckets == right2.numBuckets) {
-          left1.numBuckets > right1.numBuckets
-        } else if (left1.numBuckets == left2.numBuckets) {
+      case ((left1, right1), (left2, right2)) =>
+        // These common bytes were calculated and tagged in getCandidateIndexes.
+        // The value is the summation of common source files of the given plan and each index.
+        lazy val commonBytes1 =
+          getCommonBytes(leftChild, left1) + getCommonBytes(rightChild, right1)
+        lazy val commonBytes2 =
+          getCommonBytes(leftChild, left2) + getCommonBytes(rightChild, right2)
+
+        if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
+          if (!hybridScanEnabled || (commonBytes1 == commonBytes2)) {
+            left1.numBuckets > left2.numBuckets
+          } else {
+            // If both index pairs have the same number of buckets and Hybrid Scan is enabled,
+            // pick the pair with more common bytes with the given source plan, so as to
+            // reduce the overhead from handling appended and deleted files.
+            commonBytes1 > commonBytes2
+          }
+        } else if (left1.numBuckets == right1.numBuckets) {
           true
-        } else if (right1.numBuckets == right2.numBuckets) {
+        } else if (left2.numBuckets == right2.numBuckets) {
           false
         } else {
-          true
+          // At this point, both pairs have different number of buckets. If Hybrid Scan is enabled,
+          // pick the pair with "more common bytes", otherwise pick the first pair.
+          !hybridScanEnabled || commonBytes1 > commonBytes2
         }
     }
   }
