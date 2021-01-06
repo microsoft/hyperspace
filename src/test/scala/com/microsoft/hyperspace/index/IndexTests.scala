@@ -42,7 +42,7 @@ class IndexTests extends SparkFunSuite {
       CoveringIndex(
         CoveringIndex.Properties(
           CoveringIndex.Properties
-            .Columns(config.indexedColumns, config.includedColumns),
+            .Columns(config.indexedColumns, config.includedColumns.include),
           IndexLogEntry.schemaString(schema),
           10,
           Map())),

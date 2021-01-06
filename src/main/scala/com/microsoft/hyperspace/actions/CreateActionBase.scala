@@ -145,14 +145,34 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val spark = df.sparkSession
     val dfColumnNames = df.schema.fieldNames
     val indexedColumns = indexConfig.indexedColumns
-    val includedColumns = indexConfig.includedColumns
+    val includeColumns = indexConfig.includedColumns.include
+    val excludeColumns = indexConfig.includedColumns.exclude
     val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
-    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
+    val resolvedIncludeColumns = ResolverUtils.resolve(spark, includeColumns, dfColumnNames)
+    val resolvedExcludeColumns = ResolverUtils.resolve(spark, excludeColumns, dfColumnNames)
 
-    (resolvedIndexedColumns, resolvedIncludedColumns) match {
-      case (Some(indexed), Some(included)) => (indexed, included)
+    (resolvedIndexedColumns, resolvedIncludeColumns, resolvedExcludeColumns) match {
+      case (Some(indexed), Some(include), Some(exclude)) =>
+        if (include.intersect(exclude).nonEmpty) {
+          throw HyperspaceException(
+            "IncludedColumns include and exclude columns can not overlap.")
+        }
+
+        // If IndexConfig has both 'include' and 'exclude' columns, we pick the columns
+        // listed in indexConfig.include as index's included columns and ignore `exclude`.
+        if (includeColumns.nonEmpty) {
+          return (indexed, include)
+        } else if (excludeColumns.nonEmpty) {
+          val columns = dfColumnNames.filterNot(c => indexed.contains(c) || exclude.contains(c))
+          return (indexed, columns)
+        }
+
+        // There is no 'include' or 'exclude' column lists in indexConfig. So index will be created
+        // with only indexed columns and without any included column.
+        (indexed, Seq[String]())
+
       case _ =>
-        val unresolvedColumns = (indexedColumns ++ includedColumns)
+        val unresolvedColumns = (indexedColumns ++ includeColumns ++ excludeColumns)
           .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
           .collect { case c if c._2.isEmpty => c._1 }
         throw HyperspaceException(

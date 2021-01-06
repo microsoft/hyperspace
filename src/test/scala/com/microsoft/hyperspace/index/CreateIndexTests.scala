@@ -165,7 +165,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // For non-partitioned data, only file name lineage column should be added to index schema.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
+          (indexConfig1.indexedColumns ++ indexConfig1.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }
@@ -180,7 +180,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // should be added to index schema if they are not already among index config columns.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID) ++ partitionKeys).sorted)
     }
   }
@@ -195,7 +195,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // there should be no duplicates due to adding lineage.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
+          (indexConfig4.indexedColumns ++ indexConfig4.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }
@@ -212,7 +212,7 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       // file name column and second partition key column as lineage columns.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID, partitionKeys(1))).sorted)
     }
   }
