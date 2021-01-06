@@ -241,4 +241,20 @@ class CreateIndexTests extends HyperspaceSuite with SQLHelper {
       lineageValues.forall(lineageRange.contains(_))
     }
   }
+
+  test("Create index using IndexConfig with excluded columns.") {
+    val indexConfig = IndexConfig("index1", Seq("RGUID"), IncludedColumns(Seq(), Seq("Date")))
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+
+    val columns = Set("Query", "imprs", "clicks")
+    val indexes = hyperspace.indexes.where(s"name = '${indexConfig.indexName}' ")
+    assert(indexes.count == 1)
+    assert(indexes.head.getAs[WrappedArray[String]]("indexedColumns").head == "RGUID")
+    assert(indexes.head.getAs[WrappedArray[String]]("includedColumns").toSet === columns)
+
+    val indexRecordsDF = spark.read.parquet(
+      s"$systemPath/${indexConfig.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    assert(
+      indexRecordsDF.schema.fieldNames.toSet === (columns ++ indexConfig.indexedColumns.toSet))
+  }
 }
