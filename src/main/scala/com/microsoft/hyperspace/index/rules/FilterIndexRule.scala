@@ -26,6 +26,7 @@ import org.apache.spark.sql.execution.datasources._
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
@@ -53,7 +54,7 @@ object FilterIndexRule
         try {
           val candidateIndexes =
             findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
-          rank(candidateIndexes) match {
+          FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
               // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
               val transformedPlan =
@@ -152,19 +153,6 @@ object FilterIndexRule
     // TODO: Normalize predicates into CNF and incorporate more conditions.
     ResolverUtils.resolve(spark, indexedColumns.head, filterColumns).isDefined &&
     ResolverUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex).isDefined
-  }
-
-  /**
-   * @param candidates List of all indexes that fully cover logical plan.
-   * @return top-most index which is expected to maximize performance gain
-   *         according to ranking algorithm.
-   */
-  private def rank(candidates: Seq[IndexLogEntry]): Option[IndexLogEntry] = {
-    // TODO: Add ranking algorithm to sort candidates.
-    candidates match {
-      case Nil => None
-      case _ => Some(candidates.head)
-    }
   }
 }
 
