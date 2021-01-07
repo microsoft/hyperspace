@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.util
 
-import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter}
+import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 
 import org.apache.hadoop.conf.Configuration

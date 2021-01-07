@@ -44,7 +44,7 @@ class IndexTests extends SparkFunSuite {
           CoveringIndex.Properties
             .Columns(config.indexedColumns, config.includedColumns),
           IndexLogEntry.schemaString(schema),
-          10,
+          numBuckets,
           Map())),
       Content(Directory(path)),
       Source(SparkPlan(sourcePlanProperties)),

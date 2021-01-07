@@ -56,7 +56,7 @@ object JoinIndexRanker {
       indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     def getCommonBytes(logicalPlan: LogicalPlan, index: IndexLogEntry): Long = {
-      index.getTagValue(leftChild, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).getOrElse(0L)
+      index.getTagValue(logicalPlan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).getOrElse(0L)
     }
 
     indexPairs.sortWith {

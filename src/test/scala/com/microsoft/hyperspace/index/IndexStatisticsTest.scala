@@ -131,7 +131,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     val log = logManager(systemPath, indexName).getLatestStableLog()
     assert(log.isDefined)
     val entry = log.get.asInstanceOf[IndexLogEntry]
-    assert(indexStats.equals(IndexStatistics(spark, entry, extended = true)))
+    assert(indexStats.equals(IndexStatistics(entry, extended = true)))
 
     // Verify index content directory paths.
     val expectedIndexPaths =
