@@ -75,7 +75,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("Serde query with Hadoop file system relation.") {
-    verifyPlanSerde(scanNode, "hadoopFsRelation.plan")
+    verifyPlanSerde(scanNode)
   }
 
   private def verifyFileFormat(
@@ -125,14 +125,14 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
   test("Serde query with scalar subquery.") {
     val scalarSubquery = ScalarSubquery(singleTablePlan, Seq.empty, NamedExpression.newExprId)
     val plan = Filter(EqualTo(c3, scalarSubquery), scanNode)
-    verifyPlanSerde(plan, "scalarSubquery.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with list subquery.") {
     val listSubquery =
       ListQuery(singleTablePlan, Seq.empty, NamedExpression.newExprId, Seq.empty)
     val plan = Filter(listSubquery, scanNode)
-    verifyPlanSerde(plan, "listSubquery.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde of InSubquery") {
@@ -140,50 +140,50 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
       ListQuery(singleTablePlan, Seq.empty, NamedExpression.newExprId, Seq.empty)
     val inSubquery = InSubquery(Seq(EqualTo(c3, c1)), listSubquery)
     val plan = Filter(inSubquery, scanNode)
-    verifyPlanSerde(plan, "listSubquery.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with exists subquery.") {
     val existsSubquery =
       Exists(singleTablePlan, Seq.empty, NamedExpression.newExprId)
     val plan = Filter(existsSubquery, scanNode)
-    verifyPlanSerde(plan, "existsSubquery.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with scala UDF.") {
     val intUdf = ScalaUDF(null, IntegerType, Literal(1) :: Nil, true :: Nil)
     val plan = Filter(intUdf, scanNode)
-    verifyPlanSerde(plan, "scalaUdf.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with intersect.") {
     val plan = Intersect(singleTablePlan, singleTablePlan, isAll = true)
-    verifyPlanSerde(plan, "intersect.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with except.") {
     val plan = Except(singleTablePlan, singleTablePlan, isAll = true)
-    verifyPlanSerde(plan, "except.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with view definition.") {
     val cte = SubqueryAlias("testCte", scanNode)
     val plan = With(singleTablePlan, List(("testAlias", cte)))
-    verifyPlanSerde(plan, "viewDef.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde of single table plan.") {
     val plan = Aggregate(Seq(c1), Seq(c2, c3), singleTablePlan)
-    verifyPlanSerde(plan, "single-table.plan")
+    verifyPlanSerde(plan)
   }
 
   test("Serde query with join.") {
     val joinCondition = EqualTo(c1, c2)
     val plan = Join(singleTablePlan, singleTablePlan, JoinType("inner"), Some(joinCondition))
-    verifyPlanSerde(plan, "join.plan")
+    verifyPlanSerde(plan)
   }
 
-  private def verifyPlanSerde(plan: LogicalPlan, planFileName: String): Unit = {
+  private def verifyPlanSerde(plan: LogicalPlan): Unit = {
     // Serialize the plan to byte array.
     val serialized = LogicalPlanSerDeUtils.serialize(plan, spark)
 

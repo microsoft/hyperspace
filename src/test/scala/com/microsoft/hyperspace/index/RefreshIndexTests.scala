@@ -25,7 +25,7 @@ import com.microsoft.hyperspace.TestUtils.{getFileIdTracker, logManager}
 import com.microsoft.hyperspace.actions.{RefreshIncrementalAction, RefreshQuickAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
 import com.microsoft.hyperspace.telemetry.RefreshIncrementalActionEvent
-import com.microsoft.hyperspace.util.{FileUtils, JsonUtils, PathUtils}
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 /**
