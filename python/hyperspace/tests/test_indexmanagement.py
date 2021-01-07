@@ -30,12 +30,12 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         super(HyperspaceIndexManagementTests, self).tearDown()
 
     def test_index_create(self):
-        idx_config = IndexConfig('idx1', ['name'], ['age'])
+        idx_config = IndexConfig('idx1', ['name'], IncludedColumns(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         self.assertEqual(self.hyperspace.indexes().filter("""name = "idx1" """).count(), 1)
 
     def test_index_delete(self):
-        idx_config = IndexConfig('idx2', ['name'], ['age'])
+        idx_config = IndexConfig('idx2', ['name'], IncludedColumns(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         self.assertEqual(self.hyperspace.indexes().filter(
                          """name = "idx2" and state = "ACTIVE" """).count(), 1)
@@ -48,7 +48,7 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
                          """name = "idx2" and state = "ACTIVE" """).count(), 0)
 
     def test_index_restore(self):
-        idx_config = IndexConfig('idx3', ['name'], ['age'])
+        idx_config = IndexConfig('idx3', ['name'], IncludedColumns(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         self.hyperspace.deleteIndex("idx3")
         self.assertEqual(self.hyperspace.indexes().filter(
@@ -60,7 +60,7 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
                          """name = "idx3" and state = "DELETED" """).count(), 0)
 
     def test_index_vacuum(self):
-        idx_config = IndexConfig('idx4', ['name'], ['age'])
+        idx_config = IndexConfig('idx4', ['name'], IncludedColumns(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         self.hyperspace.deleteIndex("idx4")
         self.assertEqual(self.hyperspace.indexes().filter(
@@ -69,14 +69,14 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         self.assertEqual(self.hyperspace.indexes().filter("""name = "idx4" """).count(), 0)
 
     def test_index_refresh(self):
-        idx_config = IndexConfig('idx1', ['name'], ['age'])
+        idx_config = IndexConfig('idx1', ['name'], IncludedColumns(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         # Test the inter-op works fine for refreshIndex.
         self.hyperspace.refreshIndex('idx1')
         self.hyperspace.refreshIndex('idx1', 'incremental')
 
     def test_index_refresh(self):
-        idx_config = IndexConfig('idx1', ['name'], ['age'])
+        idx_config = IndexConfig('idx1', ['name'], IncludedColumns(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         # Test the inter-op works fine for optimizeIndex.
         self.hyperspace.optimizeIndex('idx1')
