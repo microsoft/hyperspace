@@ -17,7 +17,6 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SparkSession
 
 /**
  * Case class representing index metadata and index statistics from latest index version.
@@ -74,16 +73,12 @@ private[hyperspace] object IndexStatistics {
   /**
    * Create IndexStatistics instance for a given IndexLogEntry.
    *
-   * @param spark Spark session.
    * @param entry IndexLogEntry instance.
    * @param extended If true, all IndexStatistics fields are included;
    *                Otherwise only [[INDEX_SUMMARY_COLUMNS]] fields.
    * @return IndexStatistics instance generated from entry.
    */
-  def apply(
-      spark: SparkSession,
-      entry: IndexLogEntry,
-      extended: Boolean = false): IndexStatistics = {
+  def apply(entry: IndexLogEntry, extended: Boolean = false): IndexStatistics = {
     if (extended) {
       IndexStatistics(
         entry.name,

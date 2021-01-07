@@ -31,7 +31,6 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**

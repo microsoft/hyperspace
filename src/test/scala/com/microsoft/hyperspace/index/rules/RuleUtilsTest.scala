@@ -25,8 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{FileInfo, IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags, LogicalPlanFingerprint, Signature}
-import com.microsoft.hyperspace.index.IndexConstants.INDEX_HYBRID_SCAN_ENABLED
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {

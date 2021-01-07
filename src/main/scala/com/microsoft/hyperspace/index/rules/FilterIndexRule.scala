@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -50,10 +50,10 @@ object FilterIndexRule
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
-      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, fsRelation) =>
+      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, _) =>
         try {
           val candidateIndexes =
-            findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
+            findCoveringIndexes(filter, outputColumns, filterColumns)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
               // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
@@ -91,14 +91,12 @@ object FilterIndexRule
    * @param filter Filter node in the subplan that is being optimized.
    * @param outputColumns List of output columns in subplan.
    * @param filterColumns List of columns in filter predicate.
-   * @param fsRelation Input relation in the subplan.
    * @return List of available candidate indexes on fsRelation for the given columns.
    */
   private def findCoveringIndexes(
       filter: Filter,
       outputColumns: Seq[String],
-      filterColumns: Seq[String],
-      fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
+      filterColumns: Seq[String]): Seq[IndexLogEntry] = {
     RuleUtils.getLogicalRelation(filter) match {
       case Some(r) =>
         val indexManager = Hyperspace
@@ -115,8 +113,7 @@ object FilterIndexRule
             outputColumns,
             filterColumns,
             index.indexedColumns,
-            index.includedColumns,
-            fsRelation.fileFormat)
+            index.includedColumns)
         }
 
         // Get candidate via file-level metadata validation. This is performed after pruning
@@ -145,8 +142,7 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       indexedColumns: Seq[String],
-      includedColumns: Seq[String],
-      fileFormat: FileFormat): Boolean = {
+      includedColumns: Seq[String]): Boolean = {
     val allColumnsInPlan = outputColumns ++ filterColumns
     val allColumnsInIndex = indexedColumns ++ includedColumns
 
