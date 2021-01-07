@@ -101,7 +101,10 @@ trait HyperspaceRuleTestSuite extends HyperspaceSuite {
   def getIndexRootPath(indexName: String): Path =
     new Path(systemPath, indexName)
 
-  def setCommonBytesTags(index: IndexLogEntry, plan: LogicalPlan, files: Seq[FileInfo]): Unit = {
+  def setCommonSourceSizeInBytesTag(
+      index: IndexLogEntry,
+      plan: LogicalPlan,
+      files: Seq[FileInfo]): Unit = {
     val commonBytes = files.foldLeft(0L) { (bytes, f) =>
       bytes + f.size
     }
