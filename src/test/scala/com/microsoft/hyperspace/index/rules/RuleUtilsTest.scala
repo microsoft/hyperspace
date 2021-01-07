@@ -123,6 +123,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
       withIndex("index1") {
         val readDf = spark.read.parquet(dataPath)
+        val expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
           indexManager.create(readDf, IndexConfig("index1", Seq("id")))
         }
@@ -133,7 +134,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled: Boolean,
             hybridScanDeleteEnabled: Boolean,
             expectCandidateIndex: Boolean,
-            expectedHybridScanTag: Option[Boolean]): Unit = {
+            expectedHybridScanTag: Option[Boolean],
+            expectedCommonSourceBytes: Option[Long]): Unit = {
           withSQLConf(
             "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
             "spark.hyperspace.index.hybridscan.delete.enabled" ->
@@ -146,6 +148,9 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
               assert(
                 indexes.head.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
                   === expectedHybridScanTag)
+              assert(
+                indexes.head.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+                  === expectedCommonSourceBytes)
             } else {
               assert(indexes.isEmpty)
             }
@@ -161,13 +166,15 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = true,
-            expectedHybridScanTag = None)
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = true,
-            expectedHybridScanTag = Some(false))
+            expectedHybridScanTag = Some(false),
+            expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
 
         // Scenario #1: Append new files.
@@ -180,17 +187,22 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = None)
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = true,
-            expectedHybridScanTag = Some(true))
+            expectedHybridScanTag = Some(true),
+            expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
 
         // Scenario #2: Delete 1 file.
-        FileUtils.delete(new Path(readDf.inputFiles.head))
+        val deleteFilePath = new Path(readDf.inputFiles.head)
+        val updatedExpectedCommonSourceBytes = expectedCommonSourceBytes - FileUtils
+          .getDirectorySize(deleteFilePath)
+        FileUtils.delete(deleteFilePath)
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
@@ -199,19 +211,22 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = None)
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = None)
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
             expectCandidateIndex = true,
-            expectedHybridScanTag = Some(true))
+            expectedHybridScanTag = Some(true),
+            expectedCommonSourceBytes = Some(updatedExpectedCommonSourceBytes))
         }
 
         // Scenario #3: Replace all files.
@@ -224,13 +239,15 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
             expectCandidateIndex = false,
-            expectedHybridScanTag = None)
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
             expectCandidateIndex = false,
-            expectedHybridScanTag = None)
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
         }
       }
     }
