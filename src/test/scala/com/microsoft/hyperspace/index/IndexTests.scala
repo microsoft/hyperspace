@@ -28,7 +28,8 @@ class IndexTests extends SparkFunSuite {
   def toIndex(
       config: IndexConfig,
       path: String,
-      schema: StructType): IndexLogEntry = {
+      schema: StructType,
+      numBuckets: Int): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
       Seq(),
       null,
@@ -43,7 +44,7 @@ class IndexTests extends SparkFunSuite {
           CoveringIndex.Properties
             .Columns(config.indexedColumns, config.includedColumns),
           IndexLogEntry.schemaString(schema),
-          10,
+          numBuckets,
           Map())),
       Content(Directory(path)),
       Source(SparkPlan(sourcePlanProperties)),

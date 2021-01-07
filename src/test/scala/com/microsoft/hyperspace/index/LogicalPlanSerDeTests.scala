@@ -99,7 +99,7 @@ class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
     }
 
     // Now verify if Hyperspace serialization still works with this format.
-    verifyPlanSerde(updatedScanNode, "hadoopFsRelation.plan")
+    verifyPlanSerde(updatedScanNode)
   }
 
   test("Serde query with Hadoop file system parquet relation.") {
