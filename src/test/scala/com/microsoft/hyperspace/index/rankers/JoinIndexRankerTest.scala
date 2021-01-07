@@ -79,13 +79,13 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite with SQLHelper {
     val fileList1 = Seq(FileInfo("a", 1, 1, 1), FileInfo("b", 2, 1, 2))
     val fileList2 = Seq(FileInfo("c", 1, 1, 3), FileInfo("d", 1, 1, 4))
     val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), leftPlan, 10, fileList1, false)
-    setCommonBytesTags(l_10, leftPlan, fileList1)
+    setCommonSourceSizeInBytesTag(l_10, leftPlan, fileList1)
     val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), leftPlan, 20, fileList2, false)
-    setCommonBytesTags(l_20, leftPlan, fileList2)
+    setCommonSourceSizeInBytesTag(l_20, leftPlan, fileList2)
     val r_10 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), rightPlan, 10, fileList1, false)
-    setCommonBytesTags(r_10, rightPlan, fileList1)
+    setCommonSourceSizeInBytesTag(r_10, rightPlan, fileList1)
     val r_20 = createIndexLogEntry("r2", Seq(t2c1), Seq(t2c2), rightPlan, 20, fileList2, false)
-    setCommonBytesTags(r_20, rightPlan, fileList2)
+    setCommonSourceSizeInBytesTag(r_20, rightPlan, fileList2)
 
     {
       // Test rank algorithm without Hybrid Scan.
@@ -108,13 +108,13 @@ class JoinIndexRankerTest extends HyperspaceRuleTestSuite with SQLHelper {
     {
       // If both indexes have the same amount of common bytes, follow the original algorithm.
       val l_10 = createIndexLogEntry("l1", Seq(t1c1), Seq(t1c2), leftPlan, 10, fileList1, false)
-      setCommonBytesTags(l_10, leftPlan, fileList1)
+      setCommonSourceSizeInBytesTag(l_10, leftPlan, fileList1)
       val l_20 = createIndexLogEntry("l2", Seq(t1c1), Seq(t1c2), leftPlan, 20, fileList1, false)
-      setCommonBytesTags(l_20, leftPlan, fileList1)
+      setCommonSourceSizeInBytesTag(l_20, leftPlan, fileList1)
       val r_10 = createIndexLogEntry("r1", Seq(t2c1), Seq(t2c2), rightPlan, 10, fileList1, false)
-      setCommonBytesTags(r_10, rightPlan, fileList1)
+      setCommonSourceSizeInBytesTag(r_10, rightPlan, fileList1)
       val r_20 = createIndexLogEntry("r2", Seq(t2c1), Seq(t2c2), rightPlan, 20, fileList1, false)
-      setCommonBytesTags(r_20, rightPlan, fileList1)
+      setCommonSourceSizeInBytesTag(r_20, rightPlan, fileList1)
 
 
       val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
