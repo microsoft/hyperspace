@@ -47,8 +47,7 @@ assemblyMergeStrategy in assembly := {
 }
 
 scalacOptions ++= Seq(
-  "-target:jvm-1.8",
-  "-Ywarn-unused"
+  "-target:jvm-1.8"
 )
 
 javaOptions += "-Xmx1024m"
