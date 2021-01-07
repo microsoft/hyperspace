@@ -26,8 +26,6 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning}
 import org.apache.spark.sql.execution.SparkPlan
 
-import com.microsoft.hyperspace.index.plans.logical.BucketUnion
-
 /**
  * [[BucketUnionRDD]] is required for the hybrid scan operation which merges index data and
  * appended data without re-shuffling the index data. Spark does not support Union that retains
