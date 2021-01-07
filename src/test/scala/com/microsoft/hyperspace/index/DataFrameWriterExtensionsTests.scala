@@ -95,7 +95,7 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
       source: String,
       numBuckets: Int,
       bucketCols: Seq[String],
-      sortCols: Seq[String] = Nil,
+      sortCols: Seq[String],
       mode: SaveMode): Unit = {
     val allBucketFiles =
       dataDir.listFiles().filterNot(f => f.getName.startsWith(".") || f.getName.startsWith("_"))
