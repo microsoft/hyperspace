@@ -50,7 +50,7 @@ object IndexConstants {
   // threshold, the index won't be applied even with Hybrid Scan.
   val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD =
     "spark.hyperspace.index.hybridscan.maxDeletedRatio"
-  val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD_DEFAULT = "0.3"
+  val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD_DEFAULT = "0.2"
 
   // If the ratio of newly appended files to all source files in the given relation is greater than
   // this threshold, the index won't be applied even with Hybrid Scan.
