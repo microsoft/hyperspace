@@ -56,15 +56,15 @@ class RefreshIncrementalAction(
         s"corresponding to ${deletedFiles.length} deleted source data files.")
 
     if (appendedFiles.nonEmpty) {
-      val partialReadFileFormat = Hyperspace
+      val internalFileFormatName = Hyperspace
         .getContext(spark)
         .sourceProviderManager
-        .partialReadFileFormat(previousIndexLogEntry.relations.head)
+        .internalFileFormatName(previousIndexLogEntry.relations.head)
 
       // Create a df with only appended files from original list of files.
       val dfWithAppendedFiles = spark.read
         .schema(df.schema)
-        .format(partialReadFileFormat)
+        .format(internalFileFormatName)
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
       write(spark, dfWithAppendedFiles, indexConfig)

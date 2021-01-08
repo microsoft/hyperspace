@@ -151,12 +151,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
-   * Returns a file format name to read partial data for a given [[Relation]].
+   * Returns a file format name to read internal data files for a given [[Relation]].
    *
-   * @param relation [[Relation]] object to read partial data files.
-   * @return File format to read partial data files.
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
    */
-  override def partialReadFileFormat(relation: Relation): Option[String] = {
+  override def internalFileFormatName(relation: Relation): Option[String] = {
     if (isSupportedFileFormatName(relation.fileFormat)) {
       // Same as original file format.
       Some(relation.fileFormat)

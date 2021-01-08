@@ -70,13 +70,13 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
-   * Runs partialReadFileFormat() for each provider.
+   * Runs internalFileFormatName() for each provider.
    *
-   * @param relation [[Relation]] object to read partial data files.
-   * @return File format to read partial data files.
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
    */
-  def partialReadFileFormat(relation: Relation): String = {
-    run(p => p.partialReadFileFormat(relation))
+  def internalFileFormatName(relation: Relation): String = {
+    run(p => p.internalFileFormatName(relation))
   }
 
   /**
