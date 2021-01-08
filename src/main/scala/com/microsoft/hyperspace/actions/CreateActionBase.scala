@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.functions.input_file_name
 
@@ -64,7 +65,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = sourceRelations(spark, df)
-        // Currently we only support to create an index on a LogicalRelation.
+        // Currently we only support to create an index
         assert(relations.size == 1)
 
         val sourcePlanProperties = SparkPlan.Properties(
@@ -97,7 +98,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   private def hasParquetAsSourceFormatProperty(
       spark: SparkSession,
       df: DataFrame): Option[(String, String)] = {
-    val relation = df.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation]
+    val relation = df.queryExecution.optimizedPlan
     if (Hyperspace.getContext(spark).sourceProviderManager.hasParquetAsSourceFormat(relation)) {
       Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true")
     } else {
@@ -115,7 +116,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
-      case p: LogicalRelation =>
+      case p: LogicalPlan =>
         Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 
@@ -190,7 +191,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val relation = df.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation]
+      val relation = df.queryExecution.optimizedPlan
       val lineagePairs =
         Hyperspace.getContext(spark).sourceProviderManager.lineagePairs(relation, fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)

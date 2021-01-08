@@ -20,7 +20,8 @@ import scala.util.{Success, Try}
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.datasources.FileIndex
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -47,14 +48,14 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   /**
    * Runs createRelation() for each provider.
    *
-   * @param logicalRelation Logical relation to create [[Relation]] from.
+   * @param logicalPlan Logical plan to create [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] created from the given logical relation.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def createRelation(logicalRelation: LogicalRelation, fileIdTracker: FileIdTracker): Relation = {
-    run(p => p.createRelation(logicalRelation, fileIdTracker))
+  def createRelation(logicalPlan: LogicalPlan, fileIdTracker: FileIdTracker): Relation = {
+    run(p => p.createRelation(logicalPlan, fileIdTracker))
   }
 
   /**
@@ -82,25 +83,25 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   /**
    * Runs signature() for each provider.
    *
-   * @param logicalRelation Logical relation to compute signature from.
+   * @param logicalPlan Logical plan to compute signature from.
    * @return Computed signature.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def signature(logicalRelation: LogicalRelation): String = {
-    run(p => p.signature(logicalRelation))
+  def signature(logicalPlan: LogicalPlan): String = {
+    run(p => p.signature(logicalPlan))
   }
 
   /**
    * Runs allFiles() for each provider.
    *
-   * @param logicalRelation Logical relation to retrieve all input files.
+   * @param logicalPlan Logical plan to retrieve all input files.
    * @return List of all input files.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
-    run(p => p.allFiles(logicalRelation))
+  def allFiles(logicalPlan: LogicalPlan): Seq[FileStatus] = {
+    run(p => p.allFiles(logicalPlan))
   }
 
   /**
@@ -118,26 +119,26 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   /**
    * Runs lineagePairs() for each provider.
    *
-   * @param logicalRelation Logical Relation to check the relation type.
+   * @param logicalPlan Logical plan to check the relation type.
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of (file path, file id).
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
   def lineagePairs(
-      logicalRelation: LogicalRelation,
+      logicalPlan: LogicalPlan,
       fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    run(p => p.lineagePairs(logicalRelation, fileIdTracker))
+    run(p => p.lineagePairs(logicalPlan, fileIdTracker))
   }
 
   /**
    * Returns whether the given relation has parquet source files or not.
    *
-   * @param logicalRelation Logical Relation to check the source file format.
+   * @param logicalPlan Logical plan to check the source file format.
    * @return True if source files in the given relation are parquet.
    */
-  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Boolean = {
-    run(p => p.hasParquetAsSourceFormat(logicalRelation))
+  def hasParquetAsSourceFormat(logicalPlan: LogicalPlan): Boolean = {
+    run(p => p.hasParquetAsSourceFormat(logicalPlan))
   }
 
   /**

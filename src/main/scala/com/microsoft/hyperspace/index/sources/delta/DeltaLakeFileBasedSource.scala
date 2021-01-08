@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources.delta
 
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
@@ -48,50 +49,55 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
-   * @param logicalRelation Logical relation to derive [[Relation]] from.
+   * @param logicalPlan Logical plan to derive [[Relation]] from.
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
   override def createRelation(
-      logicalRelation: LogicalRelation,
+      logicalPlan: LogicalPlan,
       fileIdTracker: FileIdTracker): Option[Relation] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, _, options) =>
-        val files = location
-          .getSnapshot(stalenessAcceptable = false)
-          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
-          .files
-          .map { f =>
-            toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
-          }
-        // Note that source files are currently fingerprinted when the optimized plan is
-        // fingerprinted by LogicalPlanFingerprint.
-        val sourceDataProperties =
-          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-        val fileFormatName = "delta"
+    logicalPlan match {
+      case logicalRelation: LogicalRelation =>
+        logicalRelation.relation match {
+          case HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, _, options) =>
+            val files = location
+                .getSnapshot(stalenessAcceptable = false)
+                .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+                .files
+                .map { f =>
+                  toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
+                }
+            // Note that source files are currently fingerprinted when the optimized plan is
+            // fingerprinted by LogicalPlanFingerprint.
+            val sourceDataProperties =
+            Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+            val fileFormatName = "delta"
+            // "path" key in options can incur multiple data read unexpectedly and keep
 
-        // Use case-sensitive map if the provided options are case insensitive.
-        val caseSensitiveOptions = options match {
-          case map: CaseInsensitiveMap[String] => map.originalMap
-          case map => map
+            // Use case-sensitive map if the provided options are case insensitive.
+            val caseSensitiveOptions = options match {
+              case map: CaseInsensitiveMap[String] => map.originalMap
+              case map => map
+            }
+
+            val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
+
+            // "path" key in options can incur multiple data read unexpectedly and keep
+            // the table version info as metadata.
+            val opts = caseSensitiveOptions - "path" +
+              ("versionAsOf" -> location.tableVersion.toString) ++ basePathOpt
+            Some(
+              Relation(
+                Seq(
+                  PathUtils
+                    .makeAbsolute(location.path, spark.sessionState.newHadoopConf())
+                    .toString),
+                Hdfs(sourceDataProperties),
+                dataSchema.json,
+                fileFormatName,
+                opts))
+          case _ => None
         }
-
-        val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
-
-        // "path" key in options can incur multiple data read unexpectedly and keep
-        // the table version info as metadata.
-        val opts = caseSensitiveOptions - "path" +
-          ("versionAsOf" -> location.tableVersion.toString) ++ basePathOpt
-        Some(
-          Relation(
-            Seq(
-              PathUtils
-                .makeAbsolute(location.path.toString, spark.sessionState.newHadoopConf())
-                .toString),
-            Hdfs(sourceDataProperties),
-            dataSchema.json,
-            fileFormatName,
-            opts))
       case _ => None
     }
   }
@@ -129,14 +135,18 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
    * using version info and table name.
    *
-   * @param logicalRelation Logical relation to compute signature from.
+   * @param logicalPlan Logical plan to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
-  override def signature(logicalRelation: LogicalRelation): Option[String] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-        Some(location.tableVersion + location.path.toString)
+  override def signature(logicalPlan: LogicalPlan): Option[String] = {
+    logicalPlan match {
+      case logicalRelation: LogicalRelation =>
+        logicalRelation.relation match {
+          case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+            Some(location.tableVersion + location.path.toString)
+          case _ => None
+        }
       case _ => None
     }
   }
@@ -144,20 +154,24 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   /**
    * Retrieves all input files from the given [[LogicalRelation]].
    *
-   * @param logicalRelation Logical relation to retrieve input files from.
+   * @param logicalPlan Logical plan to retrieve input files from.
    * @return List of [[FileStatus]] for the given relation.
    */
-  override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-        val files = location
-          .getSnapshot(stalenessAcceptable = false)
-          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
-          .files
-          .map { f =>
-            toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
-          }
-        Some(files)
+  override def allFiles(logicalPlan: LogicalPlan): Option[Seq[FileStatus]] = {
+    logicalPlan match {
+      case logicalRelation: LogicalRelation =>
+        logicalRelation.relation match {
+          case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+            val files = location
+                .getSnapshot(stalenessAcceptable = false)
+                .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+                .files
+                .map { f =>
+                  toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
+                }
+            Some(files)
+          case _ => None
+        }
       case _ => None
     }
   }
@@ -185,35 +199,43 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * For [[DeltaLakeFileBasedSource]], each file path should be in this format:
    *   `file:/path/to/file`
    *
-   * @param logicalRelation Logical relation to check the relation type.
+   * @param logicalPlan Logical plan to check the relation type.
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of pairs of (file path, file id).
    */
   override def lineagePairs(
-      logicalRelation: LogicalRelation,
+      logicalPlan: LogicalPlan,
       fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
-        Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-          (kv._1._1, kv._2)
-        })
-      case _ =>
-        None
+    logicalPlan match {
+      case logicalRelation: LogicalRelation =>
+        logicalRelation.relation match {
+          case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
+            Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+              (kv._1._1, kv._2)
+            })
+          case _ =>
+            None
+        }
+      case _ => None
     }
   }
 
   /**
    * Returns whether the given relation has parquet source files or not.
    *
-   * @param logicalRelation Logical Relation to check the source file format.
+   * @param logicalPlan Logical plan to check the source file format.
    * @return True if source files in the given relation are parquet.
    */
-  override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
-        Some(true)
-      case _ =>
-        None
+  override def hasParquetAsSourceFormat(logicalPlan: LogicalPlan): Option[Boolean] = {
+    logicalPlan match {
+      case logicalRelation: LogicalRelation =>
+        logicalRelation.relation match {
+          case HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _) =>
+            Some(true)
+          case _ =>
+            None
+        }
+      case _ => None
     }
   }
 }

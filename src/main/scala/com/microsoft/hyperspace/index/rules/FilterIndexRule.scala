@@ -161,7 +161,7 @@ object ExtractFilterNode {
       Filter,
       Seq[String], // output columns
       Seq[String], // filter columns
-      LogicalRelation,
+      LogicalPlan, // relation node
       HadoopFsRelation)
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
