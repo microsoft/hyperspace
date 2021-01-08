@@ -36,7 +36,7 @@ class Hyperspace(spark: SparkSession) {
   /**
    * Create index.
    *
-   * @param df the DataFrame object to build index on.
+   * @param df          the DataFrame object to build index on.
    * @param indexConfig the configuration of index to be created.
    */
   def createIndex(df: DataFrame, indexConfig: IndexConfig): Unit = {
@@ -84,7 +84,7 @@ class Hyperspace(spark: SparkSession) {
    * refresh modes as listed below.
    *
    * @param indexName Name of the index to refresh.
-   * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
+   * @param mode      Refresh mode. Currently supported modes are `incremental` and `full`.
    */
   def refreshIndex(indexName: String, mode: String): Unit = {
     indexManager.refresh(indexName, mode)
@@ -121,8 +121,8 @@ class Hyperspace(spark: SparkSession) {
    * picked for compaction.
    *
    * @param indexName Name of the index to optimize.
-   * @param mode Index optimization mode. "quick" refers to optimization of only small index
-   *             files, based on a threshold. "full" refers to recreation of index.
+   * @param mode      Index optimization mode. "quick" refers to optimization of only small index
+   *                  files, based on a threshold. "full" refers to recreation of index.
    */
   def optimizeIndex(indexName: String, mode: String): Unit = {
     indexManager.optimize(indexName, mode)
@@ -145,12 +145,12 @@ class Hyperspace(spark: SparkSession) {
   /**
    * Explains how indexes will be applied to the given dataframe.
    *
-   * @param df dataFrame.
+   * @param df           dataFrame.
    * @param redirectFunc optional function to redirect output of explain.
-   * @param verbose Flag to enable verbose mode.
+   * @param verbose      Flag to enable verbose mode.
    */
   def explain(df: DataFrame, verbose: Boolean = false)(
-      implicit redirectFunc: String => Unit = print): Unit = {
+    implicit redirectFunc: String => Unit = print): Unit = {
     redirectFunc(PlanAnalyzer.explainString(df, spark, indexManager.indexes, verbose))
   }
 

@@ -44,10 +44,10 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   def testIndex(
-      config: IndexConfig,
-      numBuckets: Int,
-      schema: StructType,
-      indexDir: String): IndexLogEntry = {
+                 config: IndexConfig,
+                 numBuckets: Int,
+                 schema: StructType,
+                 indexDir: String): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
       Seq(),
       null,
@@ -83,7 +83,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
     "plan")
 
   test("Verify CreationTimeBasedIndexCache APIs.") {
-    val indexCache = new CreationTimeBasedIndexCache(spark, new MockClock)
+    val indexCache = new CreationTimeBasedIndexCache(spark, new MockClock(1))
 
     val initialEntry = indexCache.get()
     assert(initialEntry.isEmpty, "Cache initially has to be empty.")
@@ -100,7 +100,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("verify CreationTimeBasedIndexCache expiry configuration.") {
     spark.conf.set(IndexConstants.INDEX_CACHE_EXPIRY_DURATION_SECONDS, "6000")
-    val clock = new MockClock
+    val clock = new MockClock(1)
     val indexCache = new CreationTimeBasedIndexCache(spark, clock)
 
     indexCache.set(Seq(index1))
@@ -109,7 +109,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
     // Change cache expiry configuration and wait enough so cache entry expires.
     spark.conf.set(IndexConstants.INDEX_CACHE_EXPIRY_DURATION_SECONDS, "1")
 
-    clock.moveTime(1000)
+    clock.advanceTime(1000)
 
     assert(indexCache.get().isEmpty, "Cache entry should have been expired.")
   }
@@ -165,12 +165,14 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 }
 
-class MockClock(startTime: Long = 1L) extends Clock {
-  private var time: Long = startTime
-
+/**
+ * Mock for testing purposes so we can validate and invalidate entries based on time.
+ * @param time long value that tells current time
+ */
+class MockClock(private var time: Long = 0L) extends Clock {
   override def getTime: Long = time
 
-  def moveTime(value: Long): Unit = {
+  def advanceTime(value: Long): Unit = {
     time = time + value
   }
 }
@@ -178,17 +180,17 @@ class MockClock(startTime: Long = 1L) extends Clock {
 /**
  * Mock IndexCacheFactory so test code can directly access single index cache instance and
  * validate/modify cache entry in different scenarios.
+ *
  * @param spark Spark session
  */
 class MockIndexCacheFactoryImpl(spark: SparkSession) extends IndexCacheFactory {
-  private val clock: Clock = new MockClock
-  val indexCache = new CreationTimeBasedIndexCache(spark, clock)
+  val indexCache = new CreationTimeBasedIndexCache(spark, new MockClock(1))
 
-  override def create(spark: SparkSession, cacheType: String, clock: Clock)
-    : Cache[Seq[IndexLogEntry]] = {
-      cacheType match {
-        case IndexCacheType.CREATION_TIME_BASED => indexCache
-        case _ => throw HyperspaceException(s"Unknown cache type: $cacheType.")
-      }
+  override def create(spark: SparkSession, cacheType: String)
+  : Cache[Seq[IndexLogEntry]] = {
+    cacheType match {
+      case IndexCacheType.CREATION_TIME_BASED => indexCache
+      case _ => throw HyperspaceException(s"Unknown cache type: $cacheType.")
     }
+  }
 }

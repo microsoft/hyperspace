@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.yarn.util.{Clock, SystemClock}
+import org.apache.hadoop.yarn.util.SystemClock
 import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -26,20 +26,20 @@ object IndexCacheType {
 }
 
 trait IndexCacheFactory {
-  def create(spark: SparkSession, cacheType: String, clock: Clock = new SystemClock)
-    : Cache[Seq[IndexLogEntry]]
+  def create(spark: SparkSession, cacheType: String)
+  : Cache[Seq[IndexLogEntry]]
 }
 
 object IndexCacheFactoryImpl extends IndexCacheFactory {
-  override def create(spark: SparkSession, cacheType: String, clock: Clock = new SystemClock)
-    : Cache[Seq[IndexLogEntry]] = {
-      cacheType match {
-        case IndexCacheType.CREATION_TIME_BASED =>
-          new CreationTimeBasedIndexCache(
-            spark,
-            clock
-          )
-        case _ => throw HyperspaceException(s"Unknown cache type: $cacheType.")
-      }
+  override def create(spark: SparkSession, cacheType: String)
+  : Cache[Seq[IndexLogEntry]] = {
+    cacheType match {
+      case IndexCacheType.CREATION_TIME_BASED =>
+        new CreationTimeBasedIndexCache(
+          spark,
+          new SystemClock
+        )
+      case _ => throw HyperspaceException(s"Unknown cache type: $cacheType.")
+    }
   }
 }
