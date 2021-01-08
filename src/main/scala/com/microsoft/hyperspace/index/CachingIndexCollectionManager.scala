@@ -17,7 +17,6 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.yarn.util.Clock
-import org.apache.hadoop.yarn.util.SystemClock
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -30,18 +29,18 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * - If any API is called to add a new index or modify
  * an existing index's status, cache gets cleared.
  *
- * @param spark Spark session
- * @param indexCacheFactory provides cache instance
+ * @param spark                   Spark session
+ * @param indexCacheFactory       provides cache instance
  * @param indexLogManagerFactory  provides IndexLogManager instance
  * @param indexDataManagerFactory provides IndexDataManager instance
- * @param fileSystemFactory provides FileSystem instance
+ * @param fileSystemFactory       provides FileSystem instance
  */
 class CachingIndexCollectionManager(
-    spark: SparkSession,
-    indexCacheFactory: IndexCacheFactory,
-    indexLogManagerFactory: IndexLogManagerFactory,
-    indexDataManagerFactory: IndexDataManagerFactory,
-    fileSystemFactory: FileSystemFactory)
+                                     spark: SparkSession,
+                                     indexCacheFactory: IndexCacheFactory,
+                                     indexLogManagerFactory: IndexLogManagerFactory,
+                                     indexDataManagerFactory: IndexDataManagerFactory,
+                                     fileSystemFactory: FileSystemFactory)
   extends IndexCollectionManager(
     spark,
     indexLogManagerFactory,
@@ -119,9 +118,10 @@ object CachingIndexCollectionManager {
  * An implementation of cache to store indexes that uses entry's last reset time to check
  * validity of cache entry.
  * Cache entry is stale if it has been in the cache for some (configurable) time.
+ *
  * @param spark Spark session
  */
-class CreationTimeBasedIndexCache(spark: SparkSession, systemClock: Clock)
+class CreationTimeBasedIndexCache(spark: SparkSession, clock: Clock)
   extends Cache[Seq[IndexLogEntry]] {
 
   private var entries: Seq[IndexLogEntry] = Seq[IndexLogEntry]()
@@ -129,14 +129,14 @@ class CreationTimeBasedIndexCache(spark: SparkSession, systemClock: Clock)
 
   /**
    * Returns cache entry with the following expiration policy:
-   *  If lastCacheTime shows a valid time and the duration since then does not exceed
-   *  configured expiry duration, then current cache entry is valid; otherwise stale
+   * If lastCacheTime shows a valid time and the duration since then does not exceed
+   * configured expiry duration, then current cache entry is valid; otherwise stale
    *
    * @return current cache entry if not expired, otherwise None.
    */
   override def get(): Option[Seq[IndexLogEntry]] = {
     if (lastCacheTime > 0) {
-      val currentTime = systemClock.getTime
+      val currentTime = clock.getTime
       val expiryDurationInSec = spark.sessionState.conf
         .getConfString(
           IndexConstants.INDEX_CACHE_EXPIRY_DURATION_SECONDS,
@@ -153,11 +153,12 @@ class CreationTimeBasedIndexCache(spark: SparkSession, systemClock: Clock)
 
   /**
    * Reset cache content with new entry and reset cache time
+   *
    * @param entry new entry to cache
    */
   override def set(entry: Seq[IndexLogEntry]): Unit = {
     entries = entry
-    lastCacheTime = systemClock.getTime
+    lastCacheTime = clock.getTime
   }
 
   /**
