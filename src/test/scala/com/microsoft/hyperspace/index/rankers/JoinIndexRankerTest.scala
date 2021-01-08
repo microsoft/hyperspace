@@ -24,10 +24,10 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
-import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
+import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
 import com.microsoft.hyperspace.util.FileUtils
 
-class JoinIndexRankerTest extends HyperspaceRuleTestSuite with SQLHelper {
+class JoinIndexRankerTest extends HyperspaceRuleSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/JoinRankerTest")
   var leftPlan: LogicalPlan = _
   var rightPlan: LogicalPlan = _

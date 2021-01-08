@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTI
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class IndexManagerTests extends HyperspaceSuite with SQLHelper {
+class IndexManagerTest extends HyperspaceSuite with SQLHelper {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))

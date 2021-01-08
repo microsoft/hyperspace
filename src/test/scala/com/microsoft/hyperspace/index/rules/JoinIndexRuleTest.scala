@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class JoinIndexRuleTest extends HyperspaceRuleTestSuite with SQLHelper {
+class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexRuleTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()

@@ -22,7 +22,7 @@ import org.apache.spark.sql.DataFrame
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig}
 import com.microsoft.hyperspace.util.FileUtils
 
-class HyperspaceTests extends HyperspaceSuite {
+class HyperspaceTest extends HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/indexLocation")
 
   private val sampleData = SampleData.testData
