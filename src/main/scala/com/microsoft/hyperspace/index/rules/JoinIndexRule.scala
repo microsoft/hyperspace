@@ -31,7 +31,6 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -312,21 +311,26 @@ object JoinIndexRule
     val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
 
+    val leftRel = RuleUtils.getLogicalRelation(left).get
+    val rightRel = RuleUtils.getLogicalRelation(right).get
+
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
-    val lIndexes = RuleUtils.getCandidateIndexes(
-      spark,
-      lUsable,
-      RuleUtils.getLogicalRelation(left).get)
-    val rIndexes = RuleUtils.getCandidateIndexes(
-      spark,
-      rUsable,
-      RuleUtils.getLogicalRelation(right).get)
+    val lIndexes = RuleUtils.getCandidateIndexes(spark, lUsable, leftRel)
+    val rIndexes = RuleUtils.getCandidateIndexes(spark, rUsable, rightRel)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
-    compatibleIndexPairs.map(indexPairs => JoinIndexRanker.rank(indexPairs).head)
+    compatibleIndexPairs.map(
+      indexPairs =>
+        JoinIndexRanker
+          .rank(
+            spark,
+            leftRel,
+            rightRel,
+            indexPairs)
+          .head)
   }
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {

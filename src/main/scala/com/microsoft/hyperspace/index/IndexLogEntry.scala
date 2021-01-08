@@ -297,8 +297,8 @@ object Directory {
 
   private def listLeafFiles(
       path: Path,
-      pathFilter: PathFilter = PathUtils.DataPathFilter,
-      throwIfNotExists: Boolean = false,
+      pathFilter: PathFilter,
+      throwIfNotExists: Boolean,
       fs: FileSystem): Seq[FileStatus] = {
     try {
       val (files, directories) = fs.listStatus(path).partition(_.isFile)

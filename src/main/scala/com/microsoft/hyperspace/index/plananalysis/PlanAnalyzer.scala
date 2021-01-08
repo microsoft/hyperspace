@@ -113,7 +113,7 @@ object PlanAnalyzer {
     outputStream.writeLine(withoutHyperspaceContext.toString)
 
     buildHeader(outputStream, "Indexes used:")
-    writeUsedIndexes(withHyperspaceContext.originalPlan, spark, indexes, outputStream)
+    writeUsedIndexes(withHyperspaceContext.originalPlan, indexes, outputStream)
     outputStream.writeLine()
 
     if (verbose) {
@@ -207,12 +207,10 @@ object PlanAnalyzer {
    * Write used indexes (if any) to bufferStream.
    *
    * @param plan sparkPlan with indexes.
-   * @param spark sparkSession.
    * @param indexes all available indexes for the use.
    */
   private def writeUsedIndexes(
       plan: SparkPlan,
-      spark: SparkSession,
       indexes: DataFrame,
       bufferStream: BufferStream): Unit = {
     val usedIndexes = indexes.filter(indexes("indexLocation").isin(getPaths(plan): _*))

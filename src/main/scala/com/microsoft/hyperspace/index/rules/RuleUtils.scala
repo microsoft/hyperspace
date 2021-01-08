@@ -91,10 +91,11 @@ object RuleUtils {
           res
         }
       }
+
       val appendedBytesRatio = 1 - commonBytes / totalInputBytes.toFloat
       val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesBytes.toFloat
-      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
 
+      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
         commonCnt > 0 &&
         appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
@@ -108,6 +109,8 @@ object RuleUtils {
 
       val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
+        entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+
         // If there is no change in source dataset, the index will be applied by
         // transformPlanToUseIndexOnlyScan.
         entry.setTagValue(
@@ -295,7 +298,9 @@ object RuleUtils {
             _) =>
         val (filesDeleted, filesAppended) =
           if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
-            // If the index contains the source update info, we need to handle
+            // If the index contains the source update info, it means the index was validated
+            // with the latest signature including appended files and deleted files, but
+            // index data is not updated with those files. Therefore, we need to handle
             // appendedFiles and deletedFiles in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {

@@ -150,6 +150,14 @@ class Hyperspace:
                                                self.hyperspace.indexes(), verbose)
         redirectFunc(result_string)
 
+    def index(self, indexName):
+        """
+        Get index metadata and detailed index statistics for a given index.
+        :param indexName: index name
+        :return: dataFrame object containing the index metadata and detailed index statistics.
+        """
+        return DataFrame(self.hyperspace.index(indexName), self.spark._wrapped)
+
     @staticmethod
     def enable(spark):
         """

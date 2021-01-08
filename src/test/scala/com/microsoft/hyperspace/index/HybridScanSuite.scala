@@ -32,7 +32,7 @@ import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
 
-trait HybridScanTestSuite extends QueryTest with HyperspaceSuite {
+trait HybridScanSuite extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
 
   val sampleData = SampleData.testData
