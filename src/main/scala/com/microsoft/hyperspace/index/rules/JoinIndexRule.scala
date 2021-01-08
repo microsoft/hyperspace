@@ -21,10 +21,11 @@ import scala.util.Try
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
@@ -166,8 +167,8 @@ object JoinIndexRule
    */
   private def isPlanModified(plan: LogicalPlan): Boolean = {
     plan.find {
-      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-        RuleUtils.isIndexApplied(fsRelation)
+      case p: LogicalRelation =>
+        RuleUtils.isIndexApplied(p)
       case _ => false
     }.isDefined
   }
@@ -338,7 +339,9 @@ object JoinIndexRule
   }
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {
-    l.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
+    l.collectLeaves()
+        .filter(i => i.isInstanceOf[LogicalRelation] ||  i.isInstanceOf[DataSourceV2Relation])
+        .flatMap(_.output)
   }
 
   /**
@@ -379,7 +382,7 @@ object JoinIndexRule
   private def allRequiredCols(plan: LogicalPlan): Seq[String] = {
     val cleaned = CleanupAliases(plan)
     val allReferences = cleaned.collect {
-      case _: LogicalRelation => Seq()
+      case _ @ (_: LogicalRelation | _: DataSourceV2Relation) => Seq()
       case p => p.references
     }.flatten
     val topLevelOutputs = cleaned.outputSet.toSeq

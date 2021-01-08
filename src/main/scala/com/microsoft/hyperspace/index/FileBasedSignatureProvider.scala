@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.util.HashingUtils
@@ -49,7 +50,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
   private def fingerprintVisitor(logicalPlan: LogicalPlan): Option[String] = {
     var fingerprint = ""
     logicalPlan.foreachUp {
-      case p: LogicalRelation =>
+      case p @ (_: LogicalRelation | _: DataSourceV2Relation) =>
         fingerprint ++= Hyperspace.getContext.sourceProviderManager.signature(p)
       case _ =>
     }

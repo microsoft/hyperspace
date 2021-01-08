@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 
 /**
  * Utility functions for logical plan.
@@ -35,4 +36,25 @@ object LogicalPlanUtils {
       case _ => false
     }
   }
+
+  /**
+   * Check if a logical plan is a DataSourceV2Relation.
+   * @param logicalPlan Logical plan to check.
+   * @return true if a logical plan is a DataSourceV2Relation or false.
+   */
+  def isDataSourceV2Relation(logicalPlan: LogicalPlan): Boolean = {
+    logicalPlan match {
+      case _: DataSourceV2Relation => true
+      case _ => false
+    }
+  }
+
+  /**
+   * Check if a logical plan is supported.
+   * @param logicalPlan logical plan to check.
+   * @return true if a logical plan is supported or false.
+   */
+  def isLogicalPlanSupported(logicalPlan: LogicalPlan): Boolean =
+    isLogicalRelation(logicalPlan) || isDataSourceV2Relation(logicalPlan)
+
 }

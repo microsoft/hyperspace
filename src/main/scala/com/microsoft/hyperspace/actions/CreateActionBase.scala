@@ -20,11 +20,14 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.index.rules.ExtractIndexSupportedLogicalPlan
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
@@ -98,8 +101,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   private def hasParquetAsSourceFormatProperty(
       spark: SparkSession,
       df: DataFrame): Option[(String, String)] = {
-    val relation = df.queryExecution.optimizedPlan
-    if (Hyperspace.getContext(spark).sourceProviderManager.hasParquetAsSourceFormat(relation)) {
+    if (Hyperspace.getContext(spark).sourceProviderManager
+        .hasParquetAsSourceFormat(df.queryExecution.optimizedPlan)) {
       Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true")
     } else {
       None
@@ -116,7 +119,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
-      case p: LogicalPlan =>
+      case ExtractIndexSupportedLogicalPlan(p) =>
         Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 
@@ -212,6 +215,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     // Extract partition keys, if original data is partitioned.
     val partitionSchemas = df.queryExecution.optimizedPlan.collect {
       case LogicalRelation(HadoopFsRelation(_, pSchema, _, _, _, _), _, _, _) => pSchema
+      case DataSourceV2Relation(_, _, _, _, uSchema) => uSchema.getOrElse(StructType(Nil))
     }
 
     // Currently we only support creating an index on a single LogicalRelation.
