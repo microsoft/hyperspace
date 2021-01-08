@@ -98,7 +98,7 @@ object RuleUtils {
 
       val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
-        entry.setTagValue(IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+        entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
 
         // If there is no change in source dataset, the index will be applied by
         // transformPlanToUseIndexOnlyScan.

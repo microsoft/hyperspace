@@ -98,7 +98,7 @@ class IndexCollectionManager(
     import spark.implicits._
     getIndexes()
       .filter(!_.state.equals(DOESNOTEXIST))
-      .map(IndexStatistics(spark, _))
+      .map(IndexStatistics(_))
       .toDF()
       .select(
         IndexStatistics.INDEX_SUMMARY_COLUMNS.head,
@@ -119,7 +119,7 @@ class IndexCollectionManager(
       logManager.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
         case Some(l) =>
           import spark.implicits._
-          Seq(IndexStatistics(spark, toIndexLogEntry(l), extended = true)).toDF()
+          Seq(IndexStatistics(toIndexLogEntry(l), extended = true)).toDF()
         case None =>
           throw HyperspaceException(s"No latest stable log found for index $indexName.")
       }

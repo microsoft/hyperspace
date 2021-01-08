@@ -30,7 +30,6 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
   val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   val indexSystemPath = "src/test/resources/indexLocation"
   val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
-  val indexConfig2 = IndexConfig("index2", Seq("Date"), Seq("RGUID"))
 
   before {
     FileUtils.delete(new Path(indexSystemPath))
@@ -43,11 +42,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
     super.afterAll()
   }
 
-  def testIndex(
-                 config: IndexConfig,
-                 numBuckets: Int,
-                 schema: StructType,
-                 indexDir: String): IndexLogEntry = {
+  def testIndex(schema: StructType, indexDir: String): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
       Seq(),
       null,
@@ -72,13 +67,9 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   val index1 = testIndex(
-    indexConfig1,
-    50,
     StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
     "path1")
   val index2 = testIndex(
-    indexConfig2,
-    10,
     StructType(Seq(StructField("Date", StringType), StructField("RGUID", StringType))),
     "plan")
 

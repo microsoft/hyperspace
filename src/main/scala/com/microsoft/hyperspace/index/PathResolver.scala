@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import java.util.{Locale, NoSuchElementException}
+import java.util.Locale
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
@@ -66,15 +66,6 @@ private[hyperspace] class PathResolver(conf: SQLConf) {
     val defaultIndexesPath =
       new Path(conf.getConfString("spark.sql.warehouse.dir"), "indexes")
     new Path(conf.getConfString(IndexConstants.INDEX_SYSTEM_PATH, defaultIndexesPath.toString))
-  }
-
-  private def getOption(key: String): Option[String] = {
-    try {
-      Some(conf.getConfString(key))
-    } catch {
-      case _: NoSuchElementException =>
-        None
-    }
   }
 }
 
