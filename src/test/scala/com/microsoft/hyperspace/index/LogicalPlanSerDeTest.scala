@@ -37,7 +37,7 @@ import com.microsoft.hyperspace.index.serde.{KryoSerDeUtils, LogicalPlanSerDeUti
  * Some tests are adapted from examples in ExpressionParserSuite.scala, PlanParserSuite.scala,
  * and QueryPlanSuite.scala.
  */
-class LogicalPlanSerDeTests extends SparkFunSuite with SparkInvolvedSuite {
+class LogicalPlanSerDeTest extends SparkFunSuite with SparkInvolvedSuite {
   val c1: AttributeReference = AttributeReference("c1", StringType)()
   val c2: AttributeReference = AttributeReference("c2", StringType)()
   val c3: AttributeReference = AttributeReference("c3", StringType)()

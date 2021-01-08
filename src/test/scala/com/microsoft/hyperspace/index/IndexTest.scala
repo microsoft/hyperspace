@@ -21,7 +21,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 
 import com.microsoft.hyperspace.actions.Constants
 
-class IndexTests extends SparkFunSuite {
+class IndexTest extends SparkFunSuite {
   val indexConfig1 = IndexConfig("myIndex1", Array("id"), Seq("name"))
   val indexConfig2 = IndexConfig("myIndex2", Array("id"), Seq("school"))
 

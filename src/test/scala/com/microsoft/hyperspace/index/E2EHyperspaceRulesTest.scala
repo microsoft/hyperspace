@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.PathUtils
 
-class E2EHyperspaceRulesTests extends QueryTest with HyperspaceSuite {
+class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   private val testDir = "src/test/resources/e2eTests/"
   private val nonPartitionedDataPath = testDir + "sampleparquet"
   private val partitionedDataPath = testDir + "samplepartitionedparquet"

@@ -31,7 +31,7 @@ import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 /**
  * Unit E2E test cases for RefreshIndex.
  */
-class RefreshIndexTests extends QueryTest with HyperspaceSuite {
+class RefreshIndexTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val testDir = "src/test/resources/RefreshIndexDeleteTests/"
   private val nonPartitionedDataPath = testDir + "nonpartitioned"
