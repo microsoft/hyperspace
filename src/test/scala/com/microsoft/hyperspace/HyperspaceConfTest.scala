@@ -21,7 +21,7 @@ import org.apache.spark.SparkFunSuite
 import com.microsoft.hyperspace.index.IndexConstants._
 import com.microsoft.hyperspace.util.HyperspaceConf
 
-class HyperspaceConfSuite extends SparkFunSuite with SparkInvolvedSuite {
+class HyperspaceConfTest extends SparkFunSuite with SparkInvolvedSuite {
   test("Test configs that support legacy configs") {
     verifyLegacyAndNewConfig(
       () => HyperspaceConf.numBucketsForIndex(spark),
