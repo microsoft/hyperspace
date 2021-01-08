@@ -80,7 +80,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
               case map => map
             }
 
-            val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
+            val basePathOpt = partitionBasePath(logicalPlan).flatten.map("basePath" -> _)
 
             // "path" key in options can incur multiple data read unexpectedly and keep
             // the table version info as metadata.
@@ -177,18 +177,29 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   }
 
   /**
-   * Constructs the basePath for the given [[FileIndex]].
+   * Constructs the basePath for the given [[LogicalPlan]].
    *
-   * @param location Partitioned data location.
+   * @param logicalPlan Logical plan to extract the base path from.
    * @return basePath to read the given partitioned location.
+   *         Some(Some(path)) => The location of the given plan is supported
+   *                             and partition is specified.
+   *         Some(None) => The location of the given plan is supported
+   *                       but is un-partitioned.
+   *         None => The location of the given plan is not supported.
    */
-  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
-    location match {
-      case d: TahoeLogFileIndex if d.partitionSchema.nonEmpty =>
-        Some(Some(d.path.toString))
-      case _: TahoeLogFileIndex => Some(None)
-      case _ =>
-        None
+  override def partitionBasePath(logicalPlan: LogicalPlan): Option[Option[String]] = {
+    logicalPlan match {
+      case logicalRelation: LogicalRelation =>
+        logicalRelation.relation match {
+          case HadoopFsRelation(d: TahoeLogFileIndex, _, _, _, _, _) =>
+            if (d.partitionSchema.nonEmpty) {
+              Some(Some(d.path.toString))
+            } else {
+              Some(None)
+            }
+          case _ => None
+        }
+      case _ => None
     }
   }
 

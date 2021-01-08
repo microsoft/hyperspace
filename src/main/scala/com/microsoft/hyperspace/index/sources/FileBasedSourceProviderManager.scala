@@ -21,7 +21,6 @@ import scala.util.{Success, Try}
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.FileIndex
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -107,13 +106,13 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   /**
    * Runs partitionBasePath() for each provider.
    *
-   * @param location Partitioned location.
-   * @return Optional basePath string to read the given partitioned location.
+   * @param logicalPlan Partitioned location.
+   * @return basePath string to read the given partitioned location.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def partitionBasePath(location: FileIndex): Option[String] = {
-    run(p => p.partitionBasePath(location))
+  def partitionBasePath(logicalPlan: LogicalPlan): Option[String] = {
+    run(p => p.partitionBasePath(logicalPlan))
   }
 
   /**

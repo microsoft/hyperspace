@@ -121,15 +121,17 @@ trait FileBasedSourceProvider extends SourceProvider {
   def allFiles(logicalPlan: LogicalPlan): Option[Seq[FileStatus]]
 
   /**
-   * Constructs the basePath for the given [[FileIndex]].
+   * Constructs the basePath for the given [[LogicalPlan]].
    *
-   * @param location Partitioned data location.
-   * @return Optional basePath to read the given partitioned location as explained below:
-   *         Some(Some(path)) => The given location is supported and partition is specified.
-   *         Some(None) => The given location is supported but partition is not specified.
-   *         None => The given location is not supported.
+   * @param logicalPlan Logical plan to extract the base path from.
+   * @return basePath to read the given partitioned location.
+   *         Some(Some(path)) => The location of the given plan is supported
+   *                             and partition is specified.
+   *         Some(None) => The location of the given plan is supported
+   *                       but is un-partitioned.
+   *         None => The location of the given plan is not supported.
    */
-  def partitionBasePath(location: FileIndex): Option[Option[String]]
+  def partitionBasePath(logicalPlan: LogicalPlan): Option[Option[String]]
 
   /**
    * Returns list of pairs of (file path, file id) to build lineage column.

@@ -480,7 +480,7 @@ object RuleUtils {
         val options = Hyperspace
           .getContext(spark)
           .sourceProviderManager
-          .partitionBasePath(location)
+          .partitionBasePath(baseRelation)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
