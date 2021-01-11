@@ -21,7 +21,7 @@ import org.apache.spark.SparkFunSuite
 
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 
-class FileBasedSignatureProviderTests extends SparkFunSuite with SparkInvolvedSuite {
+class FileBasedSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength = 100
   private val fileModificationTime = 10000
   private val filePath = new Path("filePath")

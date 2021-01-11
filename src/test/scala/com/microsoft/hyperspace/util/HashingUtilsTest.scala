@@ -20,7 +20,7 @@ import java.util.UUID
 
 import org.apache.spark.SparkFunSuite
 
-class HashingUtilsTests extends SparkFunSuite {
+class HashingUtilsTest extends SparkFunSuite {
   test("For md5Hashing(), same input has the same output hash code.") {
     val randomUUID = UUID.randomUUID.toString
     val hashCode1 = HashingUtils.md5Hex(randomUUID)
