@@ -452,8 +452,8 @@ case class IndexLogEntry(
   }
 
   @JsonIgnore
-  lazy val sourceFilesBytes: Long = {
-    sourceFileInfoSet.foldLeft(0L)(_ + _.size)
+  lazy val sourceFilesSizeInBytes: Long = {
+    sourceFileInfoSet.map(_.size).sum
   }
 
   def sourceUpdate: Option[Update] = {

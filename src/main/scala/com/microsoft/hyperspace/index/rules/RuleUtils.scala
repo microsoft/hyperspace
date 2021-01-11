@@ -74,7 +74,7 @@ object RuleUtils {
     def isHybridScanCandidate(
         entry: IndexLogEntry,
         inputSourceFiles: Seq[FileInfo],
-        totalInputBytes: Long): Boolean = {
+        inputSourceFilesSizeInBytes: Long): Boolean = {
       // TODO: Some threshold about the similarity of source data files - number of common files or
       //  total size of common files.
       //  See https://github.com/microsoft/hyperspace/issues/159
@@ -92,8 +92,8 @@ object RuleUtils {
         }
       }
 
-      val appendedBytesRatio = 1 - commonBytes / totalInputBytes.toFloat
-      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesBytes.toFloat
+      val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
+      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
 
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
       lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
@@ -144,9 +144,9 @@ object RuleUtils {
       }
       assert(filesByRelations.length == 1)
       val inputSourceFiles = filesByRelations.flatten
-      val totalBytes = inputSourceFiles.map(_.size).sum
+      val totalSizeInBytes = inputSourceFiles.map(_.size).sum
       indexes.filter(index =>
-        index.created && isHybridScanCandidate(index, inputSourceFiles, totalBytes))
+        index.created && isHybridScanCandidate(index, inputSourceFiles, totalSizeInBytes))
     } else {
       indexes.filter(index => index.created && signatureValid(index))
     }
