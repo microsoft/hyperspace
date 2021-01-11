@@ -115,7 +115,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    * Constructs the basePath for the given [[FileIndex]].
    *
    * @param location Partitioned data location.
-   * @return basePath to read the given partitioned location.
+   * @return Optional basePath to read the given partitioned location.
    */
   def partitionBasePath(location: FileIndex): Option[Option[String]]
 

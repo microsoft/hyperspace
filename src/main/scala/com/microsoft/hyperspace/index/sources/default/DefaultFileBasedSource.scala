@@ -74,7 +74,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
-        // Use case-sensitive map if the provided options are case insensitive.
+        // Use case-sensitive map if the provided options are case insensitive. Case-insensitive
+        // map converts all key-value pairs to lowercase before storing them in the metadata,
+        // making them unusable for future use. An example is "basePath" option.
         val caseSensitiveOptions = options match {
           case map: CaseInsensitiveMap[String] => map.originalMap
           case map => map
@@ -213,7 +215,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Constructs the basePath for the given [[FileIndex]].
    *
    * @param location Partitioned data location.
-   * @return basePath to read the given partitioned location.
+   * @return Optional basePath to read the given partitioned location.
    */
   override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
