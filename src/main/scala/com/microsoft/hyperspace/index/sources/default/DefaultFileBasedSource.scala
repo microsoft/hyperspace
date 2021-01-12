@@ -213,9 +213,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    *
    * @param location Partitioned data location.
    * @return Optional basePath to read the given partitioned location as explained below:
-   *         Some(Some(path)) => location is supported and basepath is valid
-   *         Some(None) => location is supported but basePath is not valid
-   *         None => location is not supported
+   *         Some(Some(path)) => The given location is supported and partition is specified.
+   *         Some(None) => The given location is supported but partition is not specified.
+   *         None => The given location is not supported.
    */
   override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
