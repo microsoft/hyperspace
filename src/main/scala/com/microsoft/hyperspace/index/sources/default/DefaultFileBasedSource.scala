@@ -83,10 +83,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         }
 
         // Get basePath of hive-partitioned data sources, if applicable.
-        val basePathOpt = partitionBasePath(location) match {
-          case Some(Some(path)) => Map("basePath" -> path)
-          case _ => Map()
-        }
+        val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
 
         // "path" key in options can incur multiple data read unexpectedly.
         val opts = caseSensitiveOptions - "path" ++ basePathOpt
@@ -215,7 +212,10 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Constructs the basePath for the given [[FileIndex]].
    *
    * @param location Partitioned data location.
-   * @return Optional basePath to read the given partitioned location.
+   * @return Optional basePath to read the given partitioned location as explained below:
+   *         Some(Some(path)) => location is supported and basepath is valid
+   *         Some(None) => location is supported but basePath is not valid
+   *         None => location is not supported
    */
   override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
