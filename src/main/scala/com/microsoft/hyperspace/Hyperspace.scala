@@ -19,7 +19,7 @@ package com.microsoft.hyperspace
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
+import com.microsoft.hyperspace.index.IndexConstants.{NO_INDEX_SCHEMA_CHANGE, OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
@@ -87,7 +87,14 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
    */
   def refreshIndex(indexName: String, mode: String): Unit = {
-    indexManager.refresh(indexName, mode)
+    refreshIndex(indexName, mode, NO_INDEX_SCHEMA_CHANGE)
+  }
+
+  def refreshIndex(
+      indexName: String,
+      mode: String,
+      indexSchemaChange: IndexSchemaChange): Unit = {
+    indexManager.refresh(indexName, mode, indexSchemaChange)
   }
 
   /**

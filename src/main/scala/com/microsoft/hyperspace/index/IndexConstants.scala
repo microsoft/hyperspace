@@ -17,6 +17,7 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.StructType
 
 object IndexConstants {
   val INDEXES_DIR = "indexes"
@@ -111,4 +112,6 @@ object IndexConstants {
   // To provide multiple paths in the globbing pattern, separate them with commas, e.g.
   // "/temp/1/*, /temp/2/*"
   val GLOBBING_PATTERN_KEY = "spark.hyperspace.source.globbingPattern"
+
+  val NO_INDEX_SCHEMA_CHANGE = IndexSchemaChange(new StructType(), Seq[String]())
 }

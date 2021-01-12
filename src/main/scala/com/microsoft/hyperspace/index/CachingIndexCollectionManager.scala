@@ -92,9 +92,12 @@ class CachingIndexCollectionManager(
     super.vacuum(indexName)
   }
 
-  override def refresh(indexName: String, mode: String): Unit = {
+  override def refresh(
+      indexName: String,
+      mode: String,
+      indexSchemaChange: IndexSchemaChange): Unit = {
     clearCache()
-    super.refresh(indexName, mode)
+    super.refresh(indexName, mode, indexSchemaChange)
   }
 
   override def optimize(indexName: String, mode: String): Unit = {
@@ -117,6 +120,7 @@ object CachingIndexCollectionManager {
  * An implementation of cache to store indexes that uses entry's last reset time to check
  * validity of cache entry.
  * Cache entry is stale if it has been in the cache for some (configurable) time.
+ *
  * @param spark Spark session
  */
 class CreationTimeBasedIndexCache(spark: SparkSession) extends Cache[Seq[IndexLogEntry]] {
@@ -149,6 +153,7 @@ class CreationTimeBasedIndexCache(spark: SparkSession) extends Cache[Seq[IndexLo
 
   /**
    * Reset cache content with new entry and reset cache time
+   *
    * @param entry new entry to cache
    */
   override def set(entry: Seq[IndexLogEntry]): Unit = {
