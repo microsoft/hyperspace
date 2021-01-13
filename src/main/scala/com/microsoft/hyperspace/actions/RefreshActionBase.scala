@@ -23,6 +23,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -83,6 +84,47 @@ private[actions] abstract class RefreshActionBase(
       df.load(latestRelation.rootPaths.head)
     } else {
       df.load(latestRelation.rootPaths: _*)
+    }
+  }
+
+  protected lazy val indexSchema: StructType = {
+    val previousSchema = previousIndexLogEntry.schema
+    if (indexSchemaChange.equals(IndexConstants.NO_INDEX_SCHEMA_CHANGE)) {
+      previousSchema
+    } else {
+      if (ResolverUtils
+            .resolve(
+              spark,
+              indexSchemaChange.includeColumns.fieldNames.toSeq,
+              previousIndexLogEntry.indexedColumns ++ previousIndexLogEntry.includedColumns)
+            .isDefined) {
+        throw HyperspaceException(
+          "Duplicate include column names in current index schema " +
+            "and index schema change are not allowed.")
+      }
+
+      if (ResolverUtils
+            .resolve(
+              spark,
+              indexSchemaChange.excludeColumns,
+              previousIndexLogEntry.includedColumns)
+            .isDefined) {
+        throw HyperspaceException("Change in indexed columns is not allowed.")
+      }
+
+      if (ResolverUtils
+            .resolve(
+              spark,
+              indexSchemaChange.excludeColumns,
+              previousIndexLogEntry.includedColumns)
+            .isEmpty) {
+        throw HyperspaceException("Unresolved column(s) found in list of columns to exclude.")
+      }
+
+      previousSchema.copy(
+        fields = previousSchema
+          .filterNot(f => indexSchemaChange.excludeColumns.contains(f.name))
+          .toArray ++ indexSchemaChange.includeColumns)
     }
   }
 
