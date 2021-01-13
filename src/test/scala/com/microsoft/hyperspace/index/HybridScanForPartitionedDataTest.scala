@@ -22,9 +22,9 @@ import org.apache.spark.sql.DataFrame
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
 import com.microsoft.hyperspace.util.FileUtils
 
-// Hybrid Scan tests for partitioned source data. Test cases of HybridScanTestSuite are also
+// Hybrid Scan tests for partitioned source data. Test cases of HybridScanSuite are also
 // executed with partitioned source data.
-class HybridScanForPartitionedDataSuite extends HybridScanTestSuite {
+class HybridScanForPartitionedDataTest extends HybridScanSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     import spark.implicits._

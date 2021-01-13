@@ -22,7 +22,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
-class JsonUtilsTests extends SparkFunSuite {
+class JsonUtilsTest extends SparkFunSuite {
   test("Test for JsonUtils.") {
     val schema = StructType(
       Seq(

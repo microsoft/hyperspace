@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
 
-class CreateIndexTests extends HyperspaceSuite with SQLHelper {
+class CreateIndexTest extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
   private val testDir = "src/test/resources/createIndexTests/"
   private val nonPartitionedDataPath = testDir + "sampleparquet"

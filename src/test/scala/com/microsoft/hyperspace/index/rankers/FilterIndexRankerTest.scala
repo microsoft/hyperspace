@@ -23,10 +23,10 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
-import com.microsoft.hyperspace.index.rules.HyperspaceRuleTestSuite
+import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
 import com.microsoft.hyperspace.util.FileUtils
 
-class FilterIndexRankerTest extends HyperspaceRuleTestSuite {
+class FilterIndexRankerTest extends HyperspaceRuleSuite {
   override val systemPath = new Path("src/test/resources/FilterRankerTest")
   var tempPlan: LogicalPlan = _
 
