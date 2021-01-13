@@ -111,12 +111,11 @@ object MockEventLogger {
 object TestConfig {
   val HybridScanEnabled = Seq(
     IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-    IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true",
     IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
     IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99")
 
   val HybridScanEnabledAppendOnly = Seq(
     IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-    IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false",
-    IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99")
+    IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0")
 }

@@ -96,7 +96,7 @@ object RuleUtils {
       val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
 
       val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-      lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
+      val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
         commonCnt > 0 &&
         appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
         deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
@@ -107,7 +107,7 @@ object RuleUtils {
         commonCnt > 0 &&
         appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
 
-      val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
+      val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
         entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
 
