@@ -97,11 +97,11 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * Runs partitionBasePath() for each provider.
    *
    * @param location Partitioned location.
-   * @return basePath string to read the given partitioned location.
+   * @return Optional basePath string to read the given partitioned location.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def partitionBasePath(location: FileIndex): String = {
+  def partitionBasePath(location: FileIndex): Option[String] = {
     run(p => p.partitionBasePath(location))
   }
 
