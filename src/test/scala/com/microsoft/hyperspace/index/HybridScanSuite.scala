@@ -111,7 +111,9 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+      withSQLConf(
+        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -203,7 +205,9 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+    withSQLConf(
+      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+      IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))

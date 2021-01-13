@@ -110,7 +110,9 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+    withSQLConf(
+      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+      IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
