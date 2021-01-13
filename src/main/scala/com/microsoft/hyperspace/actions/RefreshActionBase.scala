@@ -37,7 +37,8 @@ import com.microsoft.hyperspace.index._
 private[actions] abstract class RefreshActionBase(
     spark: SparkSession,
     final override protected val logManager: IndexLogManager,
-    dataManager: IndexDataManager)
+    dataManager: IndexDataManager,
+    indexSchemaChange: IndexSchemaChange)
     extends CreateActionBase(dataManager)
     with Action {
   private lazy val previousLogEntry: LogEntry = {
