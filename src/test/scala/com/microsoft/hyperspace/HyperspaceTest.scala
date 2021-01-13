@@ -19,10 +19,10 @@ package com.microsoft.hyperspace
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
+import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig}
 import com.microsoft.hyperspace.util.FileUtils
 
-class HyperspaceTests extends HyperspaceSuite {
+class HyperspaceTest extends HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/indexLocation")
 
   private val sampleData = SampleData.testData
@@ -30,14 +30,12 @@ class HyperspaceTests extends HyperspaceSuite {
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private var df: DataFrame = _
-  private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
     val sparkSession = spark
     import sparkSession.implicits._
-    hyperspace = new Hyperspace(sparkSession)
     FileUtils.delete(new Path(sampleParquetDataLocation))
 
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")

@@ -22,9 +22,9 @@ import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.Hyperspace
 
-// Hybrid Scan tests for non partitioned source data. Test cases of HybridScanTestSuite are also
+// Hybrid Scan tests for non partitioned source data. Test cases of HybridScanSuite are also
 // executed with non partitioned source data.
-class HybridScanForNonPartitionedDataSuite extends HybridScanTestSuite {
+class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
 
   override def beforeAll(): Unit = {

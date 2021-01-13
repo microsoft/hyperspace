@@ -23,14 +23,16 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
+import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf, PathUtils}
+import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -66,27 +68,26 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           _,
           fileFormat,
           options) if isSupportedFileFormat(fileFormat) =>
-        val files = location.allFiles
+        val files = filesFromIndex(location)
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
-        // Store basePath of hive-partitioned data sources, if applicable.
-        val basePath = options.get("basePath") match {
-          case None => PathUtils.extractBasePath(location.partitionSpec())
-          case p => p
+        // Use case-sensitive map if the provided options are case insensitive. Case-insensitive
+        // map converts all key-value pairs to lowercase before storing them in the metadata,
+        // making them unusable for future use. An example is "basePath" option.
+        val caseSensitiveOptions = options match {
+          case map: CaseInsensitiveMap[String] => map.originalMap
+          case map => map
         }
 
+        // Get basePath of hive-partitioned data sources, if applicable.
+        val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
+
         // "path" key in options can incur multiple data read unexpectedly.
-        // Since "options" is case-insensitive map, it will change any previous entries of
-        // "basePath" to lowercase "basepath", making it unusable.
-        // Remove lowercase "basepath" and add proper cased "basePath".
-        val opts = basePath match {
-          case Some(path) => Map("basePath" -> path) ++ options - "path" - "basepath"
-          case _ => options - "path" - "basepath"
-        }
+        val opts = caseSensitiveOptions - "path" ++ basePathOpt
 
         val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
           case Some(pattern) =>
@@ -94,7 +95,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
             // This logic is picked from the globbing logic at:
             // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
             // spark/sql/execution/datasources/DataSource.scala#L540
-            val fs = location.allFiles.head.getPath.getFileSystem(new Configuration)
+            val fs = filesFromIndex(location).head.getPath.getFileSystem(new Configuration)
             val globPaths = pattern
               .split(",")
               .map(_.trim)
@@ -181,7 +182,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
           if isSupportedFileFormat(format) =>
-        val result = location.allFiles.sortBy(_.getPath.toString).foldLeft("") {
+        val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
           (acc: String, f: FileStatus) =>
             HashingUtils.md5Hex(acc + fingerprint(f))
         }
@@ -210,7 +211,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
     logicalRelation.relation match {
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-        Some(location.allFiles)
+        Some(filesFromIndex(location))
       case _ => None
     }
   }
@@ -219,11 +220,14 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * Constructs the basePath for the given [[FileIndex]].
    *
    * @param location Partitioned data location.
-   * @return basePath to read the given partitioned location.
+   * @return Optional basePath to read the given partitioned location as explained below:
+   *         Some(Some(path)) => The given location is supported and partition is specified.
+   *         Some(None) => The given location is supported but partition is not specified.
+   *         None => The given location is not supported.
    */
-  override def partitionBasePath(location: FileIndex): Option[String] = {
+  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
-      case p: PartitioningAwareFileIndex =>
+      case p: PartitioningAwareFileIndex if p.partitionSpec.partitions.nonEmpty =>
         // For example, we could have the following in PartitionSpec:
         //   - partition columns = "col1", "col2"
         //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
@@ -232,9 +236,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         // all the partitions in the path, so "partitions.head" is taken as an initial value.
         val basePath = p.partitionSpec.partitionColumns
           .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
-        Some(basePath.toString)
-      case _ =>
-        None
+        Some(Some(basePath.toString))
+      case _: PartitioningAwareFileIndex => Some(None)
+      case _ => None
     }
   }
 
@@ -272,13 +276,38 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
     logicalRelation.relation match {
       case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-        if isSupportedFileFormat(format) =>
+          if isSupportedFileFormat(format) =>
         val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
         Some(fileFormatName.equals("parquet"))
       case _ =>
         None
     }
   }
+
+  private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =
+    try {
+      // Keep the `asInstanceOf` to force casting or fallback because Databrick's
+      // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
+      // standard API's `FileStatus`.
+      index.allFiles
+    } catch {
+      case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
+        val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
+        val clazz = Utils.classForName(dbClassName)
+        val lengthMethod = clazz.getMethod("length")
+        val isDirMethod = clazz.getMethod("isDir")
+        val modificationTimeMethod = clazz.getMethod("modificationTime")
+        val pathMethod = clazz.getMethod("path")
+        index.allFiles.asInstanceOf[Seq[_]].map { f =>
+          new FileStatus(
+            lengthMethod.invoke(f).asInstanceOf[Long],
+            isDirMethod.invoke(f).asInstanceOf[Boolean],
+            0,
+            0,
+            modificationTimeMethod.invoke(f).asInstanceOf[Long],
+            new Path(pathMethod.invoke(f).asInstanceOf[String]))
+        }
+    }
 }
 
 /**
