@@ -83,7 +83,7 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         self.hyperspace.optimizeIndex('idx1', 'full')
 
     def test_index_metadata(self):
-        idx_config = IndexConfig('idx1', ['name'], ['age'])
+        idx_config = IndexConfig('idx1', ['name'], IncludedColumnsConfig(['age'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         # Test the inter-op works fine for "index" API.
         df = self.hyperspace.index('idx1')

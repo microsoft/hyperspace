@@ -1,6 +1,6 @@
 from .hyperspace import Hyperspace
 from .indexconfig import IndexConfig
-from .includedColumnsConfig import IncludedColumnsConfig
+from .includedcolumnsconfig import IncludedColumnsConfig
 
 __all__ = [
     'Hyperspace', 'IndexConfig', 'IncludedColumnsConfig'
