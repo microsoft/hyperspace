@@ -28,7 +28,7 @@ import java.util.Locale
 case class IndexConfig(
     indexName: String,
     indexedColumns: Seq[String],
-    includedColumns: IncludedColumns = IncludedColumns()) {
+    includedColumns: IncludedColumnsConfig = IncludedColumnsConfig()) {
   if (indexName.isEmpty || indexedColumns.isEmpty) {
     throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")
   }
@@ -86,14 +86,14 @@ case class IndexConfig(
 object IndexConfig {
 
   def apply(indexName: String, indexedColumns: Seq[String]): IndexConfig = {
-    IndexConfig(indexName, indexedColumns, IncludedColumns())
+    IndexConfig(indexName, indexedColumns, IncludedColumnsConfig())
   }
 
   def apply(
       indexName: String,
       indexedColumns: Seq[String],
       columnsToInclude: Seq[String]): IndexConfig = {
-    IndexConfig(indexName, indexedColumns, IncludedColumns(columnsToInclude))
+    IndexConfig(indexName, indexedColumns, IncludedColumnsConfig(columnsToInclude))
   }
 
   /**
@@ -102,8 +102,8 @@ object IndexConfig {
   class Builder {
 
     private[this] var indexedColumns: Seq[String] = Seq()
-    private[this] var includedColumnsInclude: Seq[String] = Seq()
-    private[this] var includedColumnsExclude: Seq[String] = Seq()
+    private[this] var columnsToInclude: Seq[String] = Seq()
+    private[this] var columnsToExclude: Seq[String] = Seq()
     private[this] var indexName: String = ""
 
     /**
@@ -153,11 +153,11 @@ object IndexConfig {
      * @return an [[IndexConfig.Builder]] object with updated included columns.
      */
     def include(includedColumn: String, includedColumns: String*): Builder = {
-      if (this.includedColumnsInclude.nonEmpty) {
+      if (this.columnsToInclude.nonEmpty) {
         throw new UnsupportedOperationException("Included columns are already set.")
       }
 
-      this.includedColumnsInclude = includedColumn +: includedColumns
+      this.columnsToInclude = includedColumn +: includedColumns
       this
     }
 
@@ -171,11 +171,11 @@ object IndexConfig {
      * @return an [[IndexConfig.Builder]] object with updated excluded columns.
      */
     def exclude(excludedColumn: String, excludedColumns: String*): Builder = {
-      if (this.includedColumnsExclude.nonEmpty) {
+      if (this.columnsToExclude.nonEmpty) {
         throw new UnsupportedOperationException("Excluded columns are already set.")
       }
 
-      this.includedColumnsExclude = excludedColumn +: excludedColumns
+      this.columnsToExclude = excludedColumn +: excludedColumns
       this
     }
 
@@ -189,7 +189,7 @@ object IndexConfig {
       IndexConfig(
         indexName,
         indexedColumns,
-        IncludedColumns(includedColumnsInclude, includedColumnsExclude))
+        IncludedColumnsConfig(columnsToInclude, columnsToExclude))
     }
   }
 
@@ -207,7 +207,7 @@ object IndexConfig {
  * @param include List of column names to include as include columns.
  * @param exclude List of column names to exclude to form list of included columns.
  */
-case class IncludedColumns(include: Seq[String] = Nil, exclude: Seq[String] = Nil) {
+case class IncludedColumnsConfig(include: Seq[String] = Nil, exclude: Seq[String] = Nil) {
   lazy val lowerCaseIncludeColumns = toLowerCase(include)
   lazy val lowerCaseExcludeColumns = toLowerCase(exclude)
   lazy val lowerCaseIncludeColumnsSet = lowerCaseIncludeColumns.toSet
@@ -215,7 +215,7 @@ case class IncludedColumns(include: Seq[String] = Nil, exclude: Seq[String] = Ni
 
   override def equals(that: Any): Boolean = {
     that match {
-      case IncludedColumns(thatInclude, thatExclude) =>
+      case IncludedColumnsConfig(thatInclude, thatExclude) =>
         lowerCaseIncludeColumnsSet.equals(toLowerCase(thatInclude).toSet) &&
           lowerCaseExcludeColumnsSet.equals(toLowerCase(thatExclude).toSet)
       case _ => false

@@ -35,10 +35,10 @@ class Hyperspace:
 
     def _getJavaIncludedColumns(self, include, exclude):
         """
-        Constructs IncludedColumns Java object from Java's List objects.
-        :param include: List of column names to include as include columns.
+        Constructs IncludedColumnsConfig Java object from Java's List objects.
+        :param include: List of column names to include as included columns.
         :param exclude: List of column names to exclude to form list of included columns.
-        :return: IncludedColumns python object.
+        :return: IncludedColumnsConfig python object.
 
         >>> _getJavaIncludedColumns(include, exclude)
         """
@@ -81,7 +81,7 @@ class Hyperspace:
         :param indexConfig: indexConfig
 
         >>> hyperspace = Hyperspace(spark)
-        >>> idxConfig = IndexConfig("indexName", ["c1"], IncludedColumns(["c2, c3"], []))
+        >>> idxConfig = IndexConfig("indexName", ["c1"], IncludedColumnsConfig(["c2, c3"], []))
         >>> df = spark.read.parquet("./sample.parquet").toDF("c1", "c2", "c3")
         >>> hyperspace.createIndex(df, indexConfig)
         """

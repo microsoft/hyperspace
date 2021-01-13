@@ -243,7 +243,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
   }
 
   test("Create index using IndexConfig with excluded columns.") {
-    val indexConfig = IndexConfig("index1", Seq("RGUID"), IncludedColumns(Seq(), Seq("Date")))
+    val indexConfig = IndexConfig("index1", Seq("RGUID"), IncludedColumnsConfig(Seq(), Seq("Date")))
     hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
 
     val columns = Set("Query", "imprs", "clicks")
