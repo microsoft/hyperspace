@@ -48,6 +48,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
     })
 
+  private def getLogicalRelation(plan: LogicalPlan): Option[LogicalRelation] =
+    plan match {
+      case logicalRelation: LogicalRelation => Some(logicalRelation)
+      case _ => None
+    }
+
   /**
    * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
    *
@@ -59,72 +65,67 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   override def createRelation(
       logicalPlan: LogicalPlan,
       fileIdTracker: FileIdTracker): Option[Relation] = {
-    logicalPlan match {
-      case logicalRelation: LogicalRelation =>
-        logicalRelation.relation match {
-          case HadoopFsRelation(
-              location: PartitioningAwareFileIndex,
-              _,
-              dataSchema,
-              _,
-              fileFormat,
-              options) if isSupportedFileFormat(fileFormat) =>
+    getLogicalRelation(logicalPlan).map(_.relation).flatMap {
+      case HadoopFsRelation(
+          location: PartitioningAwareFileIndex,
+          _,
+          dataSchema,
+          _,
+          fileFormat,
+          options) if isSupportedFileFormat(fileFormat) =>
+        val files = filesFromIndex(location)
+        // Note that source files are currently fingerprinted when the optimized plan is
+        // fingerprinted by LogicalPlanFingerprint.
+        val sourceDataProperties =
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+        val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
 
-            val files = filesFromIndex(location)
-            // Note that source files are currently fingerprinted when the optimized plan is
-            // fingerprinted by LogicalPlanFingerprint.
-            val sourceDataProperties =
-            Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-            val fileFormatName = fileFormat.asInstanceOf[DataSourceRegister].shortName
-
-            // Use case-sensitive map if the provided options are case insensitive. Case-insensitive
-            // map converts all key-value pairs to lowercase before storing them in the metadata,
-            // making them unusable for future use. An example is "basePath" option.
-            val caseSensitiveOptions = options match {
-              case map: CaseInsensitiveMap[String] => map.originalMap
-              case map => map
-            }
-
-            // Get basePath of hive-partitioned data sources, if applicable.
-            val basePathOpt = partitionBasePath(logicalPlan).flatten.map("basePath" -> _)
-
-            // "path" key in options can incur multiple data read unexpectedly.
-            val opts = caseSensitiveOptions - "path" ++ basePathOpt
-
-            val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
-              case Some(pattern) =>
-                // Validate if globbing pattern matches actual source paths.
-                // This logic is picked from the globbing logic at:
-                // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
-                // spark/sql/execution/datasources/DataSource.scala#L540
-                val fs = filesFromIndex(location).head.getPath
-                  .getFileSystem(spark.sessionState.newHadoopConf())
-                val globPaths = pattern
-                    .split(",")
-                    .map(_.trim)
-                    .map { path =>
-                      val hdfsPath = new Path(path)
-                      val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
-                      qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
-                    }
-                    .toMap
-
-                val globPathValues = globPaths.values.flatten.toSet
-                if (!location.rootPaths.forall(globPathValues.contains)) {
-                  throw HyperspaceException(
-                    "Some glob patterns do not match with available root " +
-                        s"paths of the source data. Please check if $pattern matches all of " +
-                        s"${location.rootPaths.mkString(",")}.")
-                }
-                globPaths.keySet.toSeq
-
-              case _ => location.rootPaths.map(_.toString)
-            }
-
-            Some(Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json,
-              fileFormatName, opts))
-          case _ => None
+        // Use case-sensitive map if the provided options are case insensitive. Case-insensitive
+        // map converts all key-value pairs to lowercase before storing them in the metadata,
+        // making them unusable for future use. An example is "basePath" option.
+        val caseSensitiveOptions = options match {
+          case map: CaseInsensitiveMap[String] => map.originalMap
+          case map => map
         }
+
+        // Get basePath of hive-partitioned data sources, if applicable.
+        val basePathOpt = partitionBasePath(logicalPlan).flatten.map("basePath" -> _)
+
+        // "path" key in options can incur multiple data read unexpectedly.
+        val opts = caseSensitiveOptions - "path" ++ basePathOpt
+
+        val rootPaths = opts.get(GLOBBING_PATTERN_KEY) match {
+          case Some(pattern) =>
+            // Validate if globbing pattern matches actual source paths.
+            // This logic is picked from the globbing logic at:
+            // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
+            // spark/sql/execution/datasources/DataSource.scala#L540
+            val fs = filesFromIndex(location).head.getPath
+              .getFileSystem(spark.sessionState.newHadoopConf())
+            val globPaths = pattern
+              .split(",")
+              .map(_.trim)
+              .map { path =>
+                val hdfsPath = new Path(path)
+                val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+                qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
+              }
+              .toMap
+
+            val globPathValues = globPaths.values.flatten.toSet
+            if (!location.rootPaths.forall(globPathValues.contains)) {
+              throw HyperspaceException(
+                "Some glob patterns do not match with available root " +
+                  s"paths of the source data. Please check if $pattern matches all of " +
+                  s"${location.rootPaths.mkString(",")}.")
+            }
+            globPaths.keySet.toSeq
+
+          case _ => location.rootPaths.map(_.toString)
+        }
+
+        Some(
+          Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json, fileFormatName, opts))
       case _ => None
     }
   }
@@ -192,18 +193,14 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    *         Otherwise, None.
    */
   override def signature(logicalPlan: LogicalPlan): Option[String] = {
-    logicalPlan match {
-      case logicalRelation: LogicalRelation =>
-        logicalRelation.relation match {
-          case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
-            if isSupportedFileFormat(format) =>
-            val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
-              (acc: String, f: FileStatus) =>
-                HashingUtils.md5Hex(acc + fingerprint(f))
-            }
-            Some(result)
-          case _ => None
+    getLogicalRelation(logicalPlan).map(_.relation).flatMap {
+      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
+          if isSupportedFileFormat(format) =>
+        val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
+          (acc: String, f: FileStatus) =>
+            HashingUtils.md5Hex(acc + fingerprint(f))
         }
+        Some(result)
       case _ => None
     }
   }
@@ -226,13 +223,9 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @return List of [[FileStatus]] for the given relation.
    */
   override def allFiles(logicalPlan: LogicalPlan): Option[Seq[FileStatus]] = {
-    logicalPlan match {
-      case logicalRelation: LogicalRelation =>
-        logicalRelation.relation match {
-          case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-            Some(filesFromIndex(location))
-          case _ => None
-        }
+    getLogicalRelation(logicalPlan).map(_.relation).flatMap {
+      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+        Some(filesFromIndex(location))
       case _ => None
     }
   }
@@ -249,8 +242,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    *         None => The location of the given plan is not supported.
    */
   override def partitionBasePath(logicalPlan: LogicalPlan): Option[Option[String]] = {
-    logicalPlan match {
-      case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
+    getLogicalRelation(logicalPlan).map(_.relation).flatMap {
+      case HadoopFsRelation(location, _, _, _, _, _) =>
         location match {
           case p: PartitioningAwareFileIndex if p.partitionSpec.partitions.nonEmpty =>
             // For example, we could have the following in PartitionSpec:
@@ -265,7 +258,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           case _: PartitioningAwareFileIndex => Some(None)
           case _ => None
         }
-      case _ => None
     }
   }
 
@@ -282,16 +274,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    */
   override def lineagePairs(logicalPlan: LogicalPlan,
       fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
-    logicalPlan match {
-      case logicalRelation: LogicalRelation =>
-        logicalRelation.relation match {
-          case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-            if isSupportedFileFormat(format) =>
-            Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-              (kv._1._1.replace("file:/", "file:///"), kv._2)
-            })
-          case _ => None
-        }
+    getLogicalRelation(logicalPlan).map(_.relation).flatMap {
+      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
+          if isSupportedFileFormat(format) =>
+        Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+          (kv._1._1.replace("file:/", "file:///"), kv._2)
+        })
       case _ => None
     }
   }
@@ -303,15 +291,11 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @return True if source files in the given relation are parquet.
    */
   override def hasParquetAsSourceFormat(logicalPlan: LogicalPlan): Option[Boolean] = {
-    logicalPlan match {
-      case logicalRelation: LogicalRelation =>
-        logicalRelation.relation match {
-          case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-            if isSupportedFileFormat(format) =>
-            val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
-            Some(fileFormatName.equals("parquet"))
-          case _ => None
-        }
+    getLogicalRelation(logicalPlan).map(_.relation).flatMap {
+      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
+          if isSupportedFileFormat(format) =>
+        val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
+        Some(fileFormatName.equals("parquet"))
       case _ => None
     }
   }

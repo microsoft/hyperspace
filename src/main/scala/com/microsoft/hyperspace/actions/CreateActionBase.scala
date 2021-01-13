@@ -27,8 +27,7 @@ import org.apache.spark.sql.types.StructType
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index.rules.ExtractIndexSupportedLogicalPlan
-import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, LogicalPlanUtils, PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -68,7 +67,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = sourceRelations(spark, df)
-        // Currently we only support to create an index
         assert(relations.size == 1)
 
         val sourcePlanProperties = SparkPlan.Properties(
@@ -119,7 +117,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
-      case ExtractIndexSupportedLogicalPlan(p) =>
+      case p: LogicalPlan if LogicalPlanUtils.hasSupportedLogicalRelation(p) =>
         Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 
@@ -194,9 +192,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val relation = df.queryExecution.optimizedPlan
-      val lineagePairs =
-        Hyperspace.getContext(spark).sourceProviderManager.lineagePairs(relation, fileIdTracker)
+      val lineagePairs = Hyperspace.getContext(spark).sourceProviderManager
+          .lineagePairs(df.queryExecution.optimizedPlan, fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 
       df.withColumn(dataPathColumn, input_file_name())

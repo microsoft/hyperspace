@@ -21,8 +21,6 @@ import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
@@ -51,7 +49,7 @@ object FilterIndexRule
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
-      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, _) =>
+      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns) =>
         try {
           val candidateIndexes =
             findCoveringIndexes(filter, outputColumns, filterColumns)
@@ -137,7 +135,6 @@ object FilterIndexRule
    * @param filterColumns List of columns in filter predicate.
    * @param indexedColumns List of indexed columns (e.g. from an index being checked)
    * @param includedColumns List of included columns (e.g. from an index being checked)
-   * @param fileFormat FileFormat for input relation in original logical plan.
    * @return 'true' if
    *         1. Index fully covers output and filter columns, and
    *         2. Filter predicate contains first column in index's 'indexed' columns.
@@ -161,58 +158,35 @@ object ExtractFilterNode {
       LogicalPlan, // original plan
       Filter,
       Seq[String], // output columns
-      Seq[String], // filter columns
-      LogicalPlan, // relation node
-      Option[HadoopFsRelation])
+      Seq[String]) // filter columns
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
     case project @ Project(
           _,
           filter @ Filter(
             condition: Expression,
-            logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)))
-        if !RuleUtils.isIndexApplied(logicalRelation) =>
+            p: LogicalPlan))
+        if LogicalPlanUtils.hasSupportedLogicalRelation(p) &&
+            !RuleUtils.isIndexApplied(p) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
         .map(_.references.map(_.asInstanceOf[AttributeReference].name))
         .flatMap(_.toSeq)
       val filterColumnNames = condition.references.map(_.name).toSeq
-      Some(project, filter, projectColumnNames, filterColumnNames, logicalRelation,
 
-        Some(fsRelation))
-
-    case project @ Project(
-          _,
-          filter @ Filter(
-          condition: Expression,
-          dataSourceV2Relation @ DataSourceV2Relation(_, _, _, _, _)))
-        if !RuleUtils.isIndexApplied(dataSourceV2Relation) =>
-      val projectColumnNames = CleanupAliases(project)
-          .asInstanceOf[Project]
-          .projectList
-          .map(_.references.map(_.asInstanceOf[AttributeReference].name))
-          .flatMap(_.toSeq)
-      val filterColumnNames = condition.references.map(_.name).toSeq
-
-      Some(project, filter, projectColumnNames, filterColumnNames, dataSourceV2Relation,
-        None)
+      Some(project, filter, projectColumnNames, filterColumnNames)
 
     case filter @ Filter(
           condition: Expression,
-          logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))
-        if !RuleUtils.isIndexApplied(logicalRelation) =>
-      val relationColumnsName = logicalRelation.output.map(_.name)
+          p: LogicalPlan)
+        if LogicalPlanUtils.hasSupportedLogicalRelation(p) &&
+            !RuleUtils.isIndexApplied(p) =>
+      val relationColumnsName = p.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(filter, filter, relationColumnsName, filterColumnNames, logicalRelation,
-        Some(fsRelation))
+      Some(filter, filter, relationColumnsName, filterColumnNames)
 
     case _ => None // plan does not match with any of filter index rule patterns
   }
-}
-
-object ExtractIndexSupportedLogicalPlan {
-  def unapply(plan: LogicalPlan): Option[LogicalPlan] =
-    Some(plan).filter(LogicalPlanUtils.isLogicalPlanSupported)
 }

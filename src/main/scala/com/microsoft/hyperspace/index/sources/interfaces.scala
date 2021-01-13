@@ -19,7 +19,6 @@ package com.microsoft.hyperspace.index.sources
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.FileIndex
 
 import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 
@@ -138,7 +137,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    *
    * File paths should be the same format with "input_file_name()" of the given relation type.
    *
-   * @param logicalPlan Logical relation to check the relation type.
+   * @param logicalPlan Logical plan to check the relation type.
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of pairs of (file path, file id).
    */
@@ -149,7 +148,7 @@ trait FileBasedSourceProvider extends SourceProvider {
   /**
    * Returns whether the given relation has parquet source files or not.
    *
-   * @param logicalPlan Logical Relation to check the source file format.
+   * @param logicalPlan Logical plan to check the source file format.
    * @return True if source files in the given relation are parquet.
    */
   def hasParquetAsSourceFormat(logicalPlan: LogicalPlan): Option[Boolean]

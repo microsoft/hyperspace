@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 
 /**
@@ -26,35 +26,15 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 object LogicalPlanUtils {
 
   /**
-   * Check if a logical plan is a LogicalRelation.
-   * @param logicalPlan logical plan to check.
-   * @return true if a logical plan is a LogicalRelation or false.
-   */
-  def isLogicalRelation(logicalPlan: LogicalPlan): Boolean = {
-    logicalPlan match {
-      case _: LogicalRelation => true
-      case _ => false
-    }
-  }
-
-  /**
-   * Check if a logical plan is a DataSourceV2Relation.
+   * Check if a logical plan is supported.
    * @param logicalPlan Logical plan to check.
-   * @return true if a logical plan is a DataSourceV2Relation or false.
+   * @return true if a logical plan is supported or false.
    */
-  def isDataSourceV2Relation(logicalPlan: LogicalPlan): Boolean = {
+  def hasSupportedLogicalRelation(logicalPlan: LogicalPlan): Boolean = {
     logicalPlan match {
+      case LogicalRelation(_: HadoopFsRelation, _, _, _) => true
       case _: DataSourceV2Relation => true
       case _ => false
     }
   }
-
-  /**
-   * Check if a logical plan is supported.
-   * @param logicalPlan logical plan to check.
-   * @return true if a logical plan is supported or false.
-   */
-  def isLogicalPlanSupported(logicalPlan: LogicalPlan): Boolean =
-    isLogicalRelation(logicalPlan) || isDataSourceV2Relation(logicalPlan)
-
 }

@@ -32,6 +32,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
+import com.microsoft.hyperspace.util.LogicalPlanUtils
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -340,7 +341,7 @@ object JoinIndexRule
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {
     l.collectLeaves()
-        .filter(i => i.isInstanceOf[LogicalRelation] ||  i.isInstanceOf[DataSourceV2Relation])
+        .filter(LogicalPlanUtils.hasSupportedLogicalRelation)
         .flatMap(_.output)
   }
 
