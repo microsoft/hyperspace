@@ -1,4 +1,4 @@
-class IncludedColumns:
+class IncludedColumnsConfig:
     def __init__(self, include, exclude):
         """
         Initializes IncludedColumnsConfig object.

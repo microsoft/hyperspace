@@ -40,7 +40,7 @@ class HyperspaceIndexUtilizationTests(HyperspaceTestCase):
                          "Hyperspace must be disabled after Hyperspace disable.")
 
     def test_hyperspace_explain(self):
-        idx_config = IndexConfig('idx1', ['age'], IncludedColumns(['name', 'department'], []))
+        idx_config = IndexConfig('idx1', ['age'], IncludedColumnsConfig(['name', 'department'], []))
         self.hyperspace.createIndex(self.df, idx_config)
         self.df.createOrReplaceTempView("employees")
         filter_query = self.spark.sql(""" SELECT age, name, department FROM employees 
