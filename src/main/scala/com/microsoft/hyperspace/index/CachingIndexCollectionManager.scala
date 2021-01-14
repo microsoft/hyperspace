@@ -29,23 +29,23 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * - If any API is called to add a new index or modify
  * an existing index's status, cache gets cleared.
  *
- * @param spark                   Spark session
- * @param indexCacheFactory       provides cache instance
- * @param indexLogManagerFactory  provides IndexLogManager instance
+ * @param spark Spark session
+ * @param indexCacheFactory provides cache instance
+ * @param indexLogManagerFactory provides IndexLogManager instance
  * @param indexDataManagerFactory provides IndexDataManager instance
- * @param fileSystemFactory       provides FileSystem instance
+ * @param fileSystemFactory provides FileSystem instance
  */
 class CachingIndexCollectionManager(
-                                     spark: SparkSession,
-                                     indexCacheFactory: IndexCacheFactory,
-                                     indexLogManagerFactory: IndexLogManagerFactory,
-                                     indexDataManagerFactory: IndexDataManagerFactory,
-                                     fileSystemFactory: FileSystemFactory)
-  extends IndexCollectionManager(
-    spark,
-    indexLogManagerFactory,
-    indexDataManagerFactory,
-    fileSystemFactory) {
+    spark: SparkSession,
+    indexCacheFactory: IndexCacheFactory,
+    indexLogManagerFactory: IndexLogManagerFactory,
+    indexDataManagerFactory: IndexDataManagerFactory,
+    fileSystemFactory: FileSystemFactory)
+    extends IndexCollectionManager(
+      spark,
+      indexLogManagerFactory,
+      indexDataManagerFactory,
+      fileSystemFactory) {
 
   private val indexCache: Cache[Seq[IndexLogEntry]] =
     indexCacheFactory.create(spark, IndexCacheType.CREATION_TIME_BASED)
