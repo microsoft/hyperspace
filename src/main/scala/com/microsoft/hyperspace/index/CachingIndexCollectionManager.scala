@@ -129,8 +129,8 @@ class CreationTimeBasedIndexCache(spark: SparkSession, clock: Clock)
 
   /**
    * Returns cache entry with the following expiration policy:
-   * If lastCacheTime shows a valid time and the duration since then does not exceed
-   * configured expiry duration, then current cache entry is valid; otherwise stale
+   *  If lastCacheTime shows a valid time and the duration since then does not exceed
+   *  configured expiry duration, then current cache entry is valid; otherwise stale
    *
    * @return current cache entry if not expired, otherwise None.
    */
