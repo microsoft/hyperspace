@@ -158,7 +158,8 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
 
 /**
  * Mock for testing purposes so we can validate and invalidate entries based on time.
- * @param time long value that tells current time
+
+ * @param time Current time.
  */
 class MockClock(private var time: Long = 0L) extends Clock {
   override def getTime: Long = time
