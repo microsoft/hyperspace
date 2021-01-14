@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Hdfs.Properties
 
-trait HyperspaceRuleTestSuite extends HyperspaceSuite {
+trait HyperspaceRuleSuite extends HyperspaceSuite {
   private val filenames = Seq("f1.parquet", "f2.parquet")
   def createIndexLogEntry(
       name: String,
