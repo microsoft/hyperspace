@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, TestConfig}
 import com.microsoft.hyperspace.util.FileUtils
 
 // Hybrid Scan tests for partitioned source data. Test cases of HybridScanSuite are also
@@ -133,8 +133,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -164,8 +163,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -215,8 +213,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -250,8 +247,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             // The new partition can be handled with Hybrid Scan approach.
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
