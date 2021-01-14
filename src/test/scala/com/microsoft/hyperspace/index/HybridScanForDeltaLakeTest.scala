@@ -20,10 +20,9 @@ import io.delta.tables.DeltaTable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import com.microsoft.hyperspace.{Hyperspace, TestConfig}
 
-import com.microsoft.hyperspace.Hyperspace
-
-class HybridScanForDeltaLakeSuite extends HybridScanSuite {
+class HybridScanForDeltaLakeTest extends HybridScanSuite {
   override protected val fileFormat = "delta"
   override protected val fileFormat2 = "delta"
 
@@ -114,7 +113,7 @@ class HybridScanForDeltaLakeSuite extends HybridScanSuite {
 
       val sourcePath = (new Path(testPath)).toString
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
         val filter = filterQuery
         val planWithHybridScan = filter.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))

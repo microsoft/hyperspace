@@ -25,8 +25,7 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExe
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
-
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
@@ -400,15 +399,14 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       val basePlan = baseQuery.queryExecution.optimizedPlan
 
       withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-        withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+        withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
+          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
             val join = joinQuery()
             checkAnswer(join, baseQuery)
             assert(basePlan.equals(join.queryExecution.optimizedPlan))
-          }
         }
 
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
           val join = joinQuery()
           val planWithHybridScan = join.queryExecution.optimizedPlan
           assert(!basePlan.equals(planWithHybridScan))
@@ -450,7 +448,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
         val filter = filterQuery
         val planWithHybridScan = filter.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -485,16 +483,12 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           val baseQuery = filterQuery
           val basePlan = baseQuery.queryExecution.optimizedPlan
 
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery
             assert(basePlan.equals(filter.queryExecution.optimizedPlan))
           }
 
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabled: _*) {
             val filter = filterQuery
             val planWithHybridScan = filter.queryExecution.optimizedPlan
             assert(!basePlan.equals(planWithHybridScan))
@@ -547,9 +541,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           assert(basePlan.equals(join.queryExecution.optimizedPlan))
         }
 
-        withSQLConf(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
           val join = joinQuery()
           val planWithHybridScan = join.queryExecution.optimizedPlan
           assert(!basePlan.equals(planWithHybridScan))
@@ -593,9 +585,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabled: _*) {
         val filter = filterQuery
         val planWithHybridScan = filter.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -649,10 +639,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           assert(basePlan.equals(join.queryExecution.optimizedPlan))
         }
 
-        withSQLConf(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true",
-          "spark.sql.optimizer.inSetConversionThreshold" -> "1") {
+        withSQLConf(TestConfig.HybridScanEnabled :+
+          "spark.sql.optimizer.inSetConversionThreshold" -> "1": _*) {
           // Changed inSetConversionThreshould to check InSet optimization.
           val join = joinQuery()
           val planWithHybridScan = join.queryExecution.optimizedPlan

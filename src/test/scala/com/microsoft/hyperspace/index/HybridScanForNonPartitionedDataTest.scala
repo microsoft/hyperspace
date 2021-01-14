@@ -20,7 +20,9 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources._
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{Hyperspace, TestConfig}
+import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 
 // Hybrid Scan tests for non partitioned source data. Test cases of HybridScanSuite are also
 // executed with non partitioned source data.
@@ -58,7 +60,7 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
         val filter = filterQuery
         val planWithHybridScan = filter.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -101,15 +103,11 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
 
             val baseQuery = filterQuery
             val basePlan = baseQuery.queryExecution.optimizedPlan
-            withSQLConf(
-              IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-              IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
+            withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
               val filter = filterQuery
               assert(basePlan.equals(filter.queryExecution.optimizedPlan))
             }
-            withSQLConf(
-              IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-              IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+            withSQLConf(TestConfig.HybridScanEnabled: _*) {
               val filter = filterQuery
               assert(
                 basePlan
@@ -123,11 +121,12 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
 
   test("Delete-only: filter rule, number of delete files threshold") {
     withTempPathAsString { testPath =>
+      val indexName = "IndexDeleteCntTest"
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         setupIndexAndChangeData(
           fileFormat,
           testPath,
-          indexConfig1.copy(indexName = "IndexDeleteCntTest"),
+          indexConfig1.copy(indexName = indexName),
           appendCnt = 0,
           deleteCnt = 2)
       }
@@ -137,18 +136,24 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
         df.filter(df("clicks") <= 2000).select(df("query"))
       val baseQuery = filterQuery
       val basePlan = baseQuery.queryExecution.optimizedPlan
+      val sourceSize = latestIndexLogEntry(systemPath, indexName).sourceFilesSizeInBytes
 
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
+      val afterDeleteSize = FileUtils.getDirectorySize(new Path(testPath))
+      val deletedRatio = 1 - (afterDeleteSize / sourceSize.toFloat)
+      // scalastyle:off
+      println(deletedRatio)
+
+      withSQLConf(TestConfig.HybridScanEnabled: _*) {
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+          (deletedRatio + 0.1).toString) {
           val filter = filterQuery
-          // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
+          // As deletedRatio is less than the threshold, the index can be applied.
           assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
         }
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+          (deletedRatio - 0.1).toString) {
           val filter = filterQuery
-          // Since number of deletedFiles = 2, index should not be applied even with Hybrid scan.
+          // As deletedRatio is greater than the threshold, the index shouldn't be applied.
           assert(basePlan.equals(filter.queryExecution.optimizedPlan))
         }
       }
