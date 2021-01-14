@@ -125,7 +125,12 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    val entry = if (indexSchemaChange.equals(IndexConstants.NO_INDEX_SCHEMA_CHANGE)) {
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    } else {
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath).copyWithDerivedDatasetProperties(
+        Map(IndexConstants.INDEX_SCHEMA_CHANGED -> "true"))
+    }
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.

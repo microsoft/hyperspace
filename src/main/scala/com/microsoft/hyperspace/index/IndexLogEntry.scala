@@ -31,6 +31,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.CoveringIndex.Properties
 import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
@@ -495,6 +496,14 @@ case class IndexLogEntry(
                           Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
   }
 
+  def copyWithDerivedDatasetProperties(properties: Map[String, String]): IndexLogEntry = {
+    val props = derivedDataset.properties.properties ++ properties
+    copy(
+      derivedDataset = derivedDataset.copy(
+        properties = derivedDataset.properties.copy(
+          properties = props)))
+  }
+
   def bucketSpec: BucketSpec =
     BucketSpec(
       numBuckets = numBuckets,
@@ -535,6 +544,11 @@ case class IndexLogEntry(
     relations.head.fileFormat.equals("parquet") ||
       derivedDataset.properties.properties.getOrElse(
         IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
+  }
+
+  def hasSchemaChange: Boolean = {
+    derivedDataset.properties.properties.getOrElse(
+      IndexConstants.INDEX_SCHEMA_CHANGED, "false").toBoolean
   }
 
   @JsonIgnore

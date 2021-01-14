@@ -488,6 +488,37 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test("Verify optimize fails as expected on an index with schema changes.") {
+    withTempPathAsString { testPath =>
+      val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, indexConfig)
+
+      // Change original data.
+      SampleData.appendWithSchemaChange(
+        spark,
+        Seq("Date", "Query", "City", "State", "ZipCode"),
+        testPath)
+
+      // Refresh index with schema changes and try to optimize.
+      val newCols =
+        StructType(Seq(StructField("City", StringType), StructField("State", StringType)))
+      val indexSchemaChange = IndexSchemaChange(newCols, Seq("imprs"))
+      hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL, indexSchemaChange)
+      val ex = intercept[HyperspaceException] {
+        hyperspace.optimizeIndex(indexConfig.indexName)
+      }
+      assert(
+        ex.msg.contains("Optimize is not supported on an index with schema changes."))
+    }
+  }
+
   test("Verify incremental refresh index properly adds hive-partition columns.") {
     withTempPathAsString { testPath =>
       val absoluteTestPath = PathUtils.makeAbsolute(testPath).toString

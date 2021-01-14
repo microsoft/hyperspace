@@ -48,4 +48,17 @@ object SampleData {
         df.write.parquet(path)
     }
   }
+
+  def appendWithSchemaChange(spark: SparkSession, columns: Seq[String], path: String): Unit = {
+    val data = Seq(
+      ("2020-12-6", "facebook", "Menlo Park", "CA", 94025),
+      ("2019-10-16", "donde", "New York", "NY", 10001))
+
+    import spark.implicits._
+    data
+      .toDF(columns: _*)
+      .write
+      .mode("append")
+      .parquet(path)
+  }
 }

@@ -454,73 +454,46 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Validate refresh in the full mode with index schema changes.") {
-    Seq(true, false).foreach { enableLineage =>
-      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
-        withIndex(indexConfig.indexName) {
-          withTempPathAsString { testPath =>
-            SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-            val df = spark.read.parquet(testPath)
-            hyperspace.createIndex(df, indexConfig)
-            appendDataWithModifiedSchema(testPath)
-            val newCols =
-              StructType(Seq(StructField("City", StringType), StructField("State", StringType)))
-            val indexSchemaChange = IndexSchemaChange(newCols, Seq("imprs"))
-            hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_FULL, indexSchemaChange)
-            val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
-              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+  test("Validate refresh in the full and incremental modes with index schema changes.") {
+    Seq(REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL).foreach {refreshMode =>
+      Seq(true, false).foreach { enableLineage =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+          withIndex(indexConfig.indexName) {
+            withTempPathAsString { testPath =>
+              SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+              val df = spark.read.parquet(testPath)
+              hyperspace.createIndex(df, indexConfig)
 
-            var expectedSchema = Set(
-              StructField("City", StringType),
-              StructField("State", StringType),
-              StructField("Query", StringType))
-            if (enableLineage) {
-              expectedSchema += StructField(IndexConstants.DATA_FILE_NAME_ID, LongType)
+              // Change original data.
+              if (enableLineage) {
+                deleteOneDataFile(testPath)
+              }
+
+              SampleData.appendWithSchemaChange(
+                spark,
+                Seq("Date", "Query", "City", "State", "ZipCode"),
+                testPath)
+
+              // Refresh index in desired mode.
+              val newCols =
+                StructType(Seq(StructField("City", StringType), StructField("State", StringType)))
+              val indexSchemaChange = IndexSchemaChange(newCols, Seq("imprs"))
+              hyperspace.refreshIndex(indexConfig.indexName, refreshMode, indexSchemaChange)
+
+              var expectedSchema = Set(
+                StructField("City", StringType),
+                StructField("State", StringType),
+                StructField("Query", StringType))
+              if (enableLineage) {
+                expectedSchema += StructField(IndexConstants.DATA_FILE_NAME_ID, LongType)
+              }
+
+              // Verify schema from latest index files.
+              val indexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
+                s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+              assert(indexDF.schema.toSet === expectedSchema)
+
             }
-            val ssss = refreshedIndexDF.schema.toSet
-            assert(ssss === expectedSchema)
-
-            refreshedIndexDF.show(100, false)
-          }
-        }
-      }
-    }
-  }
-
-  test("Validate refresh in the incremental mode with index schema changes.") {
-    Seq(true, false).foreach { enableLineage =>
-      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
-        withIndex(indexConfig.indexName) {
-          withTempPathAsString { testPath =>
-            SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
-            val df = spark.read.parquet(testPath)
-            hyperspace.createIndex(df, indexConfig)
-            if (enableLineage) {
-              deleteOneDataFile(testPath)
-            }
-
-            appendDataWithModifiedSchema(testPath)
-            val newCols =
-              StructType(Seq(StructField("City", StringType), StructField("State", StringType)))
-            val indexSchemaChange = IndexSchemaChange(newCols, Seq("imprs"))
-            hyperspace.refreshIndex(
-              indexConfig.indexName,
-              REFRESH_MODE_INCREMENTAL,
-              indexSchemaChange)
-            val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
-              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
-
-            var expectedSchema = Set(
-              StructField("City", StringType),
-              StructField("State", StringType),
-              StructField("Query", StringType))
-            if (enableLineage) {
-              expectedSchema += StructField(IndexConstants.DATA_FILE_NAME_ID, LongType)
-            }
-            val ssss = refreshedIndexDF.schema.toSet
-            assert(ssss === expectedSchema)
-
-            refreshedIndexDF.show(100, false)
           }
         }
       }
@@ -563,18 +536,5 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
       .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version"))
     assert(allowEmpty || cnt > 0)
     cnt
-  }
-
-  private def appendDataWithModifiedSchema(path: String): Unit = {
-    val data = Seq(
-      ("2020-12-6", "facebook", "Menlo Park", "CA"),
-      ("2019-10-16", "donde", "New York", "NY"))
-
-    import spark.implicits._
-    data
-      .toDF("Date", "Query", "City", "State")
-      .write
-      .mode("append")
-      .parquet(path)
   }
 }
