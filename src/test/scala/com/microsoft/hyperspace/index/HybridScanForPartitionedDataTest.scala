@@ -133,7 +133,8 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -163,7 +164,8 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -213,7 +215,8 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -247,7 +250,8 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0") {
             val filter = filterQuery(df)
             // The new partition can be handled with Hybrid Scan approach.
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
