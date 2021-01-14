@@ -169,10 +169,11 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * @param location Partitioned data location.
    * @return basePath to read the given partitioned location.
    */
-  override def partitionBasePath(location: FileIndex): Option[String] = {
+  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
-      case d: TahoeLogFileIndex =>
-        Some(d.path.toString)
+      case d: TahoeLogFileIndex if d.partitionSchema.nonEmpty =>
+        Some(Some(d.path.toString))
+      case _: TahoeLogFileIndex => Some(None)
       case _ =>
         None
     }

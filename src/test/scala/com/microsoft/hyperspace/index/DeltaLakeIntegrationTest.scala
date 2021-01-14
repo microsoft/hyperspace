@@ -22,7 +22,7 @@ import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources._
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_QUICK
 import com.microsoft.hyperspace.util.PathUtils
@@ -283,9 +283,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
         val deltaTable = DeltaTable.forPath(dataPath)
         deltaTable.delete("clicks > 5000")
 
-        withSQLConf(
-          "spark.hyperspace.index.hybridscan.enabled" -> "true",
-          "spark.hyperspace.index.hybridscan.delete.enabled" -> "true") {
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
           // The index should be applied for the updated version.
           assert(isIndexUsed(query().queryExecution.optimizedPlan, "deltaIndex"))
           val prevInputFiles = spark.read.format("delta").load(dataPath).inputFiles

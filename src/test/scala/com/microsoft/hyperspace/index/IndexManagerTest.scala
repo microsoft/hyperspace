@@ -488,6 +488,45 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test("Verify incremental refresh index properly adds hive-partition columns.") {
+    withTempPathAsString { testPath =>
+      val absoluteTestPath = PathUtils.makeAbsolute(testPath).toString
+      import spark.implicits._
+      val (testData, appendData) = SampleData.testData.partition(_._1 != "2019-10-03")
+      assert(testData.nonEmpty)
+      assert(appendData.nonEmpty)
+      testData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .parquet(testPath)
+
+      val df = spark.read.parquet(testPath)
+      hyperspace.createIndex(df, IndexConfig("index", Seq("clicks"), Seq("Date")))
+
+      // Check if partition columns are correctly stored in index contents.
+      val indexDf1 = spark.read.parquet(s"$systemPath/index").where("Date != '2019-10-03'")
+      assert(testData.size == indexDf1.count())
+      val oldEntry = latestIndexLogEntry(systemPath, "index")
+      assert(oldEntry.relations.head.options("basePath").equals(absoluteTestPath))
+
+      // Append data creating new partition and refresh index.
+      appendData
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+        .write
+        .partitionBy("Date")
+        .mode("append")
+        .parquet(testPath)
+      hyperspace.refreshIndex("index", "incremental")
+
+      // Check if partition columns are correctly stored in index contents.
+      val indexDf2 = spark.read.parquet(s"$systemPath/index").where("Date = '2019-10-03'")
+      assert(appendData.size == indexDf2.count())
+      val newEntry = latestIndexLogEntry(systemPath, "index")
+      assert(newEntry.relations.head.options("basePath").equals(absoluteTestPath))
+    }
+  }
+
   test("Verify index maintenance (create, refresh) works with globbing patterns.") {
     withTempPathAsString { testPath =>
       val absoluteTestPath = PathUtils.makeAbsolute(testPath)
@@ -693,12 +732,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
   }
 
   private def validateMetadata(indexName: String, indexVersions: Set[String]): Unit = {
-    val newIndexLocation = s"$systemPath/$indexName"
-    val indexPath = PathUtils.makeAbsolute(newIndexLocation)
-    val logManager = IndexLogManagerFactoryImpl.create(indexPath)
-    val latestLog = logManager.getLatestLog()
-    assert(latestLog.isDefined && latestLog.get.isInstanceOf[IndexLogEntry])
-    val indexLog = latestLog.get.asInstanceOf[IndexLogEntry]
+    val indexLog = latestIndexLogEntry(systemPath, indexName)
     val indexFiles = indexLog.content.files
     assert(indexFiles.nonEmpty)
     assert(indexFiles.forall(_.getName.startsWith("part-0")))
