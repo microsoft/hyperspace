@@ -122,7 +122,7 @@ object CachingIndexCollectionManager {
  * @param spark Spark session
  */
 class CreationTimeBasedIndexCache(spark: SparkSession, clock: Clock)
-  extends Cache[Seq[IndexLogEntry]] {
+    extends Cache[Seq[IndexLogEntry]] {
 
   private var entries: Seq[IndexLogEntry] = Seq[IndexLogEntry]()
   private var lastCacheTime: Long = 0L

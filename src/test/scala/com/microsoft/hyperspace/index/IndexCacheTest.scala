@@ -177,8 +177,7 @@ class MockClock(private var time: Long = 0L) extends Clock {
 class MockIndexCacheFactoryImpl(spark: SparkSession) extends IndexCacheFactory {
   val indexCache = new CreationTimeBasedIndexCache(spark, new MockClock(1))
 
-  override def create(spark: SparkSession, cacheType: String)
-  : Cache[Seq[IndexLogEntry]] = {
+  override def create(spark: SparkSession, cacheType: String): Cache[Seq[IndexLogEntry]] = {
     cacheType match {
       case IndexCacheType.CREATION_TIME_BASED => indexCache
       case _ => throw HyperspaceException(s"Unknown cache type: $cacheType.")

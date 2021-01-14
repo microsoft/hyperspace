@@ -26,19 +26,14 @@ object IndexCacheType {
 }
 
 trait IndexCacheFactory {
-  def create(spark: SparkSession, cacheType: String)
-  : Cache[Seq[IndexLogEntry]]
+  def create(spark: SparkSession, cacheType: String): Cache[Seq[IndexLogEntry]]
 }
 
 object IndexCacheFactoryImpl extends IndexCacheFactory {
-  override def create(spark: SparkSession, cacheType: String)
-  : Cache[Seq[IndexLogEntry]] = {
+  override def create(spark: SparkSession, cacheType: String): Cache[Seq[IndexLogEntry]] = {
     cacheType match {
       case IndexCacheType.CREATION_TIME_BASED =>
-        new CreationTimeBasedIndexCache(
-          spark,
-          new SystemClock
-        )
+        new CreationTimeBasedIndexCache(spark, new SystemClock)
       case _ => throw HyperspaceException(s"Unknown cache type: $cacheType.")
     }
   }
