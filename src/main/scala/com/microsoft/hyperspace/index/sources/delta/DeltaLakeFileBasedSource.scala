@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources.delta
 
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 
@@ -68,9 +69,19 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
         val sourceDataProperties =
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = "delta"
+
+        // Use case-sensitive map if the provided options are case insensitive.
+        val caseSensitiveOptions = options match {
+          case map: CaseInsensitiveMap[String] => map.originalMap
+          case map => map
+        }
+
+        val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
+
         // "path" key in options can incur multiple data read unexpectedly and keep
         // the table version info as metadata.
-        val opts = options - "path" + ("versionAsOf" -> location.tableVersion.toString)
+        val opts = caseSensitiveOptions - "path" +
+          ("versionAsOf" -> location.tableVersion.toString) ++ basePathOpt
         Some(
           Relation(
             Seq(PathUtils.makeAbsolute(location.path).toString),
@@ -92,6 +103,20 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   override def refreshRelation(relation: Relation): Option[Relation] = {
     if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
       Some(relation.copy(options = relation.options - "versionAsOf" - "timestampAsOf"))
+    } else {
+      None
+    }
+  }
+
+  /**
+   * Returns a file format name to read internal data files for a given [[Relation]].
+   *
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
+   */
+  override def internalFileFormatName(relation: Relation): Option[String] = {
+    if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
+      Some("parquet")
     } else {
       None
     }
@@ -140,10 +165,11 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * @param location Partitioned data location.
    * @return basePath to read the given partitioned location.
    */
-  override def partitionBasePath(location: FileIndex): Option[String] = {
+  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
-      case d: TahoeLogFileIndex =>
-        Some(d.path.toString)
+      case d: TahoeLogFileIndex if d.partitionSchema.nonEmpty =>
+        Some(Some(d.path.toString))
+      case _: TahoeLogFileIndex => Some(None)
       case _ =>
         None
     }

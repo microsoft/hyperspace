@@ -70,6 +70,16 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Runs internalFileFormatName() for each provider.
+   *
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
+   */
+  def internalFileFormatName(relation: Relation): String = {
+    run(p => p.internalFileFormatName(relation))
+  }
+
+  /**
    * Runs signature() for each provider.
    *
    * @param logicalRelation Logical relation to compute signature from.
@@ -97,11 +107,11 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * Runs partitionBasePath() for each provider.
    *
    * @param location Partitioned location.
-   * @return basePath string to read the given partitioned location.
+   * @return Optional basePath string to read the given partitioned location.
    * @throws HyperspaceException if multiple providers returns [[Some]] or
    *                             if no providers return [[Some]].
    */
-  def partitionBasePath(location: FileIndex): String = {
+  def partitionBasePath(location: FileIndex): Option[String] = {
     run(p => p.partitionBasePath(location))
   }
 
