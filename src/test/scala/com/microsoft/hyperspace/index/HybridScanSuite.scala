@@ -26,6 +26,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
+
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
