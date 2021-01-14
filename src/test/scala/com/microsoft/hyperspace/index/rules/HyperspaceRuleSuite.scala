@@ -105,9 +105,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
       index: IndexLogEntry,
       plan: LogicalPlan,
       files: Seq[FileInfo]): Unit = {
-    val commonBytes = files.foldLeft(0L) { (bytes, f) =>
-      bytes + f.size
-    }
-    index.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+    val commonSizeInBytes = files.map(_.size).sum
+    index.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonSizeInBytes)
   }
 }
