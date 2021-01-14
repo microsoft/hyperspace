@@ -71,9 +71,8 @@ private[actions] abstract class RefreshActionBase(
     val relations = previousIndexLogEntry.relations
     val latestRelation =
       Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
-    val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
     val df = spark.read
-      .schema(dataSchema)
+      .schema(indexSchema)
       .format(latestRelation.fileFormat)
       .options(latestRelation.options)
     // Due to the difference in how the "path" option is set: https://github.com/apache/spark/
@@ -107,7 +106,7 @@ private[actions] abstract class RefreshActionBase(
             .resolve(
               spark,
               indexSchemaChange.excludeColumns,
-              previousIndexLogEntry.includedColumns)
+              previousIndexLogEntry.indexedColumns)
             .isDefined) {
         throw HyperspaceException("Change in indexed columns is not allowed.")
       }
@@ -123,14 +122,19 @@ private[actions] abstract class RefreshActionBase(
 
       previousSchema.copy(
         fields = previousSchema
-          .filterNot(f => indexSchemaChange.excludeColumns.contains(f.name))
+          .filterNot(f =>
+            indexSchemaChange.excludeColumns.contains(f.name) || f.name.equals(
+              IndexConstants.DATA_FILE_NAME_ID))
           .toArray ++ indexSchemaChange.includeColumns)
     }
   }
 
   protected lazy val indexConfig: IndexConfig = {
-    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+    val indexedColumns = indexSchema.fieldNames
+      .filter(previousIndexLogEntry.derivedDataset.properties.columns.indexed.contains)
+      .toSeq
+    val includedColumns = indexSchema.fieldNames.toSeq.diff(indexedColumns)
+    IndexConfig(previousIndexLogEntry.name, indexedColumns, includedColumns)
   }
 
   final override val transientState: String = REFRESHING

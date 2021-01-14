@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.{LongType, StructField}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
@@ -72,6 +73,7 @@ class RefreshIncrementalAction(
       // deleted source data files as those entries are no longer valid.
       val refreshDF =
         spark.read
+          .schema(indexSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType)))
           .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
           .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedFiles.map(_.id): _*))
 
