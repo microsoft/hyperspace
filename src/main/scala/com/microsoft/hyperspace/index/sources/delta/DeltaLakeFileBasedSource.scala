@@ -76,11 +76,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
           case map => map
         }
 
-        val basePathOpt = if (location.partitionSchema.isEmpty) {
-          None
-        } else {
-          partitionBasePath(location).map("basePath" -> _)
-        }
+        val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
 
         // "path" key in options can incur multiple data read unexpectedly and keep
         // the table version info as metadata.

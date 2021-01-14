@@ -238,9 +238,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           }
 
           // Refreshed index as quick mode can be applied with Hybrid Scan config.
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabled: _*) {
             spark.disableHyperspace()
             val dfWithHyperspaceDisabled = query()
             val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
