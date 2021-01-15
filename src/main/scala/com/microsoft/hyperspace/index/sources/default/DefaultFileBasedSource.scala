@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -94,7 +93,8 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
             // This logic is picked from the globbing logic at:
             // https://github.com/apache/spark/blob/v2.4.4/sql/core/src/main/scala/org/apache/
             // spark/sql/execution/datasources/DataSource.scala#L540
-            val fs = filesFromIndex(location).head.getPath.getFileSystem(new Configuration)
+            val fs = filesFromIndex(location).head.getPath
+              .getFileSystem(spark.sessionState.newHadoopConf())
             val globPaths = pattern
               .split(",")
               .map(_.trim)

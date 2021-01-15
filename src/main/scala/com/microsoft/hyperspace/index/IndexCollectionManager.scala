@@ -34,11 +34,14 @@ class IndexCollectionManager(
   private val conf: SQLConf = spark.sessionState.conf
 
   override def create(df: DataFrame, indexConfig: IndexConfig): Unit = {
-    val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexConfig.indexName)
-    val dataManager = indexDataManagerFactory.create(indexPath)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+      .getIndexPath(indexConfig.indexName)
+    val dataManager =
+      indexDataManagerFactory.create(indexPath, hadoopConf)
     val logManager = getLogManager(indexConfig.indexName) match {
       case Some(manager) => manager
-      case None => indexLogManagerFactory.create(indexPath)
+      case None => indexLogManagerFactory.create(indexPath, hadoopConf)
     }
 
     new CreateAction(spark, df, indexConfig, logManager, dataManager).run()
@@ -58,16 +61,22 @@ class IndexCollectionManager(
 
   override def vacuum(indexName: String): Unit = {
     withLogManager(indexName) { logManager =>
-      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-      val dataManager = indexDataManagerFactory.create(indexPath)
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
       new VacuumAction(logManager, dataManager).run()
     }
   }
 
   override def refresh(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
-      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-      val dataManager = indexDataManagerFactory.create(indexPath)
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
       if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
         new RefreshIncrementalAction(spark, logManager, dataManager).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
@@ -82,8 +91,11 @@ class IndexCollectionManager(
 
   override def optimize(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
-      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-      val dataManager = indexDataManagerFactory.create(indexPath)
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
       new OptimizeAction(spark, logManager, dataManager, mode).run()
     }
   }
@@ -127,21 +139,25 @@ class IndexCollectionManager(
   }
 
   private def indexLogManagers: Seq[IndexLogManager] = {
-    val rootPath = PathResolver(conf).systemPath
-    val fs = fileSystemFactory.create(rootPath)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val rootPath = PathResolver(conf, hadoopConf).systemPath
+    val fs = fileSystemFactory.create(rootPath, hadoopConf)
     val indexPaths: Seq[Path] = if (fs.exists(rootPath)) {
       fs.listStatus(rootPath).map(_.getPath)
     } else {
       Seq()
     }
-    indexPaths.map(path => indexLogManagerFactory.create(path))
+    indexPaths.map(path =>
+      indexLogManagerFactory.create(path, hadoopConf))
   }
 
   private def getLogManager(indexName: String): Option[IndexLogManager] = {
-    val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-    val fs = fileSystemFactory.create(indexPath)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+      .getIndexPath(indexName)
+    val fs = fileSystemFactory.create(indexPath, hadoopConf)
     if (fs.exists(indexPath)) {
-      Some(indexLogManagerFactory.create(indexPath))
+      Some(indexLogManagerFactory.create(indexPath, hadoopConf))
     } else {
       None
     }

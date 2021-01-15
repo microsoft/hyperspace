@@ -80,11 +80,11 @@ class IndexLogManagerImplTest
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    FileUtils.delete(new Path(testRoot), true)
+    FileUtils.delete(new Path(testRoot), isRecursive = true)
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(new Path(testRoot), true)
+    FileUtils.delete(new Path(testRoot), isRecursive = true)
     super.afterAll()
   }
 

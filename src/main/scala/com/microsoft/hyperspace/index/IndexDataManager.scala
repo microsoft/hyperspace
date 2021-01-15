@@ -43,9 +43,10 @@ trait IndexDataManager {
   def delete(id: Int): Unit
 }
 
-class IndexDataManagerImpl(indexPath: Path) extends IndexDataManager {
+class IndexDataManagerImpl(indexPath: Path, configuration: Configuration)
+    extends IndexDataManager {
   // TODO: Investigate whether FileContext should be used instead of FileSystem for atomic renames.
-  private lazy val fs: FileSystem = indexPath.getFileSystem(new Configuration)
+  private lazy val fs: FileSystem = indexPath.getFileSystem(configuration)
 
   /**
    * This method relies on the naming convention that directory name will be similar to hive
