@@ -55,7 +55,7 @@ object JoinIndexRanker {
       rightChild: LogicalPlan,
       indexPairs: Seq[(IndexLogEntry, IndexLogEntry)]): Seq[(IndexLogEntry, IndexLogEntry)] = {
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
-    def getCommonBytes(logicalPlan: LogicalPlan, index: IndexLogEntry): Long = {
+    def getCommonSizeInBytes(logicalPlan: LogicalPlan, index: IndexLogEntry): Long = {
       index.getTagValue(logicalPlan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).getOrElse(0L)
     }
 
@@ -63,19 +63,19 @@ object JoinIndexRanker {
       case ((left1, right1), (left2, right2)) =>
         // These common bytes were calculated and tagged in getCandidateIndexes.
         // The value is the summation of common source files of the given plan and each index.
-        lazy val commonBytes1 =
-          getCommonBytes(leftChild, left1) + getCommonBytes(rightChild, right1)
-        lazy val commonBytes2 =
-          getCommonBytes(leftChild, left2) + getCommonBytes(rightChild, right2)
+        lazy val commonSizeInBytes1 =
+          getCommonSizeInBytes(leftChild, left1) + getCommonSizeInBytes(rightChild, right1)
+        lazy val commonSizeInBytes2 =
+          getCommonSizeInBytes(leftChild, left2) + getCommonSizeInBytes(rightChild, right2)
 
         if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
-          if (!hybridScanEnabled || (commonBytes1 == commonBytes2)) {
+          if (!hybridScanEnabled || (commonSizeInBytes1 == commonSizeInBytes2)) {
             left1.numBuckets > left2.numBuckets
           } else {
             // If both index pairs have the same number of buckets and Hybrid Scan is enabled,
             // pick the pair with more common bytes with the given source plan, so as to
             // reduce the overhead from handling appended and deleted files.
-            commonBytes1 > commonBytes2
+            commonSizeInBytes1 > commonSizeInBytes2
           }
         } else if (left1.numBuckets == right1.numBuckets) {
           true
@@ -84,7 +84,7 @@ object JoinIndexRanker {
         } else {
           // At this point, both pairs have different number of buckets. If Hybrid Scan is enabled,
           // pick the pair with "more common bytes", otherwise pick the first pair.
-          !hybridScanEnabled || commonBytes1 > commonBytes2
+          !hybridScanEnabled || commonSizeInBytes1 > commonSizeInBytes2
         }
     }
   }

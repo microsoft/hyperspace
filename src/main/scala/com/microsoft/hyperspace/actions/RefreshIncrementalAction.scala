@@ -20,7 +20,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{LongType, StructField}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshIncrementalActionEvent}
@@ -58,10 +58,15 @@ class RefreshIncrementalAction(
         s"corresponding to ${deletedFiles.length} deleted source data files.")
 
     if (appendedFiles.nonEmpty) {
+      val internalFileFormatName = Hyperspace
+        .getContext(spark)
+        .sourceProviderManager
+        .internalFileFormatName(previousIndexLogEntry.relations.head)
+
       // Create a df with only appended files from original list of files.
       val dfWithAppendedFiles = spark.read
         .schema(df.schema)
-        .format(previousIndexLogEntry.relations.head.fileFormat)
+        .format(internalFileFormatName)
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
       write(spark, dfWithAppendedFiles, indexConfig)

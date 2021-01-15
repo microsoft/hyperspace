@@ -205,7 +205,7 @@ object Hyperspace {
 }
 
 private[hyperspace] class HyperspaceContext(val spark: SparkSession) {
-  val indexCollectionManager = CachingIndexCollectionManager(spark)
+  val indexCollectionManager: IndexManager = CachingIndexCollectionManager(spark)
 
   val sourceProviderManager = new FileBasedSourceProviderManager(spark)
 }

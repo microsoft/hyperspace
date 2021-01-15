@@ -70,6 +70,16 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Runs internalFileFormatName() for each provider.
+   *
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
+   */
+  def internalFileFormatName(relation: Relation): String = {
+    run(p => p.internalFileFormatName(relation))
+  }
+
+  /**
    * Runs signature() for each provider.
    *
    * @param logicalRelation Logical relation to compute signature from.

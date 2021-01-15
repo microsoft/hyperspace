@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
@@ -670,8 +670,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         }
 
         // Refreshed index as quick mode can be applied with Hybrid Scan config.
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
             spark.disableHyperspace()
             val dfWithHyperspaceDisabled = query()
             val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
@@ -679,7 +678,6 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
             val dfWithHyperspaceEnabled = query()
             assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
             checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
-          }
         }
       }
     }
@@ -721,7 +719,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
         val filter = filterQuery
         val planWithHybridScan = filter.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))

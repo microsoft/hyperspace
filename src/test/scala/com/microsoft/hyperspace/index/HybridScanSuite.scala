@@ -27,7 +27,7 @@ import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
@@ -109,7 +109,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -201,7 +201,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+    withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
@@ -276,16 +276,12 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         val baseQuery = filterQuery
         val basePlan = baseQuery.queryExecution.optimizedPlan
 
-        withSQLConf(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
+        withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
           val filter = filterQuery
           assert(basePlan.equals(filter.queryExecution.optimizedPlan))
         }
 
-        withSQLConf(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
           val filter = filterQuery
           val planWithHybridScan = filter.queryExecution.optimizedPlan
           assert(!basePlan.equals(planWithHybridScan))
@@ -343,9 +339,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+      withSQLConf(TestConfig.HybridScanEnabled: _*) {
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan
         assert(!basePlan.equals(planWithHybridScan))
@@ -389,8 +383,9 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Delete-only: filter rule, number of delete files threshold.") {
+  test("Delete-only: filter rule, deleted files ratio threshold.") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
+    val sourceSize = FileUtils.getDirectorySize(new Path(sampleDataFormatDelete4))
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       setupIndexAndChangeData(
         fileFormat,
@@ -405,18 +400,20 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       df.filter(df("clicks") <= 2000).select(df("query"))
     val baseQuery = filterQuery
     val basePlan = baseQuery.queryExecution.optimizedPlan
+    val afterDeleteSize = FileUtils.getDirectorySize(new Path(sampleDataFormatDelete4))
+    val deletedRatio = 1 - (afterDeleteSize / sourceSize.toFloat)
 
-    withSQLConf(
-      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-      IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
+    withSQLConf(TestConfig.HybridScanEnabled: _*) {
+      withSQLConf(
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> (deletedRatio + 0.1).toString) {
         val filter = filterQuery
-        // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
+        // As ratio of deleted files is less than the threshold, the index can be applied.
         assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
       }
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
+      withSQLConf(
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> (deletedRatio - 0.1).toString) {
         val filter = filterQuery
-        // Since number of deletedFiles = 2, index should not be applied even with Hybrid scan.
+        // As ratio of deleted files is greater than the threshold, the index shouldn't be applied.
         assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
     }
@@ -436,9 +433,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf(
-      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-      IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+    withSQLConf(TestConfig.HybridScanEnabled: _*) {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
@@ -529,10 +524,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         assert(basePlan.equals(join.queryExecution.optimizedPlan))
       }
 
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true",
-        "spark.sql.optimizer.inSetConversionThreshold" -> "1") {
+      withSQLConf(TestConfig.HybridScanEnabled :+
+        ("spark.sql.optimizer.inSetConversionThreshold" -> "1"): _*) {
         // Changed inSetConversionThreshould to check InSet optimization.
         val join = joinQuery()
         val planWithHybridScan = join.queryExecution.optimizedPlan

@@ -20,7 +20,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources._
 
-import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.{Hyperspace, TestConfig}
 
 // Hybrid Scan tests for non partitioned source data. Test cases of HybridScanSuite are also
 // executed with non partitioned source data.
@@ -110,7 +110,7 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
       assert(basePlan.equals(filter.queryExecution.optimizedPlan))
     }
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+    withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
       val filter = filterQuery
       val planWithHybridScan = filter.queryExecution.optimizedPlan
       assert(!basePlan.equals(planWithHybridScan))
@@ -148,15 +148,11 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
             df.filter(df("clicks") <= 2000).select(df("query"))
           val baseQuery = filterQuery
           val basePlan = baseQuery.queryExecution.optimizedPlan
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery
             assert(basePlan.equals(filter.queryExecution.optimizedPlan))
           }
-          withSQLConf(
-            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-            IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabled: _*) {
             val filter = filterQuery
             assert(
               basePlan
