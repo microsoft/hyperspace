@@ -20,6 +20,7 @@ import io.delta.tables.DeltaTable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+
 import com.microsoft.hyperspace.{Hyperspace, TestConfig}
 
 class HybridScanForDeltaLakeTest extends HybridScanSuite {

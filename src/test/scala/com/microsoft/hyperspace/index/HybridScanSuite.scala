@@ -25,6 +25,7 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExe
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
+
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.index.execution.BucketUnionExec

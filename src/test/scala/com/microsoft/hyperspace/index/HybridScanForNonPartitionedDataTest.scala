@@ -21,8 +21,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{Hyperspace, TestConfig}
-import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
+import com.microsoft.hyperspace.util.FileUtils
 
 // Hybrid Scan tests for non partitioned source data. Test cases of HybridScanSuite are also
 // executed with non partitioned source data.
