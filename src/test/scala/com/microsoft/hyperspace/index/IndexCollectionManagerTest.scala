@@ -119,32 +119,32 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(actual.equals(expected))
   }
 
-  test("delete() throws exception if index is not found") {
+  test("delete() throws exception if index is not found.") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.delete("idx4"))
   }
 
-  test("vacuum() throws exception if index is not found") {
+  test("vacuum() throws exception if index is not found.") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.vacuum("idx4"))
   }
 
-  test("restore() throws exception if index is not found") {
+  test("restore() throws exception if index is not found.") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.restore("idx4"))
   }
 
-  test("refresh() with mode = 'full' throws exception if index is not found") {
+  test("refresh() with mode = 'full' throws exception if index is not found.") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](
       indexCollectionManager
-        .refresh("idx4", REFRESH_MODE_FULL, IndexConstants.NO_INDEX_SCHEMA_CHANGE))
+        .refresh("idx4", REFRESH_MODE_FULL, IndexSchemaChange.NO_CHANGE))
   }
 
-  test("refresh() with mode = 'incremental' throws exception if index is not found") {
+  test("refresh() with mode = 'incremental' throws exception if index is not found.") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](
       indexCollectionManager
-        .refresh("idx4", REFRESH_MODE_INCREMENTAL, IndexConstants.NO_INDEX_SCHEMA_CHANGE))
+        .refresh("idx4", REFRESH_MODE_INCREMENTAL, IndexSchemaChange.NO_CHANGE))
   }
 }

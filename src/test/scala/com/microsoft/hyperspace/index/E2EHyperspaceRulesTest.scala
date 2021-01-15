@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
@@ -740,6 +741,100 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         // Filter Index and Parquet format source file can be handled with 1 LogicalRelation.
         assert(nodes.length === 1)
         checkAnswer(baseQuery, filter)
+      }
+    }
+  }
+
+  test("E2E test for filter index rule on index with schema changes.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        // Save a copy of source data files.
+        val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+        SampleData.save(spark, testPath, dataColumns)
+
+        // Create index on original source data files.
+        val df = spark.read.parquet(testPath)
+        val indexConfig = IndexConfig("filterIndex", Seq("c3"), Seq("c1", "c5"))
+        hyperspace.createIndex(df, indexConfig)
+
+        // Delete some source data file.
+        TestUtils.deleteFiles(testPath, "*parquet", 1)
+
+        // Append some source data files with changes in schema.
+        SampleData.appendWithSchemaChange(spark, Seq("c1", "c3", "c6", "c7", "c8"), testPath)
+
+        // Define a filter query which uses new columns added to the index schema.
+        def query(): DataFrame =
+          spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c6", "c7")
+
+        // Verify index is not used after source data changes.
+        spark.enableHyperspace()
+        val planRootPaths = getAllRootPaths(query().queryExecution.optimizedPlan)
+        spark.disableHyperspace()
+        assert(planRootPaths.equals(Seq(PathUtils.makeAbsolute(testPath))))
+
+        // Refresh index with schema changes.
+        val newCols =
+          StructType(Seq(StructField("c6", StringType), StructField("c7", StringType)))
+        val indexSchemaChange = IndexSchemaChange(newCols, Seq("c5"))
+        hyperspace.refreshIndex(
+          indexConfig.indexName,
+          REFRESH_MODE_INCREMENTAL,
+          indexSchemaChange)
+
+        // Verify index usage on latest version of index (v=1) after refresh.
+        verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, Seq(1)))
+      }
+    }
+  }
+
+  test("E2E test for join index rule on index with schema changes.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        val indexConfig = IndexConfig("index", Seq("c3"), Seq("c1", "c5"))
+        val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
+        SampleData.save(spark, testPath, dataColumns)
+
+        val df = spark.read.load(testPath)
+        hyperspace.createIndex(df, indexConfig)
+
+        // Delete some source data file.
+        TestUtils.deleteFiles(testPath, "*parquet", 1)
+
+        // Append some source data files with changes in schema.
+        SampleData.appendWithSchemaChange(spark, Seq("c1", "c3", "c6", "c7", "c8"), testPath)
+
+        // Refresh index with schema changes.
+        val newCols =
+          StructType(Seq(StructField("c6", StringType), StructField("c7", StringType)))
+        val indexSchemaChange = IndexSchemaChange(newCols, Seq("c5"))
+        hyperspace.refreshIndex(
+          indexConfig.indexName,
+          REFRESH_MODE_INCREMENTAL,
+          indexSchemaChange)
+
+        // Define a join query which uses new columns added to the index schema.
+        val leftDf = spark.read.parquet(testPath)
+        val rightDf = spark.read.parquet(testPath)
+
+        def query(): DataFrame = {
+          leftDf
+            .join(rightDf, leftDf("c3") === rightDf("c3"))
+            .select(leftDf("c3"), leftDf("c6"), rightDf("c1"), rightDf("c7"))
+        }
+
+        // Verify indexes are used and all index files are picked.
+        verifyIndexUsage(
+          query,
+          getIndexFilesPath(indexConfig.indexName, Seq(1)) ++ // for Left
+            getIndexFilesPath(indexConfig.indexName, Seq(1))) // for Right
+
+        // Verify correctness of results.
+        spark.disableHyperspace()
+        val dfWithHyperspaceDisabled = query()
+        spark.enableHyperspace()
+        val dfWithHyperspaceEnabled = query()
+        checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
       }
     }
   }

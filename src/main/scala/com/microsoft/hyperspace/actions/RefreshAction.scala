@@ -34,7 +34,7 @@ class RefreshAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager,
-    indexSchemaChange: IndexSchemaChange = IndexConstants.NO_INDEX_SCHEMA_CHANGE)
+    indexSchemaChange: IndexSchemaChange = IndexSchemaChange.NO_CHANGE)
     extends RefreshActionBase(spark, logManager, dataManager, indexSchemaChange) {
 
   override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)

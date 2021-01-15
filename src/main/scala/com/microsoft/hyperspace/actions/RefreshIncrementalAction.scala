@@ -49,7 +49,7 @@ class RefreshIncrementalAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager,
-    indexSchemaChange: IndexSchemaChange = IndexConstants.NO_INDEX_SCHEMA_CHANGE)
+    indexSchemaChange: IndexSchemaChange = IndexSchemaChange.NO_CHANGE)
     extends RefreshActionBase(spark, logManager, dataManager, indexSchemaChange) {
 
   final override def op(): Unit = {
@@ -73,7 +73,7 @@ class RefreshIncrementalAction(
       // deleted source data files as those entries are no longer valid.
       val refreshDF =
         spark.read
-          .schema(indexSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType)))
+          .schema(indexSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType, false)))
           .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
           .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedFiles.map(_.id): _*))
 
@@ -125,7 +125,7 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry = if (indexSchemaChange.equals(IndexConstants.NO_INDEX_SCHEMA_CHANGE)) {
+    val entry = if (indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE)) {
       getIndexLogEntry(spark, df, indexConfig, indexDataPath)
     } else {
       getIndexLogEntry(spark, df, indexConfig, indexDataPath).copyWithDerivedDatasetProperties(

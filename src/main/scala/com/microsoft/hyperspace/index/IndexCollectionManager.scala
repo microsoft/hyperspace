@@ -23,7 +23,7 @@ import org.apache.spark.sql.internal.SQLConf
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
 import com.microsoft.hyperspace.actions.Constants.States.DOESNOTEXIST
-import com.microsoft.hyperspace.index.IndexConstants.{NO_INDEX_SCHEMA_CHANGE, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -76,7 +76,7 @@ class IndexCollectionManager(
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager, indexSchemaChange).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_QUICK)) {
-        if (!indexSchemaChange.equals(NO_INDEX_SCHEMA_CHANGE)) {
+        if (!indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE)) {
           throw HyperspaceException("Index schema change is no supported refresh quick mode.")
         }
         new RefreshQuickAction(spark, logManager, dataManager).run()

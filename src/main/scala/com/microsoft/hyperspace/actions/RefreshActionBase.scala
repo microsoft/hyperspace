@@ -87,14 +87,17 @@ private[actions] abstract class RefreshActionBase(
   }
 
   protected lazy val indexSchema: StructType = {
-    val previousSchema = previousIndexLogEntry.schema
-    if (indexSchemaChange.equals(IndexConstants.NO_INDEX_SCHEMA_CHANGE)) {
+    val previousSchema = previousIndexLogEntry.schema.copy(
+      fields = previousIndexLogEntry.schema.fields
+        .filterNot(_.name.equals(IndexConstants.DATA_FILE_NAME_ID)))
+    if (indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE)) {
       previousSchema
     } else {
-      if (ResolverUtils
+      val columnsToInclude = indexSchemaChange.includeColumns
+      if (columnsToInclude.nonEmpty && ResolverUtils
             .resolve(
               spark,
-              indexSchemaChange.includeColumns.fieldNames.toSeq,
+              columnsToInclude.fieldNames.toSeq,
               previousIndexLogEntry.indexedColumns ++ previousIndexLogEntry.includedColumns)
             .isDefined) {
         throw HyperspaceException(
@@ -102,11 +105,9 @@ private[actions] abstract class RefreshActionBase(
             "and index schema change are not allowed.")
       }
 
-      if (ResolverUtils
-            .resolve(
-              spark,
-              indexSchemaChange.excludeColumns,
-              previousIndexLogEntry.indexedColumns)
+      val columnsToExclude = indexSchemaChange.excludeColumns
+      if (columnsToExclude.nonEmpty && ResolverUtils
+            .resolve(spark, columnsToExclude, previousIndexLogEntry.indexedColumns)
             .isDefined) {
         throw HyperspaceException("Change in indexed columns is not allowed.")
       }
@@ -122,10 +123,7 @@ private[actions] abstract class RefreshActionBase(
 
       previousSchema.copy(
         fields = previousSchema
-          .filterNot(f =>
-            indexSchemaChange.excludeColumns.contains(f.name) || f.name.equals(
-              IndexConstants.DATA_FILE_NAME_ID))
-          .toArray ++ indexSchemaChange.includeColumns)
+          .filterNot(f => columnsToExclude.contains(f.name)).toArray ++ columnsToInclude)
     }
   }
 

@@ -40,3 +40,7 @@ case class IndexSchemaChange(includeColumns: StructType, excludeColumns: Seq[Str
       "Duplicate column names in include and exclude columns are not allowed.")
   }
 }
+
+object IndexSchemaChange {
+  val NO_CHANGE = IndexSchemaChange(new StructType(), Seq[String]())
+}

@@ -113,6 +113,5 @@ object IndexConstants {
   // "/temp/1/*, /temp/2/*"
   val GLOBBING_PATTERN_KEY = "spark.hyperspace.source.globbingPattern"
 
-  val NO_INDEX_SCHEMA_CHANGE = IndexSchemaChange(new StructType(), Seq[String]())
   val INDEX_SCHEMA_CHANGED = "schemaChanged"
 }
