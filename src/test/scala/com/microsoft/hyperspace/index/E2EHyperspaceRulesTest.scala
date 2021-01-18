@@ -68,7 +68,6 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     spark.disableHyperspace()
   }
 
-  /*
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
     val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
     val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
@@ -682,7 +681,6 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       }
     }
   }
-   */
 
   test("Verify InMemoryFileIndex cache is used.") {
     withTempPathAsString { testPath =>
