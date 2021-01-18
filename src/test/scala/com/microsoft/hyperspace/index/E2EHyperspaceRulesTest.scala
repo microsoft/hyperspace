@@ -21,9 +21,8 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.SortExec
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
-
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
@@ -68,6 +67,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     spark.disableHyperspace()
   }
 
+  /*
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
     val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
     val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
@@ -678,6 +678,52 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
             assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
             checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
         }
+      }
+    }
+  }
+   */
+
+  test("Verify InMemoryFileIndex cache is used.") {
+    withTempPathAsString { testPath =>
+      // Setup. Create data.
+      val indexConfig = IndexConfig("index", Seq("c3"), Seq("c4"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.load(testPath)
+      hyperspace.createIndex(df, indexConfig)
+      withIndex(indexConfig.indexName) {
+
+        spark.enableHyperspace()
+
+        val df = spark.read.parquet(testPath)
+        def query(): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c4")
+
+        val indexManager = Hyperspace
+          .getContext(spark)
+          .indexCollectionManager
+        val indexEntry =
+          indexManager.getIndexes().filter(_.name.equals(indexConfig.indexName)).head
+        assert(indexEntry.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).isEmpty)
+        query().collect
+        val location1 = query().queryExecution.optimizedPlan.collect {
+          case LogicalRelation(HadoopFsRelation(loc, _, _, _, _, _), _, _, _) =>
+            loc
+        }.head
+
+        assert(indexEntry.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).nonEmpty)
+        val location2 = query().queryExecution.optimizedPlan.collect {
+          case LogicalRelation(HadoopFsRelation(loc, _, _, _, _, _), _, _, _) =>
+            loc
+        }.head
+
+        assert(location2.eq(location1))
+        assert(
+          location2.eq(
+            indexEntry.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).get))
       }
     }
   }

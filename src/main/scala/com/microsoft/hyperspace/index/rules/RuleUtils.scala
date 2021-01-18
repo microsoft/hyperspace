@@ -249,12 +249,13 @@ object RuleUtils {
     //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
-        val location =
+        val location = {
           index.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).getOrElse {
             val loc = new InMemoryFileIndex(spark, index.content.files, Map(), None)
             index.setTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY, loc)
             loc
           }
+        }
         val relation = HadoopFsRelation(
           location,
           new StructType(),
