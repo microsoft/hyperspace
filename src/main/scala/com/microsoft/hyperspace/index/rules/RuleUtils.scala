@@ -250,7 +250,11 @@ object RuleUtils {
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val location =
-          new InMemoryFileIndex(spark, index.content.files, Map(), None)
+          index.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).getOrElse {
+            val loc = new InMemoryFileIndex(spark, index.content.files, Map(), None)
+            index.setTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY, loc)
+            loc
+          }
         val relation = HadoopFsRelation(
           location,
           new StructType(),
@@ -358,7 +362,20 @@ object RuleUtils {
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
-        val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
+        val newLocation = if (filesAppended.isEmpty) {
+            index.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).getOrElse {
+              val loc = new InMemoryFileIndex(spark, index.content.files, Map(), None)
+              index.setTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY, loc)
+              loc
+            }
+        } else {
+          index.getTagValue(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN).getOrElse {
+            val loc = new InMemoryFileIndex(spark, filesToRead, Map(), None)
+            index.setTagValue(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN, loc)
+            loc
+          }
+        }
+
         val relation = HadoopFsRelation(
           newLocation,
           new StructType(),
