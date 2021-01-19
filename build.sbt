@@ -92,6 +92,10 @@ fork in Test := true
 javaOptions in Test ++= Seq(
   "-Dspark.ui.enabled=false",
   "-Dspark.ui.showConsoleProgress=false",
+  "-Dspark.databricks.delta.snapshotPartitions=2",
+  "-Dspark.sql.shuffle.partitions=5",
+  "-Ddelta.log.cacheSize=3",
+  "-Dspark.sql.sources.parallelPartitionDiscovery.parallelism=5",
   "-Xmx1024m"
 )
 
