@@ -671,13 +671,13 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
         // Refreshed index as quick mode can be applied with Hybrid Scan config.
         withSQLConf(TestConfig.HybridScanEnabled: _*) {
-            spark.disableHyperspace()
-            val dfWithHyperspaceDisabled = query()
-            val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
-            spark.enableHyperspace()
-            val dfWithHyperspaceEnabled = query()
-            assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
-            checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+          spark.disableHyperspace()
+          val dfWithHyperspaceDisabled = query()
+          val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+          val dfWithHyperspaceEnabled = query()
+          assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
+          checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
         }
       }
     }
@@ -763,7 +763,11 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
         // Define a filter query which uses new columns added to the index schema.
         def query(): DataFrame =
-          spark.read.parquet(testPath).filter("c3 == 'facebook'").select("c3", "c6", "c7")
+          spark.read
+            .option("mergeSchema", "true")
+            .parquet(testPath)
+            .filter("c3 == 'facebook'")
+            .select("c3", "c6", "c7")
 
         // Verify index is not used after source data changes.
         spark.enableHyperspace()
@@ -789,7 +793,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   test("E2E test for join index rule on index with schema changes.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-        val indexConfig = IndexConfig("index", Seq("c3"), Seq("c1", "c5"))
+        val indexConfig = IndexConfig("joinIndex", Seq("c3"), Seq("c1", "c5"))
         val dataColumns = Seq("c1", "c2", "c3", "c4", "c5")
         SampleData.save(spark, testPath, dataColumns)
 
@@ -812,8 +816,8 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
           indexSchemaChange)
 
         // Define a join query which uses new columns added to the index schema.
-        val leftDf = spark.read.parquet(testPath)
-        val rightDf = spark.read.parquet(testPath)
+        val leftDf = spark.read.option("mergeSchema", "true").parquet(testPath)
+        val rightDf = spark.read.option("mergeSchema", "true").parquet(testPath)
 
         def query(): DataFrame = {
           leftDf
