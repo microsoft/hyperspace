@@ -21,8 +21,11 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.execution.datasources.{FileFormat, FileIndex, HadoopFsRelation}
 import org.apache.spark.sql.types.StructType
 
+import com.microsoft.hyperspace.index.IndexLogEntry
+
 class IndexHadoopFsRelation(
     spark: SparkSession,
+    index: IndexLogEntry,
     location: FileIndex,
     partitionSchema: StructType,
     dataSchema: StructType,
@@ -38,6 +41,6 @@ class IndexHadoopFsRelation(
       options)(spark) {
 
   override def toString(): String = {
-    "CoveringIndex"
+    s"Index ${index.name}_${index.logVersion}"
   }
 }

@@ -542,6 +542,10 @@ case class IndexLogEntry(
         IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
   }
 
+  def logVersion: String = {
+    properties.getOrElse(IndexConstants.INDEX_LOG_VERSION_PROPERTY, "undefined")
+  }
+
   @JsonIgnore
   lazy val fileIdTracker: FileIdTracker = {
     val tracker = new FileIdTracker

@@ -253,6 +253,7 @@ object RuleUtils {
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
         val relation = new IndexHadoopFsRelation(
           spark,
+          index,
           location,
           new StructType(),
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
@@ -362,6 +363,7 @@ object RuleUtils {
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = new IndexHadoopFsRelation(
           spark,
+          index,
           newLocation,
           new StructType(),
           newSchema,
