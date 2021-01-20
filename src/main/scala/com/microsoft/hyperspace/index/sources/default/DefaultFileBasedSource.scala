@@ -163,6 +163,21 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
+   * Returns a file format name to read internal data files for a given [[Relation]].
+   *
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
+   */
+  override def internalFileFormatName(relation: Relation): Option[String] = {
+    if (isSupportedFileFormatName(relation.fileFormat)) {
+      // Same as original file format.
+      Some(relation.fileFormat)
+    } else {
+      None
+    }
+  }
+
+  /**
    * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
    * using all the files found in [[PartitioningAwareFileIndex]].
    *

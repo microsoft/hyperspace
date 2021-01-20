@@ -90,6 +90,14 @@ trait FileBasedSourceProvider extends SourceProvider {
   def refreshRelation(relation: Relation): Option[Relation]
 
   /**
+   * Returns a file format name to read internal data for a given [[Relation]].
+   *
+   * @param relation [[Relation]] object to read internal data files.
+   * @return File format to read internal data files.
+   */
+  def internalFileFormatName(relation: Relation): Option[String]
+
+  /**
    * Computes the signature using the given [[LogicalRelation]].
    *
    * This API is used when the signature of source needs to be computed, e.g., creating an index,

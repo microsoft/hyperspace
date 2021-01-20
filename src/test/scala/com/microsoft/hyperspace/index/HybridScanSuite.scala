@@ -20,14 +20,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, EqualTo, In, InSet, Literal, Not}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project, RepartitionByExpression, Union}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
 import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExec}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.sources.DataSourceRegister
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
+import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
@@ -36,31 +36,33 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/hybridScanTest")
 
   val sampleData = SampleData.testData
-  protected val sampleDataLocationRoot = "src/test/resources/data/"
-  protected val sampleDataFormatAppend = sampleDataLocationRoot + "sample0"
-  protected val sampleDataFormatAppend2 = sampleDataLocationRoot + "sample1"
-  protected val sampleDataFormatDelete = sampleDataLocationRoot + "sample2"
-  protected val sampleDataFormatDelete2 = sampleDataLocationRoot + "sample3"
-  protected val sampleDataFormatDelete3 = sampleDataLocationRoot + "sample4"
-  protected val sampleDataFormatDelete4 = sampleDataLocationRoot + "sample5"
-  protected val sampleDataFormatBoth = sampleDataLocationRoot + "sample6"
-  protected val sampleDataFormat2Append = sampleDataLocationRoot + "sample7"
-  protected val sampleDataFormat2Delete = sampleDataLocationRoot + "sample8"
   var hyperspace: Hyperspace = _
 
-  // Introduce fileFormat to support "delta" format soon.
-  val fileFormat = "parquet"
-  val fileFormat2 = "json"
+  import spark.implicits._
+  val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+  val indexConfig1 = IndexConfig("indexType1", Seq("clicks"), Seq("query"))
+  val indexConfig2 = IndexConfig("indexType2", Seq("clicks"), Seq("Date"))
 
-  // Construct a df with `sourceFileFormat` and `sourcePath` and create an index with the df and
-  // given 'indexConfig'. Then copies the first 'appendCnt' number of input files from 'df' and
-  // deletes the last 'deleteCnt' of the input files.
+  protected val fileFormat = "parquet"
+  protected val fileFormat2 = "json"
+
+  def normalizePaths(in: Seq[String]): Seq[String] = {
+    in.map(_.replace("file:///", "file:/"))
+  }
+  def equalNormalizedPaths(a: Seq[String], b: Seq[String]): Boolean = {
+    normalizePaths(a).toSet === normalizePaths(b).toSet
+  }
+
+  // Create source data and create an index with given 'sourcePath', 'sourceFileFormat' and
+  // 'indexConfig'. Then copies the first 'appendCnt' number of input files from 'df' and
+  // deletes the last 'deleteCnt' of the input files. Return appended and deleted file lists.
   def setupIndexAndChangeData(
       sourceFileFormat: String,
       sourcePath: String,
       indexConfig: IndexConfig,
       appendCnt: Int,
-      deleteCnt: Int): Unit = {
+      deleteCnt: Int): (Seq[String], Seq[String]) = {
+    dfFromSample.write.format(sourceFileFormat).save(sourcePath)
     val df = spark.read.format(sourceFileFormat).load(sourcePath)
     hyperspace.createIndex(df, indexConfig)
     val inputFiles = df.inputFiles
@@ -72,175 +74,276 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       val destPath = new Path(inputFiles(i) + ".copy")
       fs.copyToLocalFile(sourcePath, destPath)
     }
+
     for (i <- 1 to deleteCnt) {
       fs.delete(new Path(inputFiles(inputFiles.length - i)), false)
     }
+
+    val df2 = spark.read.format(sourceFileFormat).load(sourcePath)
+    (df2.inputFiles diff inputFiles, inputFiles diff df2.inputFiles)
   }
 
   before {
+    spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
     spark.enableHyperspace()
   }
 
   after {
+    FileUtils.delete(systemPath)
     spark.disableHyperspace()
   }
 
-  override def afterAll(): Unit = {
-    super.afterAll()
-    FileUtils.delete(new Path(sampleDataLocationRoot))
+  private def getLatestStableLog(indexName: String): IndexLogEntry = {
+    val entry = logManager(systemPath, indexName).getLatestStableLog()
+    assert(entry.isDefined)
+    assert(entry.get.isInstanceOf[IndexLogEntry])
+    entry.get.asInstanceOf[IndexLogEntry]
   }
 
-  test(
-    "Append-only: join rule, appended data should be shuffled with indexed columns " +
-      "and merged by BucketUnion.") {
-    val df1 = spark.read.format(fileFormat).load(sampleDataFormatAppend)
-    val df2 = spark.read.format(fileFormat).load(sampleDataFormatAppend2)
-    def joinQuery(): DataFrame = {
-      val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
-      val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
-      query.join(query2, "clicks")
-    }
-    val baseQuery = joinQuery()
-    val basePlan = baseQuery.queryExecution.optimizedPlan
+  // Check if the given plan is transformed correctly to handle deleted files. The plan
+  // should include only one LogicalRelation node which is transformed with the given index.
+  def checkDeletedFiles(
+      plan: LogicalPlan,
+      indexName: String,
+      expectedDeletedFileNames: Seq[String]): Unit = {
 
-    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-        val join = joinQuery()
-        assert(basePlan.equals(join.queryExecution.optimizedPlan))
+    val fileNameToId = getLatestStableLog(indexName).fileIdTracker.getFileToIdMap.toSeq.map {
+      kv =>
+        (kv._1._1, kv._2)
+    }.toMap
+
+    val expectedDeletedFiles =
+      expectedDeletedFileNames.map(f => fileNameToId(f.replace("file:///", "file:/")).toString)
+
+    if (expectedDeletedFiles.nonEmpty) {
+      log
+      val inputFiles = plan.collect {
+        case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+          fsRelation.inputFiles.toSeq
+      }.flatten
+      val deletedFilesList = plan collect {
+        case Filter(
+            Not(EqualTo(left: Attribute, right: Literal)),
+            LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+          // Check new filter condition on lineage column.
+          val colName = left.toString
+          val deletedFile = right.toString
+          assert(colName.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
+          val deleted = Seq(deletedFile)
+          assert(expectedDeletedFiles.length == 1)
+          // Check the location is replaced with index data files properly.
+          val files = fsRelation.location.inputFiles
+          assert(files.nonEmpty && files.forall(_.contains(indexName)))
+          deleted
+        case Filter(
+            Not(InSet(attr, deletedFileIds)),
+            LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+          // Check new filter condition on lineage column.
+          assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
+          val deleted = deletedFileIds.map(_.toString).toSeq
+          assert(
+            expectedDeletedFiles.length > spark.conf
+              .get("spark.sql.optimizer.inSetConversionThreshold")
+              .toLong)
+          // Check the location is replaced with index data files properly.
+          val files = fsRelation.location.inputFiles
+          assert(files.nonEmpty && files.forall(_.contains(indexName)))
+          deleted
+        case Filter(
+            Not(In(attr, deletedFileIds)),
+            LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+          // Check new filter condition on lineage column.
+          assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
+          val deleted = deletedFileIds.map(_.toString)
+          assert(
+            expectedDeletedFiles.length <= spark.conf
+              .get("spark.sql.optimizer.inSetConversionThreshold")
+              .toLong)
+          // Check the location is replaced with index data files properly.
+          val files = fsRelation.location.inputFiles
+          assert(files.nonEmpty && files.forall(_.contains(indexName)))
+          deleted
       }
+      assert(deletedFilesList.length === 1)
+      val deletedFiles = deletedFilesList.flatten
+      assert(deletedFiles.length === expectedDeletedFiles.size)
+      assert(deletedFiles.distinct.length === deletedFiles.length)
+      assert(deletedFiles.forall(f => !inputFiles.contains(f)))
+      assert(equalNormalizedPaths(deletedFiles, expectedDeletedFiles))
 
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
-        val join = joinQuery()
-        val planWithHybridScan = join.queryExecution.optimizedPlan
-        assert(!basePlan.equals(planWithHybridScan))
+      val execPlan = spark.sessionState.executePlan(plan).executedPlan
+      val execNodes = execPlan collect {
+        case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+          // Check deleted files.
+          assert(deletedFiles.forall(dataFilters.toString.contains))
+          p
+      }
+      assert(execNodes.length === 1)
+    }
+  }
 
-        // Check appended file is added to relation node or not.
-        val nodes = planWithHybridScan.collect {
-          case b @ BucketUnion(children, bucketSpec) =>
-            assert(bucketSpec.numBuckets === 200)
-            assert(
-              bucketSpec.bucketColumnNames.size === 1 &&
-                bucketSpec.bucketColumnNames.head === "clicks")
+  // Check if the given plan is transformed correctly for Join index application.
+  def checkJoinIndexHybridScan(
+      plan: LogicalPlan,
+      leftIndexName: String,
+      leftAppended: Seq[String],
+      leftDeleted: Seq[String],
+      rightIndexName: String,
+      rightAppended: Seq[String],
+      rightDeleted: Seq[String],
+      filterConditions: Seq[String] = Nil): Unit = {
+    // Project - Join - children
+    val left = plan.children.head.children.head
+    val right = plan.children.head.children.last
 
-            val childNodes = children.collect {
-              case r @ RepartitionByExpression(
-                    attrs,
-                    Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
-                    numBucket) =>
-                assert(attrs.size === 1)
-                assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
-                // Check 1 appended file.
-                assert(fsRelation.location.inputFiles.forall(f =>
-                  f.contains(sampleDataFormatAppend) || f.contains(sampleDataFormatAppend2)))
-                assert(fsRelation.location.inputFiles.length === 1)
-                assert(numBucket === 200)
-                r
-              case p @ Project(
-                    _,
-                    Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))) =>
-                // Check 4 of index data files.
-                assert(
-                  fsRelation.location.inputFiles.forall(_.contains("index_ParquetAppend"))
-                    || fsRelation.location.inputFiles
-                      .forall(_.contains("indexType2_ParquetAppend2")))
-                assert(fsRelation.location.inputFiles.length === 4)
-                p
+    // Check deleted files with the first child of each left and right child.
+    checkDeletedFiles(left.children.head, leftIndexName, leftDeleted)
+    checkDeletedFiles(right.children.head, rightIndexName, rightDeleted)
+
+    val leftNodes = left.collect {
+      case b @ BucketUnion(children, bucketSpec) =>
+        assert(bucketSpec.numBuckets === 200)
+        assert(
+          bucketSpec.bucketColumnNames.size === 1 &&
+            bucketSpec.bucketColumnNames.head === "clicks")
+
+        val childNodes = children.collect {
+          case r @ RepartitionByExpression(
+                attrs,
+                Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
+                numBucket) =>
+            assert(attrs.size === 1)
+            assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
+
+            // Check appended file.
+            val files = fsRelation.location.inputFiles
+            assert(equalNormalizedPaths(files, leftAppended))
+            assert(files.length === leftAppended.length)
+            assert(numBucket === 200)
+            r
+          case p @ Project(_, Filter(_, _)) =>
+            val files = p collect {
+              case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+                fsRelation.location.inputFiles
             }
-
-            // BucketUnion has 2 children.
-            assert(childNodes.size === 2)
-            assert(childNodes.count(_.isInstanceOf[Project]) === 1)
-            assert(childNodes.count(_.isInstanceOf[RepartitionByExpression]) === 1)
-            b
+            assert(files.nonEmpty && files.flatten.forall(_.contains(leftIndexName)))
+            p
         }
-        // 2 BucketUnion in Join Rule v1.
-        assert(nodes.count(_.isInstanceOf[BucketUnion]) === 2)
 
-        withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
-          val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-          val execNodes = execPlan.collect {
-            case p @ BucketUnionExec(children, bucketSpec) =>
-              assert(children.size === 2)
-              // children.head is always the index plan.
-              assert(children.head.isInstanceOf[ProjectExec])
-              assert(children.last.isInstanceOf[ShuffleExchangeExec])
-              assert(bucketSpec.numBuckets === 200)
-              p
-            case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
-              // Check filter pushed down properly.
-              if (partitionFilters.nonEmpty) {
-                assert(
-                  partitionFilters.toString.contains(" >= 2000)") && partitionFilters.toString
-                    .contains(" <= 4000)"))
-              } else {
-                assert(
-                  dataFilters.toString.contains(" >= 2000)") && dataFilters.toString.contains(
-                    " <= 4000)"))
-              }
-              p
+        // BucketUnion has 2 children.
+        assert(childNodes.size === 2)
+        assert(childNodes.count(_.isInstanceOf[Project]) === 1)
+        assert(childNodes.count(_.isInstanceOf[RepartitionByExpression]) === 1)
+        b
+    }
+
+    val rightNodes = right.collect {
+      case b @ BucketUnion(children, bucketSpec) =>
+        assert(bucketSpec.numBuckets === 200)
+        assert(
+          bucketSpec.bucketColumnNames.size === 1 &&
+            bucketSpec.bucketColumnNames.head === "clicks")
+
+        val childNodes = children.collect {
+          case r @ RepartitionByExpression(
+                attrs,
+                Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
+                numBucket) =>
+            assert(attrs.size === 1)
+            assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
+
+            // Check appended files.
+            val files = fsRelation.location.inputFiles
+            assert(equalNormalizedPaths(files, rightAppended))
+            assert(files.length === rightAppended.length)
+            assert(numBucket === 200)
+            r
+          case p @ Project(
+                _,
+                Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))) =>
+            // Check index data files.
+            val files = fsRelation.location.inputFiles
+            assert(files.nonEmpty && files.forall(_.contains(rightIndexName)))
+            p
+        }
+
+        // BucketUnion has 2 children.
+        assert(childNodes.size === 2)
+        assert(childNodes.count(_.isInstanceOf[Project]) === 1)
+        assert(childNodes.count(_.isInstanceOf[RepartitionByExpression]) === 1)
+        b
+    }
+
+    // Check BucketUnion node if needed.
+    assert(leftAppended.isEmpty || leftNodes.count(_.isInstanceOf[BucketUnion]) === 1)
+    assert(rightAppended.isEmpty || rightNodes.count(_.isInstanceOf[BucketUnion]) === 1)
+
+    withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
+      val execPlan = spark.sessionState.executePlan(plan).executedPlan
+      val execNodes = execPlan.collect {
+        case p @ BucketUnionExec(children, bucketSpec) =>
+          assert(children.size === 2)
+          // children.head is always the index plan.
+          assert(children.head.isInstanceOf[ProjectExec])
+          assert(children.last.isInstanceOf[ShuffleExchangeExec])
+          assert(bucketSpec.numBuckets === 200)
+          p
+        case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
+          // Check filter pushed down properly.
+          if (partitionFilters.nonEmpty) {
+            assert(filterConditions.forall(partitionFilters.toString.contains))
+          } else {
+            assert(filterConditions.forall(dataFilters.toString.contains))
           }
-          assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === 2)
-          // 2 of index, 2 of appended file
-          assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 4)
-        }
-        checkAnswer(join, baseQuery)
+          p
       }
+      var requiredBucketUnion = 0
+      if (leftAppended.nonEmpty) requiredBucketUnion += 1
+      if (rightAppended.nonEmpty) requiredBucketUnion += 1
+      assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === requiredBucketUnion)
+      // 2 of index data and number of indexes with appended files.
+      assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 2 + requiredBucketUnion)
     }
   }
 
-  test(
-    "Append-only: filter rule and non-parquet format," +
-      "appended data should be shuffled and merged by Union.") {
-    val df = spark.read.format(fileFormat2).load(sampleDataFormat2Append)
-    def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
-    val baseQuery = filterQuery
-    val basePlan = baseQuery.queryExecution.optimizedPlan
+  // Check if the given plan is transformed correctly for Filter index application and appended
+  // files are handled with Union operation if appended files is not empty.
+  def checkFilterIndexHybridScanUnion(
+      plan: LogicalPlan,
+      indexName: String,
+      expectedAppendedFiles: Seq[String] = Nil,
+      expectedDeletedFiles: Seq[String] = Nil,
+      filterConditions: Seq[String] = Nil): Unit = {
+    // The first child should be the index data scan; thus check if the deleted files are handled
+    // properly with the first child plan.
+    checkDeletedFiles(plan.children.head, indexName, expectedDeletedFiles)
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-      val filter = filterQuery
-      assert(basePlan.equals(filter.queryExecution.optimizedPlan))
-    }
-
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
-      val filter = filterQuery
-      val planWithHybridScan = filter.queryExecution.optimizedPlan
-      assert(!basePlan.equals(planWithHybridScan))
-
-      // Check appended file is added to relation node or not.
-      val nodes = planWithHybridScan.collect {
+    if (expectedAppendedFiles.nonEmpty) {
+      val nodes = plan.collect {
         case u @ Union(children) =>
-          val formats = children.collect {
-            case Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))) =>
-              val fileFormatName = fsRelation.fileFormat match {
-                case d: DataSourceRegister => d.shortName
-                case _ => fail("Unexpected file format")
-              }
-              fileFormatName match {
-                case "parquet" =>
-                  // Check 4 of index data files.
-                  assert(fsRelation.location.inputFiles.forall(_.contains("index_JsonAppend")))
-                  assert(fsRelation.location.inputFiles.length === 4)
-                case "json" =>
-                  // Check 1 appended file.
-                  assert(fsRelation.location.inputFiles.forall(_.contains(".copy")))
-                  assert(fsRelation.location.inputFiles.length === 1)
-                case _ => fail("Unexpected file format")
-              }
-              fileFormatName
+          val indexChild = children.head
+          indexChild collect {
+            case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+              assert(fsRelation.location.inputFiles.forall(_.contains(indexName)))
           }
 
-          // Union has 2 children.
-          assert(formats.size === 2)
-          assert(formats.contains("parquet") && formats.contains("json"))
+          assert(children.tail.size === 1)
+          val appendChild = children.last
+          appendChild collect {
+            case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
+              val files = fsRelation.location.inputFiles
+              assert(equalNormalizedPaths(files, expectedAppendedFiles))
+              assert(files.length === expectedAppendedFiles.size)
+          }
           u
       }
       assert(nodes.count(_.isInstanceOf[Union]) === 1)
 
       // Make sure there is no shuffle.
-      planWithHybridScan.foreach(p => assert(!p.isInstanceOf[RepartitionByExpression]))
+      plan.foreach(p => assert(!p.isInstanceOf[RepartitionByExpression]))
 
       withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
-        val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
+        val execPlan = spark.sessionState.executePlan(plan).executedPlan
         val execNodes = execPlan.collect {
           case p @ UnionExec(children) =>
             assert(children.size === 2)
@@ -249,9 +352,11 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
             p
           case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
             // Check filter pushed down properly.
-            assert(
-              dataFilters.toString.contains(" <= 2000)") ||
-                partitionFilters.toString.contains(" <= 2000)"))
+            if (partitionFilters.nonEmpty) {
+              assert(filterConditions.forall(partitionFilters.toString.contains))
+            } else {
+              assert(filterConditions.forall(dataFilters.toString.contains))
+            }
             p
         }
         assert(execNodes.count(_.isInstanceOf[UnionExec]) === 1)
@@ -260,164 +365,198 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         // Make sure there is no shuffle.
         execPlan.foreach(p => assert(!p.isInstanceOf[ShuffleExchangeExec]))
       }
-      checkAnswer(baseQuery, filter)
     }
   }
 
-  test("Delete-only: index relation should have additional filter for deleted files.") {
-    // Test for both file format
-    Seq(
-      (sampleDataFormatDelete, "index_ParquetDelete", "parquet"),
-      (sampleDataFormat2Delete, "index_JsonDelete", "json")) foreach {
-      case (dataPath, indexName, dataFormat) =>
-        val df = spark.read.format(dataFormat).load(dataPath)
-        def filterQuery: DataFrame =
-          df.filter(df("clicks") <= 2000).select(df("query"))
-        val baseQuery = filterQuery
-        val basePlan = baseQuery.queryExecution.optimizedPlan
+  test(
+    "Append-only: join rule, appended data should be shuffled with indexed columns " +
+      "and merged by BucketUnion") {
+    withTempPathAsString { testPath =>
+      val appendPath1 = testPath + "/append1"
+      val appendPath2 = testPath + "/append2"
+      val leftIndexName = "index_Append"
+      val rightIndexName = "indexType2_Append"
+      val (leftAppended, leftDeleted) = setupIndexAndChangeData(
+        fileFormat,
+        appendPath1,
+        indexConfig1.copy(indexName = leftIndexName),
+        appendCnt = 1,
+        deleteCnt = 0)
+      val (rightAppended, rightDeleted) = setupIndexAndChangeData(
+        fileFormat,
+        appendPath2,
+        indexConfig2.copy(indexName = rightIndexName),
+        appendCnt = 1,
+        deleteCnt = 0)
 
-        withSQLConf(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "false") {
-          val filter = filterQuery
-          assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+      val df1 = spark.read.format(fileFormat).load(appendPath1)
+      val df2 = spark.read.format(fileFormat).load(appendPath2)
+      def joinQuery(): DataFrame = {
+        val query2 = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
+        val query = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
+        query2.join(query, "clicks")
+      }
+      val baseQuery = joinQuery()
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+
+      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+        withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
+          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val join = joinQuery()
+            checkAnswer(join, baseQuery)
+            assert(basePlan.equals(join.queryExecution.optimizedPlan))
         }
 
-        withSQLConf(
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-          IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-          val filter = filterQuery
-          val planWithHybridScan = filter.queryExecution.optimizedPlan
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
+          val join = joinQuery()
+          val planWithHybridScan = join.queryExecution.optimizedPlan
           assert(!basePlan.equals(planWithHybridScan))
+          checkJoinIndexHybridScan(
+            planWithHybridScan,
+            leftIndexName,
+            leftAppended,
+            leftDeleted,
+            rightIndexName,
+            rightAppended,
+            rightDeleted,
+            Seq(">= 2000", "<= 4000"))
+          checkAnswer(join, baseQuery)
+        }
+      }
+    }
+  }
 
-          val deletedFilesList = planWithHybridScan collect {
-            case Filter(
-                Not(In(attr, deletedFileNames)),
-                LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-              // Check new filter condition on lineage column.
-              assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
-              val deleted = deletedFileNames.map(_.toString)
-              assert(deleted.length === 2)
-              assert(deleted.distinct.length === deleted.length)
-              assert(deleted.forall(f => !df.inputFiles.contains(f)))
-              // Check the location is replaced with index data files properly.
-              assert(fsRelation.location.inputFiles.forall(_.contains(indexName)))
-              assert(fsRelation.location.inputFiles.length === 4)
-              deleted
+  test(
+    "Append-only: filter rule and non-parquet format," +
+      "appended data should be shuffled and merged by Union") {
+    // Note: for delta lake, this test is also eligible as the dataset is partitioned.
+    withTempPathAsString { testPath =>
+      val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
+        fileFormat2,
+        testPath,
+        indexConfig1.copy(indexName = "index_Format2Append"),
+        appendCnt = 1,
+        deleteCnt = 0)
+
+      val df = spark.read.format(fileFormat2).load(testPath)
+      def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
+
+      val baseQuery = filterQuery
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+        val filter = filterQuery
+        assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+      }
+
+      withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
+        val filter = filterQuery
+        val planWithHybridScan = filter.queryExecution.optimizedPlan
+        assert(!basePlan.equals(planWithHybridScan))
+
+        checkFilterIndexHybridScanUnion(
+          planWithHybridScan,
+          "index_Format2Append",
+          appendedFiles,
+          deletedFiles,
+          Seq(" <= 2000"))
+        checkAnswer(baseQuery, filter)
+      }
+    }
+  }
+
+  test("Delete-only: index relation should have additional filter for deleted files") {
+    val testSet = Seq(("index_ParquetDelete", fileFormat), ("index_JsonDelete", fileFormat2))
+    testSet foreach {
+      case (indexName, dataFormat) =>
+        withTempPathAsString { dataPath =>
+          val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
+            dataFormat,
+            dataPath,
+            indexConfig1.copy(indexName = indexName),
+            appendCnt = 0,
+            deleteCnt = 1)
+
+          val df = spark.read.format(dataFormat).load(dataPath)
+          def filterQuery: DataFrame =
+            df.filter(df("clicks") <= 2000).select(df("query"))
+
+          val baseQuery = filterQuery
+          val basePlan = baseQuery.queryExecution.optimizedPlan
+
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
+            val filter = filterQuery
+            assert(basePlan.equals(filter.queryExecution.optimizedPlan))
           }
-          assert(deletedFilesList.length === 1)
-          val deletedFiles = deletedFilesList.flatten
-          assert(deletedFiles.length === 2)
 
-          val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-          val execNodes = execPlan collect {
-            case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
-              // Check filter pushed down properly.
-              val filterStr = dataFilters.toString
-              assert(filterStr.contains(" <= 2000)"))
-              // Check deleted files.
-              assert(deletedFiles.forall(filterStr.contains))
-              p
+          withSQLConf(TestConfig.HybridScanEnabled: _*) {
+            val filter = filterQuery
+            val planWithHybridScan = filter.queryExecution.optimizedPlan
+            assert(!basePlan.equals(planWithHybridScan))
+            checkFilterIndexHybridScanUnion(
+              planWithHybridScan,
+              indexName,
+              appendedFiles,
+              deletedFiles,
+              Seq(" <= 2000"))
+            checkAnswer(baseQuery, filter)
           }
-          assert(execNodes.length === 1)
-
-          checkAnswer(baseQuery, filter)
         }
     }
   }
 
   test("Delete-only: join rule, deleted files should be excluded from each index data relation.") {
-    val df1 = spark.read.format(fileFormat).load(sampleDataFormatDelete)
-    val df2 = spark.read.format(fileFormat).load(sampleDataFormatDelete3)
-    def joinQuery(): DataFrame = {
-      val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
-      val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
-      query.join(query2, "clicks")
-    }
-    val baseQuery = joinQuery()
-    val basePlan = baseQuery.queryExecution.optimizedPlan
-
-    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-        val join = joinQuery()
-        assert(basePlan.equals(join.queryExecution.optimizedPlan))
-      }
-
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-        val join = joinQuery()
-        val planWithHybridScan = join.queryExecution.optimizedPlan
-        assert(!basePlan.equals(planWithHybridScan))
-
-        val deletedFilesList = planWithHybridScan collect {
-          case Filter(
-              Not(In(attr, deletedFileNames)),
-              LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-            // Check new filter condition on lineage column.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
-            val deleted = deletedFileNames.map(_.toString)
-            assert(deleted.length === 2)
-            assert(deleted.distinct.length === deleted.length)
-            assert(deleted.forall(f => !df1.inputFiles.contains(f)))
-            assert(deleted.forall(f => !df2.inputFiles.contains(f)))
-            assert(
-              fsRelation.location.inputFiles.forall(_.contains("index_ParquetDelete")) ||
-                fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
-            assert(fsRelation.location.inputFiles.length === 4)
-            deleted
-        }
-        assert(deletedFilesList.length === 2)
-        var deletedFiles = deletedFilesList.flatten
-        assert(deletedFiles.length === 4)
-
-        val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-        val execNodes = execPlan collect {
-          case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
-            // Check filter pushed down properly.
-            val filterStr = dataFilters.toString
-            assert(filterStr.contains(" >= 2000)") && filterStr.contains(" <= 4000)"))
-            // Check deleted files in the push down condition and remove from the list.
-            deletedFiles = deletedFiles.filterNot(filterStr.contains(_))
-            p
-        }
-        assert(deletedFiles.isEmpty)
-        assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 2)
-
-        checkAnswer(join, baseQuery)
-      }
-    }
-  }
-
-  test("Delete-only: filter rule, number of delete files threshold.") {
-    val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
-    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      setupIndexAndChangeData(
+    withTempPathAsString { testPath =>
+      val deletePath1 = testPath + "/delete1"
+      val deletePath2 = testPath + "/delete2"
+      val leftIndexName = "index_Delete"
+      val rightIndexName = "indexType2_Delete2"
+      val (leftAppended, leftDeleted) = setupIndexAndChangeData(
         fileFormat,
-        sampleDataFormatDelete4,
-        indexConfig.copy(indexName = "IndexDeleteCntTest"),
+        deletePath1,
+        indexConfig1.copy(indexName = leftIndexName),
         appendCnt = 0,
         deleteCnt = 2)
-    }
+      val (rightAppended, rightDeleted) = setupIndexAndChangeData(
+        fileFormat,
+        deletePath2,
+        indexConfig2.copy(indexName = rightIndexName),
+        appendCnt = 0,
+        deleteCnt = 2)
 
-    val df = spark.read.format(fileFormat).load(sampleDataFormatDelete4)
-    def filterQuery: DataFrame =
-      df.filter(df("clicks") <= 2000).select(df("query"))
-    val baseQuery = filterQuery
-    val basePlan = baseQuery.queryExecution.optimizedPlan
+      val df1 = spark.read.format(fileFormat).load(deletePath1)
+      val df2 = spark.read.format(fileFormat).load(deletePath2)
 
-    withSQLConf(
-      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-      IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "2") {
-        val filter = filterQuery
-        // Since number of deletedFiles = 2, index can be applied with Hybrid scan.
-        assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
+      def joinQuery(): DataFrame = {
+        val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
+        val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
+        query.join(query2, "clicks")
       }
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES -> "1") {
-        val filter = filterQuery
-        // Since number of deletedFiles = 2, index should not be applied even with Hybrid scan.
-        assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+
+      val baseQuery = joinQuery()
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+
+      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+          val join = joinQuery()
+          assert(basePlan.equals(join.queryExecution.optimizedPlan))
+        }
+
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
+          val join = joinQuery()
+          val planWithHybridScan = join.queryExecution.optimizedPlan
+          assert(!basePlan.equals(planWithHybridScan))
+          checkJoinIndexHybridScan(
+            planWithHybridScan,
+            leftIndexName,
+            leftAppended,
+            leftDeleted,
+            rightIndexName,
+            rightAppended,
+            rightDeleted,
+            Seq(" >= 2000", " <= 4000"))
+          checkAnswer(join, baseQuery)
+        }
       }
     }
   }
@@ -425,85 +564,39 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
   test(
     "Append+Delete: filter rule, appended files should be handled " +
       "with additional plan and merged by Union.") {
-    val df = spark.read.format(fileFormat).load(sampleDataFormatBoth)
-    def filterQuery: DataFrame =
-      df.filter(df("clicks") <= 2000).select(df("query"))
-    val baseQuery = filterQuery
-    val basePlan = baseQuery.queryExecution.optimizedPlan
 
-    withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-      val filter = filterQuery
-      assert(basePlan.equals(filter.queryExecution.optimizedPlan))
-    }
+    withTempPathAsString { testPath =>
+      val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
+        fileFormat,
+        testPath,
+        indexConfig1.copy(indexName = "index_appendAndDelete"),
+        appendCnt = 1,
+        deleteCnt = 1)
 
-    withSQLConf(
-      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-      IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true") {
-      val filter = filterQuery
-      val planWithHybridScan = filter.queryExecution.optimizedPlan
-      assert(!basePlan.equals(planWithHybridScan))
+      val df = spark.read.format(fileFormat).load(testPath)
 
-      var deletedFilesList: Seq[Seq[String]] = Nil
-      val nodes = planWithHybridScan collect {
-        // OptimizeIn would change `IN` to `EqualTo` if there is only one element in `In`.
-        case p @ Filter(
-              Not(EqualTo(left: Attribute, right: Literal)),
-              LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-          // Check new filter condition on lineage column.
-          val colName = left.toString
-          val deletedFile = right.toString
-          assert(colName.contains(IndexConstants.DATA_FILE_NAME_ID))
-          assert(!df.inputFiles.contains(deletedFile))
-          assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
-          assert(fsRelation.location.inputFiles.length === 4)
-          deletedFilesList = deletedFilesList :+ Seq(deletedFile)
-          p
-        case p: Union =>
-          p
-        case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-          if (fsRelation.location.inputFiles.exists(_.contains(".copy"))) {
-            // Check input files for appended files.
-            assert(fsRelation.location.inputFiles.length === 1)
-          } else {
-            // Check input files for index data files.
-            assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
-            assert(fsRelation.location.inputFiles.length === 4)
-          }
-          p
+      def filterQuery: DataFrame =
+        df.filter(df("clicks") <= 2000).select(df("query"))
+
+      val baseQuery = filterQuery
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+        val filter = filterQuery
+        assert(basePlan.equals(filter.queryExecution.optimizedPlan))
       }
-      assert(nodes.count(_.isInstanceOf[Filter]) === 1)
-      assert(nodes.count(_.isInstanceOf[Union]) === 1)
-      assert(nodes.count(_.isInstanceOf[LogicalRelation]) === 2)
 
-      withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
-        val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-        var deletePushDownFilterFound = false
-        val execNodes = execPlan collect {
-          case p @ UnionExec(children) =>
-            assert(children.size === 2)
-            assert(children.head.isInstanceOf[ProjectExec]) // index data
-            assert(children.last.isInstanceOf[ProjectExec]) // appended data
-            p
-          case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
-            // Check filter pushed down properly.
-            val filterStr = dataFilters.toString
-            assert(filterStr.contains(" <= 2000)"))
-            if (filterStr.contains(IndexConstants.DATA_FILE_NAME_ID)) {
-              assert(deletedFilesList.flatten.forall(filterStr.contains(_)))
-              assert(!deletePushDownFilterFound)
-              deletePushDownFilterFound = true
-            }
-            p
-          case _: ShuffleExchangeExec =>
-            // Make sure there is no shuffle.
-            fail("ShuffleExchangeExec node found.")
-        }
+      withSQLConf(TestConfig.HybridScanEnabled: _*) {
+        val filter = filterQuery
+        val planWithHybridScan = filter.queryExecution.optimizedPlan
+        assert(!basePlan.equals(planWithHybridScan))
 
-        assert(execNodes.count(_.isInstanceOf[UnionExec]) === 1)
-        // 1 of index, 1 of appended file
-        assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 2)
-        assert(deletePushDownFilterFound)
-
+        checkFilterIndexHybridScanUnion(
+          planWithHybridScan,
+          "index_appendAndDelete",
+          appendedFiles,
+          deletedFiles,
+          Seq(" <= 2000"))
         checkAnswer(baseQuery, filter)
       }
     }
@@ -513,119 +606,55 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
     "Append+Delete: join rule, appended data should be shuffled with indexed columns " +
       "and merged by BucketUnion and deleted files are handled with index data.") {
     // One relation has both deleted & appended files and the other one has only deleted files.
-    val df1 = spark.read.format(fileFormat).load(sampleDataFormatBoth)
-    val df2 = spark.read.format(fileFormat).load(sampleDataFormatDelete3)
-    def joinQuery(): DataFrame = {
-      val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
-      val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
-      query.join(query2, "clicks")
-    }
-    val baseQuery = joinQuery()
-    val basePlan = baseQuery.queryExecution.optimizedPlan
+    withTempPathAsString { testPath =>
+      val leftDataPath = testPath + "/leftPath"
+      val rightDataPath = testPath + "/rightPath"
+      val leftIndexName = "index_Both"
+      val rightIndexName = "indexType2_Delete"
+      val (leftAppended, leftDeleted) = setupIndexAndChangeData(
+        fileFormat,
+        leftDataPath,
+        indexConfig1.copy(indexName = leftIndexName),
+        appendCnt = 1,
+        deleteCnt = 1)
+      val (rightAppended, rightDeleted) = setupIndexAndChangeData(
+        fileFormat,
+        rightDataPath,
+        indexConfig2.copy(indexName = rightIndexName),
+        appendCnt = 0,
+        deleteCnt = 2)
 
-    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-        val join = joinQuery()
-        assert(basePlan.equals(join.queryExecution.optimizedPlan))
+      val df1 = spark.read.format(fileFormat).load(leftDataPath)
+      val df2 = spark.read.format(fileFormat).load(rightDataPath)
+      def joinQuery(): DataFrame = {
+        val query = df1.filter(df1("clicks") >= 2000).select(df1("clicks"), df1("query"))
+        val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
+        query.join(query2, "clicks")
       }
+      val baseQuery = joinQuery()
+      val basePlan = baseQuery.queryExecution.optimizedPlan
 
-      withSQLConf(
-        IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
-        IndexConstants.INDEX_HYBRID_SCAN_DELETE_ENABLED -> "true",
-        "spark.sql.optimizer.inSetConversionThreshold" -> "1") {
-        // Changed inSetConversionThreshould to check InSet optimization.
-        val join = joinQuery()
-        val planWithHybridScan = join.queryExecution.optimizedPlan
-        assert(!basePlan.equals(planWithHybridScan))
-
-        var deletedFilesList: Seq[Seq[String]] = Nil
-        val nodes = planWithHybridScan collect {
-          case p @ Filter(
-                Not(InSet(attr, deletedFileNames)),
-                LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-            // Check new filter condition on lineage column.
-            assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
-            // This node should be df2 - Filter-Not-InSet with 2 deleted files.
-            assert(deletedFileNames.size === 2)
-            val deleted = deletedFileNames.map(_.toString).toSeq
-            assert(deleted.forall(f => !df2.inputFiles.contains(f)))
-            assert(
-              fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")) ||
-                fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
-            assert(fsRelation.location.inputFiles.length === 4)
-            deletedFilesList = deletedFilesList :+ deleted
-            p
-          // OptimizeIn would change `IN` to `EqualTo` if there is only one element in `In`.
-          case p @ Filter(
-                Not(EqualTo(left: Attribute, right: Literal)),
-                LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
-            // Check new filter condition on lineage column.
-            val colName = left.toString
-            val deletedFile = right.toString
-            // This node should be df1 - Filter-Not with 1 deleted files.
-            assert(colName.contains(IndexConstants.DATA_FILE_NAME_ID))
-            assert(!df1.inputFiles.contains(deletedFile))
-            assert(fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")))
-            assert(fsRelation.location.inputFiles.length === 4)
-            deletedFilesList = deletedFilesList :+ Seq(deletedFile)
-            p
-          case p @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-            val appendedFileCnt = fsRelation.location.inputFiles.count(_.contains(".copy"))
-            val indexFileCnt = fsRelation.location.inputFiles.count(_.contains("index"))
-            if (appendedFileCnt > 0) {
-              assert(appendedFileCnt === 1)
-              assert(fsRelation.location.inputFiles.length === 1)
-            } else {
-              assert(
-                fsRelation.location.inputFiles.forall(_.contains("index_ParquetBoth")) ||
-                  fsRelation.location.inputFiles.forall(_.contains("indexType2_ParquetDelete3")))
-              assert(indexFileCnt === 4)
-              assert(fsRelation.location.inputFiles.length === 4)
-            }
-            p
-          case p: BucketUnion => p
+      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+          val join = joinQuery()
+          assert(basePlan.equals(join.queryExecution.optimizedPlan))
         }
-        // 2 LogicalRelation for index with append+delete, 1 for index with delete.
-        assert(nodes.count(_.isInstanceOf[LogicalRelation]) === 3)
-        // 1 BucketUnion for index with append+delete.
-        assert(nodes.count(_.isInstanceOf[BucketUnion]) === 1)
-        // 2 Filter-Not-In nodes for index with delete.
-        assert(nodes.count(_.isInstanceOf[Filter]) === 2)
-        assert(deletedFilesList.length === 2)
-        var deletedFiles = deletedFilesList.flatten
-        assert(deletedFiles.length === 3)
 
-        withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
-          val execPlan = spark.sessionState.executePlan(planWithHybridScan).executedPlan
-          var deleteFilesPushDownFilterCnt = 0
-          val execNodes = execPlan collect {
-            case p @ BucketUnionExec(children, bucketSpec) =>
-              assert(children.size === 2)
-              // children.head is always the index plan.
-              assert(children.head.isInstanceOf[ProjectExec]) // index data
-              assert(children.last.isInstanceOf[ShuffleExchangeExec]) // appended data
-              assert(bucketSpec.bucketColumnNames.length === 1)
-              assert(bucketSpec.bucketColumnNames.head.equals("clicks"))
-              assert(bucketSpec.numBuckets === 200)
-              p
-            case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
-              // Check filter pushed down properly.
-              val filterStr = dataFilters.toString
-              assert(filterStr.contains(" >= 2000)") && filterStr.contains(" <= 4000)"))
-              // Check deleted files.
-              if (filterStr.contains(IndexConstants.DATA_FILE_NAME_ID)) {
-                deletedFiles = deletedFiles.filterNot(filterStr.contains(_))
-                deleteFilesPushDownFilterCnt += 1
-              }
-              p
-          }
-          // Check all deleted files are present in Push-down filter condition.
-          assert(deletedFiles.isEmpty)
-          assert(execNodes.count(_.isInstanceOf[BucketUnionExec]) === 1)
-          // 2 of index data, 1 of appended file.
-          assert(execNodes.count(_.isInstanceOf[FileSourceScanExec]) === 3)
-          assert(deleteFilesPushDownFilterCnt === 2)
-
+        withSQLConf(TestConfig.HybridScanEnabled :+
+          "spark.sql.optimizer.inSetConversionThreshold" -> "1": _*) {
+          // Changed inSetConversionThreshould to check InSet optimization.
+          val join = joinQuery()
+          val planWithHybridScan = join.queryExecution.optimizedPlan
+          assert(!basePlan.equals(planWithHybridScan))
+          checkJoinIndexHybridScan(
+            planWithHybridScan,
+            leftIndexName,
+            leftAppended,
+            leftDeleted,
+            rightIndexName,
+            rightAppended,
+            rightDeleted,
+            Seq(" >= 2000)", " <= 4000)"))
           checkAnswer(baseQuery, join)
         }
       }

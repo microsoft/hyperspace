@@ -137,9 +137,10 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             expectedHybridScanTag: Option[Boolean],
             expectedCommonSourceBytes: Option[Long]): Unit = {
           withSQLConf(
-            "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
-            "spark.hyperspace.index.hybridscan.delete.enabled" ->
-              hybridScanDeleteEnabled.toString) {
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> hybridScanEnabled.toString,
+            IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+              (if (hybridScanDeleteEnabled) "0.99" else "0")) {
             val indexes = RuleUtils
               .getCandidateIndexes(spark, allIndexes, plan)
             if (expectCandidateIndex) {
