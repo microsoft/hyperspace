@@ -684,7 +684,6 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
   test("Verify InMemoryFileIndex cache is used.") {
     withTempPathAsString { testPath =>
-      // Setup. Create data.
       val indexConfig = IndexConfig("index", Seq("c3"), Seq("c4"))
       import spark.implicits._
       SampleData.testData
@@ -729,7 +728,6 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
   test("Verify InMemoryFileIndex cache is not used for a different plan with Hybrid scan.") {
     withTempPathAsString { testPath =>
-      // Setup. Create data.
       val indexConfig = IndexConfig("index", Seq("c3"), Seq("c4"))
       import spark.implicits._
       SampleData.testData
@@ -808,6 +806,108 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
             location4.eq(indexEntry
               .getTagValue(getQueryPlanKey(df3), IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN)
               .get))
+        }
+      }
+    }
+  }
+
+  test("Verify INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED tag works as expected.") {
+    withTempPathAsString { testPath =>
+      val indexConfig = IndexConfig("index", Seq("c3"), Seq("c4"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .json(testPath)
+      val df = spark.read.json(testPath)
+      hyperspace.createIndex(df, indexConfig)
+      withIndex(indexConfig.indexName) {
+        spark.enableHyperspace()
+        val df = spark.read.json(testPath)
+        def query(df: DataFrame): DataFrame = {
+          df.filter("c3 == 'facebook'").select("c3", "c4")
+        }
+        def getQueryPlanKey(df: DataFrame): LogicalPlan = {
+          spark.disableHyperspace()
+          val p = query(df).queryExecution.optimizedPlan
+          spark.enableHyperspace()
+          p
+        }
+        def getFsLocations(plan: LogicalPlan): Seq[FileIndex] = {
+          plan.collect {
+            case LogicalRelation(HadoopFsRelation(loc, _, _, _, _, _), _, _, _) =>
+              loc
+          }
+        }
+
+        val indexManager = Hyperspace
+          .getContext(spark)
+          .indexCollectionManager
+        val indexEntry =
+          indexManager.getIndexes().filter(_.name.equals(indexConfig.indexName)).head
+        assert(indexEntry.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).isEmpty)
+        query(df).collect
+        val locations1 = getFsLocations(query(df).queryExecution.optimizedPlan)
+        assert(locations1.length === 1)
+        assert(indexEntry.getTagValue(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY).nonEmpty)
+
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(3)
+          .write
+          .mode("append")
+          .json(testPath)
+
+        val df2 = spark.read.json(testPath)
+        withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
+          query(df2).collect
+          assert(
+            indexEntry
+              .getTagValue(getQueryPlanKey(df2), IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN)
+              .isEmpty)
+          assert(
+            indexEntry
+              .getTagValue(
+                getQueryPlanKey(df2),
+                IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED)
+              .nonEmpty)
+          val locations2 = getFsLocations(query(df2).queryExecution.optimizedPlan)
+          assert(locations2.length === 2)
+          assert(locations2.head.eq(locations1.head))
+
+          query(df2).collect
+          val locations3 = getFsLocations(query(df2).queryExecution.optimizedPlan)
+          assert(locations3.length === 2)
+          assert(locations3.head.eq(locations1.head))
+          assert(locations3.last.eq(locations2.last))
+          assert(
+            locations3.last.eq(
+              indexEntry
+                .getTagValue(
+                  getQueryPlanKey(df2),
+                  IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED)
+                .get))
+
+          SampleData.testData
+            .toDF("c1", "c2", "c3", "c4", "c5")
+            .limit(1)
+            .write
+            .mode("append")
+            .json(testPath)
+
+          val df3 = spark.read.json(testPath)
+          query(df3).collect
+          val locations4 = getFsLocations(query(df3).queryExecution.optimizedPlan)
+          assert(locations4.length === 2)
+          assert(!locations4.last.eq(locations3.last))
+          assert(
+            locations4.last.eq(
+              indexEntry
+                .getTagValue(
+                  getQueryPlanKey(df3),
+                  IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED)
+                .get))
         }
       }
     }

@@ -361,7 +361,7 @@ object RuleUtils {
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
-        val newLocation = if (filesAppended.isEmpty) {
+        val newLocation = if (filesToRead.length == index.content.files.size) {
           index.getTagValueOrUpdate(
             IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY,
             new InMemoryFileIndex(spark, index.content.files, Map(), None))
