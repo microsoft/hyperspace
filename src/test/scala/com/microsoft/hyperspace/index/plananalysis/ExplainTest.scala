@@ -113,7 +113,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("<----:  +- Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append("<----:     +- *(1) Project [Col1#11, Col2#12]---->")
       .append(defaultDisplayMode.newLine)
@@ -125,7 +125,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")
@@ -348,55 +348,6 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val expectedOutput = new StringBuilder
 
     // The format of the explain output looks as follows:
-    // scalastyle:off filelinelengthchecker
-    /**
-     *=============================================================
-     *Plan with indexes:
-     *=============================================================
-     * SortMergeJoin [Col1#11], [Col1#21], Inner
-     * <----:- *(1) Project [Col1#11, Col2#12]---->
-     * <----:  +- *(1) Filter isnotnull(Col1#11)---->
-     * <----:     +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
-     * <----+- *(2) Project [Col1#21, Col2#22]---->
-     *    <----+- *(2) Filter isnotnull(Col1#21)---->
-     *       <----+- *(2) FileScan parquet [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/joinIndex/v__=0], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->
-     *
-     *=============================================================
-     *Plan without indexes:
-     *=============================================================
-     * SortMergeJoin [Col1#11], [Col1#21], Inner
-     * <----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->
-     * <----:  +- Exchange hashpartitioning(Col1#11, 200)---->
-     * <----:     +- *(1) Project [Col1#11, Col2#12]---->
-     * <----:        +- *(1) Filter isnotnull(Col1#11)---->
-     * <----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/sampleparquet], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->
-     * <----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->
-     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->
-     *
-     *=============================================================
-     *Indexes used:
-     *=============================================================
-     *joinIndex:src/test/resources/indexLocation/joinIndex/v__=0
-     *
-     * =============================================================
-     * Physical operator stats:
-     * =============================================================
-     * +------------------+-------------------+------------------+----------+
-     * | Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|
-     * +------------------+-------------------+------------------+----------+
-     * |           *Filter|                  1|                 2|         1|
-     * |     *InputAdapter|                  4|                 2|        -2|
-     * |          *Project|                  1|                 2|         1|
-     * |   *ReusedExchange|                  1|                 0|        -1|
-     * |     *Scan parquet|                  1|                 2|         1|
-     * |  *ShuffleExchange|                  1|                 0|        -1|
-     * |             *Sort|                  2|                 0|        -2|
-     * |*WholeStageCodegen|                  4|                 3|        -1|
-     * |     SortMergeJoin|                  1|                 1|         0|
-     * +------------------+-------------------+------------------+----------+
-     */
-    // scalastyle:on filelinelengthchecker
-
     val joinIndexFilePath = getIndexFilesPath("joinIndex")
 
     val joinIndexPath = getIndexRootPath("joinIndex")
@@ -438,7 +389,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("<----:  +- Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append("<----:     +- *(1) Project [Col1#11, Col2#12]---->")
       .append(defaultDisplayMode.newLine)
@@ -450,7 +401,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")
@@ -516,31 +467,6 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val indexConfig = IndexConfig("filterIndex", Seq("Col2"), Seq("Col1"))
     hyperspace.createIndex(df, indexConfig)
 
-    // scalastyle:off filelinelengthchecker
-    /**
-     * Expected output with displayMode-specific strings substituted (not shown below):
-     *
-     * =============================================================
-     * Plan with indexes:
-     * =============================================================
-     * Project [Col1#500]
-     * +- Filter (isnotnull(Col2#501) && (Col2#501 = 2))
-     *    +- FileScan parquet [Col2#501,Col1#500] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/indexLocation/indexes/filterIndex], PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ReadSchema: struct<Col2:int,Col1:string>
-     *
-     * =============================================================
-     * Plan without indexes:
-     * =============================================================
-     * Project [Col1#500]
-     * +- Filter (isnotnull(Col2#501) && (Col2#501 = 2))
-     *    +- FileScan parquet [Col1#500,Col2#501] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/src/test/resources/sampleparquet], PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ReadSchema: struct<Col1:string,Col2:int>
-     *
-     * =============================================================
-     * Indexes used:
-     * =============================================================
-     * filterIndex:src/test/resources/indexLocation/indexes/filterIndex
-     *
-     */
-    // scalastyle:on filelinelengthchecker
     val expectedOutput = new StringBuilder
     expectedOutput
       .append(displayMode.beginEndTag.open)
