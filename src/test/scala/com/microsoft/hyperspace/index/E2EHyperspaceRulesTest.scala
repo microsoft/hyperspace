@@ -873,6 +873,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
                 IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED)
               .nonEmpty)
           val locations2 = getFsLocations(query(df2).queryExecution.optimizedPlan)
+          // head is from the index plan, last is from the plan for appended json files.
           assert(locations2.length === 2)
           assert(locations2.head.eq(locations1.head))
 
