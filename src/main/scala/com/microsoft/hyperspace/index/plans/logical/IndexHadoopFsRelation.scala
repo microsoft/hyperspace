@@ -23,6 +23,9 @@ import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.IndexLogEntry
 
+/**
+ * Wrapper class of HadoopFsRelation to indicate index application more explicitly in Plan string.
+ */
 class IndexHadoopFsRelation(
     spark: SparkSession,
     index: IndexLogEntry,
