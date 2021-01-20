@@ -81,7 +81,7 @@ class HybridScanForDeltaLakeTest extends HybridScanSuite {
 
   test(
     "Append-only: filter rule & parquet format, " +
-      "index relation should include appended file paths") {
+      "index relation should include appended file paths.") {
     // This flag is for testing plan transformation if appended files could be load with index
     // data scan node. Currently, it's applied for a very specific case: FilterIndexRule,
     // Parquet source format, no partitioning, no deleted files.

@@ -370,7 +370,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: join rule, appended data should be shuffled with indexed columns " +
-      "and merged by BucketUnion") {
+      "and merged by BucketUnion.") {
     withTempPathAsString { testPath =>
       val appendPath1 = testPath + "/append1"
       val appendPath2 = testPath + "/append2"
@@ -400,11 +400,12 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       val basePlan = baseQuery.queryExecution.optimizedPlan
 
       withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-        withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
+        withSQLConf(
+          SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
           IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-            val join = joinQuery()
-            checkAnswer(join, baseQuery)
-            assert(basePlan.equals(join.queryExecution.optimizedPlan))
+          val join = joinQuery()
+          checkAnswer(join, baseQuery)
+          assert(basePlan.equals(join.queryExecution.optimizedPlan))
         }
 
         withSQLConf(TestConfig.HybridScanEnabled: _*) {
@@ -428,7 +429,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
   test(
     "Append-only: filter rule and non-parquet format," +
-      "appended data should be shuffled and merged by Union") {
+      "appended data should be shuffled and merged by Union.") {
     // Note: for delta lake, this test is also eligible as the dataset is partitioned.
     withTempPathAsString { testPath =>
       val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
@@ -460,12 +461,72 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           appendedFiles,
           deletedFiles,
           Seq(" <= 2000"))
+
+        // Check bucketSpec is not used.
+        val bucketSpec = planWithHybridScan collect {
+          case LogicalRelation(HadoopFsRelation(_, _, _, bucketSpec, _, _), _, _, _) =>
+            bucketSpec
+        }
+        assert(bucketSpec.length == 2)
+        assert(bucketSpec.head.isEmpty && bucketSpec.head.isEmpty)
+
         checkAnswer(baseQuery, filter)
       }
     }
   }
 
-  test("Delete-only: index relation should have additional filter for deleted files") {
+  test(
+    "Append-only: filter rule and non-parquet format," +
+      "appended data should be shuffled and merged by Union even with bucketSpec.") {
+    // Note: for delta lake, this test is also eligible as the dataset is partitioned.
+    withTempPathAsString { testPath =>
+      val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
+        fileFormat2,
+        testPath,
+        indexConfig1.copy(indexName = "index_Format2Append"),
+        appendCnt = 1,
+        deleteCnt = 0)
+
+      val df = spark.read.format(fileFormat2).load(testPath)
+      def filterQuery: DataFrame = df.filter(df("clicks") <= 2000).select(df("query"))
+
+      val baseQuery = filterQuery
+      val basePlan = baseQuery.queryExecution.optimizedPlan
+
+      withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+        val filter = filterQuery
+        assert(basePlan.equals(filter.queryExecution.optimizedPlan))
+      }
+
+      withSQLConf(
+        TestConfig.HybridScanEnabledAppendOnly :+
+          IndexConstants.INDEX_FILTER_RULE_USE_BUCKET_SPEC -> "true": _*) {
+        val filter = filterQuery
+        val planWithHybridScan = filter.queryExecution.optimizedPlan
+        assert(!basePlan.equals(planWithHybridScan))
+
+        checkFilterIndexHybridScanUnion(
+          planWithHybridScan,
+          "index_Format2Append",
+          appendedFiles,
+          deletedFiles,
+          Seq(" <= 2000"))
+
+        // Check bucketSpec is used.
+        val bucketSpec = planWithHybridScan collect {
+          case LogicalRelation(HadoopFsRelation(_, _, _, bucketSpec, _, _), _, _, _) =>
+            bucketSpec
+        }
+        assert(bucketSpec.length == 2)
+        assert(bucketSpec.head.isDefined && bucketSpec.last.isEmpty)
+        assert(bucketSpec.head.get.bucketColumnNames.toSet === indexConfig1.indexedColumns.toSet)
+
+        checkAnswer(baseQuery, filter)
+      }
+    }
+  }
+
+  test("Delete-only: index relation should have additional filter for deleted files.") {
     val testSet = Seq(("index_ParquetDelete", fileFormat), ("index_JsonDelete", fileFormat2))
     testSet foreach {
       case (indexName, dataFormat) =>
@@ -640,8 +701,9 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           assert(basePlan.equals(join.queryExecution.optimizedPlan))
         }
 
-        withSQLConf(TestConfig.HybridScanEnabled :+
-          "spark.sql.optimizer.inSetConversionThreshold" -> "1": _*) {
+        withSQLConf(
+          TestConfig.HybridScanEnabled :+
+            "spark.sql.optimizer.inSetConversionThreshold" -> "1": _*) {
           // Changed inSetConversionThreshould to check InSet optimization.
           val join = joinQuery()
           val planWithHybridScan = join.queryExecution.optimizedPlan
