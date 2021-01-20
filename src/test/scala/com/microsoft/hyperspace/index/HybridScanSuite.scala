@@ -468,7 +468,9 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
             bucketSpec
         }
         assert(bucketSpec.length == 2)
-        assert(bucketSpec.head.isEmpty && bucketSpec.head.isEmpty)
+        // bucketSpec.head is from the index plan, bucketSpec.last is from the plan
+        // for appended files.
+        assert(bucketSpec.head.isEmpty && bucketSpec.last.isEmpty)
 
         checkAnswer(baseQuery, filter)
       }
@@ -518,6 +520,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
             bucketSpec
         }
         assert(bucketSpec.length == 2)
+        // bucketSpec.head is from the index plan, bucketSpec.last is from the plan
+        // for appended files.
         assert(bucketSpec.head.isDefined && bucketSpec.last.isEmpty)
         assert(bucketSpec.head.get.bucketColumnNames.toSet === indexConfig1.indexedColumns.toSet)
 
