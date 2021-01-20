@@ -153,16 +153,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     (resolvedIndexedColumns, resolvedIncludeColumns, resolvedExcludeColumns) match {
       case (Some(indexed), Some(include), Some(exclude)) =>
-        if (include.nonEmpty && exclude.nonEmpty) {
-          throw HyperspaceException(
-            "IncludedColumnsConfig include and exclude columns can not both be non-empty.")
-        }
-
-        if (include.intersect(exclude).nonEmpty) {
-          throw HyperspaceException(
-            "IncludedColumnsConfig include and exclude columns can not overlap.")
-        }
-
         if (includeColumns.nonEmpty) {
           return (indexed, include)
         } else if (excludeColumns.nonEmpty) {

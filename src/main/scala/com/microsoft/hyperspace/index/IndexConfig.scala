@@ -47,6 +47,16 @@ case class IndexConfig(
       "Duplicate include or exclude column names in included columns are not allowed.")
   }
 
+  if (lowerCaseIncludedColumnsIncludeSet.nonEmpty && lowerCaseIncludedColumnsExcludeSet.nonEmpty) {
+    throw new IllegalArgumentException(
+      "IncludedColumnsConfig include and exclude columns can not both be non-empty.")
+  }
+
+  if (lowerCaseIncludedColumnsIncludeSet.intersect(lowerCaseIncludedColumnsExcludeSet).nonEmpty) {
+    throw new IllegalArgumentException(
+      "IncludedColumnsConfig include and exclude columns can not overlap.")
+  }
+
   for (indexedColumn <- lowerCaseIndexedColumns) {
     if (lowerCaseIncludedColumnsIncludeSet.contains(indexedColumn) ||
         lowerCaseIncludedColumnsExcludeSet.contains(indexedColumn)) {
