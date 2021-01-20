@@ -31,10 +31,15 @@ object IndexLogEntryTags {
   val INMEMORYFILEINDEX_INDEX_ONLY: IndexLogEntryTag[InMemoryFileIndex] =
     IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexIndexOnly")
 
-  // INMEMORYFILEINDEX_HYBRID_SCAN stores InMemoryFileIndex including appended files
-  // for Hybrid Scan.
+  // INMEMORYFILEINDEX_HYBRID_SCAN stores InMemoryFileIndex including index data files and also
+  // appended files for Hybrid Scan.
   val INMEMORYFILEINDEX_HYBRID_SCAN: IndexLogEntryTag[InMemoryFileIndex] =
     IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScan")
+
+  // INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED stores InMemoryFileIndex including only appended files
+  // for Hybrid Scan.
+  val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
+    IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
 
 
 }

@@ -567,6 +567,16 @@ case class IndexLogEntry(
     tags.get((plan, tag)).map(_.asInstanceOf[T])
   }
 
+  def getTagValueOrUpdate[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], op: => T): T = {
+    getTagValue(plan, tag) match {
+      case Some(v) => v
+      case None =>
+        val v = op
+        setTagValue(plan, tag, v)
+        v
+    }
+  }
+
   def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((plan, tag))
   }
@@ -577,6 +587,16 @@ case class IndexLogEntry(
 
   def getTagValue[T](tag: IndexLogEntryTag[T]): Option[T] = {
     tags.get((null, tag)).map(_.asInstanceOf[T])
+  }
+
+  def getTagValueOrUpdate[T](tag: IndexLogEntryTag[T], op: => T): T = {
+    getTagValue(tag) match {
+      case Some(v) => v
+      case None =>
+        val v = op
+        setTagValue(tag, v)
+        v
+    }
   }
 
   def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
