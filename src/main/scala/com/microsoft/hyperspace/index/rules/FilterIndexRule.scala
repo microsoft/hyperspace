@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -62,7 +62,8 @@ object FilterIndexRule
                   spark,
                   index,
                   originalPlan,
-                  useBucketSpec = false)
+                  useBucketSpec = HyperspaceConf.useBucketSpecForFilterRule(spark),
+                  useBucketUnionForAppended = false)
               logEvent(
                 HyperspaceIndexUsageEvent(
                   AppInfo(
