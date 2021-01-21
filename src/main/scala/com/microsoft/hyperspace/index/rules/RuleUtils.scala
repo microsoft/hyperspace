@@ -101,10 +101,8 @@ object RuleUtils {
         appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
         deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
 
-
       // For append-only Hybrid Scan, deleted files are not allowed.
-      lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
-        commonCnt > 0 &&
+      lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
         appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
 
       val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
