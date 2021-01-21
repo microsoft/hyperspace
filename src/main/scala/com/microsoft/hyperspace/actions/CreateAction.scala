@@ -35,8 +35,7 @@ class CreateAction(
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
     with Action {
-  final override def logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, super[Action].endId)
+  final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override val transientState: String = CREATING
 

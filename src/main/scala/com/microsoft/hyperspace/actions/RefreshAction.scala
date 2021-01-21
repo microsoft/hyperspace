@@ -34,11 +34,9 @@ class RefreshAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager)
-    with Action {
+    extends RefreshActionBase(spark, logManager, dataManager) {
 
-  override def logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, super[Action].endId)
+  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 
   final override def op(): Unit = write(spark, df, indexConfig)
 

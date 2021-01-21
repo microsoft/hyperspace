@@ -51,8 +51,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
-      path: Path,
-      logVersionId: Int): IndexLogEntry = {
+      path: Path): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path)
     val numBuckets = numBucketsForIndex(spark)
 
@@ -89,7 +88,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               coveringIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
-          Map(IndexConstants.INDEX_LOG_VERSION_PROPERTY -> logVersionId.toString))
+          Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
