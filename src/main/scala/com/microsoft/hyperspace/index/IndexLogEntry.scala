@@ -343,6 +343,7 @@ object FileInfo {
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.
 case class CoveringIndex(properties: CoveringIndex.Properties) {
   val kind = "CoveringIndex"
+  val kindAbbr = "CI"
 }
 object CoveringIndex {
   case class Properties(columns: Properties.Columns,

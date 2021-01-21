@@ -44,6 +44,7 @@ class IndexHadoopFsRelation(
       options)(spark) {
 
   override def toString(): String = {
-    s"Index ${index.name}_${index.logVersion}"
+    s"Hyperspace(Type: ${index.derivedDataset.kindAbbr}, " +
+      s"Name: ${index.name}, LogVersion: ${index.logVersion})"
   }
 }
