@@ -16,89 +16,46 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, TestConfig}
 import com.microsoft.hyperspace.util.FileUtils
 
-// Hybrid Scan tests for partitioned source data. Test cases of HybridScanTestSuite are also
+// Hybrid Scan tests for partitioned source data. Test cases of HybridScanSuite are also
 // executed with partitioned source data.
-class HybridScanForPartitionedDataSuite extends HybridScanTestSuite {
+class HybridScanForPartitionedDataTest extends HybridScanSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
-    import spark.implicits._
-    val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
     hyperspace = new Hyperspace(spark)
+  }
 
-    FileUtils.delete(new Path(sampleDataLocationRoot))
-    dfFromSample.write
-      .partitionBy("clicks", "Date")
-      .format(fileFormat)
-      .save(sampleDataFormatAppend)
-    dfFromSample.write.partitionBy("Date").format(fileFormat).save(sampleDataFormatAppend2)
-    dfFromSample.write.partitionBy("Date").format(fileFormat).save(sampleDataFormatDelete)
-    dfFromSample.write.partitionBy("imprs").format(fileFormat).save(sampleDataFormatDelete2)
-    dfFromSample.write
-      .partitionBy("Date", "imprs")
-      .format(fileFormat)
-      .save(sampleDataFormatDelete3)
-    dfFromSample.write.partitionBy("Date").format(fileFormat).save(sampleDataFormatDelete4)
-    dfFromSample.write.partitionBy("Date").format(fileFormat).save(sampleDataFormatBoth)
-    dfFromSample.write
-      .partitionBy("Date", "clicks")
-      .format(fileFormat2)
-      .save(sampleDataFormat2Append)
-    dfFromSample.write.partitionBy("Date").format(fileFormat2).save(sampleDataFormat2Delete)
+  override def setupIndexAndChangeData(
+      sourceFileFormat: String,
+      sourcePath: String,
+      indexConfig: IndexConfig,
+      appendCnt: Int,
+      deleteCnt: Int): (Seq[String], Seq[String]) = {
+    dfFromSample.write.partitionBy("clicks", "Date").format(sourceFileFormat).save(sourcePath)
+    val df = spark.read.format(sourceFileFormat).load(sourcePath)
+    hyperspace.createIndex(df, indexConfig)
+    val inputFiles = df.inputFiles
+    assert(appendCnt + deleteCnt < inputFiles.length)
 
-    val indexConfig1 = IndexConfig("indexType1", Seq("clicks"), Seq("query"))
-    val indexConfig2 = IndexConfig("indexType2", Seq("clicks"), Seq("Date"))
-
-    setupIndexAndChangeData(
-      fileFormat,
-      sampleDataFormatAppend,
-      indexConfig1.copy(indexName = "index_ParquetAppend"),
-      appendCnt = 1,
-      deleteCnt = 0)
-    setupIndexAndChangeData(
-      fileFormat,
-      sampleDataFormatAppend2,
-      indexConfig2.copy(indexName = "indexType2_ParquetAppend2"),
-      appendCnt = 1,
-      deleteCnt = 0)
-    setupIndexAndChangeData(
-      fileFormat2,
-      sampleDataFormat2Append,
-      indexConfig1.copy(indexName = "index_JsonAppend"),
-      appendCnt = 1,
-      deleteCnt = 0)
-
-    withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      setupIndexAndChangeData(
-        fileFormat,
-        sampleDataFormatDelete,
-        indexConfig1.copy(indexName = "index_ParquetDelete"),
-        appendCnt = 0,
-        deleteCnt = 2)
-      setupIndexAndChangeData(
-        fileFormat,
-        sampleDataFormatDelete3,
-        indexConfig2.copy(indexName = "indexType2_ParquetDelete3"),
-        appendCnt = 0,
-        deleteCnt = 2)
-      setupIndexAndChangeData(
-        fileFormat,
-        sampleDataFormatBoth,
-        indexConfig1.copy(indexName = "index_ParquetBoth"),
-        appendCnt = 1,
-        deleteCnt = 1)
-      setupIndexAndChangeData(
-        fileFormat2,
-        sampleDataFormat2Delete,
-        indexConfig1.copy(indexName = "index_JsonDelete"),
-        appendCnt = 0,
-        deleteCnt = 2)
+    val fs = systemPath.getFileSystem(new Configuration)
+    for (i <- 0 until appendCnt) {
+      val sourcePath = new Path(inputFiles(i))
+      val destPath = new Path(inputFiles(i) + ".copy")
+      fs.copyToLocalFile(sourcePath, destPath)
     }
+
+    for (i <- 1 to deleteCnt) {
+      fs.delete(new Path(inputFiles(inputFiles.length - i)), false)
+    }
+
+    val df2 = spark.read.format(sourceFileFormat).load(sourcePath)
+    (df2.inputFiles diff inputFiles, inputFiles diff df2.inputFiles)
   }
 
   test("Verify Hybrid Scan for newly added partition after index creation.") {
@@ -133,7 +90,7 @@ class HybridScanForPartitionedDataSuite extends HybridScanTestSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -163,7 +120,7 @@ class HybridScanForPartitionedDataSuite extends HybridScanTestSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -213,7 +170,7 @@ class HybridScanForPartitionedDataSuite extends HybridScanTestSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
             checkAnswer(baseQuery, filter)
@@ -247,7 +204,7 @@ class HybridScanForPartitionedDataSuite extends HybridScanTestSuite {
             checkAnswer(baseQuery, filter)
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
             val filter = filterQuery(df)
             // The new partition can be handled with Hybrid Scan approach.
             assert(!basePlan.equals(filter.queryExecution.optimizedPlan))

@@ -81,7 +81,10 @@ object RuleUtils {
       }
     }
 
-    def isHybridScanCandidate(entry: IndexLogEntry, inputSourceFiles: Seq[FileInfo]): Boolean = {
+    def isHybridScanCandidate(
+        entry: IndexLogEntry,
+        inputSourceFiles: Seq[FileInfo],
+        inputSourceFilesSizeInBytes: Long): Boolean = {
       // TODO: Some threshold about the similarity of source data files - number of common files or
       //  total size of common files.
       //  See https://github.com/microsoft/hyperspace/issues/159
@@ -95,19 +98,34 @@ object RuleUtils {
         return isHybridScanCandidateTag.get
       }
 
-      // Find the number of common files between the source relations & index source files.
-      val commonCnt = inputSourceFiles.count(entry.sourceFileInfoSet.contains)
-      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
+      // Find the number of common files between the source relation and index source files.
+      // The total size of common files are collected and tagged for candidate.
+      val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
+        if (entry.sourceFileInfoSet.contains(f)) {
+          (res._1 + 1, res._2 + f.size) // count, total bytes
+        } else {
+          res
+        }
+      }
 
-      lazy val isDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
-        commonCnt > 0 && deletedCnt <= HyperspaceConf.hybridScanDeleteMaxNumFiles(spark)
+      val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
+      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
+
+      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
+      val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
+        commonCnt > 0 &&
+        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
+        deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
 
       // For append-only Hybrid Scan, deleted files are not allowed.
       lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
-        commonCnt > 0
+        commonCnt > 0 &&
+        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
 
-      val isCandidate = isDeleteCandidate || isAppendOnlyCandidate
+      val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
       if (isCandidate) {
+        entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+
         // If there is no change in source dataset, the index will be applied by
         // transformPlanToUseIndexOnlyScan.
         entry.setTagValue(
@@ -142,8 +160,10 @@ object RuleUtils {
       }
       assert(filesByRelations.length == 1)
       IndexLogEntryTags.resetHybridScanTagsIfNeeded(spark, plan, indexes)
+      val inputSourceFiles = filesByRelations.flatten
+      val totalSizeInBytes = inputSourceFiles.map(_.size).sum
       indexes.filter(index =>
-        index.created && isHybridScanCandidate(index, filesByRelations.flatten))
+        index.created && isHybridScanCandidate(index, inputSourceFiles, totalSizeInBytes))
     } else {
       indexes.filter(index => index.created && signatureValid(index))
     }
@@ -295,7 +315,9 @@ object RuleUtils {
             _) =>
         val (filesDeleted, filesAppended) =
           if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
-            // If the index contains the source update info, we need to handle
+            // If the index contains the source update info, it means the index was validated
+            // with the latest signature including appended files and deleted files, but
+            // index data is not updated with those files. Therefore, we need to handle
             // appendedFiles and deletedFiles in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
@@ -435,7 +457,10 @@ object RuleUtils {
             baseOutput,
             _,
             _) =>
-        val options = extractBasePath(spark, location)
+        val options = Hyperspace
+          .getContext(spark)
+          .sourceProviderManager
+          .partitionBasePath(location)
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -459,14 +484,6 @@ object RuleUtils {
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended
-  }
-
-  private def extractBasePath(spark: SparkSession, location: FileIndex): Option[String] = {
-    if (location.partitionSchema.isEmpty) {
-      None
-    } else {
-      Some(Hyperspace.getContext(spark).sourceProviderManager.partitionBasePath(location))
-    }
   }
 
   /**

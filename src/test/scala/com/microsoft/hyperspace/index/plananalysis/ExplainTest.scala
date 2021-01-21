@@ -91,12 +91,12 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
      *=============================================================
      * SortMergeJoin [Col1#11], [Col1#21], Inner
      * <----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->
-     * <----:  +- Exchange hashpartitioning(Col1#11, 200)---->
+     * <----:  +- Exchange hashpartitioning(Col1#11, 5)---->
      * <----:     +- *(1) Project [Col1#11, Col2#12]---->
      * <----:        +- *(1) Filter isnotnull(Col1#11)---->
      * <----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/sampleparquet], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->
      * <----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->
-     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->
+     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 5)---->
      *
      *=============================================================
      *Indexes used:
@@ -163,7 +163,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("<----:  +- Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append("<----:     +- *(1) Project [Col1#11, Col2#12]---->")
       .append(defaultDisplayMode.newLine)
@@ -175,7 +175,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")
@@ -465,12 +465,12 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
      *=============================================================
      * SortMergeJoin [Col1#11], [Col1#21], Inner
      * <----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->
-     * <----:  +- Exchange hashpartitioning(Col1#11, 200)---->
+     * <----:  +- Exchange hashpartitioning(Col1#11, 5)---->
      * <----:     +- *(1) Project [Col1#11, Col2#12]---->
      * <----:        +- *(1) Filter isnotnull(Col1#11)---->
      * <----:           +- *(1) FileScan parquet [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[src/test/resources/sampleparquet], PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>---->
      * <----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->
-     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->
+     *    <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 5)---->
      *
      *=============================================================
      *Indexes used:
@@ -537,7 +537,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:- *(2) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("<----:  +- Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("<----:  +- Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append("<----:     +- *(1) Project [Col1#11, Col2#12]---->")
       .append(defaultDisplayMode.newLine)
@@ -549,7 +549,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----+- *(4) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
       .append(defaultDisplayMode.newLine)
-      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 200)---->")
+      .append("   <----+- ReusedExchange [Col1#21, Col2#22], Exchange hashpartitioning(Col1#11, 5)---->")
       .append(defaultDisplayMode.newLine)
       .append(defaultDisplayMode.newLine)
       .append("=============================================================")

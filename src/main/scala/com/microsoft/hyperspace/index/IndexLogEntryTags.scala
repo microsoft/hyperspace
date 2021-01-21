@@ -23,9 +23,12 @@ import com.microsoft.hyperspace.util.HyperspaceConf
 
 object IndexLogEntryTags {
   // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for the index or not.
-  // This is set in getCandidateIndexes and utilized in transformPlanToUseIndex.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
+
+  // COMMON_SOURCE_SIZE_IN_BYTES stores overlapping bytes of index source files and given relation.
+  val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
+    IndexLogEntryTag[Long]("commonSourceSizeInBytes")
 
   // IS_SIGNATURE_MATCH indicates if the plan has the same signature value with the index or not.
   val IS_SIGNATURE_MATCH: IndexLogEntryTag[Boolean] =
@@ -42,8 +45,8 @@ object IndexLogEntryTags {
   private def getHybridScanConfigs(spark: SparkSession): Seq[String] = {
     Seq(
       HyperspaceConf.hybridScanEnabled(spark).toString,
-      HyperspaceConf.hybridScanDeleteEnabled(spark).toString,
-      HyperspaceConf.hybridScanDeleteMaxNumFiles(spark).toString)
+      HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString,
+      HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString)
   }
 
   private[hyperspace] def resetHybridScanTagsIfNeeded(
@@ -61,5 +64,4 @@ object IndexLogEntryTags {
       }
     }
   }
-
 }

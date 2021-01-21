@@ -297,8 +297,8 @@ object Directory {
 
   private def listLeafFiles(
       path: Path,
-      pathFilter: PathFilter = PathUtils.DataPathFilter,
-      throwIfNotExists: Boolean = false,
+      pathFilter: PathFilter,
+      throwIfNotExists: Boolean,
       fs: FileSystem): Seq[FileStatus] = {
     try {
       val (files, directories) = fs.listStatus(path).partition(_.isFile)
@@ -449,6 +449,11 @@ case class IndexLogEntry(
   @JsonIgnore
   lazy val sourceFileInfoSet: Set[FileInfo] = {
     relations.head.data.properties.content.fileInfos
+  }
+
+  @JsonIgnore
+  lazy val sourceFilesSizeInBytes: Long = {
+    sourceFileInfoSet.map(_.size).sum
   }
 
   def sourceUpdate: Option[Update] = {

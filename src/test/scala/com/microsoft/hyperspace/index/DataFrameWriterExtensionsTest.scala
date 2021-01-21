@@ -32,7 +32,7 @@ import com.microsoft.hyperspace.{SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.FileUtils
 
-class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSuite {
+class DataFrameWriterExtensionsTest extends SparkFunSuite with SparkInvolvedSuite {
 
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -95,7 +95,7 @@ class DataFrameWriterExtensionsTests extends SparkFunSuite with SparkInvolvedSui
       source: String,
       numBuckets: Int,
       bucketCols: Seq[String],
-      sortCols: Seq[String] = Nil,
+      sortCols: Seq[String],
       mode: SaveMode): Unit = {
     val allBucketFiles =
       dataDir.listFiles().filterNot(f => f.getName.startsWith(".") || f.getName.startsWith("_"))

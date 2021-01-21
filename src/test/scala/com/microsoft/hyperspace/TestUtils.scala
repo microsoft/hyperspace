@@ -20,7 +20,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 
 import com.microsoft.hyperspace.MockEventLogger.reset
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
+import com.microsoft.hyperspace.index.{FileIdTracker, IndexConfig, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
 import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -81,6 +81,10 @@ object TestUtils {
       .get
       .asInstanceOf[IndexLogEntry]
   }
+
+  def getFileIdTracker(systemPath: Path, indexConfig: IndexConfig): FileIdTracker = {
+    latestIndexLogEntry(systemPath, indexConfig.indexName).fileIdTracker
+  }
 }
 
 /**
@@ -102,4 +106,16 @@ object MockEventLogger {
   def reset(): Unit = {
     emittedEvents = Seq()
   }
+}
+
+object TestConfig {
+  val HybridScanEnabled = Seq(
+    IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+    IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99")
+
+  val HybridScanEnabledAppendOnly = Seq(
+    IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+    IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0")
 }
