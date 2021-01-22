@@ -141,12 +141,11 @@ object RuleUtils {
       val curConfigs = IndexLogEntryTags.getHybridScanRelatedConfigs(spark)
 
       indexes.foreach { index =>
-        index.getTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS).foreach { taggedConfigs =>
-          if (taggedConfigs.equals(curConfigs)) {
-            // Need to reset cached tags as these config changes can change the result.
-            index.unsetTagValue(plan, IS_HYBRIDSCAN_CANDIDATE)
-            index.setTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS, curConfigs)
-          }
+        val taggedConfigs = index.getTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS)
+        if (taggedConfigs.isEmpty || !taggedConfigs.get.equals(curConfigs)) {
+          // Need to reset cached tags as these config changes can change the result.
+          index.unsetTagValue(plan, IS_HYBRIDSCAN_CANDIDATE)
+          index.setTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS, curConfigs)
         }
       }
     }

@@ -293,16 +293,17 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
                 .get == Seq("true", "0.99", "0.2"))
           }
 
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.4") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.2") {
             val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, optimizedPlan)
+            assert(indexes.isEmpty)
             assert(
-              !indexes.head
+              !allIndexes.head
                 .getTagValue(optimizedPlan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
                 .get)
             assert(
-              indexes.head
+              allIndexes.head
                 .getTagValue(optimizedPlan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
-                .get == Seq("true", "0.4", "0.2"))
+                .get == Seq("true", "0.2", "0.2"))
           }
         }
       }

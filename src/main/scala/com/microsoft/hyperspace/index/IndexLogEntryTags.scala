@@ -46,7 +46,7 @@ object IndexLogEntryTags {
   def getHybridScanRelatedConfigs(spark: SparkSession): Seq[String] = {
     Seq(
       HyperspaceConf.hybridScanEnabled(spark).toString,
-      HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString,
-      HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString)
+      HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString,
+      HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString)
   }
 }
