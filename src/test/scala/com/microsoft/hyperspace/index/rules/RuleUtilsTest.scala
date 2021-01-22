@@ -121,14 +121,16 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
       val dataPath = tempPath.getAbsolutePath
       df.write.parquet(dataPath)
 
-      withIndex("index1", "index2") {
+      val indexNameWithLineage = "index1"
+      val indexNameWithoutLineage = "index2"
+      withIndex(indexNameWithLineage, indexNameWithoutLineage) {
         val readDf = spark.read.parquet(dataPath)
         val expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+          indexManager.create(readDf, IndexConfig(indexNameWithLineage, Seq("id")))
         }
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "false") {
-          indexManager.create(readDf, IndexConfig("index2", Seq("id")))
+          indexManager.create(readDf, IndexConfig(indexNameWithoutLineage, Seq("id")))
         }
         val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
@@ -136,7 +138,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
             hybridScanDeleteEnabled: Boolean,
-            numExpectedCandidateIndex: Int,
+            expectedCandidateIndexes: Seq[String],
             expectedHybridScanTag: Option[Boolean],
             expectedCommonSourceBytes: Option[Long]): Unit = {
           withSQLConf(
@@ -146,10 +148,9 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
               (if (hybridScanDeleteEnabled) "0.99" else "0")) {
             val indexes = RuleUtils
               .getCandidateIndexes(spark, allIndexes, plan)
-              .sortBy(_.name)
-            if (numExpectedCandidateIndex > 0) {
-              assert(indexes.length === numExpectedCandidateIndex)
-              assert(indexes.head.name === "index1")
+            if (expectedCandidateIndexes.nonEmpty) {
+              assert(indexes.length === expectedCandidateIndexes.length)
+              assert(indexes.map(_.name).toSet.equals(expectedCandidateIndexes.toSet))
               indexes.foreach { index =>
                 assert(
                   index.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
@@ -172,14 +173,14 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 2,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 2,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
             expectedHybridScanTag = Some(false),
             expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
@@ -193,14 +194,14 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 0,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 2,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
             expectedHybridScanTag = Some(true),
             expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
@@ -217,21 +218,21 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 0,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 0,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
-            numExpectedCandidateIndex = 1,
+            expectedCandidateIndexes = Seq(indexNameWithLineage),
             expectedHybridScanTag = Some(true),
             expectedCommonSourceBytes = Some(updatedExpectedCommonSourceBytes))
         }
@@ -245,14 +246,14 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            numExpectedCandidateIndex = 0,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
-            numExpectedCandidateIndex = 0,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
         }
