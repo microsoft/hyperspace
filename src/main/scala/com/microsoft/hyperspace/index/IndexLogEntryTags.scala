@@ -38,7 +38,7 @@ object IndexLogEntryTags {
   val IS_HYBRIDSCAN_CANDIDATE: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanCandidate")
 
-  // IS_HYBRIDSCAN_CANDIDATE indicates if the index can be applied to the plan using Hybrid Scan.
+  // IS_HYBRIDSCAN_CONFIG_CAPTURE contains values of Hybrid Scan related configs.
   val HYBRIDSCAN_CONFIG_CAPTURE: IndexLogEntryTag[Seq[String]] =
     IndexLogEntryTag[Seq[String]]("hybridScanConfigCapture")
 
