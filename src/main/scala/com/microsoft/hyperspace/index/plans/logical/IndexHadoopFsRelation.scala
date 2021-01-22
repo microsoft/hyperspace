@@ -27,14 +27,12 @@ import com.microsoft.hyperspace.index.IndexLogEntry
  * Wrapper class of HadoopFsRelation to indicate index application more explicitly in Plan string.
  */
 class IndexHadoopFsRelation(
-    spark: SparkSession,
-    index: IndexLogEntry,
     location: FileIndex,
     partitionSchema: StructType,
     dataSchema: StructType,
     bucketSpec: Option[BucketSpec],
     fileFormat: FileFormat,
-    options: Map[String, String])
+    options: Map[String, String])(spark: SparkSession, index: IndexLogEntry)
     extends HadoopFsRelation(
       location,
       partitionSchema,
@@ -43,8 +41,10 @@ class IndexHadoopFsRelation(
       fileFormat,
       options)(spark) {
 
-  override def toString(): String = {
+  val indexPlanStr: String = {
     s"Hyperspace(Type: ${index.derivedDataset.kindAbbr}, " +
       s"Name: ${index.name}, LogVersion: ${index.id})"
   }
+  override def toString(): String = indexPlanStr
+
 }

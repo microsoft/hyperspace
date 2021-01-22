@@ -33,7 +33,6 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, HyperspaceE
  */
 trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession {
   protected val baseId: Int = logManager.getLatestId().getOrElse(-1)
-  final protected def endId: Int = baseId + 2
 
   def logEntry: LogEntry
 
@@ -58,7 +57,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
   def op(): Unit
 
   private def end(): Unit = {
-    val newId = endId
+    val newId = baseId + 2
     val entry = logEntry
     entry.state = finalState
     entry.id = newId

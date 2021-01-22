@@ -252,14 +252,12 @@ object RuleUtils {
         val location =
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
         val relation = new IndexHadoopFsRelation(
-          spark,
-          index,
           location,
           new StructType(),
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -362,14 +360,12 @@ object RuleUtils {
 
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val relation = new IndexHadoopFsRelation(
-          spark,
-          index,
           newLocation,
           new StructType(),
           newSchema,
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))

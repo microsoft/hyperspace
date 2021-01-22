@@ -146,13 +146,9 @@ class OptimizeAction(
         Directory.fromLeafFiles(filesToIgnoreStatuses, fileIdTracker)
       }
       val mergedContent = Content(newContent.root.merge(filesToIgnoreDirectory))
-      previousIndexLogEntry.copy(
-        content = mergedContent,
-        properties = previousIndexLogEntry.properties)
+      previousIndexLogEntry.copy(content = mergedContent)
     } else {
-      previousIndexLogEntry.copy(
-        content = newContent,
-        properties = previousIndexLogEntry.properties)
+      previousIndexLogEntry.copy(content = newContent)
     }
   }
 
