@@ -36,6 +36,14 @@ object HyperspaceConf {
     hybridScanDeletedRatioThreshold(spark) > 0.0
   }
 
+  def hybridScanShuffleCheckEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_HYBRID_SCAN_SHUFFLE_CHECK_ENABLED,
+        IndexConstants.INDEX_HYBRID_SCAN_SHUFFLE_CHECK_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
   def optimizeFileSizeThreshold(spark: SparkSession): Long = {
     spark.conf
       .get(

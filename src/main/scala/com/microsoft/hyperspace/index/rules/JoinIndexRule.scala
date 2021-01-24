@@ -24,13 +24,17 @@ import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
+import org.apache.spark.sql.execution.joins.SortMergeJoinExec
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
+import com.microsoft.hyperspace.util.HyperspaceConf
 import com.microsoft.hyperspace.util.ResolverUtils._
 
 /**
@@ -68,18 +72,54 @@ object JoinIndexRule
                     right =
                       RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
 
+              def getShuffleCnt(sparkPlan: SparkPlan): Long = {
+                sparkPlan.collect { case _: ShuffleExchangeExec => true }.length
+              }
+
+              val resultPlan =
+                if (!HyperspaceConf.hybridScanEnabled(spark) || !HyperspaceConf
+                      .hybridScanShuffleCheckEnabled(spark)) {
+                  updatedPlan
+                } else {
+                  val shuffleCntPair = spark.sessionState
+                    .executePlan(updatedPlan)
+                    .executedPlan
+                    .collect {
+                      case smj: SortMergeJoinExec =>
+                        (getShuffleCnt(smj.left), getShuffleCnt(smj.right))
+                    }
+                  assert(shuffleCntPair.length <= 1)
+                  shuffleCntPair.headOption.flatMap {
+                    // If the number of shuffle is 2, the candidate index pair cannot remove
+                    // the shuffles in both left and right for join and also Hybrid Scan causes
+                    // an additional shuffle for merging appended files. We don't apply the index
+                    // for the child with 2 shuffle nodes using JoinIndexRule.
+                    // However, the child node is still applicable for FilterIndexRule.
+                    case (leftCnt, _) if leftCnt == 2 => Some(updatedPlan.copy(left = l))
+                    case (_, rightCnt) if rightCnt == 2 => Some(updatedPlan.copy(right = r))
+                    case _ => None
+                  }.getOrElse {
+                    updatedPlan
+                  }
+                }
+
+              val appliedIndexes = resultPlan match {
+                case j: Join if j.left.equals(l) => Seq(rIndex)
+                case j: Join if j.right.equals(r) => Seq(lIndex)
+                case _ => Seq(lIndex, rIndex)
+              }
+
               logEvent(
                 HyperspaceIndexUsageEvent(
                   AppInfo(
                     sparkContext.sparkUser,
                     sparkContext.applicationId,
                     sparkContext.appName),
-                  Seq(lIndex, rIndex),
+                  appliedIndexes,
                   join.toString,
-                  updatedPlan.toString,
+                  resultPlan.toString,
                   "Join index rule applied."))
-
-              updatedPlan
+              resultPlan
           }
           .getOrElse(join)
       } catch {
@@ -325,11 +365,7 @@ object JoinIndexRule
     compatibleIndexPairs.map(
       indexPairs =>
         JoinIndexRanker
-          .rank(
-            spark,
-            leftRel,
-            rightRel,
-            indexPairs)
+          .rank(spark, leftRel, rightRel, indexPairs)
           .head)
   }
 

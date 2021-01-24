@@ -20,9 +20,10 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
-import org.apache.spark.sql.execution.SortExec
+import org.apache.spark.sql.execution.{SortExec, SparkPlan => SparkPlanNode}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
+import org.apache.spark.sql.execution.joins.SortMergeJoinExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
@@ -670,13 +671,95 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
         // Refreshed index as quick mode can be applied with Hybrid Scan config.
         withSQLConf(TestConfig.HybridScanEnabled: _*) {
-            spark.disableHyperspace()
-            val dfWithHyperspaceDisabled = query()
-            val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
-            spark.enableHyperspace()
-            val dfWithHyperspaceEnabled = query()
-            assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
-            checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+          spark.disableHyperspace()
+          val dfWithHyperspaceDisabled = query()
+          val basePlan = dfWithHyperspaceDisabled.queryExecution.optimizedPlan
+          spark.enableHyperspace()
+          val dfWithHyperspaceEnabled = query()
+          assert(!basePlan.equals(dfWithHyperspaceEnabled.queryExecution.optimizedPlan))
+          checkAnswer(dfWithHyperspaceDisabled, dfWithHyperspaceEnabled)
+        }
+      }
+    }
+  }
+
+  test("Verify Hybrid Scan is not applied when shuffle is not removed.") {
+    withTempPathAsString { testPath =>
+      val indexConfig = IndexConfig("indexRight", Seq("c2"), Seq("c4"))
+      val indexConfig2 = IndexConfig("indexLeft", Seq("c2"), Seq("c3"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .parquet(testPath)
+      val df = spark.read.load(testPath)
+
+      withSQLConf(IndexConstants.INDEX_NUM_BUCKETS -> "11") {
+        // Create an index with bucket num 11.
+        hyperspace.createIndex(df, indexConfig)
+      }
+      withSQLConf(IndexConstants.INDEX_NUM_BUCKETS -> "12") {
+        // Create an index with bucket num 12.
+        hyperspace.createIndex(df, indexConfig2)
+      }
+
+      // Append to original data.
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(3)
+        .write
+        .mode("append")
+        .parquet(testPath)
+
+      {
+        // Create a join query.
+        val df2 = spark.read.parquet(testPath)
+
+        def query(): DataFrame = {
+          df2.select("c2", "c3").join(df2.select("c2", "c4"), "c2")
+        }
+
+        val inputFiles = df.inputFiles
+        val appendedFiles = df2.inputFiles.diff(inputFiles).map(new Path(_))
+
+        spark.enableHyperspace()
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
+          def getShuffleCnt(sparkPlan: SparkPlanNode): Long = {
+            sparkPlan.collect { case _: ShuffleExchangeExec => true }.length
+          }
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_SHUFFLE_CHECK_ENABLED -> "false") {
+            val execPlan = query().queryExecution.executedPlan
+            val shuffleCnt = execPlan.collect {
+              case smj: SortMergeJoinExec =>
+                (getShuffleCnt(smj.left), getShuffleCnt(smj.right))
+            }.head
+            assert(shuffleCnt._1 === 1)
+            // Right child of join has 2 shuffle nodes because of Hybrid Scan for appended files.
+            assert(shuffleCnt._2 === 2)
+
+            // Verify indexes are used, and all index files are picked.
+            verifyIndexUsage(
+              query,
+              getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles ++
+                getIndexFilesPath(indexConfig2.indexName, Seq(0)) ++ appendedFiles)
+          }
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_SHUFFLE_CHECK_ENABLED -> "true") {
+            val execPlan = query().queryExecution.executedPlan
+            val shuffleCnt = execPlan.collect {
+              case smj: SortMergeJoinExec =>
+                (getShuffleCnt(smj.left), getShuffleCnt(smj.right))
+            }.head
+            assert(shuffleCnt._1 === 1)
+            // One shuffle node of right child is removed with shuffle count check.
+            assert(shuffleCnt._2 === 1)
+
+            // For right child, indexRight can be still applied by FilterIndexRule.
+            verifyIndexUsage(
+              query,
+              getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles ++
+                getIndexFilesPath(indexConfig2.indexName, Seq(0)) ++ appendedFiles)
+          }
         }
       }
     }

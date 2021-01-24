@@ -47,6 +47,12 @@ object IndexConstants {
     "spark.hyperspace.index.hybridscan.maxAppendedRatio"
   val INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD_DEFAULT = "0.3"
 
+  // If this config is enabled, Hybrid Scan won't be applied when it causes unnecessary shuffle
+  // to merge appended data.
+  val INDEX_HYBRID_SCAN_SHUFFLE_CHECK_ENABLED =
+    "spark.hyperspace.index.hybridscan.shuffleCheck.enabled"
+  val INDEX_HYBRID_SCAN_SHUFFLE_CHECK_ENABLED_DEFAULT = "true"
+
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.
   // In Spark 3.0, we could utilize TreeNodeTag to mark the identifier for each plan.
