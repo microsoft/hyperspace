@@ -30,6 +30,7 @@ import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -58,27 +59,24 @@ object RuleUtils {
     val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
-      val signatureMatchTag = entry.getTagValue(plan, IndexLogEntryTags.IS_SIGNATURE_MATCH)
-      if (signatureMatchTag.isDefined) {
-        return signatureMatchTag.get
+      entry.getTagValue(plan, IndexLogEntryTags.SIGNATURE_MATCHED).foreach { sigMatched =>
+        return sigMatched
       }
 
       val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
       assert(sourcePlanSignatures.length == 1)
       val sourcePlanSignature = sourcePlanSignatures.head
-      signatureMap.getOrElseUpdate(
+
+      val sigMatched = signatureMap.getOrElseUpdate(
         sourcePlanSignature.provider,
         LogicalPlanSignatureProvider
           .create(sourcePlanSignature.provider)
           .signature(plan)) match {
-        case Some(s) =>
-          val result = s.equals(sourcePlanSignature.value)
-          entry.setTagValue(plan, IndexLogEntryTags.IS_SIGNATURE_MATCH, result)
-          result
-        case None =>
-          entry.setTagValue(plan, IndexLogEntryTags.IS_SIGNATURE_MATCH, false)
-          false
+        case Some(s) => s.equals(sourcePlanSignature.value)
+        case None => false
       }
+      entry.setTagValue(plan, IndexLogEntryTags.SIGNATURE_MATCHED, sigMatched)
+      sigMatched
     }
 
     def isHybridScanCandidate(
@@ -118,8 +116,7 @@ object RuleUtils {
         deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
 
       // For append-only Hybrid Scan, deleted files are not allowed.
-      lazy val isAppendOnlyCandidate = !hybridScanDeleteEnabled && deletedCnt == 0 &&
-        commonCnt > 0 &&
+      lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
         appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
 
       val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
@@ -135,6 +132,23 @@ object RuleUtils {
       }
       entry.setTagValue(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE, isCandidate)
       isCandidate
+    }
+
+    def prepareHybridScanCandidateSelection(
+        spark: SparkSession,
+        plan: LogicalPlan,
+        indexes: Seq[IndexLogEntry]): Unit = {
+      val curConfigs = IndexLogEntryTags.getHybridScanRelatedConfigs(spark)
+
+      indexes.foreach { index =>
+        index.getTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS).foreach { taggedConfigs =>
+          if (taggedConfigs.equals(curConfigs)) {
+            // Need to reset cached tags as these config changes can change the result.
+            index.unsetTagValue(plan, IS_HYBRIDSCAN_CANDIDATE)
+            index.setTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS, curConfigs)
+          }
+        }
+      }
     }
 
     if (hybridScanEnabled) {
@@ -159,7 +173,7 @@ object RuleUtils {
             }
       }
       assert(filesByRelations.length == 1)
-      IndexLogEntryTags.resetHybridScanTagsIfNeeded(spark, plan, indexes)
+      prepareHybridScanCandidateSelection(spark, plan, indexes)
       val inputSourceFiles = filesByRelations.flatten
       val totalSizeInBytes = inputSourceFiles.map(_.size).sum
       indexes.filter(index =>

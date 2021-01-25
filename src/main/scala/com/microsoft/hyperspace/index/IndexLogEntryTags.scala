@@ -30,38 +30,23 @@ object IndexLogEntryTags {
   val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
     IndexLogEntryTag[Long]("commonSourceSizeInBytes")
 
-  // IS_SIGNATURE_MATCH indicates if the plan has the same signature value with the index or not.
-  val IS_SIGNATURE_MATCH: IndexLogEntryTag[Boolean] =
+  // SIGNATURE_MATCHED indicates if the plan has the same signature value with the index or not.
+  val SIGNATURE_MATCHED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("isSignatureMatch")
 
   // IS_HYBRIDSCAN_CANDIDATE indicates if the index can be applied to the plan using Hybrid Scan.
+  // This tag is reset when HYBRIDSCAN_RELATED_CONFIGS was changed.
   val IS_HYBRIDSCAN_CANDIDATE: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanCandidate")
 
-  // IS_HYBRIDSCAN_CONFIG_CAPTURE contains values of Hybrid Scan related configs.
-  val HYBRIDSCAN_CONFIG_CAPTURE: IndexLogEntryTag[Seq[String]] =
+  // HYBRIDSCAN_RELATED_CONFIGS contains Seq of value strings of Hybrid Scan related configs.
+  val HYBRIDSCAN_RELATED_CONFIGS: IndexLogEntryTag[Seq[String]] =
     IndexLogEntryTag[Seq[String]]("hybridScanConfigCapture")
 
-  private def getHybridScanConfigs(spark: SparkSession): Seq[String] = {
+  def getHybridScanRelatedConfigs(spark: SparkSession): Seq[String] = {
     Seq(
       HyperspaceConf.hybridScanEnabled(spark).toString,
       HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString,
       HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString)
-  }
-
-  private[hyperspace] def resetHybridScanTagsIfNeeded(
-      spark: SparkSession,
-      plan: LogicalPlan,
-      indexes: Seq[IndexLogEntry]): Unit = {
-    val curConfigs = getHybridScanConfigs(spark)
-
-    indexes.foreach { index =>
-      val taggedConfigs = index.getTagValue(plan, HYBRIDSCAN_CONFIG_CAPTURE)
-      if (taggedConfigs.isEmpty || !taggedConfigs.get.equals(curConfigs)) {
-        // Need to reset cached tags as these config changes can change the result.
-        index.unsetTagValue(plan, IS_HYBRIDSCAN_CANDIDATE)
-        index.setTagValue(plan, HYBRIDSCAN_CONFIG_CAPTURE, curConfigs)
-      }
-    }
   }
 }
