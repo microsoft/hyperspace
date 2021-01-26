@@ -23,10 +23,9 @@ object IndexLogEntryTags {
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
 
-  // INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED stores InMemoryFileIndex including only appended files
-  // for Hybrid Scan.
-  val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
-    IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
+  // COMMON_SOURCE_SIZE_IN_BYTES stores overlapping bytes of index source files and given relation.
+  val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
+    IndexLogEntryTag[Long]("commonSourceSizeInBytes")
 
   // SIGNATURE_MATCHED indicates if the plan has the same signature value with the index or not.
   val SIGNATURE_MATCHED: IndexLogEntryTag[Boolean] =
@@ -41,10 +40,6 @@ object IndexLogEntryTags {
   val HYBRIDSCAN_RELATED_CONFIGS: IndexLogEntryTag[Seq[String]] =
     IndexLogEntryTag[Seq[String]]("hybridScanRelatedConfigs")
 
-  // COMMON_SOURCE_SIZE_IN_BYTES stores overlapping bytes of index source files and given relation.
-  val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
-    IndexLogEntryTag[Long]("commonSourceSizeInBytes")
-
   // INMEMORYFILEINDEX_INDEX_ONLY stores InMemoryFileIndex for index only scan.
   val INMEMORYFILEINDEX_INDEX_ONLY: IndexLogEntryTag[InMemoryFileIndex] =
     IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexIndexOnly")
@@ -54,4 +49,8 @@ object IndexLogEntryTags {
   val INMEMORYFILEINDEX_HYBRID_SCAN: IndexLogEntryTag[InMemoryFileIndex] =
   IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScan")
 
+  // INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED stores InMemoryFileIndex including only appended files
+  // for Hybrid Scan.
+  val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
+  IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
 }

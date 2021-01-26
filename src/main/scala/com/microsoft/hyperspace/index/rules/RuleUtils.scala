@@ -96,6 +96,7 @@ object RuleUtils {
             res
           }
         }
+
         val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
         val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
 
