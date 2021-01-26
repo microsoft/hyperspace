@@ -108,7 +108,8 @@ Or we can substitute this with 3 builders design.
         includedColumns: Seq[String] = Seq()
     ) extends CoveringIndexConfig
 
-By allowing Index Config to remain same we allow backward compatibility with older scripts.
+By allowing Index Config to remain same we allow <br>
+backward compatibility with older scripts.
 </td>
 </tr>
 
@@ -116,8 +117,9 @@ By allowing Index Config to remain same we allow backward compatibility with old
 <td>Additional Methods</td>
 <td>
     
-    // Returns the erroraneous probability of this BloomFilter returning true for an element not actually 
-    // being put in this BloomFilter 
+    // Returns the erroraneous probability of this 
+    // BloomFilter returning true for an element not 
+    // actually being put in this BloomFilter 
     def expectedFpp(): Double   
 </td>
 <td>
