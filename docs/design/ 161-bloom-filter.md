@@ -167,7 +167,7 @@ Creating covering non-covering index.
 </td>
 <td>
     
-    case class CoveringIndex(
+    case class BloomIndex(
         kind: String = "NonCovering", 
         kindAbbr: String = "BFNC", 
         properties: CoveringIndex.Properties
