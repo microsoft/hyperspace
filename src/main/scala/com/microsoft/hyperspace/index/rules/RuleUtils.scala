@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.plans.logical.BucketUnion
+import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
@@ -249,13 +249,13 @@ object RuleUtils {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
         val location =
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
-        val relation = HadoopFsRelation(
+        val relation = new IndexHadoopFsRelation(
           location,
           new StructType(),
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -357,13 +357,13 @@ object RuleUtils {
               IndexConstants.DATA_FILE_NAME_ID))))
 
         val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
-        val relation = HadoopFsRelation(
+        val relation = new IndexHadoopFsRelation(
           newLocation,
           new StructType(),
           newSchema,
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
