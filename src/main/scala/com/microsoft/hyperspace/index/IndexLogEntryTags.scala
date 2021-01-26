@@ -16,11 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-
-import com.microsoft.hyperspace.util.HyperspaceConf
-
 object IndexLogEntryTags {
   // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for the index or not.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
@@ -42,11 +37,4 @@ object IndexLogEntryTags {
   // HYBRIDSCAN_RELATED_CONFIGS contains Seq of value strings of Hybrid Scan related configs.
   val HYBRIDSCAN_RELATED_CONFIGS: IndexLogEntryTag[Seq[String]] =
     IndexLogEntryTag[Seq[String]]("hybridScanRelatedConfigs")
-
-  def getHybridScanRelatedConfigs(spark: SparkSession): Seq[String] = {
-    Seq(
-      HyperspaceConf.hybridScanEnabled(spark).toString,
-      HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString,
-      HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString)
-  }
 }

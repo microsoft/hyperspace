@@ -59,24 +59,20 @@ object RuleUtils {
     val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
-      entry.getTagValue(plan, IndexLogEntryTags.SIGNATURE_MATCHED).foreach { sigMatched =>
-        return sigMatched
-      }
+      entry.withCachedTag(plan, IndexLogEntryTags.SIGNATURE_MATCHED) { () =>
+        val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
+        assert(sourcePlanSignatures.length == 1)
+        val sourcePlanSignature = sourcePlanSignatures.head
 
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
-
-      val sigMatched = signatureMap.getOrElseUpdate(
-        sourcePlanSignature.provider,
-        LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(plan)) match {
-        case Some(s) => s.equals(sourcePlanSignature.value)
-        case None => false
+        signatureMap.getOrElseUpdate(
+          sourcePlanSignature.provider,
+          LogicalPlanSignatureProvider
+            .create(sourcePlanSignature.provider)
+            .signature(plan)) match {
+          case Some(s) => s.equals(sourcePlanSignature.value)
+          case None => false
+        }
       }
-      entry.setTagValue(plan, IndexLogEntryTags.SIGNATURE_MATCHED, sigMatched)
-      sigMatched
     }
 
     def isHybridScanCandidate(
@@ -90,55 +86,53 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      val isHybridScanCandidateTag =
-        entry.getTagValue(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
-      if (isHybridScanCandidateTag.isDefined) {
-        return isHybridScanCandidateTag.get
-      }
-
-      // Find the number of common files between the source relation and index source files.
-      // The total size of common files are collected and tagged for candidate.
-      val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
-        if (entry.sourceFileInfoSet.contains(f)) {
-          (res._1 + 1, res._2 + f.size) // count, total bytes
-        } else {
-          res
+      entry.withCachedTag(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) { () =>
+        // Find the number of common files between the source relation and index source files.
+        // The total size of common files are collected and tagged for candidate.
+        val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
+          if (entry.sourceFileInfoSet.contains(f)) {
+            (res._1 + 1, res._2 + f.size) // count, total bytes
+          } else {
+            res
+          }
         }
+
+        val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
+        val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
+
+        val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
+        val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
+          commonCnt > 0 &&
+          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
+          deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
+
+        // For append-only Hybrid Scan, deleted files are not allowed.
+        lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
+          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
+
+        val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
+        if (isCandidate) {
+          entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+
+          // If there is no change in source dataset, the index will be applied by
+          // transformPlanToUseIndexOnlyScan.
+          entry.setTagValue(
+            plan,
+            IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+            !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
+        }
+        isCandidate
       }
-
-      val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
-      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
-
-      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-      val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
-        commonCnt > 0 &&
-        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
-        deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
-
-      // For append-only Hybrid Scan, deleted files are not allowed.
-      lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
-        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
-
-      val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
-      if (isCandidate) {
-        entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
-
-        // If there is no change in source dataset, the index will be applied by
-        // transformPlanToUseIndexOnlyScan.
-        entry.setTagValue(
-          plan,
-          IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
-          !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
-      }
-      entry.setTagValue(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE, isCandidate)
-      isCandidate
     }
 
     def prepareHybridScanCandidateSelection(
         spark: SparkSession,
         plan: LogicalPlan,
         indexes: Seq[IndexLogEntry]): Unit = {
-      val curConfigs = IndexLogEntryTags.getHybridScanRelatedConfigs(spark)
+      val curConfigs = Seq(
+        HyperspaceConf.hybridScanEnabled(spark).toString,
+        HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString,
+        HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString)
 
       indexes.foreach { index =>
         val taggedConfigs = index.getTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS)
