@@ -32,16 +32,16 @@ object IndexLogEntryTags {
 
   // SIGNATURE_MATCHED indicates if the plan has the same signature value with the index or not.
   val SIGNATURE_MATCHED: IndexLogEntryTag[Boolean] =
-    IndexLogEntryTag[Boolean]("isSignatureMatch")
+    IndexLogEntryTag[Boolean]("signatureMatched")
 
   // IS_HYBRIDSCAN_CANDIDATE indicates if the index can be applied to the plan using Hybrid Scan.
   // This tag is reset when HYBRIDSCAN_RELATED_CONFIGS was changed.
   val IS_HYBRIDSCAN_CANDIDATE: IndexLogEntryTag[Boolean] =
-    IndexLogEntryTag[Boolean]("hybridScanCandidate")
+    IndexLogEntryTag[Boolean]("isHybridScanCandidate")
 
   // HYBRIDSCAN_RELATED_CONFIGS contains Seq of value strings of Hybrid Scan related configs.
   val HYBRIDSCAN_RELATED_CONFIGS: IndexLogEntryTag[Seq[String]] =
-    IndexLogEntryTag[Seq[String]]("hybridScanConfigCapture")
+    IndexLogEntryTag[Seq[String]]("hybridScanRelatedConfigs")
 
   def getHybridScanRelatedConfigs(spark: SparkSession): Seq[String] = {
     Seq(
