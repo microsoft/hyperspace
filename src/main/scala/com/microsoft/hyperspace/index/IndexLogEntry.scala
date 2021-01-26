@@ -572,6 +572,13 @@ case class IndexLogEntry(
     tags.remove((plan, tag))
   }
 
+  def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
+    getTagValue(plan, tag).foreach { return _ }
+    val ret = f
+    setTagValue(plan, tag, ret)
+    ret
+  }
+
   def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
     tags((null, tag)) = value
   }
@@ -582,6 +589,13 @@ case class IndexLogEntry(
 
   def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((null, tag))
+  }
+
+  def withCachedTag[T](tag: IndexLogEntryTag[T])(f: => T): T = {
+    getTagValue(tag).foreach { return _ }
+    val ret = f
+    setTagValue(tag, ret)
+    ret
   }
 }
 

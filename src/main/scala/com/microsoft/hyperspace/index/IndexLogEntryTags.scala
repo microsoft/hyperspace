@@ -17,11 +17,24 @@
 package com.microsoft.hyperspace.index
 
 object IndexLogEntryTags {
-  // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for this index or not.
+  // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for the index or not.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("hybridScanRequired")
 
   // COMMON_SOURCE_SIZE_IN_BYTES stores overlapping bytes of index source files and given relation.
   val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
     IndexLogEntryTag[Long]("commonSourceSizeInBytes")
+
+  // SIGNATURE_MATCHED indicates if the plan has the same signature value with the index or not.
+  val SIGNATURE_MATCHED: IndexLogEntryTag[Boolean] =
+    IndexLogEntryTag[Boolean]("signatureMatched")
+
+  // IS_HYBRIDSCAN_CANDIDATE indicates if the index can be applied to the plan using Hybrid Scan.
+  // This tag is reset when HYBRIDSCAN_RELATED_CONFIGS was changed.
+  val IS_HYBRIDSCAN_CANDIDATE: IndexLogEntryTag[Boolean] =
+    IndexLogEntryTag[Boolean]("isHybridScanCandidate")
+
+  // HYBRIDSCAN_RELATED_CONFIGS contains Seq of value strings of Hybrid Scan related configs.
+  val HYBRIDSCAN_RELATED_CONFIGS: IndexLogEntryTag[Seq[String]] =
+    IndexLogEntryTag[Seq[String]]("hybridScanRelatedConfigs")
 }
