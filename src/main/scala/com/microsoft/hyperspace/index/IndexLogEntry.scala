@@ -568,25 +568,18 @@ case class IndexLogEntry(
     tags.get((plan, tag)).map(_.asInstanceOf[T])
   }
 
-  def getTagValueOrUpdate[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], op: => T): T = {
-    getTagValue(plan, tag) match {
-      case Some(v) => v
-      case None =>
-        val v = op
-        setTagValue(plan, tag, v)
-        v
-    }
-  }
-
   def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((plan, tag))
   }
 
   def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
-    getTagValue(plan, tag).foreach { return _ }
-    val ret = f
-    setTagValue(plan, tag, ret)
-    ret
+    getTagValue(plan, tag) match {
+      case Some(v) => v
+      case None =>
+        val ret = f
+        setTagValue(plan, tag, ret)
+        ret
+    }
   }
 
   def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
@@ -597,25 +590,18 @@ case class IndexLogEntry(
     tags.get((null, tag)).map(_.asInstanceOf[T])
   }
 
-  def getTagValueOrUpdate[T](tag: IndexLogEntryTag[T], op: => T): T = {
-    getTagValue(tag) match {
-      case Some(v) => v
-      case None =>
-        val v = op
-        setTagValue(tag, v)
-        v
-    }
-  }
-
   def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((null, tag))
   }
 
   def withCachedTag[T](tag: IndexLogEntryTag[T])(f: => T): T = {
-    getTagValue(tag).foreach { return _ }
-    val ret = f
-    setTagValue(tag, ret)
-    ret
+    getTagValue(tag) match {
+      case Some(v) => v
+      case None =>
+        val ret = f
+        setTagValue(tag, ret)
+        ret
+    }
   }
 }
 
