@@ -280,7 +280,6 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
 
         withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
-
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
             val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, optimizedPlan)
             assert(
@@ -290,7 +289,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             assert(
               indexes.head
                 .getTagValue(optimizedPlan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
-                .get == Seq("true", "0.99", "0.2"))
+                .get == Seq("0.99", "0.2"))
           }
 
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.2") {
@@ -303,7 +302,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             assert(
               allIndexes.head
                 .getTagValue(optimizedPlan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
-                .get == Seq("true", "0.2", "0.2"))
+                .get == Seq("0.2", "0.2"))
           }
         }
       }

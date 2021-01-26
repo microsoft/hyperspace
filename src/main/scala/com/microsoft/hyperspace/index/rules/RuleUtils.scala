@@ -59,7 +59,7 @@ object RuleUtils {
     val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
-      entry.withCachedTag(plan, IndexLogEntryTags.SIGNATURE_MATCHED) { () =>
+      entry.withCachedTag(plan, IndexLogEntryTags.SIGNATURE_MATCHED) {
         val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
         assert(sourcePlanSignatures.length == 1)
         val sourcePlanSignature = sourcePlanSignatures.head
@@ -86,7 +86,7 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      entry.withCachedTag(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) { () =>
+      entry.withCachedTag(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
         // Find the number of common files between the source relation and index source files.
         // The total size of common files are collected and tagged for candidate.
         val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
@@ -129,8 +129,8 @@ object RuleUtils {
         spark: SparkSession,
         plan: LogicalPlan,
         indexes: Seq[IndexLogEntry]): Unit = {
+      assert(HyperspaceConf.hybridScanEnabled(spark))
       val curConfigs = Seq(
-        HyperspaceConf.hybridScanEnabled(spark).toString,
         HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString,
         HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString)
 
