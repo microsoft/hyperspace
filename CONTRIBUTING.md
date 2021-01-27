@@ -31,31 +31,17 @@ To learn about the motivation behind Hyperspace, see the talk [Hyperspace: An In
 
 The process outlined below is for reviewing a proposal and reaching a decision about whether to accept/decline a proposal.	
 
-  1. The proposal author [creates a brief issue](https://github.com/microsoft/hyperspace/issues/new?assignees=&labels=untriaged%2C+proposal&template=design-template.md&title=%5BPROPOSAL%5D%3A+) describing the proposal.
-     > **Note: There is no need for a design document at this point.
+  1. The proposal author [creates a design proposal issue](https://github.com/microsoft/hyperspace/issues/new?assignees=&labels=untriaged%2C+proposal&template=design-template.md&title=%5BPROPOSAL%5D%3A+) describing the proposal.
   2. A discussion on the issue will aim to triage the proposal into one of three outcomes:
      - Accept proposal
      - Decline proposal
-     - Ask for a design doc
-     If the proposal is accepted/declined, the process is done. Otherwise, the discussion is expected to identify concerns that should be addressed in a more detailed design document.
-  3. The proposal author [writes a design doc](#writing-a-design-document) to work out details of the proposed design and address the concerns raised in the initial discussion.
-  4. Once comments and revisions on the design document are complete, there is a final discussion on the issue to reach one of two outcomes:
+     - Ask for more details
+     If the proposal is accepted/declined, the process is done. Otherwise, the discussion is expected to identify concerns that should be addressed by updating the proposal.
+  3. Once comments and revisions on the design proposal issue are complete, there is a final discussion on the issue to reach one of two outcomes:
      - Accept proposal
      - Decline proposal
 
 After the proposal is accepted or declined (e.g., after Step 2 or Step 4), implementation work proceeds in the same way as any other contribution. 	
-
-> **Tip:** If you are an experienced committer and are certain that a design doc will be required for a particular proposal, you can skip Step 2 and just include the doc PR with the initial issue.
-
-### Writing a Design Document
-
-As noted [above](#the-proposal-process), some (but not all) proposals need to be elaborated in a design document.	
-
-  - The design document should follow the template outlined [here](./docs/design/TEMPLATE.md) and must be named as `docs/design/GITHUB-ISSUE-NUMBER-shortname.md`.
-    > Note: To obtain the `GITHUB-ISSUE-NUMBER`, you need to first open a GitHub issue and since you are in this section reading how to write a design document, it is assumed that you have already gone through a round of initial discussion in the issue and were asked to explicitly write a design document. 
-  - Once you have the document ready and have addressed any specific concerns raised during the initial discussion, please open a PR. 
-  - Address any additional feedback/questions and update your PR as needed. New design doc authors may be paired with a design doc *shepherd* to help work on the doc.
-  - Once all the comments are address, you can check-in the design doc. It is expected that the design doc may go through multiple checked-in revisions so please feel free to open subsequent PRs to update/add more information. 
 
 ### Proposal Review
 
