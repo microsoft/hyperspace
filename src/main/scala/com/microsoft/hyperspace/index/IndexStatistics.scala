@@ -91,13 +91,13 @@ private[hyperspace] object IndexStatistics {
         entry.derivedDataset.kind,
         entry.hasLineageColumn,
         entry.content.fileInfos.size,
-        entry.content.fileInfos.map(_.size).sum,
+        entry.content.fileInfos.foldLeft(0L)(_ + _.size),
         entry.sourceFileInfoSet.size,
-        entry.sourceFileInfoSet.map(_.size).sum,
+        entry.sourceFileInfoSet.foldLeft(0L)(_ + _.size),
         entry.appendedFiles.size,
-        entry.appendedFiles.map(_.size).sum,
+        entry.appendedFiles.foldLeft(0L)(_ + _.size),
         entry.deletedFiles.size,
-        entry.deletedFiles.map(_.size).sum,
+        entry.deletedFiles.foldLeft(0L)(_ + _.size),
         getIndexContentDirectoryPaths(entry))
     } else {
       IndexStatistics(
