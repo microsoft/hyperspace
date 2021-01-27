@@ -116,7 +116,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |            "properties" : {
          |              "content" : {
          |                "root" : {
-         |                  "name" : "",
+         |                  "name" : "test",
          |                  "files" : [ {
          |                    "name" : "f1",
          |                    "size" : 100,
@@ -124,7 +124,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |                    "id" : 0
          |                  }, {
          |                    "name" : "f2",
-         |                    "size" : 200,
+         |                    "size" : 100,
          |                    "modifiedTime" : 200,
          |                    "id" : 1
          |                  } ],
@@ -195,8 +195,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
             Hdfs.Properties(
               Content(
                 Directory(
-                  "",
-                  Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 200L, 200L, 1)),
+                  "test",
+                  Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 100L, 200L, 1)),
                   Seq()
                 )
               ),
@@ -237,6 +237,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
     assert(actual.equals(expected))
+    assert(actual.sourceFilesSizeInBytes == 200L)
   }
 
   test("Content.files api lists all files from Content object.") {
