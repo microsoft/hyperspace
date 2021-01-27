@@ -36,12 +36,13 @@ The process outlined below is for reviewing a proposal and reaching a decision a
      - Accept proposal
      - Decline proposal
      - Ask for more details
+     
      If the proposal is accepted/declined, the process is done. Otherwise, the discussion is expected to identify concerns that should be addressed by updating the proposal.
   3. Once comments and revisions on the design proposal issue are complete, there is a final discussion on the issue to reach one of two outcomes:
      - Accept proposal
      - Decline proposal
 
-After the proposal is accepted or declined (e.g., after Step 2 or Step 4), implementation work proceeds in the same way as any other contribution. 	
+After the proposal is accepted or declined, implementation work proceeds in the same way as any other contribution. 	
 
 ### Proposal Review
 
