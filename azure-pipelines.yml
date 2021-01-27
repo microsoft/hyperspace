@@ -6,34 +6,23 @@ trigger:
       - master
 
 jobs:
-  - job: Build
-    displayName: 'Build sources and run unit tests'
+  - job: Build_2_11
+    displayName: 'Build sources and run unit tests for Scala 2.11'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-      - script: sbt +clean
-        displayName: 'Running $sbt +clean'
-      - script: sbt +update
-        displayName: 'Running $sbt +update'
-      - script: sbt +compile
-        displayName: 'Running $sbt +compile'
-      - script: sbt +test
-        displayName: 'Running $sbt +test'
-      - task: Bash@3
-        inputs:
-          filePath: 'script/download_spark.sh'
-        displayName: 'Downloading spark'
-      - task: PythonScript@0
-        inputs:
-          scriptSource: 'filePath'
-          scriptPath: 'run-tests.py'
-        displayName: 'Running python tests'
-        env:
-          SPARK_HOME: $(Build.SourcesDirectory)/spark-2.4.2-bin-hadoop2.7
+      - script: sbt ++2.11.12 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.11.12 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.11.12 compile
+        displayName: 'Running $sbt compile'
+      - script: sbt ++2.11.12 test
+        displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt +package
-          displayName: 'Running $sbt +package'
+        - script: sbt ++2.11.12 package
+          displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
@@ -45,3 +34,51 @@ jobs:
           inputs:
             artifactName: 'hyperspace-core'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+
+  - job: Build_2_12
+    displayName: 'Build sources and run unit tests for Scala 2.12'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - script: sbt ++2.12.8 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.12.8 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.12.8 compile
+        displayName: 'Running $sbt compile'
+      - script: sbt ++2.12.8 test
+        displayName: 'Running $sbt test'
+      # If not a pull request, publish artifacts.
+      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+        - script: sbt ++2.12.8 package
+          displayName: 'Running $sbt package'
+        - task: CopyFiles@2
+          displayName: 'Copy hyperspace-core JAR'
+          inputs:
+            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            contents: '**/*.jar'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish Hyperspace artifacts'
+          inputs:
+            artifactName: 'hyperspace-core'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+
+    - job: PythonTest
+      - script: sbt ++2.11.12 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.11.12 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.11.12 compile
+        displayName: 'Running $sbt compile'
+      - task: Bash@3
+        inputs:
+          filePath: 'script/download_spark.sh'
+        displayName: 'Downloading spark'
+      - task: PythonScript@0
+        inputs:
+          scriptSource: 'filePath'
+          scriptPath: 'run-tests.py'
+        displayName: 'Running python tests'
+        env:
+          SPARK_HOME: $(Build.SourcesDirectory)/spark-2.4.2-bin-hadoop2.7
