@@ -595,13 +595,7 @@ case class IndexLogEntry(
   }
 
   def withCachedTag[T](tag: IndexLogEntryTag[T])(f: => T): T = {
-    getTagValue(tag) match {
-      case Some(v) => v
-      case None =>
-        val ret = f
-        setTagValue(tag, ret)
-        ret
-    }
+    withCachedTag(null, tag)(f)
   }
 }
 

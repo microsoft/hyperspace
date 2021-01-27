@@ -384,14 +384,12 @@ object RuleUtils {
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
+        def fileIndex: InMemoryFileIndex =
+          new InMemoryFileIndex(spark, filesToRead, Map(), None)
         val newLocation = if (filesToRead.length == index.content.files.size) {
-          index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
-            new InMemoryFileIndex(spark, index.content.files, Map(), None)
-          }
+          index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY)(fileIndex)
         } else {
-          index.withCachedTag(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN) {
-            new InMemoryFileIndex(spark, filesToRead, Map(), None)
-          }
+          index.withCachedTag(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN)(fileIndex)
         }
 
         val relation = new IndexHadoopFsRelation(
