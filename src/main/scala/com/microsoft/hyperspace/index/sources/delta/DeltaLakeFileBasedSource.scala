@@ -84,7 +84,10 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
           ("versionAsOf" -> location.tableVersion.toString) ++ basePathOpt
         Some(
           Relation(
-            Seq(PathUtils.makeAbsolute(location.path).toString),
+            Seq(
+              PathUtils
+                .makeAbsolute(location.path.toString, spark.sessionState.newHadoopConf())
+                .toString),
             Hdfs(sourceDataProperties),
             dataSchema.json,
             fileFormatName,

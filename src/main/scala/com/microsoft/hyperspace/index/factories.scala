@@ -20,31 +20,34 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 trait IndexLogManagerFactory {
-  def create(indexPath: Path): IndexLogManager
+  def create(indexPath: Path, configuration: Configuration): IndexLogManager
 }
 
 object IndexLogManagerFactoryImpl extends IndexLogManagerFactory {
-  override def create(indexPath: Path): IndexLogManager = {
-    new IndexLogManagerImpl(indexPath)
+  override def create(
+      indexPath: Path,
+      configuration: Configuration = new Configuration): IndexLogManager = {
+    new IndexLogManagerImpl(indexPath, configuration)
   }
 }
 
 trait IndexDataManagerFactory {
-  def create(indexPath: Path): IndexDataManager
+  def create(indexPath: Path, configuration: Configuration): IndexDataManager
 }
 
 object IndexDataManagerFactoryImpl extends IndexDataManagerFactory {
-  override def create(indexPath: Path): IndexDataManager = {
-    new IndexDataManagerImpl(indexPath)
+  override def create(
+      indexPath: Path,
+      configuration: Configuration = new Configuration): IndexDataManager = {
+    new IndexDataManagerImpl(indexPath, configuration)
   }
 }
 
 trait FileSystemFactory {
-  def create(path: Path): FileSystem
+  def create(path: Path, configuration: Configuration): FileSystem
 }
 
 object FileSystemFactoryImpl extends FileSystemFactory {
-  private val configuration = new Configuration
-
-  override def create(path: Path): FileSystem = path.getFileSystem(configuration)
+  override def create(path: Path, configuration: Configuration = new Configuration): FileSystem =
+    path.getFileSystem(configuration)
 }
