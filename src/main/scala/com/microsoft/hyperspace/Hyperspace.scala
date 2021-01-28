@@ -87,7 +87,11 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
    */
   def refreshIndex(indexName: String, mode: String): Unit = {
-    indexManager.refresh(indexName, mode)
+    indexManager.refresh(indexName, mode, None)
+  }
+
+  def refreshIndex(indexName: String, mode: String, scanPattern: Option[String]): Unit = {
+    indexManager.refresh(indexName, mode, scanPattern)
   }
 
   /**

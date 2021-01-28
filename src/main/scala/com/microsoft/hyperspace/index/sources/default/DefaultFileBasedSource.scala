@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
+import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
@@ -106,7 +107,14 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
               .toMap
 
             val globPathValues = globPaths.values.flatten.toSet
-            if (!location.rootPaths.forall(globPathValues.contains)) {
+
+            // Root paths could be directories or leaf files. Make sure that all root paths either
+            // match the glob paths, in case of directories, or belong to glob paths, in case of
+            // files.
+            if (!location.rootPaths.forall(p =>
+                  globPathValues.exists(g =>
+                    FilenameUtils.equalsNormalized(p.toString, g.toString) ||
+                      FilenameUtils.directoryContains(g.toString, p.toString)))) {
               throw HyperspaceException(
                 "Some glob patterns do not match with available root " +
                   s"paths of the source data. Please check if $pattern matches all of " +
@@ -296,7 +304,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       // Keep the `asInstanceOf` to force casting or fallback because Databrick's
       // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
       // standard API's `FileStatus`.
-      index.allFiles.map(_.asInstanceOf[FileStatus])
+      index.allFiles
     } catch {
       case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
         val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
