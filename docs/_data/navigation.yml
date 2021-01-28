@@ -19,6 +19,8 @@ docs:
         url: /docs/ug-mutable-dataset/
       - title: "Optimize index"
         url: /docs/ug-optimize-index/
+      - title: "Types of data sources"
+        url: /docs/ug-types-of-data-sources/
       - title: "Release Notes"
         url: https://github.com/microsoft/hyperspace/releases
 # Needs to be written later
