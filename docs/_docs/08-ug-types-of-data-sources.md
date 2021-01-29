@@ -7,10 +7,10 @@ toc: false
 classes: wide
 ---
 
-This guide helps you to utilize indexes on other types of data source layers.
+This guide helps you to utilize indexes on other types of data sources such as [Delta Lake](https://github.com/delta-io/delta).
 
 ## Pluggable source builders
-Since Hyperspace v0.4, Hyperspace supports the indexes built on other types of data sources.
+Since Hyperspace v0.4, Hyperspace supports indexes built on other types of data sources.
 To avoid unnecessary library dependencies, we provide pluggable source builders
 to support other types of sources.
 
@@ -41,12 +41,11 @@ hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Qu
 ```
 
 ### Mutable dataset
-For Delta Lake, You can still utilize the existing feature set such as Hybrid Scan & incremental refresh in the same way.
+For Delta Lake, you can still utilize the existing feature set such as Hybrid Scan & incremental refresh in the same way.
 Please note that these features are based on the difference of source files.
 If there are a lot of changes in the source dataset from update/insert/delete executions,
-these features won't be applied or performed in an inefficient way.
-
-We would recommend you not to make a lot of changes or create a proper partition to reduce the difference.
+these features won't be applied due to performance implications. We highly recommend 
+that you analyze performance on your own workloads before going into production. 
 
 For more information, please refer
 [Mutable dataset](https://microsoft.github.io/hyperspace/docs/ug-mutable-dataset/) page.
