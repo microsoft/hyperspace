@@ -70,7 +70,10 @@ class IndexCollectionManager(
     }
   }
 
-  override def refresh(indexName: String, mode: String): Unit = {
+  override def refresh(
+      indexName: String,
+      mode: String,
+      indexSchemaChange: IndexSchemaChange): Unit = {
     withLogManager(indexName) { logManager =>
       val hadoopConf = spark.sessionState.newHadoopConf()
       val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
@@ -78,10 +81,13 @@ class IndexCollectionManager(
       val dataManager =
         indexDataManagerFactory.create(indexPath, hadoopConf)
       if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
-        new RefreshIncrementalAction(spark, logManager, dataManager).run()
+        new RefreshIncrementalAction(spark, logManager, dataManager, indexSchemaChange).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
-        new RefreshAction(spark, logManager, dataManager).run()
+        new RefreshAction(spark, logManager, dataManager, indexSchemaChange).run()
       } else if (mode.equalsIgnoreCase(REFRESH_MODE_QUICK)) {
+        if (!indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE)) {
+          throw HyperspaceException("Index schema change is no supported refresh quick mode.")
+        }
         new RefreshQuickAction(spark, logManager, dataManager).run()
       } else {
         throw HyperspaceException(s"Unsupported refresh mode '$mode' found.")

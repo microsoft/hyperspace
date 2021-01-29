@@ -33,7 +33,11 @@ class RefreshQuickAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    extends RefreshActionBase(
+      spark,
+      logManager,
+      dataManager,
+      IndexSchemaChange.NO_CHANGE) {
   final override def op(): Unit = {
     logInfo(
       s"Refresh index is updating metadata only with ${deletedFiles.size} of deleted " +

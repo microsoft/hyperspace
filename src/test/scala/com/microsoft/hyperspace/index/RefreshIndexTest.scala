@@ -19,11 +19,12 @@ package com.microsoft.hyperspace.index
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{AnalysisException, QueryTest}
+import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestUtils}
 import com.microsoft.hyperspace.TestUtils.{getFileIdTracker, logManager}
 import com.microsoft.hyperspace.actions.{RefreshIncrementalAction, RefreshQuickAction}
-import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 import com.microsoft.hyperspace.telemetry.RefreshIncrementalActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
@@ -453,6 +454,107 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Validate refresh in the full and incremental modes with index schema changes.") {
+    Seq(REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL).foreach { refreshMode =>
+      Seq(true, false).foreach { enableLineage =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+          withIndex(indexConfig.indexName) {
+            withTempPathAsString { testPath =>
+              SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+              val df = spark.read.parquet(testPath)
+              hyperspace.createIndex(df, indexConfig)
+
+              // Change original data.
+              if (enableLineage) {
+                deleteOneDataFile(testPath)
+              }
+
+              SampleData.appendWithSchemaChange(
+                spark,
+                Seq("Date", "Query", "City", "State", "ZipCode"),
+                testPath)
+
+              // Refresh index in desired mode.
+              val newCols =
+                StructType(Seq(StructField("City", StringType), StructField("State", StringType)))
+              val indexSchemaChange = IndexSchemaChange(newCols, Seq("imprs"))
+              hyperspace.refreshIndex(indexConfig.indexName, refreshMode, indexSchemaChange)
+
+              var expectedSchema = Set(
+                StructField("City", StringType),
+                StructField("State", StringType),
+                StructField("Query", StringType))
+              if (enableLineage) {
+                expectedSchema += StructField(IndexConstants.DATA_FILE_NAME_ID, LongType, false)
+              }
+
+              // Verify index metadata.
+              val indexLogEntry = getLatestStableLog(indexConfig.indexName)
+              assert(
+                indexLogEntry.hasSchemaChange == refreshMode.equals(REFRESH_MODE_INCREMENTAL))
+              assert(indexLogEntry.indexedColumns.toSet === indexConfig.indexedColumns.toSet)
+              assert(indexLogEntry.includedColumns.toSet ===
+                (indexConfig.includedColumns.diff(Seq("imprs")) ++ Seq("City", "State")).toSet)
+              assert(indexLogEntry.schema.toSet === expectedSchema)
+
+              // Verify schema from latest index files.
+              val indexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
+                s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+              assert(indexDF.schema.fieldNames.toSet === expectedSchema.map(_.name))
+            }
+          }
+        }
+      }
+    }
+  }
+
+  test(
+    "Validate refresh in the full and incremental modes fails as expected " +
+      "if trying to make an invalid schema change.") {
+    Seq(REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL).foreach { refreshMode =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        withIndex(indexConfig.indexName) {
+          withTempPathAsString { testPath =>
+            SampleData.save(spark, testPath, Seq("Date", "RGUID", "Query", "imprs", "clicks"))
+            val df = spark.read.parquet(testPath)
+            hyperspace.createIndex(df, indexConfig)
+
+            // Change original data to avoid NoChangesException.
+            deleteOneDataFile(testPath)
+
+            // Try to exclude an indexed column.
+            val ex1 = intercept[HyperspaceException](
+              hyperspace.refreshIndex(
+                indexConfig.indexName,
+                refreshMode,
+                IndexSchemaChange(new StructType(), Seq("Query"))))
+            assert(ex1.getMessage.contains("Change in indexed columns is not allowed."))
+
+            // Try to include an already existing column.
+            val ex2 = intercept[HyperspaceException](
+              hyperspace.refreshIndex(
+                indexConfig.indexName,
+                refreshMode,
+                IndexSchemaChange(StructType(Seq(StructField("imprs", IntegerType))), Seq())))
+            assert(
+              ex2.getMessage.contains("Duplicate include column names in current index schema " +
+                "and index schema change are not allowed."))
+
+            // Try to exclude a non-existing column.
+            val ex3 = intercept[HyperspaceException](
+              hyperspace.refreshIndex(
+                indexConfig.indexName,
+                refreshMode,
+                IndexSchemaChange(new StructType(), Seq("GhostColumn"))))
+            assert(
+              ex3.getMessage.contains(
+                "Unresolved column(s) found in list of columns to exclude."))
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Delete one file from a given path.
    *
@@ -490,5 +592,4 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
     assert(allowEmpty || cnt > 0)
     cnt
   }
-
 }

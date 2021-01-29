@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.{LongType, StructField}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
@@ -47,8 +48,9 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshIncr
 class RefreshIncrementalAction(
     spark: SparkSession,
     logManager: IndexLogManager,
-    dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    dataManager: IndexDataManager,
+    indexSchemaChange: IndexSchemaChange = IndexSchemaChange.NO_CHANGE)
+    extends RefreshActionBase(spark, logManager, dataManager, indexSchemaChange) {
 
   final override def op(): Unit = {
     logInfo(
@@ -76,6 +78,7 @@ class RefreshIncrementalAction(
       // deleted source data files as those entries are no longer valid.
       val refreshDF =
         spark.read
+          .schema(indexSchema.add(StructField(IndexConstants.DATA_FILE_NAME_ID, LongType, false)))
           .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
           .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedFiles.map(_.id): _*))
 
@@ -127,7 +130,12 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    val entry = if (indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE)) {
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    } else {
+      getIndexLogEntry(spark, df, indexConfig, indexDataPath).copyWithDerivedDatasetProperties(
+        Map(IndexConstants.INDEX_SCHEMA_CHANGED -> "true"))
+    }
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.

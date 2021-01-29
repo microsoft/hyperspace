@@ -65,7 +65,7 @@ trait IndexManager {
    *
    * @param indexName Name of the index to refresh.
    */
-  def refresh(indexName: String, mode: String): Unit
+  def refresh(indexName: String, mode: String, indexSchemaChange: IndexSchemaChange): Unit
 
   /**
    * Optimize index by changing the underlying index data layout (e.g., compaction).

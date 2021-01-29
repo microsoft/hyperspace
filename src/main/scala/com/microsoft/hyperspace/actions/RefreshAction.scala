@@ -33,8 +33,9 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshActi
 class RefreshAction(
     spark: SparkSession,
     logManager: IndexLogManager,
-    dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    dataManager: IndexDataManager,
+    indexSchemaChange: IndexSchemaChange = IndexSchemaChange.NO_CHANGE)
+    extends RefreshActionBase(spark, logManager, dataManager, indexSchemaChange) {
 
   override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
 

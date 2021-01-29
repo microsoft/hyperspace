@@ -105,6 +105,10 @@ class OptimizeAction(
       throw HyperspaceException(s"Unsupported optimize mode '$mode' found.")
     }
 
+    if (previousIndexLogEntry.hasSchemaChange) {
+      throw HyperspaceException("Optimize is not supported on an index with schema changes.")
+    }
+
     if (filesToOptimize.isEmpty) {
       throw NoChangesException(
         "Optimize aborted as no optimizable index files smaller than " +

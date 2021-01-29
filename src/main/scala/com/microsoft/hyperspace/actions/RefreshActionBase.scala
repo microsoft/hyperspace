@@ -23,6 +23,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -37,7 +38,8 @@ import com.microsoft.hyperspace.index._
 private[actions] abstract class RefreshActionBase(
     spark: SparkSession,
     final override protected val logManager: IndexLogManager,
-    dataManager: IndexDataManager)
+    dataManager: IndexDataManager,
+    indexSchemaChange: IndexSchemaChange)
     extends CreateActionBase(dataManager)
     with Action {
   private lazy val previousLogEntry: LogEntry = {
@@ -64,16 +66,18 @@ private[actions] abstract class RefreshActionBase(
     previousIndexLogEntry.hasLineageColumn
   }
 
-  // Reconstruct a df from schema
+  // Reconstruct a df from schema.
   protected lazy val df = {
-    val relations = previousIndexLogEntry.relations
-    val latestRelation =
-      Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
-    val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
-    val df = spark.read
-      .schema(dataSchema)
-      .format(latestRelation.fileFormat)
-      .options(latestRelation.options)
+    val df = if (eligibleForSchemaChange) {
+      spark.read
+        .schema(indexSchema)
+        .format(latestRelation.fileFormat)
+        .options(latestRelation.options)
+    } else {
+      spark.read
+        .format(latestRelation.fileFormat)
+        .options(latestRelation.options)
+    }
     // Due to the difference in how the "path" option is set: https://github.com/apache/spark/
     // blob/ef1441b56c5cab02335d8d2e4ff95cf7e9c9b9ca/sql/core/src/main/scala/org/apache/spark/
     // sql/DataFrameReader.scala#L197
@@ -85,9 +89,54 @@ private[actions] abstract class RefreshActionBase(
     }
   }
 
+  protected lazy val indexSchema: StructType = {
+    val previousSchema = previousIndexLogEntry.schema.copy(
+      fields = previousIndexLogEntry.schema.fields
+        .filterNot(_.name.equals(IndexConstants.DATA_FILE_NAME_ID)))
+    if (indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE)) {
+      previousSchema
+    } else {
+      val columnsToInclude = indexSchemaChange.includeColumns
+      if (columnsToInclude.nonEmpty && ResolverUtils
+            .resolve(
+              spark,
+              columnsToInclude.fieldNames.toSeq,
+              previousIndexLogEntry.indexedColumns ++ previousIndexLogEntry.includedColumns)
+            .isDefined) {
+        throw HyperspaceException(
+          "Duplicate include column names in current index schema " +
+            "and index schema change are not allowed.")
+      }
+
+      val columnsToExclude = indexSchemaChange.excludeColumns
+      if (columnsToExclude.nonEmpty && ResolverUtils
+            .resolve(spark, columnsToExclude, previousIndexLogEntry.indexedColumns)
+            .isDefined) {
+        throw HyperspaceException("Change in indexed columns is not allowed.")
+      }
+
+      if (ResolverUtils
+            .resolve(
+              spark,
+              indexSchemaChange.excludeColumns,
+              previousIndexLogEntry.includedColumns)
+            .isEmpty) {
+        throw HyperspaceException("Unresolved column(s) found in list of columns to exclude.")
+      }
+
+      previousSchema.copy(
+        fields = previousSchema
+          .filterNot(f => columnsToExclude.contains(f.name))
+          .toArray ++ columnsToInclude)
+    }
+  }
+
   protected lazy val indexConfig: IndexConfig = {
-    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+    val indexedColumns = indexSchema.fieldNames
+      .filter(previousIndexLogEntry.derivedDataset.properties.columns.indexed.contains)
+      .toSeq
+    val includedColumns = indexSchema.fieldNames.toSeq.diff(indexedColumns)
+    IndexConfig(previousIndexLogEntry.name, indexedColumns, includedColumns)
   }
 
   final override val transientState: String = REFRESHING
@@ -99,6 +148,11 @@ private[actions] abstract class RefreshActionBase(
       throw HyperspaceException(
         s"Refresh is only supported in $ACTIVE state. " +
           s"Current index state is ${previousIndexLogEntry.state}")
+    }
+
+    if (!indexSchemaChange.equals(IndexSchemaChange.NO_CHANGE) && !eligibleForSchemaChange) {
+      throw HyperspaceException(
+        s"Index schema changes are not supported on format: ${latestRelation.fileFormat}.")
     }
   }
 
@@ -144,5 +198,17 @@ private[actions] abstract class RefreshActionBase(
     val originalFiles = relation.data.properties.content.fileInfos
 
     (currentFiles -- originalFiles).toSeq
+  }
+
+  private lazy val eligibleForSchemaChange: Boolean = {
+    // Some formats (s.a. "delta") do not allow user-specified schemas.
+    // Index schema change is only supported on a format that allows specifying
+    // a customized schema when reading content.
+    latestRelation.fileFormat.equals("parquet")
+  }
+
+  private lazy val latestRelation: Relation = {
+    val relations = previousIndexLogEntry.relations
+    Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
   }
 }
