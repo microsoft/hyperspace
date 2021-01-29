@@ -131,6 +131,8 @@ and any other pre-requisite.
 
 You can use the following configurations to enable Hybrid Scan for indexes on an append-only dataset.
 We provide a threshold config for the amount of appended data (`spark.hyperspace.index.hybridscan.maxAppendedRatio`, 0.0 to 1.0).
+It indicates the maximum ratio of *total size of appended files files* to *total size of all source files
+covered by the candidate index*. If there's more appended data than this threshold, Hybrid scan won't be applied.
 As Hybrid Scan causes some regression depending on workload types, we allow 30% (0.3) of appended data by default.
 
 Scala:
@@ -209,12 +211,12 @@ Therefore, you need to be aware of possible performance regression from it.
 
 You can use the following configurations to enable Hybrid Scan for indexes on a dataset with both append and delete files.
 
-We currently provide one threshold config for deleted files:
+Similar to appended files, we provide the threshold config for deleted files:
 `spark.hyperspace.index.hybridscan.maxDeletedRatio`
 
-It indicates the maximum ratio of deleted data compared to index data to perform Hybrid Scan.
-If there's more deleted data than this threshold, Hybrid scan won't be applied. Currently it's 0.2 (20%) by default.
-To apply Hybrid Scan, both threshold conditions should be met.
+It indicates the maximum ratio of *total size of deleted files* to *total size of all source files
+covered by the candidate index*.  If there's more deleted data than this threshold, Hybrid scan won't be applied. Currently it's 0.2 (20%) by default.
+To apply Hybrid Scan, both appended & deleted threshold conditions should be met.
 
 Scala:
 ```scala
