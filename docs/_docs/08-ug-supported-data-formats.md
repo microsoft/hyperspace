@@ -1,7 +1,7 @@
 ---
-title: "Types of data sources"
-permalink: /docs/ug-types-of-data-sources/
-excerpt: "Supported types of data sources"
+title: "Supported data formats"
+permalink: /docs/ug-supported-data-formats/
+excerpt: "Supported data formats"
 last_modified_at: 2021-01-28
 toc: false
 classes: wide
