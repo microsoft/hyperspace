@@ -58,8 +58,10 @@ object FileUtils {
    * @param directoryPath the directory path.
    * @return the size in byte of the directory.
    */
-  def getDirectorySize(directoryPath: Path): Long = {
-    val fileSystem = directoryPath.getFileSystem(new Configuration)
+  def getDirectorySize(
+      directoryPath: Path,
+      hadoopConfiguration: Configuration = new Configuration): Long = {
+    val fileSystem = directoryPath.getFileSystem(hadoopConfiguration)
     fileSystem.getContentSummary(directoryPath).getLength
   }
 
@@ -68,8 +70,10 @@ object FileUtils {
    *
    * @param dirPath the directory path.
    */
-  def createDirectory(dirPath: Path): Unit = {
-    val fileSystem = dirPath.getFileSystem(new Configuration)
+  def createDirectory(
+      dirPath: Path,
+      hadoopConfiguration: Configuration = new Configuration): Unit = {
+    val fileSystem = dirPath.getFileSystem(hadoopConfiguration)
     if (!fileSystem.exists(dirPath)) {
       fileSystem.mkdirs(dirPath)
     }
@@ -81,8 +85,11 @@ object FileUtils {
    * @param dirPath the directory path to be deleted.
    * @param isRecursive option to delete recursively.
    */
-  def delete(dirPath: Path, isRecursive: Boolean = true): Unit = {
-    dirPath.getFileSystem(new Configuration).delete(dirPath, isRecursive)
+  def delete(
+      dirPath: Path,
+      hadoopConfiguration: Configuration = new Configuration,
+      isRecursive: Boolean = true): Unit = {
+    dirPath.getFileSystem(hadoopConfiguration).delete(dirPath, isRecursive)
   }
 
   /**

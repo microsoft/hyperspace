@@ -50,7 +50,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
   }
 
   after {
-    FileUtils.delete(systemPath, true)
+    FileUtils.delete(systemPath, isRecursive = true)
   }
 
   override def afterAll(): Unit = {
@@ -795,8 +795,8 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
               Map())),
           Content.fromDirectory(
             PathUtils.makeAbsolute(
-              new Path(s"$systemPath/${indexConfig.indexName}" +
-                s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
+              s"$systemPath/${indexConfig.indexName}" +
+                s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
             fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
           Map())

@@ -88,8 +88,10 @@ object Content {
       path: Path,
       fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
+      hadoopConfiguration: Configuration = new Configuration,
       throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, throwIfNotExists))
+    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration,
+      throwIfNotExists))
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
@@ -192,8 +194,9 @@ object Directory {
       path: Path,
       fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
+      hadoopConfiguration: Configuration = new Configuration,
       throwIfNotExists: Boolean = false): Directory = {
-    val fs = path.getFileSystem(new Configuration)
+    val fs = path.getFileSystem(hadoopConfiguration)
     val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists, fs)
 
     if (leafFiles.nonEmpty) {
@@ -454,7 +457,7 @@ case class IndexLogEntry(
 
   @JsonIgnore
   lazy val sourceFilesSizeInBytes: Long = {
-    sourceFileInfoSet.map(_.size).sum
+    sourceFileInfoSet.foldLeft(0L)(_ + _.size)
   }
 
   def sourceUpdate: Option[Update] = {

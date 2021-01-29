@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.spark.SparkFunSuite
 import org.mockito.ArgumentMatchers.any
@@ -28,7 +29,7 @@ import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH
 class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   private val indexSystemPath = "src/test/resources/indexLocation"
   private val testLogManagerFactory: IndexLogManagerFactory = new IndexLogManagerFactory {
-    override def create(indexPath: Path): IndexLogManager =
+    override def create(indexPath: Path, hadoopConfiguration: Configuration): IndexLogManager =
       new IndexLogManager {
         override def getLog(id: Int): Option[LogEntry] = Some(testLogEntry)
         override def getLatestId(): Option[Int] = Some(0)
@@ -70,7 +71,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
-    when(mockFileSystemFactory.create(any[Path])).thenReturn(mockFileSystem)
+    when(mockFileSystemFactory.create(any[Path], any[Configuration])).thenReturn(mockFileSystem)
 
     indexCollectionManager = new IndexCollectionManager(
       spark,

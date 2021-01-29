@@ -20,10 +20,11 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
 
 object PathUtils {
-  def makeAbsolute(path: String): Path = makeAbsolute(new Path(path))
+  def makeAbsolute(path: String, hadoopConfiguration: Configuration = new Configuration): Path =
+    makeAbsolute(new Path(path), hadoopConfiguration)
 
-  def makeAbsolute(path: Path): Path = {
-    val fs = path.getFileSystem(new Configuration)
+  def makeAbsolute(path: Path, hadoopConfiguration: Configuration): Path = {
+    val fs = path.getFileSystem(hadoopConfiguration)
     fs.makeQualified(path)
   }
 
