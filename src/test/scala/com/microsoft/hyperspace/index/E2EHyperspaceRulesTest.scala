@@ -1026,7 +1026,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   }
 
   private def equalsRef(a: Set[FileIndex], b: Set[FileIndex]): Boolean = {
-    a.zip(b).forall(f => f._1 eq f._2)
+    a.size == b.size && a.zip(b).forall(f => f._1 eq f._2)
   }
 
   private def getFsLocation(plan: LogicalPlan): Set[FileIndex] = {
