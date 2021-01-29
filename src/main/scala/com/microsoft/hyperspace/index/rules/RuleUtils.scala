@@ -273,8 +273,10 @@ object RuleUtils {
     //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
-        val location =
+        val location = index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
+        }
+
         val relation = new IndexHadoopFsRelation(
           location,
           new StructType(),
@@ -382,7 +384,14 @@ object RuleUtils {
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
-        val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
+        def fileIndex: InMemoryFileIndex =
+          new InMemoryFileIndex(spark, filesToRead, Map(), None)
+        val newLocation = if (filesToRead.length == index.content.files.size) {
+          index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY)(fileIndex)
+        } else {
+          index.withCachedTag(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN)(fileIndex)
+        }
+
         val relation = new IndexHadoopFsRelation(
           newLocation,
           new StructType(),
@@ -416,7 +425,7 @@ object RuleUtils {
       // For more details, see https://github.com/microsoft/hyperspace/issues/150.
 
       val planForAppended =
-        transformPlanToReadAppendedFiles(spark, index.schema, plan, unhandledAppendedFiles)
+        transformPlanToReadAppendedFiles(spark, index, plan, unhandledAppendedFiles)
       if (useBucketSpec) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
@@ -447,14 +456,14 @@ object RuleUtils {
    * by using [[BucketUnion]] or [[Union]].
    *
    * @param spark Spark session.
-   * @param indexSchema Index schema used for the output.
+   * @param index Index used in transformation of plan.
    * @param originalPlan Original plan.
    * @param filesAppended Appended files to the source relation.
    * @return Transformed linear logical plan for appended files.
    */
   private def transformPlanToReadAppendedFiles(
       spark: SparkSession,
-      indexSchema: StructType,
+      index: IndexLogEntry,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
     // Transform the location of LogicalRelation with appended files.
@@ -474,14 +483,18 @@ object RuleUtils {
           }
           .getOrElse(Map())
 
-        val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
+        val newLocation = index.withCachedTag(
+          originalPlan,
+          IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED) {
+          new InMemoryFileIndex(spark, filesAppended, options, None)
+        }
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
         val partitionColumns = location.partitionSchema.map(_.name)
         val updatedSchema = StructType(baseRelation.schema.filter(col =>
-          indexSchema.contains(col) || location.partitionSchema.contains(col)))
+          index.schema.contains(col) || location.partitionSchema.contains(col)))
         val updatedOutput = baseOutput.filter(attr =>
-          indexSchema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+          index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
         val newRelation = fsRelation.copy(
           location = newLocation,
           dataSchema = updatedSchema,

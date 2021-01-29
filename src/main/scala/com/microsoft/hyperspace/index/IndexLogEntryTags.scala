@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.spark.sql.execution.datasources.InMemoryFileIndex
+
 object IndexLogEntryTags {
   // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for the index or not.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
@@ -37,4 +39,18 @@ object IndexLogEntryTags {
   // HYBRIDSCAN_RELATED_CONFIGS contains Seq of value strings of Hybrid Scan related configs.
   val HYBRIDSCAN_RELATED_CONFIGS: IndexLogEntryTag[Seq[String]] =
     IndexLogEntryTag[Seq[String]]("hybridScanRelatedConfigs")
+
+  // INMEMORYFILEINDEX_INDEX_ONLY stores InMemoryFileIndex for index only scan.
+  val INMEMORYFILEINDEX_INDEX_ONLY: IndexLogEntryTag[InMemoryFileIndex] =
+    IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexIndexOnly")
+
+  // INMEMORYFILEINDEX_HYBRID_SCAN stores InMemoryFileIndex including index data files and also
+  // appended files for Hybrid Scan.
+  val INMEMORYFILEINDEX_HYBRID_SCAN: IndexLogEntryTag[InMemoryFileIndex] =
+  IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScan")
+
+  // INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED stores InMemoryFileIndex including only appended files
+  // for Hybrid Scan.
+  val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
+  IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
 }

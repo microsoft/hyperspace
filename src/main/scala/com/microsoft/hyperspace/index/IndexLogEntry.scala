@@ -576,10 +576,13 @@ case class IndexLogEntry(
   }
 
   def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
-    getTagValue(plan, tag).foreach { return _ }
-    val ret = f
-    setTagValue(plan, tag, ret)
-    ret
+    getTagValue(plan, tag) match {
+      case Some(v) => v
+      case None =>
+        val ret = f
+        setTagValue(plan, tag, ret)
+        ret
+    }
   }
 
   def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
@@ -595,10 +598,7 @@ case class IndexLogEntry(
   }
 
   def withCachedTag[T](tag: IndexLogEntryTag[T])(f: => T): T = {
-    getTagValue(tag).foreach { return _ }
-    val ret = f
-    setTagValue(tag, ret)
-    ret
+    withCachedTag(null, tag)(f)
   }
 }
 
