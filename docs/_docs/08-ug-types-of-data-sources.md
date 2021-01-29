@@ -19,6 +19,7 @@ so you can use the existing APIs with a DataFrame built on a different type of s
 
 Currently, Hyperspace supports the below source types:
 - Delta Lake (since v0.4)
+- Apache Iceberg (work-in-progress PRs)
 
 ## Delta Lake
 Since Hyperspace v0.4, Hyperspace supports index creation on Delta Lake tables.
@@ -57,6 +58,4 @@ Then we can apply Hybrid Scan by considering:
 - **appended** files after the older version as **deleted** files 
 - **deleted** files after the older version as **appended** files
 
-We are working on improving time travel query by selecting a proper version of a candidate index.
-If there are multiple refreshed versions of a candidate index, we could get the "closest" version for the given delta version and apply Hybrid Scan.
-In this way, we could reduce the difference of sources files which should be handled with Hybrid Scan.
+We have some planned improvements discussed in this [issue](https://github.com/microsoft/hyperspace/issues/270).
