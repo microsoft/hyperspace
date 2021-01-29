@@ -52,9 +52,11 @@ For more information, please refer
 
 ### Time travel query
 Hyperspace can support Delta Lake time travel queries using Hybrid Scan.
-In order to support an older version compared to the delta version of the latest index, *appended* files after
-the older version are considered as *deleted* files, *deleted* files after the older version are considered as *appended* files.
+We can extract appended and deleted files from an older delta version based on the latest index.
+Then we can apply Hybrid Scan by considering:
+- **appended** files after the older version as **deleted** files 
+- **deleted** files after the older version as **appended** files
 
-In the next Hyperspace release (v0.5), we will optimize time travel query by selecting a proper version of the index.
+We are working on improving time travel query by selecting a proper version of a candidate index.
 If there are multiple refreshed versions of a candidate index, we could get the "closest" version for the given delta version and apply Hybrid Scan.
 In this way, we could reduce the difference of sources files which should be handled with Hybrid Scan.
