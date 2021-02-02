@@ -27,7 +27,7 @@ import org.apache.spark.sql.internal.SQLConf
  *
  * @param conf SQL Configuration
  */
-private[hyperspace] class PathResolver(conf: SQLConf) {
+private[hyperspace] class PathResolver(conf: SQLConf, hadoopConf: Configuration) {
 
   /**
    * Get path for the given index name. It enumerates the file system to resolve
@@ -38,7 +38,7 @@ private[hyperspace] class PathResolver(conf: SQLConf) {
    */
   def getIndexPath(name: String): Path = {
     val root = systemPath
-    val fs = root.getFileSystem(new Configuration)
+    val fs = root.getFileSystem(hadoopConf)
     if (fs.exists(root)) {
       // Note that fs.exists() is case-sensitive in some platforms and case-insensitive
       // in others, thus the check is manually done to make the comparison case-insensitive.
@@ -70,7 +70,7 @@ private[hyperspace] class PathResolver(conf: SQLConf) {
 }
 
 object PathResolver {
-  def apply(conf: SQLConf): PathResolver = {
-    new PathResolver(conf)
+  def apply(conf: SQLConf, hadoopConf: Configuration): PathResolver = {
+    new PathResolver(conf, hadoopConf)
   }
 }

@@ -117,12 +117,8 @@ deleted files in the index data. This requires enabling lineage for the index at
 Currently, HybridScan is disabled by default. You can check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/)
 page to see how it can be enabled.
 
-If a dataset has many deleted source files, query performance could degrade when Hybrid Scan is
-enforcing deletes at the query runtime. Hyperspace provides two different configurations to tune
-this behavior. 
-You can use them to enable supporting deletes during Hybrid Scan (`spark.hyperspace.index.hybridscan.delete.maxNumDeleted`)
-and determine when it should be applied, depending on the total number of deleted source files (`spark.hyperspace.index.hybridscan.delete.enabled`).
-You can check the detail in [Append and Delete](#append-and-delete-dataset) section.
+Hyperspace provides two threshold configurations (`spark.hyperspace.index.hybridscan.maxDeletedRatio`, `spark.hyperspace.index.hybridscan.maxAppendedRatio`)
+to determine whether we apply the candidate index with Hybrid Scan or not depending on the amount of appended data and deleted data.
 
 #### Append-only dataset
 
@@ -134,17 +130,21 @@ and any other pre-requisite.
 ###### How to enable
 
 You can use the following configurations to enable Hybrid Scan for indexes on an append-only dataset.
+We provide a threshold config for the amount of appended data (`spark.hyperspace.index.hybridscan.maxAppendedRatio`, 0.0 to 1.0).
+It indicates the maximum ratio of *total size of appended files files* to *total size of all source files
+covered by the candidate index*. If there's more appended data than this threshold, Hybrid scan won't be applied.
+As Hybrid Scan causes some regression depending on workload types, we allow 30% (0.3) of appended data by default.
 
 Scala:
 ```scala
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) // 30% by default
 ```
 
 Python:
 ```python
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) # false by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) # 30% by default
 ```
 
 ###### Example
@@ -199,35 +199,35 @@ query.show
 #### Append and Delete dataset
 
 Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
-by scanning all index rows and verifying whether each is coming from a deleted source file or not.
+by scanning all index rows and verifying whether each row is coming from a deleted source file or not.
 In order to trace which source file each row is from, you need to enable linage column config before creating an index.
-Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is
-enabled when creating an index.
+Check [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how to enable the lineage column at index creation.
 
 Due to the way Hybrid Scan enforces deletes at the query time, supporting deletes is more expensive than appended
-files. The more deleted files it has, the more overhead it will incur to filter the rows.
+files. The more deleted files it has, the more overhead it will incur to filter the rows, and the benefit from the index will decrease.
 Therefore, you need to be aware of possible performance regression from it.
-
-We will provide several threshold configs after some experiments and optimizations.
 
 ###### How to enable
 
 You can use the following configurations to enable Hybrid Scan for indexes on a dataset with both append and delete files.
 
-We currently provide one threshold config:
-`spark.hyperspace.index.hybridscan.delete.maxNumDeleted`. If there are more deleted files than the config value,
-we do not perform Hybrid Scan for the index.
+Similar to appended files, we provide the threshold config for deleted files:
+`spark.hyperspace.index.hybridscan.maxDeletedRatio`
+
+It indicates the maximum ratio of *total size of deleted files* to *total size of all source files
+covered by the candidate index*.  If there's more deleted data than this threshold, Hybrid scan won't be applied. Currently it's 0.2 (20%) by default.
+To apply Hybrid Scan, both appended & deleted threshold conditions should be met.
 
 Scala:
 ```scala
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) // 30 by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) // 30% by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxDeletedRatio", 0.2) // 20% by default
 ```
 
 Python:
 ```python
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) # 30 by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) # 30% by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxDeletedRatio", 0.2) # 20% by default
 ```

@@ -88,8 +88,10 @@ object Content {
       path: Path,
       fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
+      hadoopConfiguration: Configuration = new Configuration,
       throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, throwIfNotExists))
+    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration,
+      throwIfNotExists))
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
@@ -192,8 +194,9 @@ object Directory {
       path: Path,
       fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
+      hadoopConfiguration: Configuration = new Configuration,
       throwIfNotExists: Boolean = false): Directory = {
-    val fs = path.getFileSystem(new Configuration)
+    val fs = path.getFileSystem(hadoopConfiguration)
     val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists, fs)
 
     if (leafFiles.nonEmpty) {
@@ -343,6 +346,7 @@ object FileInfo {
 // IndexLogEntry-specific CoveringIndex that represents derived dataset.
 case class CoveringIndex(properties: CoveringIndex.Properties) {
   val kind = "CoveringIndex"
+  val kindAbbr = "CI"
 }
 object CoveringIndex {
   case class Properties(columns: Properties.Columns,
@@ -453,7 +457,7 @@ case class IndexLogEntry(
 
   @JsonIgnore
   lazy val sourceFilesSizeInBytes: Long = {
-    sourceFileInfoSet.map(_.size).sum
+    sourceFileInfoSet.foldLeft(0L)(_ + _.size)
   }
 
   def sourceUpdate: Option[Update] = {
@@ -571,6 +575,16 @@ case class IndexLogEntry(
     tags.remove((plan, tag))
   }
 
+  def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
+    getTagValue(plan, tag) match {
+      case Some(v) => v
+      case None =>
+        val ret = f
+        setTagValue(plan, tag, ret)
+        ret
+    }
+  }
+
   def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
     tags((null, tag)) = value
   }
@@ -581,6 +595,10 @@ case class IndexLogEntry(
 
   def unsetTagValue[T](tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((null, tag))
+  }
+
+  def withCachedTag[T](tag: IndexLogEntryTag[T])(f: => T): T = {
+    withCachedTag(null, tag)(f)
   }
 }
 

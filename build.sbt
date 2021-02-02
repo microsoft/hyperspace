@@ -141,12 +141,6 @@ developers := List(
     url   = url("https://github.com/pirz")
   ),
   Developer(
-    id    = "thrajput",
-    name  = "Tarun Rajput",
-    email = "",
-    url   = url("https://github.com/thrajput")
-  ),
-  Developer(
     id    = "AFFogarty",
     name  = "Andrew Fogarty",
     email = "",
@@ -163,6 +157,12 @@ developers := List(
     name  = "Eunjin Song",
     email = "",
     url   = url("https://github.com/sezruby")
+  ),
+  Developer(
+    id    = "thugsatbay",
+    name  = "Gurleen Singh",
+    email = "",
+    url   = url("https://github.com/thugsatbay")
   )
 )
 

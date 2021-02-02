@@ -30,7 +30,8 @@ import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.plans.logical.BucketUnion
+import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
+import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
@@ -58,16 +59,19 @@ object RuleUtils {
     val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
-      val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-      assert(sourcePlanSignatures.length == 1)
-      val sourcePlanSignature = sourcePlanSignatures.head
-      signatureMap.getOrElseUpdate(
-        sourcePlanSignature.provider,
-        LogicalPlanSignatureProvider
-          .create(sourcePlanSignature.provider)
-          .signature(plan)) match {
-        case Some(s) => s.equals(sourcePlanSignature.value)
-        case None => false
+      entry.withCachedTag(plan, IndexLogEntryTags.SIGNATURE_MATCHED) {
+        val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
+        assert(sourcePlanSignatures.length == 1)
+        val sourcePlanSignature = sourcePlanSignatures.head
+
+        signatureMap.getOrElseUpdate(
+          sourcePlanSignature.provider,
+          LogicalPlanSignatureProvider
+            .create(sourcePlanSignature.provider)
+            .signature(plan)) match {
+          case Some(s) => s.equals(sourcePlanSignature.value)
+          case None => false
+        }
       }
     }
 
@@ -82,41 +86,62 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      // Find the number of common files between the source relation and index source files.
-      // The total size of common files are collected and tagged for candidate.
-      val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
-        if (entry.sourceFileInfoSet.contains(f)) {
-          (res._1 + 1, res._2 + f.size) // count, total bytes
-        } else {
-          res
+      entry.withCachedTag(plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
+        // Find the number of common files between the source relation and index source files.
+        // The total size of common files are collected and tagged for candidate.
+        val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
+          if (entry.sourceFileInfoSet.contains(f)) {
+            (res._1 + 1, res._2 + f.size) // count, total bytes
+          } else {
+            res
+          }
+        }
+
+        val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
+        val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
+
+        val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
+        val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
+          commonCnt > 0 &&
+          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
+          deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
+
+        // For append-only Hybrid Scan, deleted files are not allowed.
+        lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
+          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
+
+        val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
+        if (isCandidate) {
+          entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
+
+          // If there is no change in source dataset, the index will be applied by
+          // transformPlanToUseIndexOnlyScan.
+          entry.setTagValue(
+            plan,
+            IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+            !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
+        }
+        isCandidate
+      }
+    }
+
+    def prepareHybridScanCandidateSelection(
+        spark: SparkSession,
+        plan: LogicalPlan,
+        indexes: Seq[IndexLogEntry]): Unit = {
+      assert(HyperspaceConf.hybridScanEnabled(spark))
+      val curConfigs = Seq(
+        HyperspaceConf.hybridScanAppendedRatioThreshold(spark).toString,
+        HyperspaceConf.hybridScanDeletedRatioThreshold(spark).toString)
+
+      indexes.foreach { index =>
+        val taggedConfigs = index.getTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS)
+        if (taggedConfigs.isEmpty || !taggedConfigs.get.equals(curConfigs)) {
+          // Need to reset cached tags as these config changes can change the result.
+          index.unsetTagValue(plan, IS_HYBRIDSCAN_CANDIDATE)
+          index.setTagValue(plan, HYBRIDSCAN_RELATED_CONFIGS, curConfigs)
         }
       }
-
-      val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
-      val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
-
-      val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-      val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
-        commonCnt > 0 &&
-        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
-        deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
-
-      // For append-only Hybrid Scan, deleted files are not allowed.
-      lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
-        appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
-
-      val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
-      if (isCandidate) {
-        entry.setTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES, commonBytes)
-
-        // If there is no change in source dataset, the index will be applied by
-        // transformPlanToUseIndexOnlyScan.
-        entry.setTagValue(
-          plan,
-          IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
-          !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
-      }
-      isCandidate
     }
 
     if (hybridScanEnabled) {
@@ -141,6 +166,7 @@ object RuleUtils {
             }
       }
       assert(filesByRelations.length == 1)
+      prepareHybridScanCandidateSelection(spark, plan, indexes)
       val inputSourceFiles = filesByRelations.flatten
       val totalSizeInBytes = inputSourceFiles.map(_.size).sum
       indexes.filter(index =>
@@ -249,15 +275,17 @@ object RuleUtils {
     //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
-        val location =
+        val location = index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
-        val relation = HadoopFsRelation(
+        }
+
+        val relation = new IndexHadoopFsRelation(
           location,
           new StructType(),
           StructType(index.schema.filter(baseRelation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -360,14 +388,21 @@ object RuleUtils {
             baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
-        val newLocation = new InMemoryFileIndex(spark, filesToRead, Map(), None)
-        val relation = HadoopFsRelation(
+        def fileIndex: InMemoryFileIndex =
+          new InMemoryFileIndex(spark, filesToRead, Map(), None)
+        val newLocation = if (filesToRead.length == index.content.files.size) {
+          index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY)(fileIndex)
+        } else {
+          index.withCachedTag(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN)(fileIndex)
+        }
+
+        val relation = new IndexHadoopFsRelation(
           newLocation,
           new StructType(),
           newSchema,
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
-          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark)
+          Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
@@ -394,7 +429,7 @@ object RuleUtils {
       // For more details, see https://github.com/microsoft/hyperspace/issues/150.
 
       val planForAppended =
-        transformPlanToReadAppendedFiles(spark, index.schema, plan, unhandledAppendedFiles)
+        transformPlanToReadAppendedFiles(spark, index, plan, unhandledAppendedFiles)
       if (useBucketUnionForAppended && useBucketSpec) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
@@ -425,14 +460,14 @@ object RuleUtils {
    * by using [[BucketUnion]] or [[Union]].
    *
    * @param spark Spark session.
-   * @param indexSchema Index schema used for the output.
+   * @param index Index used in transformation of plan.
    * @param originalPlan Original plan.
    * @param filesAppended Appended files to the source relation.
    * @return Transformed linear logical plan for appended files.
    */
   private def transformPlanToReadAppendedFiles(
       spark: SparkSession,
-      indexSchema: StructType,
+      index: IndexLogEntry,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
     // Transform the location of LogicalRelation with appended files.
@@ -452,14 +487,18 @@ object RuleUtils {
           }
           .getOrElse(Map())
 
-        val newLocation = new InMemoryFileIndex(spark, filesAppended, options, None)
+        val newLocation = index.withCachedTag(
+          originalPlan,
+          IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED) {
+          new InMemoryFileIndex(spark, filesAppended, options, None)
+        }
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
         val partitionColumns = location.partitionSchema.map(_.name)
         val updatedSchema = StructType(baseRelation.schema.filter(col =>
-          indexSchema.contains(col) || location.partitionSchema.contains(col)))
+          index.schema.contains(col) || location.partitionSchema.contains(col)))
         val updatedOutput = baseOutput.filter(attr =>
-          indexSchema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+          index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
         val newRelation = fsRelation.copy(
           location = newLocation,
           dataSchema = updatedSchema,
