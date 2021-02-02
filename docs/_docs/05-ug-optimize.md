@@ -16,7 +16,7 @@ As these index files accumulate, they could affect query performance when the in
 Once the index is leveraged for a query, the large number of these files could increase overall query time as more index
 files need to be accessed and potentially read to compute the query results.
 
-> NOTE: Since Hyperspace v0.4.0, below commend shows the number of index data files for the given index.</p>
+> NOTE: Since Hyperspace v0.4.0, below command shows the number of index data files for the given index.</p>
 >```scala
 >import com.microsoft.hyperspace._
 >val hs = new Hyperspace(spark)
@@ -52,7 +52,7 @@ in terms of the subset of index files they identify and try to merge.
 |----------|----------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
 | Optimize |                | Faster Optimize Speed                                                                      | Slower Optimize Speed                                                                       |
 |          | API            | optimizeIndex(mode="quick")                                                                | optimizeIndex(mode="full")                                                                  |
-|          | What it does?  | Best-effort merge of small index files  within a bucket; DOES NOT refresh the index        | Create a single file per bucket by merging small & large files; DOES NOT refresh the index  |
+|          | What it does?  | Best-effort merge of small index files within a bucket; DOES NOT refresh the index        | Create a single file per bucket by merging small & large files; DOES NOT refresh the index  |
 |          | When to use?   | When perf starts degrading by many index data files from incremental refreshes             | When perf starts degrading by many index data files from incremental refreshes              |
  
 ### Optimize Index - Quick Mode
