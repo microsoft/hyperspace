@@ -23,7 +23,8 @@ Now, we offer several options to handle above scenario more efficiently.
 
 1. [Refresh Index](#refresh-index)
   - [Full Mode](#refresh-index---full-mode)
-  - [Incremental Mode](#refresh-index---full-mode)
+  - [Incremental Mode](#refresh-index---incremental-mode)
+  - [Quick Mode](#refresh-index---quick-mode)
 2. [Hybrid Scan](#hybrid-scan)
   - [Append-only](#append-only-dataset)
   - [Append and Delete](#append-and-delete-dataset)
@@ -43,10 +44,24 @@ after deleting some source data files, then you do not need to enable lineage fo
 
 ### Refresh Index
 You can refresh an index according to its latest source data files by running the `refreshIndex` command.
-Hyperspace provide several modes to refresh an index. These modes differ in terms of the way they update the index and the amount of data scans and shuffle each does.
+Hyperspace provides several modes to refresh an index. These modes differ in terms of the way they update the index data, the amount of data scans and shuffle each does.
 You should pick a mode for refreshing an index according to its current size and total amount of data deleted from or appended to its source data files.
 You can specify the mode as an argument when calling the `refreshIndex` command.
-Currently, there are two refresh modes available for an index: `"full"` and `"incremental"`.
+Currently, there are 3 refresh modes available for an index: `"full"`, `"incremental"` and `"quick"`.
+
+#### Refresh Modes
+
+|          |                | Full - Rebuild                                        | Incremental - Quick Query                                                                 | Quick - Fast Refresh                                                                        |
+|----------|----------------|-------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Append   | Characteristic | Slowest refresh/fastest query                         | Slow refresh/fast query                                                                    | Fast refresh/moderately fast query                                                          |
+|          | API            | refreshIndex(mode="full")                             | refreshIndex(mode="incremental")                                                           | refreshIndex(mode="quick")                                                                  |
+|          | What it does?  | Rebuilds the index                                    | Builds index on newly added data                                                           | Captures meta-data for appended  files and leverages hybrid scan                            |
+|          | When to use?   | Underlying source data is  relatively stable          | Infrequently appending large  amounts of data                                              | Frequently appending small  amounts of data                                                 |
+| Delete   | Characteristic | Creates a new index (by  reshuffling the source data) | Slow refresh/fast query                                                                    | Fast refresh/moderately fast query                                                          |
+|          | API            |                                                       | refreshIndex(mode="incremental")                                                           | refreshIndex(mode="quick")                                                                  |
+|          | What it does?  |                                                       | Deletes rows from index immediately; Avoids  shuffling the source data using index lineage | Captures file/partition predicates  and deletes entries at query time                       |
+|          | When to use?   |                                                       | Infrequently deleting large  amount of data                                                | Frequently deleting small  amounts of data                                                  |
+
 
 #### Refresh Index - Full Mode
 After some changes in an index's original dataset files, using `refreshIndex` with the `"full"` mode causes
@@ -104,6 +119,31 @@ from hyperspace import Hyperspace
 
 hs = Hyperspace(spark)
 hs.refreshIndex("empIndex", "incremental")
+```
+
+#### Refresh Index - Quick Mode
+
+Refresh Quick mode is a metadata only operation. It collects the list of appended and deleted source data files at refresh time, and does not update any index data.
+To leverage the difference of source data files, Hyperspace utilizes [Hybrid Scan](#hybrid-scan) when applying the index, even if Hybrid Scan is disabled.
+It relies on on-the-fly shuffle and merge for appended files and injected filter condition for deleted files.
+
+To handle deleted files, [Lineage column](#lineage) is required as in [incremental mode](#refresh-index---incremental-mode) or Hybrid Scan.
+
+Scala:
+```scala
+import com.microsoft.hyperspace._
+
+val hs = new Hyperspace(spark)
+hs.refreshIndex("empIndex", "quick")
+``` 
+
+Python:
+
+```python
+from hyperspace import Hyperspace
+
+hs = Hyperspace(spark)
+hs.refreshIndex("empIndex", "quick")
 ```
 
 ### Hybrid Scan
