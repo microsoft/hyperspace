@@ -123,10 +123,9 @@ hs.refreshIndex("empIndex", "incremental")
 
 #### Refresh Index - Quick Mode
 
-Refresh Quick mode is metadata only. It collects the list of appended and deleted source data files at refresh time, and does not update any index data.
+Refresh Quick mode is a metadata only operation. It collects the list of appended and deleted source data files at refresh time, and does not update any index data.
 To leverage the difference of source data files, Hyperspace utilizes [Hybrid Scan](#hybrid-scan) when applying the index, even if Hybrid Scan is disabled.
 It relies on on-the-fly shuffle and merge for appended files and injected filter condition for deleted files.
-Newly processed data will not be persisted. 
 
 To handle deleted files, [Lineage column](#lineage) is required as in [incremental mode](#refresh-index---incremental-mode) or Hybrid Scan.
 
