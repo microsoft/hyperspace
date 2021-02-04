@@ -37,8 +37,7 @@ libraryDependencies ++= Seq(
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "test" classifier "tests",
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
+  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests"
 )
 
 assemblyMergeStrategy in assembly := {
