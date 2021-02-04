@@ -283,82 +283,81 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
   test("E2E test for join query on external catalog tables") {
     Seq(true, false).map { useDDL =>
-      withTable("t1", "t2") {
-        if (useDDL) {
-          spark.sql(s"""
-              |CREATE TABLE t1
-              |(c1 string, c3 string)
-              |USING PARQUET
-              |LOCATION '$nonPartitionedDataPath'
-            """.stripMargin)
-          spark.sql(s"""
-              |CREATE TABLE t2
-              |(c3 string, c4 int)
-              |USING PARQUET
-              |LOCATION '$nonPartitionedDataPath'
-            """.stripMargin)
-        } else {
-          val table1Location = testDir + "tables/t1"
-          val table2Location = testDir + "tables/t2"
-          val originalDf = spark.read.parquet(nonPartitionedDataPath)
-          originalDf.select("c1", "c3").write.option("path", table1Location).saveAsTable("t1")
-          originalDf.select("c3", "c4").write.option("path", table2Location).saveAsTable("t2")
+      withIndex("leftIndex", "rightIndex") {
+        withTable("t1", "t2") {
+          if (useDDL) {
+            spark.sql("CREATE TABLE t1 (c1 string, c3 string) USING PARQUET " +
+              s"LOCATION '$nonPartitionedDataPath'")
+            spark.sql("CREATE TABLE t2 (c3 string, c4 int) USING PARQUET " +
+              s"LOCATION '$nonPartitionedDataPath'")
+          } else {
+            val table1Location = testDir + "tables/t1"
+            val table2Location = testDir + "tables/t2"
+            val originalDf = spark.read.parquet(nonPartitionedDataPath)
+            originalDf.select("c1", "c3").write.option("path", table1Location).saveAsTable("t1")
+            originalDf.select("c3", "c4").write.option("path", table2Location).saveAsTable("t2")
+          }
+
+          assert(spark.catalog.getTable("t1").tableType == "EXTERNAL")
+          assert(spark.catalog.getTable("t2").tableType == "EXTERNAL")
+
+          val leftDf = spark.table("t1")
+          val rightDf = spark.table("t2")
+          val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
+          val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
+          hyperspace.createIndex(leftDf, leftDfIndexConfig)
+          hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+          // Test whether indexes work with catalog tables or not.
+          def query(): DataFrame =
+            spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
+
+          verifyIndexUsage(
+            query,
+            getIndexFilesPath(leftDfIndexConfig.indexName) ++
+              getIndexFilesPath(rightDfIndexConfig.indexName))
         }
-
-        assert(spark.catalog.getTable("t1").tableType == "EXTERNAL")
-        assert(spark.catalog.getTable("t2").tableType == "EXTERNAL")
-
-        val leftDf = spark.table("t1")
-        val rightDf = spark.table("t2")
-        val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
-        val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
-        hyperspace.createIndex(leftDf, leftDfIndexConfig)
-        hyperspace.createIndex(rightDf, rightDfIndexConfig)
-
-        // Test whether indexes work with catalog tables or not.
-        def query(): DataFrame = spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
-        verifyIndexUsage(
-          query,
-          getIndexFilesPath(leftDfIndexConfig.indexName) ++
-            getIndexFilesPath(rightDfIndexConfig.indexName))
       }
     }
   }
 
   test("E2E test for join query on managed catalog tables") {
     Seq(true, false).map { useDDL =>
-      withTable("t1", "t2") {
-        if (useDDL) {
-          withView("tv1", "tv2") {
+      withIndex("leftIndex", "rightIndex") {
+        withTable("t1", "t2") {
+          if (useDDL) {
+            withView("tv1", "tv2") {
+              val originalDf = spark.read.parquet(nonPartitionedDataPath)
+              originalDf.select("c1", "c3").createOrReplaceTempView("tv1")
+              originalDf.select("c3", "c4").createOrReplaceTempView("tv2")
+              spark.sql("CREATE TABLE t1 USING PARQUET AS SELECT * FROM tv1")
+              spark.sql("CREATE TABLE t2 USING PARQUET AS SELECT * FROM tv2")
+            }
+          } else {
             val originalDf = spark.read.parquet(nonPartitionedDataPath)
-            originalDf.select("c1", "c3").createOrReplaceTempView("tv1")
-            originalDf.select("c3", "c4").createOrReplaceTempView("tv2")
-            spark.sql("CREATE TABLE t1 USING PARQUET AS SELECT * FROM tv1")
-            spark.sql("CREATE TABLE t2 USING PARQUET AS SELECT * FROM tv2")
+            originalDf.select("c1", "c3").write.saveAsTable("t1")
+            originalDf.select("c3", "c4").write.saveAsTable("t2")
           }
-        } else {
-          val originalDf = spark.read.parquet(nonPartitionedDataPath)
-          originalDf.select("c1", "c3").write.saveAsTable("t1")
-          originalDf.select("c3", "c4").write.saveAsTable("t2")
+
+          assert(spark.catalog.getTable("t1").tableType == "MANAGED")
+          assert(spark.catalog.getTable("t2").tableType == "MANAGED")
+
+          val leftDf = spark.table("t1")
+          val rightDf = spark.table("t2")
+          val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
+          val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
+          hyperspace.createIndex(leftDf, leftDfIndexConfig)
+          hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+          // Test whether indexes work with catalog tables or not.
+          def query(): DataFrame =
+            spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
+
+          verifyIndexUsage(
+            query,
+            getIndexFilesPath(leftDfIndexConfig.indexName) ++
+              getIndexFilesPath(rightDfIndexConfig.indexName))
         }
-
-        assert(spark.catalog.getTable("t1").tableType == "MANAGED")
-        assert(spark.catalog.getTable("t2").tableType == "MANAGED")
-
-        val leftDf = spark.table("t1")
-        val rightDf = spark.table("t2")
-        val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3"), Seq("c1"))
-        val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("c4"))
-        hyperspace.createIndex(leftDf, leftDfIndexConfig)
-        hyperspace.createIndex(rightDf, rightDfIndexConfig)
-
-        // Test whether indexes work with catalog tables or not.
-        def query(): DataFrame =
-          spark.sql("SELECT t1.c1, t2.c4 FROM t1, t2 WHERE t1.c3 = t2.c3")
-        verifyIndexUsage(
-          query,
-          getIndexFilesPath(leftDfIndexConfig.indexName) ++
-            getIndexFilesPath(rightDfIndexConfig.indexName))
       }
     }
   }
