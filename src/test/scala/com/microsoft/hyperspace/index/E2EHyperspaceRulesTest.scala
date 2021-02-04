@@ -282,7 +282,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   }
 
   test("E2E test for join query on external catalog tables") {
-    Seq(true, false).map { useDDL =>
+    Seq(true, false).foreach { useDDL =>
       withIndex("leftIndex", "rightIndex") {
         withTable("t1", "t2") {
           if (useDDL) {
@@ -322,7 +322,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   }
 
   test("E2E test for join query on managed catalog tables") {
-    Seq(true, false).map { useDDL =>
+    Seq(true, false).foreach { useDDL =>
       withIndex("leftIndex", "rightIndex") {
         withTable("t1", "t2") {
           if (useDDL) {
