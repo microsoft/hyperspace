@@ -68,6 +68,14 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  def filterRuleBucketCheckEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED,
+        IndexConstants.INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
   def numBucketsForIndex(spark: SparkSession): Int = {
     getConfStringWithMultipleKeys(
       spark,

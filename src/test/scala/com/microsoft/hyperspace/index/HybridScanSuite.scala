@@ -502,6 +502,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
       withSQLConf(
         TestConfig.HybridScanEnabledAppendOnly :+
+          IndexConstants.INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED -> "false" :+
           IndexConstants.INDEX_FILTER_RULE_USE_BUCKET_SPEC -> "true": _*) {
         val filter = filterQuery
         val planWithHybridScan = filter.queryExecution.optimizedPlan

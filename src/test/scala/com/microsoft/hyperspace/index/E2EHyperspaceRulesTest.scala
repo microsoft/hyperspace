@@ -20,8 +20,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
-import org.apache.spark.sql.execution.SortExec
-import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.{FileSourceScanExec, SortExec, UnionExec}
+import org.apache.spark.sql.execution.datasources.{BucketingUtils, FileIndex, HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
@@ -30,6 +30,7 @@ import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.util.LogicalPlanUtils.BucketSelector
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
@@ -165,7 +166,8 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
             def query(): DataFrame = spark.sql("SELECT * from t where c4 = 1")
 
             // Verify no Project node is present in the query plan, as a result of using SELECT *
-            assert(query().queryExecution.optimizedPlan.collect { case p: Project => p }.isEmpty)
+            val queryPlan = query().queryExecution.optimizedPlan
+            assert(queryPlan.collect { case p: Project => p }.isEmpty)
 
             verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
           }
@@ -581,6 +583,112 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Verify adaptive bucket spec application for FilterIndexRule.") {
+    withTempPathAsString { testPath =>
+      // Setup. Create data.
+      val indexConfig = IndexConfig("index", Seq("c3"), Seq("c4"))
+      import spark.implicits._
+      SampleData.testData
+        .toDF("c1", "c2", "c3", "c4", "c5")
+        .limit(10)
+        .write
+        .json(testPath)
+      val df = spark.read.json(testPath)
+
+      // Create index.
+      hyperspace.createIndex(df, indexConfig)
+      spark.enableHyperspace()
+
+      def query(): DataFrame =
+        df.filter(df("c3") isin (Seq("facebook", "donde", "miperro"): _*)).select("c4", "c3")
+
+      withIndex("index") {
+        withSQLConf("spark.sql.optimizer.inSetConversionThreshold" -> "10") {
+          // Check bucketSpec is applied.
+          val execPlan = query.queryExecution.executedPlan
+          val foundPrunedBuckets = execPlan.collect {
+            case _ @FileSourceScanExec(_, _, _, _, optionalBucketSet, _, _) =>
+              optionalBucketSet.get.cardinality()
+          }
+          assert(foundPrunedBuckets.length == 1)
+          assert(foundPrunedBuckets.head == 3)
+
+          verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, Seq(0)))
+        }
+
+        // TODO: because of SPARK-33372, bucket pruning is not applied for InSet operator.
+        //   As indexes are bucketed, supporting bucket pruning can improve the performance of
+        //   queries with high selectivity. Will add a new FileSourceScanStrategy soon.
+        withSQLConf("spark.sql.optimizer.inSetConversionThreshold" -> "2") {
+          val execPlan = query().queryExecution.executedPlan
+          // Check bucketSpec is not applied.
+          val foundPrunedBuckets = execPlan.collect {
+            case _ @FileSourceScanExec(_, _, _, _, optionalBucketSet, _, _)
+                if (optionalBucketSet.isDefined) =>
+              optionalBucketSet.get.cardinality()
+          }
+          assert(foundPrunedBuckets.isEmpty)
+          verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName, Seq(0)))
+        }
+
+        // Append to original data.
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(3)
+          .write
+          .mode("append")
+          .json(testPath)
+
+        val df2 = spark.read.json(testPath)
+        val inputFiles = df.inputFiles
+        val appendedFiles = df2.inputFiles.diff(inputFiles).map(new Path(_))
+        def query2(): DataFrame = {
+          df2.filter(df2("c3") isin (Seq("facebook", "donde", "miperro"): _*)).select("c4", "c3")
+        }
+
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
+          withSQLConf("spark.sql.optimizer.inSetConversionThreshold" -> "10") {
+            // Check bucketSpec is applied.
+            val execPlan = query2().queryExecution.executedPlan
+            val foundPrunedBuckets = execPlan.collect {
+              case _ @UnionExec(children) =>
+                val p = children.head.collect {
+                  case _ @FileSourceScanExec(_, _, _, _, optionalBucketSet, _, _)
+                      if optionalBucketSet.isDefined =>
+                    optionalBucketSet.get.cardinality()
+                }
+                p.head
+            }
+            assert(foundPrunedBuckets.length == 1)
+            assert(foundPrunedBuckets.head == 3)
+            verifyIndexUsage(
+              query2,
+              getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles.toSeq)
+          }
+
+          withSQLConf("spark.sql.optimizer.inSetConversionThreshold" -> "2") {
+            val execPlan = query2().queryExecution.executedPlan
+            // Check bucketSpec is not applied.
+            val foundPrunedBuckets = execPlan.collect {
+              case _ @ UnionExec(children) =>
+                val b = children.head.collect {
+                  case _ @FileSourceScanExec(_, _, _, _, optionalBucketSet, _, _)
+                      if optionalBucketSet.isDefined =>
+                    optionalBucketSet.get.cardinality()
+                }
+                assert(b.isEmpty)
+              true
+            }
+            assert(foundPrunedBuckets.length == 1)
+            verifyIndexUsage(
+              query2,
+              getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles.toSeq)
+          }
+        }
+      }
+    }
+  }
+
   test(
     "Verify JoinIndexRule utilizes indexes correctly after quick refresh when some file " +
       "gets deleted and some appended to source data.") {
@@ -733,7 +841,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       withIndex(indexConfig.indexName) {
         spark.enableHyperspace()
         val df = spark.read.parquet(testPath)
-        def query(df: DataFrame): DataFrame = df.filter("c3 == 'facebook'").select("c3", "c4")
+        def query(df: DataFrame): DataFrame = df.filter("c3 != 'facebook'").select("c3", "c4")
 
         val indexManager = Hyperspace
           .getContext(spark)
@@ -978,6 +1086,19 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
           _) =>
         location.rootPaths
     }.flatten
+  }
+
+  private def getIndexFilesPathWithBucketSelector(
+      plan: LogicalPlan,
+      indexName: String,
+      versions: Seq[Int] = Seq(0)): Seq[Path] = {
+    val paths = getIndexFilesPath(indexName, versions)
+    BucketSelector(plan, TestUtils.latestIndexLogEntry(systemPath, indexName).bucketSpec) match {
+      case Some(buckets) =>
+        paths.filter(f => buckets.get(BucketingUtils.getBucketId(f.getName).get))
+      case None =>
+        paths
+    }
   }
 
   private def getIndexFilesPath(indexName: String, versions: Seq[Int] = Seq(0)): Seq[Path] = {

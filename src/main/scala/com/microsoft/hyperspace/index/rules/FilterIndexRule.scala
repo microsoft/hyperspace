@@ -29,6 +29,7 @@ import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+import com.microsoft.hyperspace.util.LogicalPlanUtils.BucketSelector
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -56,6 +57,11 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
+              val useBucketSpec = if (HyperspaceConf.filterRuleBucketCheckEnabled(spark)) {
+                BucketSelector(plan, index.bucketSpec).isDefined
+              } else {
+                HyperspaceConf.useBucketSpecForFilterRule(spark)
+              }
               // As FilterIndexRule is not intended to support bucketed scan, we set
               // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
               // unnecessary shuffle for appended data to apply BucketUnion for merging data.
@@ -64,7 +70,7 @@ object FilterIndexRule
                   spark,
                   index,
                   originalPlan,
-                  useBucketSpec = HyperspaceConf.useBucketSpecForFilterRule(spark),
+                  useBucketSpec = useBucketSpec,
                   useBucketUnionForAppended = false)
               logEvent(
                 HyperspaceIndexUsageEvent(
@@ -136,7 +142,6 @@ object FilterIndexRule
    * @param filterColumns List of columns in filter predicate.
    * @param indexedColumns List of indexed columns (e.g. from an index being checked)
    * @param includedColumns List of included columns (e.g. from an index being checked)
-   * @param fileFormat FileFormat for input relation in original logical plan.
    * @return 'true' if
    *         1. Index fully covers output and filter columns, and
    *         2. Filter predicate contains first column in index's 'indexed' columns.
