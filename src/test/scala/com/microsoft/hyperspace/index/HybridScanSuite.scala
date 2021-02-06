@@ -481,7 +481,6 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
   test(
     "Append-only: filter rule and non-parquet format," +
       "appended data should be shuffled and merged by Union even with bucketSpec.") {
-    // Note: for delta lake, this test is also eligible as the dataset is partitioned.
     withTempPathAsString { testPath =>
       val (appendedFiles, deletedFiles) = setupIndexAndChangeData(
         fileFormat2,

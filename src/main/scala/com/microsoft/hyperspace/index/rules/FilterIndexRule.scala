@@ -56,7 +56,9 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
-              // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
+              // As FilterIndexRule is not intended to support bucketed scan, we set
+              // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
+              // unnecessary shuffle for appended data to apply BucketUnion for merging data.
               val transformedPlan =
                 RuleUtils.transformPlanToUseIndex(
                   spark,
