@@ -202,13 +202,15 @@ object RuleUtils {
    * @param index Index used in transformation of plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
+   * @param useBucketUnionForAppended Option whether to use BucketUnion to merge appended data.
    * @return Transformed plan.
    */
   def transformPlanToUseIndex(
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
-      useBucketSpec: Boolean): LogicalPlan = {
+      useBucketSpec: Boolean,
+      useBucketUnionForAppended: Boolean): LogicalPlan = {
     // Check pre-requisite.
     val logicalRelation = getLogicalRelation(plan)
     assert(logicalRelation.isDefined)
@@ -225,7 +227,7 @@ object RuleUtils {
     lazy val isSourceUpdated = index.hasSourceUpdate
 
     val transformed = if (hybridScanRequired || isSourceUpdated) {
-      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec)
+      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec, useBucketUnionForAppended)
     } else {
       transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
     }
@@ -302,13 +304,15 @@ object RuleUtils {
    * @param index Index used in transformation of plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
+   * @param useBucketUnionForAppended Option whether to use BucketUnion to merge appended data.
    * @return Transformed logical plan that leverages an index and merges appended data.
    */
   private def transformPlanToUseHybridScan(
       spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
-      useBucketSpec: Boolean): LogicalPlan = {
+      useBucketSpec: Boolean,
+      useBucketUnionForAppended: Boolean): LogicalPlan = {
     var unhandledAppendedFiles: Seq[Path] = Nil
 
     // Get transformed plan with index data and appended files if applicable.
@@ -426,7 +430,7 @@ object RuleUtils {
 
       val planForAppended =
         transformPlanToReadAppendedFiles(spark, index, plan, unhandledAppendedFiles)
-      if (useBucketSpec) {
+      if (useBucketUnionForAppended && useBucketSpec) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
 

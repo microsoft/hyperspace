@@ -36,7 +36,7 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
 
   test(
     "Append-only: filter rule & parquet format, " +
-      "index relation should include appended file paths") {
+      "index relation should include appended file paths.") {
     // This flag is for testing plan transformation if appended files could be load with index
     // data scan node. Currently, it's applied for a very specific case: FilterIndexRule,
     // Parquet source format, no partitioning, no deleted files.
@@ -83,7 +83,7 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
     }
   }
 
-  test("Delete-only: Hybrid Scan for delete support doesn't work without lineage column") {
+  test("Delete-only: Hybrid Scan for delete support doesn't work without lineage column.") {
     val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
     Seq(("indexWithoutLineage", "false", false), ("indexWithLineage", "true", true)) foreach {
       case (indexName, lineageColumnConfig, transformationExpected) =>
@@ -119,7 +119,7 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
     }
   }
 
-  test("Delete-only: filter rule, number of delete files threshold") {
+  test("Delete-only: filter rule, number of delete files threshold.") {
     withTempPathAsString { testPath =>
       val indexName = "IndexDeleteCntTest"
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
@@ -140,8 +140,6 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
 
       val afterDeleteSize = FileUtils.getDirectorySize(new Path(testPath))
       val deletedRatio = 1 - (afterDeleteSize / sourceSize.toFloat)
-      // scalastyle:off
-      println(deletedRatio)
 
       withSQLConf(TestConfig.HybridScanEnabled: _*) {
         withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
@@ -159,5 +157,4 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
       }
     }
   }
-
 }
