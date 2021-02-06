@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -56,13 +56,16 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
-              // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
+              // As FilterIndexRule is not intended to support bucketed scan, we set
+              // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
+              // unnecessary shuffle for appended data to apply BucketUnion for merging data.
               val transformedPlan =
                 RuleUtils.transformPlanToUseIndex(
                   spark,
                   index,
                   originalPlan,
-                  useBucketSpec = false)
+                  useBucketSpec = HyperspaceConf.useBucketSpecForFilterRule(spark),
+                  useBucketUnionForAppended = false)
               logEvent(
                 HyperspaceIndexUsageEvent(
                   AppInfo(

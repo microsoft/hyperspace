@@ -63,10 +63,18 @@ object JoinIndexRule
               val updatedPlan =
                 join
                   .copy(
-                    left =
-                      RuleUtils.transformPlanToUseIndex(spark, lIndex, l, useBucketSpec = true),
-                    right =
-                      RuleUtils.transformPlanToUseIndex(spark, rIndex, r, useBucketSpec = true))
+                    left = RuleUtils.transformPlanToUseIndex(
+                      spark,
+                      lIndex,
+                      l,
+                      useBucketSpec = true,
+                      useBucketUnionForAppended = true),
+                    right = RuleUtils.transformPlanToUseIndex(
+                      spark,
+                      rIndex,
+                      r,
+                      useBucketSpec = true,
+                      useBucketUnionForAppended = true))
 
               logEvent(
                 HyperspaceIndexUsageEvent(
@@ -325,11 +333,7 @@ object JoinIndexRule
     compatibleIndexPairs.map(
       indexPairs =>
         JoinIndexRanker
-          .rank(
-            spark,
-            leftRel,
-            rightRel,
-            indexPairs)
+          .rank(spark, leftRel, rightRel, indexPairs)
           .head)
   }
 

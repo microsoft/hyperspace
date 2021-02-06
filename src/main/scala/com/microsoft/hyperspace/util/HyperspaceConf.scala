@@ -60,6 +60,14 @@ object HyperspaceConf {
       .toDouble
   }
 
+  def useBucketSpecForFilterRule(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_FILTER_RULE_USE_BUCKET_SPEC,
+        IndexConstants.INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT)
+      .toBoolean
+  }
+
   def numBucketsForIndex(spark: SparkSession): Int = {
     getConfStringWithMultipleKeys(
       spark,
