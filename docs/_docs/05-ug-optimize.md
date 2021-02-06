@@ -8,12 +8,22 @@ classes: wide
 ---
 
 ## Optimize Index
+
 One way to index new data files and merge them into an existing index is by calling `refreshIndex`
 with the `"incremental"` mode. In this mode, each time refresh is called to index newly appended source data files,
 it creates fresh index files for these files and updates index metadata to include them in the index content.
 As these index files accumulate, they could affect query performance when the index is used.
 Once the index is leveraged for a query, the large number of these files could increase overall query time as more index
 files need to be accessed and potentially read to compute the query results.
+
+> NOTE: Since Hyperspace v0.4.0, below command shows the number of index data files for the given index.</p>
+>```scala
+>import com.microsoft.hyperspace._
+>val hs = new Hyperspace(spark)
+>
+>hs.index("lineitem_index4").select("numIndexFiles").show
+>````
+
 Hyperspace provides the `optimizeIndex` command to alleviate above issue by changing index files layout for an
 index which has many index files, due to incremental refresh call(s). This is achieved by merging index files together,
 if possible, and replacing them with fewer larger files that capture exact same index records. This process is similar to
@@ -35,6 +45,15 @@ original layout. An example of such an index is an index right after creation or
 
 Currently, there are two optimize modes available for an index: `"quick"` and `"full"`. These modes differ with each other
 in terms of the subset of index files they identify and try to merge.
+
+### Optimize Modes
+
+|          |                | Quick - small files only                                                                   | Full                                                                                        |
+|----------|----------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Optimize |                | Faster Optimize Speed                                                                      | Slower Optimize Speed                                                                       |
+|          | API            | optimizeIndex(mode="quick")                                                                | optimizeIndex(mode="full")                                                                  |
+|          | What it does?  | Best-effort merge of small index files within a bucket; DOES NOT refresh the index        | Create a single file per bucket by merging small & large files; DOES NOT refresh the index  |
+|          | When to use?   | When perf starts degrading by many index data files from incremental refreshes             | When perf starts degrading by many index data files from incremental refreshes              |
  
 ### Optimize Index - Quick Mode
 Using `optimizeIndex` command with the `"quick"` mode on an index with many index files, due to incremental index refresh,
@@ -56,7 +75,6 @@ hs.optimizeIndex("empIndex", "quick")
 ``` 
 
 Python:
-
 ```python
 from hyperspace import Hyperspace
 
