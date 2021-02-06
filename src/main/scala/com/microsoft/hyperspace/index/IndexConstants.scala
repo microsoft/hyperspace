@@ -48,7 +48,7 @@ object IndexConstants {
   val INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD_DEFAULT = "0.3"
 
   // Config used to set bucketSpec for Filter rule. If bucketSpec is used, Spark can prune
-  // not applicable buckets, so we could read less files in case of a high selectivity query.
+  // not applicable buckets, so it can read less files in case of a highly selective query.
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC = "spark.hyperspace.index.filterRule.useBucketSpec"
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT = "false"
 
