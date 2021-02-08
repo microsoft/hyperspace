@@ -150,7 +150,7 @@ object RuleUtils {
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
       val filesByRelations = plan.collect {
-        case p: LogicalPlan if LogicalPlanUtils.hasSupportedLogicalRelation(p) =>
+        case p: LogicalPlan if LogicalPlanUtils.isSupportedRelation(p) =>
           Hyperspace
             .getContext(spark)
             .sourceProviderManager
@@ -282,7 +282,7 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
 
-    def makeHadoopFsRelation(index: IndexLogEntry, relation: LogicalPlan) = {
+    def makeHadoopFsRelation(index: IndexLogEntry, schema: StructType) = {
       val location = index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
         new InMemoryFileIndex(spark, index.content.files, Map(), None)
       }
@@ -290,7 +290,7 @@ object RuleUtils {
       new IndexHadoopFsRelation(
         location,
         new StructType(),
-        StructType(index.schema.filter(relation.schema.contains(_))),
+        StructType(index.schema.filter(schema.contains(_))),
         if (useBucketSpec) Some(index.bucketSpec) else None,
         new ParquetFileFormat,
         Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
@@ -303,12 +303,12 @@ object RuleUtils {
     //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
     plan transformDown {
       case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
-        val relation = makeHadoopFsRelation(index, baseRelation)
+        val relation = makeHadoopFsRelation(index, baseRelation.schema)
         val updatedOutput =
           baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
         baseRelation.copy(relation = relation, output = updatedOutput)
       case v2Relation @ DataSourceV2Relation(_, output, _, _, _) =>
-        val relation = makeHadoopFsRelation(index, v2Relation)
+        val relation = makeHadoopFsRelation(index, v2Relation.schema)
         val updatedOutput =
           output.filter(attr => relation.schema.fieldNames.contains(attr.name))
         new LogicalRelation(relation, updatedOutput, None, false)

@@ -341,7 +341,7 @@ object JoinIndexRule
 
   private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {
     l.collectLeaves()
-        .filter(LogicalPlanUtils.hasSupportedLogicalRelation)
+        .filter(LogicalPlanUtils.isSupportedRelation)
         .flatMap(_.output)
   }
 

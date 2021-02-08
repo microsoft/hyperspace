@@ -43,7 +43,7 @@ class CreateAction(
 
   final override def validate(): Unit = {
     // We currently only support createIndex() over HDFS file based scan nodes.
-    if (!LogicalPlanUtils.hasSupportedLogicalRelation(df.queryExecution.optimizedPlan)) {
+    if (!LogicalPlanUtils.isSupportedRelation(df.queryExecution.optimizedPlan)) {
       throw HyperspaceException(
         "Only creating index over HDFS file based scan nodes is supported.")
     }

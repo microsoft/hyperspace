@@ -67,7 +67,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    *
    * If the given logical relation does not belong to this provider, None should be returned.
    *
-   * @param logicalPlan Logical relation to derive [[Relation]] from.
+   * @param logicalPlan Logical plan to derive [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
    * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
@@ -105,7 +105,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    *
    * If the given logical relation does not belong to this provider, None should be returned.
    *
-   * @param logicalPlan Logical relation to compute signature from.
+   * @param logicalPlan Logical plan to compute signature from.
    * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
    *         Otherwise, None.
    */
@@ -114,7 +114,7 @@ trait FileBasedSourceProvider extends SourceProvider {
   /**
    * Retrieves all input files from the given [[LogicalPlan]].
    *
-   * @param logicalPlan Logical relation to retrieve input files from.
+   * @param logicalPlan Logical plan to retrieve input files from.
    * @return List of [[FileStatus]] for the given relation.
    */
   def allFiles(logicalPlan: LogicalPlan): Option[Seq[FileStatus]]

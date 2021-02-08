@@ -26,11 +26,11 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 object LogicalPlanUtils {
 
   /**
-   * Check if a logical plan is supported.
+   * Check if a logical plan is a supported relation.
    * @param logicalPlan Logical plan to check.
    * @return true if a logical plan is supported or false.
    */
-  def hasSupportedLogicalRelation(logicalPlan: LogicalPlan): Boolean = {
+  def isSupportedRelation(logicalPlan: LogicalPlan): Boolean = {
     logicalPlan match {
       case LogicalRelation(_: HadoopFsRelation, _, _, _) => true
       case _: DataSourceV2Relation => true

@@ -67,6 +67,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
         val relations = sourceRelations(spark, df)
+        // Currently, we only support to create an index on only one relation.
         assert(relations.size == 1)
 
         val sourcePlanProperties = SparkPlan.Properties(
@@ -117,7 +118,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
     df.queryExecution.optimizedPlan.collect {
-      case p: LogicalPlan if LogicalPlanUtils.hasSupportedLogicalRelation(p) =>
+      case p: LogicalPlan if LogicalPlanUtils.isSupportedRelation(p) =>
         Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
     }
 

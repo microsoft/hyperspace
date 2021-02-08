@@ -166,7 +166,7 @@ object ExtractFilterNode {
           filter @ Filter(
             condition: Expression,
             p: LogicalPlan))
-        if LogicalPlanUtils.hasSupportedLogicalRelation(p) &&
+        if LogicalPlanUtils.isSupportedRelation(p) &&
             !RuleUtils.isIndexApplied(p) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
@@ -180,7 +180,7 @@ object ExtractFilterNode {
     case filter @ Filter(
           condition: Expression,
           p: LogicalPlan)
-        if LogicalPlanUtils.hasSupportedLogicalRelation(p) &&
+        if LogicalPlanUtils.isSupportedRelation(p) &&
             !RuleUtils.isIndexApplied(p) =>
       val relationColumnsName = p.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
