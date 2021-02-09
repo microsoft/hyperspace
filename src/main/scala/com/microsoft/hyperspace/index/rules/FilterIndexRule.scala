@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
-import com.microsoft.hyperspace.util.LogicalPlanUtils.BucketSelector
+import com.microsoft.hyperspace.util.BucketSelector
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -57,10 +57,14 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
-              val useBucketSpec = if (HyperspaceConf.filterRuleBucketCheckEnabled(spark)) {
-                BucketSelector(plan, index.bucketSpec).isDefined
+              val useBucketSpec = if (HyperspaceConf.useBucketSpecForFilterRule(spark)) {
+                true
               } else {
-                HyperspaceConf.useBucketSpecForFilterRule(spark)
+                // Check bucket pruning is applicable and threshold condition.
+                val selectedBuckets = BucketSelector(plan, index.bucketSpec).map(_.cardinality())
+                selectedBuckets.isDefined &&
+                  selectedBuckets.get <= index.bucketSpec.numBuckets * HyperspaceConf
+                  .prunedBucketRatioToAutoEnableBucketRead(spark)
               }
               // As FilterIndexRule is not intended to support bucketed scan, we set
               // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause

@@ -52,13 +52,12 @@ object IndexConstants {
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC = "spark.hyperspace.index.filterRule.useBucketSpec"
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT = "false"
 
-  // If this config is true, Hyperspace generates a plan with bucketSpec first and check
-  // the selectivity of the filter query by creating the physical plan in advance.
-  // If less than half number of buckets are selected, Filter Rule uses the plan with bucketSpec.
-  // Otherwise, newly generated bucketSpec is not used for Filter Rule.
-  val INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED =
-    "spark.hyperspace.index.filterRule.bucketCheck.enabled"
-  val INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED_DEFAULT = "true"
+  // If INDEX_FILTER_RULE_USE_BUCKET_SPEC config is false, Hyperspace applies bucketing if
+  // the given filter query is applicable for bucket pruning AND the number of selected buckets
+  // is under this threshold.
+  val INDEX_FILTER_RULE_AUTO_BUCKETING_THRESHOLD =
+    "spark.hyperspace.index.filterRule.autoBucketing.threshold"
+  val INDEX_FILTER_RULE_AUTO_BUCKETING_THRESHOLD_DEFAULT = "0.8"
 
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.

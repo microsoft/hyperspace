@@ -68,12 +68,12 @@ object HyperspaceConf {
       .toBoolean
   }
 
-  def filterRuleBucketCheckEnabled(spark: SparkSession): Boolean = {
+  def prunedBucketRatioToAutoEnableBucketRead(spark: SparkSession): Double = {
     spark.conf
       .get(
-        IndexConstants.INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED,
-        IndexConstants.INDEX_FILTER_RULE_BUCKET_CHECK_ENABLED_DEFAULT)
-      .toBoolean
+        IndexConstants.INDEX_FILTER_RULE_AUTO_BUCKETING_THRESHOLD,
+        IndexConstants.INDEX_FILTER_RULE_AUTO_BUCKETING_THRESHOLD_DEFAULT)
+      .toDouble
   }
 
   def numBucketsForIndex(spark: SparkSession): Int = {
