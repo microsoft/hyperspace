@@ -19,14 +19,14 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
@@ -50,7 +50,7 @@ object FilterIndexRule
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
-      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, _) =>
+      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns) =>
         try {
           val candidateIndexes =
             findCoveringIndexes(filter, outputColumns, filterColumns)
@@ -160,17 +160,11 @@ object ExtractFilterNode {
       LogicalPlan, // original plan
       Filter,
       Seq[String], // output columns
-      Seq[String], // filter columns
-      LogicalRelation,
-      HadoopFsRelation)
+      Seq[String]) // filter columns
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
-    case project @ Project(
-          _,
-          filter @ Filter(
-            condition: Expression,
-            logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)))
-        if !RuleUtils.isIndexApplied(fsRelation) =>
+    case project @ Project(_, filter @ Filter(condition: Expression, ExtractRelation(relation)))
+        if !RuleUtils.isIndexApplied(relation) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
@@ -178,17 +172,26 @@ object ExtractFilterNode {
         .flatMap(_.toSeq)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(project, filter, projectColumnNames, filterColumnNames, logicalRelation, fsRelation)
+      Some(project, filter, projectColumnNames, filterColumnNames)
 
-    case filter @ Filter(
-          condition: Expression,
-          logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))
-        if !RuleUtils.isIndexApplied(fsRelation) =>
-      val relationColumnsName = logicalRelation.output.map(_.name)
+    case filter @ Filter(condition: Expression, ExtractRelation(relation))
+        if !RuleUtils.isIndexApplied(relation) =>
+      val relationColumnsName = relation.plan.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(filter, filter, relationColumnsName, filterColumnNames, logicalRelation, fsRelation)
+      Some(filter, filter, relationColumnsName, filterColumnNames)
 
     case _ => None // plan does not match with any of filter index rule patterns
+  }
+}
+
+object ExtractRelation extends ActiveSparkSession {
+  def unapply(plan: LeafNode): Option[FileBasedRelation] = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
+    if (provider.isSupportedRelation(plan)) {
+      Some(provider.getRelation(plan))
+    } else {
+      None
+    }
   }
 }

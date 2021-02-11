@@ -21,6 +21,7 @@ import java.util.Locale
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
@@ -29,8 +30,15 @@ import org.apache.spark.util.hyperspace.Utils
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
-import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
 import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, HyperspaceConf}
+
+/**
+ * Implementation for file-based relation used by [[DefaultFileBasedSource]]
+ */
+case class DefaultFileBasedRelation(plan: LogicalRelation) extends FileBasedRelation {
+  override def options: Map[String, String] = plan.relation.asInstanceOf[HadoopFsRelation].options
+}
 
 /**
  * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
@@ -289,6 +297,39 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       case _ =>
         None
     }
+  }
+
+  /**
+   * Returns true if the given logical plan is a supported relation.
+   *
+   * @param plan Logical plan to check if it's supported.
+   * @return Some(true) if the given plan is a supported relation, otherwise None.
+   */
+  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
+    case LogicalRelation(
+        HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, fileFormat, _),
+        _,
+        _,
+        _) if isSupportedFileFormat(fileFormat) =>
+      Some(true)
+    case _ => None
+  }
+
+  /**
+   * Returns the [[FileBasedRelation]] that wraps the given logical plan if the given
+   * logical plan is a supported relation.
+   *
+   * @param plan Logical plan to wrap to [[FileBasedRelation]]
+   * @return [[FileBasedRelation]] that wraps the given logical plan.
+   */
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
+    case l @ LogicalRelation(
+          HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, fileFormat, _),
+          _,
+          _,
+          _) if isSupportedFileFormat(fileFormat) =>
+      Some(DefaultFileBasedRelation(l))
+    case _ => None
   }
 
   private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =

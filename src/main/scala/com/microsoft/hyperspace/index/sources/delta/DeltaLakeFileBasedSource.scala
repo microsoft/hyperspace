@@ -18,12 +18,14 @@ package com.microsoft.hyperspace.index.sources.delta
 
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
-import com.microsoft.hyperspace.index.sources.{FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
 /**
@@ -215,6 +217,31 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
       case _ =>
         None
     }
+  }
+
+  /**
+   * Returns true if the given logical plan is a relation for Delta Lake.
+   *
+   * @param plan Logical plan to check if it's supported.
+   * @return Some(true) if the given plan is a supported relation, otherwise None.
+   */
+  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
+    case LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
+      Some(true)
+    case _ => None
+  }
+
+  /**
+   * Returns the [[FileBasedRelation]] that wraps the given logical plan if the given
+   * logical plan is a supported relation.
+   *
+   * @param plan Logical plan to wrap to [[FileBasedRelation]]
+   * @return [[FileBasedRelation]] that wraps the given logical plan.
+   */
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
+    case l @ LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
+      Some(DefaultFileBasedRelation(l))
+    case _ => None
   }
 }
 

@@ -20,6 +20,7 @@ import scala.util.{Success, Try}
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 import org.apache.spark.util.hyperspace.Utils
 
@@ -141,9 +142,35 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Returns true if the given logical plan is a supported relation. If all of the registered
+   * providers return None, this returns false. (e.g, the given plan could be RDD-based relation,
+   * which is not applicable).
+   *
+   * @param plan Logical plan to check if it's supported.
+   * @return True if the given plan is a supported relation.
+   */
+  def isSupportedRelation(plan: LogicalPlan): Boolean = {
+    runWithDefault(p => p.isSupportedRelation(plan))(false)
+  }
+
+  /**
+   * Returns the [[FileBasedRelation]] that wraps the given logical plan.
+   * If you are using this from an extractor, check if the logical plan
+   * is supported first by using [[isSupportedRelation]]. Otherwise, HyperspaceException can be
+   * thrown if none of the registered providers supports the given plan.
+   *
+   * @param plan Logical plan to wrap to [[FileBasedRelation]]
+   * @return [[FileBasedRelation]] that wraps the given logical plan.
+   */
+  def getRelation(plan: LogicalPlan): FileBasedRelation = {
+    run(p => p.getRelation(plan))
+  }
+
+  /**
    * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
    * [[Option]] for each provider built. This function ensures that only one provider returns
-   * [[Some]] when 'f' is executed.
+   * [[Some]] when 'f' is executed. If all of the providers return None, it will throw
+   * HyperspaceException.
    *
    * @param f Function that runs a [[FileBasedSourceProvider]]'s API that returns [[Option]]
    *          given a provider.
@@ -151,6 +178,24 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * @return The object in [[Some]] that 'f' returns.
    */
   private def run[A](f: FileBasedSourceProvider => Option[A]): A = {
+    runWithDefault(f) {
+      throw HyperspaceException("No source provider returned valid results.")
+    }
+  }
+
+  /**
+   * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
+   * [[Option]] for each provider built. This function ensures that only one provider returns
+   * [[Some]] when 'f' is executed. If all of the providers return None, it will return the given
+   * default value.
+   *
+   * @param f Function that runs a [[FileBasedSourceProvider]]'s API that returns [[Option]]
+   *          given a provider.
+   * @param default Expression to compute the default value.
+   * @tparam A Type of the object that 'f' returns, wrapped in [[Option]].
+   * @return The object in [[Some]] that 'f' returns.
+   */
+  private def runWithDefault[A](f: FileBasedSourceProvider => Option[A])(default: => A): A = {
     sourceProviders
       .load()
       .foldLeft(Option.empty[(A, FileBasedSourceProvider)]) { (result, provider) =>
@@ -168,7 +213,7 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
       }
       .map(_._1)
       .getOrElse {
-        throw HyperspaceException("No source provider returned valid results.")
+        default
       }
   }
 

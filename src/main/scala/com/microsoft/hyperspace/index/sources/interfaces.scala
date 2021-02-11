@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.sources
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 
 import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
@@ -49,6 +50,42 @@ trait SourceProviderBuilder {
    * @return [[SourceProvider]] object.
    */
   def build(spark: SparkSession): SourceProvider
+}
+
+trait FileBasedRelation {
+
+  /**
+   * Th logical plan that this FileBasedRelation wraps.
+   */
+  def plan: LogicalPlan
+
+  /**
+   * Options of the current relation.
+   */
+  def options: Map[String, String]
+
+  //  /**
+  //   * All the files that the current relation references to.
+  //   */
+  //  def allFiles: Seq[FileStatus]
+  //
+  //  /**
+  //   * The partition schema of the current relation.
+  //   */
+  //  def partitionSchema: StructType
+  //
+  //  /**
+  //   * The optional partition base path of the current relation.
+  //   */
+  //  def partitionBasePath: Option[String]
+  //
+  //  /**
+  //   * Convert the current relation to [[LogicalRelation]].
+  //   */
+  //  def toLogicalRelation(
+  //    hadoopFsRelation: HadoopFsRelation,
+  //    newOutput: Seq[Attribute]): LogicalRelation
+  //
 }
 
 /**
@@ -151,4 +188,20 @@ trait FileBasedSourceProvider extends SourceProvider {
    */
   def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean]
 
+  /**
+   * Returns true if the given logical plan is a supported relation.
+   *
+   * @param plan Logical plan to check if it's supported.
+   * @return Some(true) if the given plan is a supported relation, otherwise None.
+   */
+  def isSupportedRelation(plan: LogicalPlan): Option[Boolean]
+
+  /**
+   * Returns the [[FileBasedRelation]] that wraps the given logical plan if the given
+   * logical plan is a supported relation.
+   *
+   * @param plan Logical plan to wrap to [[FileBasedRelation]]
+   * @return [[FileBasedRelation]] that wraps the given logical plan.
+   */
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation]
 }

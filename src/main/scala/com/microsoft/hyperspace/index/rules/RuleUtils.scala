@@ -32,6 +32,7 @@ import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 object RuleUtils {
@@ -183,7 +184,12 @@ object RuleUtils {
    * @param relation HadoopFsRelation to check if an index is applied.
    * @return true if the relation has index plan identifier. Otherwise false.
    */
+  // TODO: remove the following.
   def isIndexApplied(relation: HadoopFsRelation): Boolean = {
+    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
+  }
+
+  def isIndexApplied(relation: FileBasedRelation): Boolean = {
     relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
 
