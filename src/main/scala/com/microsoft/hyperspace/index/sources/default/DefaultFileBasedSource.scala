@@ -36,8 +36,56 @@ import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, Hyperspa
 /**
  * Implementation for file-based relation used by [[DefaultFileBasedSource]]
  */
-case class DefaultFileBasedRelation(plan: LogicalRelation) extends FileBasedRelation {
+case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
+    extends FileBasedRelation {
   override def options: Map[String, String] = plan.relation.asInstanceOf[HadoopFsRelation].options
+
+  override def signature: String = plan.relation match {
+    case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+      val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
+        (acc: String, f: FileStatus) =>
+          HashingUtils.md5Hex(acc + fingerprint(f))
+      }
+      result
+  }
+
+  /**
+   * All the files that the current relation references to.
+   */
+  override def allFiles: Seq[FileStatus] = plan.relation match {
+    case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+      filesFromIndex(location)
+  }
+
+  private def fingerprint(fileStatus: FileStatus): String = {
+    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
+      fileStatus.getPath.toString
+  }
+
+  private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =
+    try {
+      // Keep the `asInstanceOf` to force casting or fallback because Databricks
+      // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
+      // standard API's `FileStatus`.
+      index.allFiles.map(_.asInstanceOf[FileStatus])
+    } catch {
+      case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
+        val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
+        val clazz = Utils.classForName(dbClassName)
+        val lengthMethod = clazz.getMethod("length")
+        val isDirMethod = clazz.getMethod("isDir")
+        val modificationTimeMethod = clazz.getMethod("modificationTime")
+        val pathMethod = clazz.getMethod("path")
+        index.allFiles.asInstanceOf[Seq[_]].map { f =>
+          new FileStatus(
+            lengthMethod.invoke(f).asInstanceOf[Long],
+            isDirMethod.invoke(f).asInstanceOf[Boolean],
+            0,
+            0,
+            modificationTimeMethod.invoke(f).asInstanceOf[Long],
+            new Path(pathMethod.invoke(f).asInstanceOf[String]))
+        }
+    }
 }
 
 /**
@@ -186,27 +234,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
-   * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
-   * using all the files found in [[PartitioningAwareFileIndex]].
-   *
-   * @param logicalRelation Logical relation to compute signature from.
-   * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  override def signature(logicalRelation: LogicalRelation): Option[String] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, format, _)
-          if isSupportedFileFormat(format) =>
-        val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
-          (acc: String, f: FileStatus) =>
-            HashingUtils.md5Hex(acc + fingerprint(f))
-        }
-        Some(result)
-      case _ => None
-    }
-  }
-
-  /**
    * Fingerprints a file.
    *
    * @param fileStatus File status.
@@ -328,7 +355,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           _,
           _,
           _) if isSupportedFileFormat(fileFormat) =>
-      Some(DefaultFileBasedRelation(l))
+      Some(DefaultFileBasedRelation(spark, l))
     case _ => None
   }
 

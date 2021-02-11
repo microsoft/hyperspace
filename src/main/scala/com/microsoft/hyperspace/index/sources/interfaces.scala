@@ -64,11 +64,19 @@ trait FileBasedRelation {
    */
   def options: Map[String, String]
 
-  //  /**
-  //   * All the files that the current relation references to.
-  //   */
-  //  def allFiles: Seq[FileStatus]
-  //
+  /**
+   * Computes the signature of the current relation.
+   *
+   * This API is used when the signature of source needs to be computed, e.g., creating an index,
+   * computing query plan's signature, etc.
+   */
+  def signature: String
+
+  /**
+   * All the files that the current relation references to.
+   */
+  def allFiles: Seq[FileStatus]
+
   //  /**
   //   * The partition schema of the current relation.
   //   */
@@ -133,20 +141,6 @@ trait FileBasedSourceProvider extends SourceProvider {
    * @return File format to read internal data files.
    */
   def internalFileFormatName(relation: Relation): Option[String]
-
-  /**
-   * Computes the signature using the given [[LogicalRelation]].
-   *
-   * This API is used when the signature of source needs to be computed, e.g., creating an index,
-   * computing query plan's signature, etc.
-   *
-   * If the given logical relation does not belong to this provider, None should be returned.
-   *
-   * @param logicalRelation Logical relation to compute signature from.
-   * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  def signature(logicalRelation: LogicalRelation): Option[String]
 
   /**
    * Retrieves all input files from the given [[LogicalRelation]].

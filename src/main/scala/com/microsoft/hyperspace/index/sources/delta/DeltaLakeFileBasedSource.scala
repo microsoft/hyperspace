@@ -25,8 +25,43 @@ import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, 
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
-import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
+
+/**
+ * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
+ */
+case class DeltaLakeRelation(plan: LogicalRelation) extends FileBasedRelation {
+  override def options: Map[String, String] = plan.relation.asInstanceOf[HadoopFsRelation].options
+
+  override def signature: String = plan.relation match {
+    case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+      location.tableVersion + location.path.toString
+  }
+
+  /**
+   * All the files that the current relation references to.
+   */
+  def allFiles: Seq[FileStatus] = plan.relation match {
+    case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+      location
+        .getSnapshot(stalenessAcceptable = false)
+        .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+        .files
+        .map { f =>
+          toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
+        }
+  }
+
+  private def toFileStatus(fileSize: Long, modificationTime: Long, path: Path): FileStatus = {
+    new FileStatus(
+      /* length */ fileSize,
+      /* isDir */ false,
+      /* blockReplication */ 0,
+      /* blockSize */ 1,
+      /* modificationTime */ modificationTime,
+      path)
+  }
+}
 
 /**
  * Delta Lake file-based source provider.
@@ -128,22 +163,6 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
   }
 
   /**
-   * Computes the signature using the given [[LogicalRelation]]. This computes a signature of
-   * using version info and table name.
-   *
-   * @param logicalRelation Logical relation to compute signature from.
-   * @return Signature computed if the given 'logicalRelation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  override def signature(logicalRelation: LogicalRelation): Option[String] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-        Some(location.tableVersion + location.path.toString)
-      case _ => None
-    }
-  }
-
-  /**
    * Retrieves all input files from the given [[LogicalRelation]].
    *
    * @param logicalRelation Logical relation to retrieve input files from.
@@ -240,7 +259,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
     case l @ LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
-      Some(DefaultFileBasedRelation(l))
+      Some(DeltaLakeRelation(l))
     case _ => None
   }
 }

@@ -81,18 +81,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
-   * Runs signature() for each provider.
-   *
-   * @param logicalRelation Logical relation to compute signature from.
-   * @return Computed signature.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def signature(logicalRelation: LogicalRelation): String = {
-    run(p => p.signature(logicalRelation))
-  }
-
-  /**
    * Runs allFiles() for each provider.
    *
    * @param logicalRelation Logical relation to retrieve all input files.
