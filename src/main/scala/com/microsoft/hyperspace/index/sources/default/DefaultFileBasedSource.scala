@@ -21,10 +21,12 @@ import java.util.Locale
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -55,6 +57,25 @@ case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
   override def allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
       filesFromIndex(location)
+  }
+
+  /**
+   * The partition schema of the current relation.
+   */
+  def partitionSchema: StructType = plan.relation match {
+    case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+      location.partitionSchema
+  }
+
+  /**
+   * Creates [[LogicalRelation]] based on the current relation.
+   *
+   * This is mainly used to read the index files.
+   */
+  def toLogicalRelation(
+      hadoopFsRelation: HadoopFsRelation,
+      newOutput: Seq[AttributeReference]): LogicalRelation = {
+    plan.copy(relation = hadoopFsRelation, output = newOutput)
   }
 
   private def fingerprint(fileStatus: FileStatus): String = {

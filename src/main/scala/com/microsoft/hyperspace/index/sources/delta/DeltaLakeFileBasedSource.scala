@@ -18,10 +18,12 @@ package com.microsoft.hyperspace.index.sources.delta
 
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
@@ -41,7 +43,7 @@ case class DeltaLakeRelation(plan: LogicalRelation) extends FileBasedRelation {
   /**
    * All the files that the current relation references to.
    */
-  def allFiles: Seq[FileStatus] = plan.relation match {
+  override def allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
       location
         .getSnapshot(stalenessAcceptable = false)
@@ -50,6 +52,25 @@ case class DeltaLakeRelation(plan: LogicalRelation) extends FileBasedRelation {
         .map { f =>
           toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
         }
+  }
+
+  /**
+   * The partition schema of the current relation.
+   */
+  def partitionSchema: StructType = plan.relation match {
+    case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+      location.partitionSchema
+  }
+
+  /**
+   * Creates [[LogicalRelation]] based on the current relation.
+   *
+   * This is mainly used to read the index files.
+   */
+  def toLogicalRelation(
+      hadoopFsRelation: HadoopFsRelation,
+      newOutput: Seq[AttributeReference]): LogicalRelation = {
+    plan.copy(relation = hadoopFsRelation, output = newOutput)
   }
 
   private def toFileStatus(fileSize: Long, modificationTime: Long, path: Path): FileStatus = {

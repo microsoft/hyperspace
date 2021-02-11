@@ -310,19 +310,16 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
     var unhandledAppendedFiles: Seq[Path] = Nil
-
     // Get transformed plan with index data and appended files if applicable.
     val indexPlan = plan transformUp {
       // Use transformUp here as currently one Logical Relation is allowed (pre-requisite).
       // The transformed plan will have LogicalRelation as a child; for example, LogicalRelation
       // can be transformed to 'Project -> Filter -> Logical Relation'. Thus, with transformDown,
       // it will be matched again and transformed recursively which causes stack overflow exception.
-      case baseRelation @ LogicalRelation(
-            _ @HadoopFsRelation(location: FileIndex, _, _, _, _, _),
-            baseOutput,
-            _,
-            _) =>
+      case l: LeafNode if provider.isSupportedRelation(l) =>
+        val relation = provider.getRelation(l)
         val (filesDeleted, filesAppended) =
           if (!HyperspaceConf.hybridScanEnabled(spark) && index.hasSourceUpdate) {
             // If the index contains the source update info, it means the index was validated
@@ -331,11 +328,8 @@ object RuleUtils {
             // appendedFiles and deletedFiles in IndexLogEntry.
             (index.deletedFiles, index.appendedFiles.map(f => new Path(f.name)).toSeq)
           } else {
-            val curFiles = Hyperspace
-              .getContext(spark)
-              .sourceProviderManager
-              .allFiles(baseRelation)
-              .map(f => FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
+            val curFiles = relation.allFiles.map(f =>
+              FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
             if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
               val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
               val filesAppended = nonExist.map(f => new Path(f.name))
@@ -356,7 +350,7 @@ object RuleUtils {
 
         val filesToRead = {
           if (useBucketSpec || !index.hasParquetAsSourceFormat || filesDeleted.nonEmpty ||
-              location.partitionSchema.nonEmpty) {
+              relation.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -382,18 +376,20 @@ object RuleUtils {
         // rows from the deleted files.
         val newSchema = StructType(
           index.schema.filter(s =>
-            baseRelation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
+            relation.plan.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
-        def fileIndex: InMemoryFileIndex =
+        def fileIndex: InMemoryFileIndex = {
           new InMemoryFileIndex(spark, filesToRead, Map(), None)
+        }
+
         val newLocation = if (filesToRead.length == index.content.files.size) {
           index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY)(fileIndex)
         } else {
           index.withCachedTag(plan, IndexLogEntryTags.INMEMORYFILEINDEX_HYBRID_SCAN)(fileIndex)
         }
 
-        val relation = new IndexHadoopFsRelation(
+        val indexFsRelation = new IndexHadoopFsRelation(
           newLocation,
           new StructType(),
           newSchema,
@@ -401,16 +397,16 @@ object RuleUtils {
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput =
-          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
+        val updatedOutput = relation.plan.output
+          .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+          .map(_.asInstanceOf[AttributeReference])
 
         if (filesDeleted.isEmpty) {
-          baseRelation.copy(relation = relation, output = updatedOutput)
+          relation.toLogicalRelation(indexFsRelation, updatedOutput)
         } else {
           val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_ID, LongType)()
           val deletedFileIds = filesDeleted.map(f => Literal(f.id)).toArray
-          val rel =
-            baseRelation.copy(relation = relation, output = updatedOutput ++ Seq(lineageAttr))
+          val rel = relation.toLogicalRelation(indexFsRelation, updatedOutput ++ Seq(lineageAttr))
           val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }

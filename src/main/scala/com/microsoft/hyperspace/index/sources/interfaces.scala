@@ -18,8 +18,10 @@ package com.microsoft.hyperspace.index.sources
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 
@@ -77,23 +79,25 @@ trait FileBasedRelation {
    */
   def allFiles: Seq[FileStatus]
 
-  //  /**
-  //   * The partition schema of the current relation.
-  //   */
-  //  def partitionSchema: StructType
+  /**
+   * The partition schema of the current relation.
+   */
+  def partitionSchema: StructType
+
   //
   //  /**
   //   * The optional partition base path of the current relation.
   //   */
   //  def partitionBasePath: Option[String]
   //
-  //  /**
-  //   * Convert the current relation to [[LogicalRelation]].
-  //   */
-  //  def toLogicalRelation(
-  //    hadoopFsRelation: HadoopFsRelation,
-  //    newOutput: Seq[Attribute]): LogicalRelation
-  //
+  /**
+   * Creates [[LogicalRelation]] based on the current relation.
+   *
+   * This is mainly used to read the index files.
+   */
+  def toLogicalRelation(
+      hadoopFsRelation: HadoopFsRelation,
+      newOutput: Seq[AttributeReference]): LogicalRelation
 }
 
 /**
