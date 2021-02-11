@@ -402,11 +402,12 @@ object RuleUtils {
           .map(_.asInstanceOf[AttributeReference])
 
         if (filesDeleted.isEmpty) {
-          relation.toLogicalRelation(indexFsRelation, updatedOutput)
+          relation.createLogicalRelation(indexFsRelation, updatedOutput)
         } else {
           val lineageAttr = AttributeReference(IndexConstants.DATA_FILE_NAME_ID, LongType)()
           val deletedFileIds = filesDeleted.map(f => Literal(f.id)).toArray
-          val rel = relation.toLogicalRelation(indexFsRelation, updatedOutput ++ Seq(lineageAttr))
+          val rel =
+            relation.createLogicalRelation(indexFsRelation, updatedOutput ++ Seq(lineageAttr))
           val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }
@@ -463,17 +464,12 @@ object RuleUtils {
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
     // Transform the location of LogicalRelation with appended files.
     val planForAppended = originalPlan transformDown {
-      case baseRelation @ LogicalRelation(
-            fsRelation @ HadoopFsRelation(location: FileIndex, _, _, _, _, _),
-            baseOutput,
-            _,
-            _) =>
-        val options = Hyperspace
-          .getContext(spark)
-          .sourceProviderManager
-          .partitionBasePath(location)
+      case l: LeafNode if provider.isSupportedRelation(l) =>
+        val relation = provider.getRelation(l)
+        val options = relation.partitionBasePath
           .map { basePath =>
             // Set "basePath" so that partitioned columns are also included in the output schema.
             Map("basePath" -> basePath)
@@ -487,17 +483,18 @@ object RuleUtils {
         }
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
-        val partitionColumns = location.partitionSchema.map(_.name)
-        val updatedSchema = StructType(baseRelation.schema.filter(col =>
-          index.schema.contains(col) || location.partitionSchema.contains(col)))
-        val updatedOutput = baseOutput.filter(attr =>
-          index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
-        val newRelation = fsRelation.copy(
-          location = newLocation,
-          dataSchema = updatedSchema,
-          options =
-            fsRelation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
-        baseRelation.copy(relation = newRelation, output = updatedOutput)
+        val partitionColumns = relation.partitionSchema.map(_.name)
+        val updatedSchema = StructType(relation.plan.schema.filter(col =>
+          index.schema.contains(col) || relation.partitionSchema.contains(col)))
+        val updatedOutput = relation.plan.output
+          .filter(attr =>
+            index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+          .map(_.asInstanceOf[AttributeReference])
+        val newRelation = relation.createHadoopFsRelation(
+          newLocation,
+          updatedSchema,
+          relation.options + IndexConstants.INDEX_RELATION_IDENTIFIER)
+        relation.createLogicalRelation(newRelation, updatedOutput)
     }
     assert(!originalPlan.equals(planForAppended))
     planForAppended

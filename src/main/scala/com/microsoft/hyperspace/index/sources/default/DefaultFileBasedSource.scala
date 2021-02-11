@@ -68,11 +68,42 @@ case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
   }
 
   /**
+   * The optional partition base path of the current relation.
+   */
+  def partitionBasePath: Option[String] = plan.relation match {
+    case HadoopFsRelation(p: PartitioningAwareFileIndex, _, _, _, _, _)
+        if p.partitionSpec.partitions.nonEmpty =>
+      // For example, we could have the following in PartitionSpec:
+      //   - partition columns = "col1", "col2"
+      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+      // , and going up the same number of directory levels as the number of partition columns
+      // will compute the base path. Note that PartitionSpec.partitions will always contain
+      // all the partitions in the path, so "partitions.head" is taken as an initial value.
+      val basePath = p.partitionSpec.partitionColumns
+        .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
+      Some(basePath.toString)
+    case _ => None
+  }
+
+  /**
+   * Creates [[HadoopFsRelation]] based on the current relation.
+   *
+   * This is mainly used in conjunction with [[createLogicalRelation]].
+   */
+  def createHadoopFsRelation(
+      location: FileIndex,
+      dataSchema: StructType,
+      options: Map[String, String]): HadoopFsRelation = plan.relation match {
+    case h: HadoopFsRelation =>
+      h.copy(location = location, dataSchema = dataSchema, options = options)(spark)
+  }
+
+  /**
    * Creates [[LogicalRelation]] based on the current relation.
    *
    * This is mainly used to read the index files.
    */
-  def toLogicalRelation(
+  def createLogicalRelation(
       hadoopFsRelation: HadoopFsRelation,
       newOutput: Seq[AttributeReference]): LogicalRelation = {
     plan.copy(relation = hadoopFsRelation, output = newOutput)

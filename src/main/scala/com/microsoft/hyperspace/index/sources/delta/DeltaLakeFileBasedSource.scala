@@ -32,7 +32,8 @@ import com.microsoft.hyperspace.util.PathUtils
 /**
  * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
  */
-case class DeltaLakeRelation(plan: LogicalRelation) extends FileBasedRelation {
+case class DeltaLakeRelation(spark: SparkSession, plan: LogicalRelation)
+    extends FileBasedRelation {
   override def options: Map[String, String] = plan.relation.asInstanceOf[HadoopFsRelation].options
 
   override def signature: String = plan.relation match {
@@ -63,11 +64,33 @@ case class DeltaLakeRelation(plan: LogicalRelation) extends FileBasedRelation {
   }
 
   /**
+   * The optional partition base path of the current relation.
+   */
+  def partitionBasePath: Option[String] = plan.relation match {
+    case HadoopFsRelation(t: TahoeLogFileIndex, _, _, _, _, _) if t.partitionSchema.nonEmpty =>
+      Some(t.path.toString)
+    case _ => None
+  }
+
+  /**
+   * Creates [[HadoopFsRelation]] based on the current relation.
+   *
+   * This is mainly used in conjunction with [[createLogicalRelation]].
+   */
+  def createHadoopFsRelation(
+      location: FileIndex,
+      dataSchema: StructType,
+      options: Map[String, String]): HadoopFsRelation = plan.relation match {
+    case h: HadoopFsRelation =>
+      h.copy(location = location, dataSchema = dataSchema, options = options)(spark)
+  }
+
+  /**
    * Creates [[LogicalRelation]] based on the current relation.
    *
    * This is mainly used to read the index files.
    */
-  def toLogicalRelation(
+  def createLogicalRelation(
       hadoopFsRelation: HadoopFsRelation,
       newOutput: Seq[AttributeReference]): LogicalRelation = {
     plan.copy(relation = hadoopFsRelation, output = newOutput)
@@ -280,7 +303,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
     case l @ LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
-      Some(DeltaLakeRelation(l))
+      Some(DeltaLakeRelation(spark, l))
     case _ => None
   }
 }

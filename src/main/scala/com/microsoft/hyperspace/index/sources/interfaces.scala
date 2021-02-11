@@ -84,18 +84,27 @@ trait FileBasedRelation {
    */
   def partitionSchema: StructType
 
-  //
-  //  /**
-  //   * The optional partition base path of the current relation.
-  //   */
-  //  def partitionBasePath: Option[String]
-  //
+  /**
+   * The optional partition base path of the current relation.
+   */
+  def partitionBasePath: Option[String]
+
+  /**
+   * Creates [[HadoopFsRelation]] based on the current relation.
+   *
+   * This is mainly used in conjunction with [[createLogicalRelation]].
+   */
+  def createHadoopFsRelation(
+      location: FileIndex,
+      dataSchema: StructType,
+      options: Map[String, String]): HadoopFsRelation
+
   /**
    * Creates [[LogicalRelation]] based on the current relation.
    *
    * This is mainly used to read the index files.
    */
-  def toLogicalRelation(
+  def createLogicalRelation(
       hadoopFsRelation: HadoopFsRelation,
       newOutput: Seq[AttributeReference]): LogicalRelation
 }
