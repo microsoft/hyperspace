@@ -191,7 +191,7 @@ object RuleUtils {
    *
    * Pre-requisites
    * - We know for sure the index which can be used to transform the plan.
-   * - The plan should be linear and include one LogicalRelation.
+   * - The plan should be linear and include one supported relation.
    *
    * @param spark Spark session.
    * @param index Index used in transformation of plan.
@@ -252,7 +252,7 @@ object RuleUtils {
    * The transformed plan reads data from indexes instead of the source relations.
    * Bucketing information of the index is retained if useBucketSpec is true.
    *
-   * NOTE: This method currently only supports transformation of Scan Nodes i.e. Logical relations.
+   * NOTE: This method currently only supports transformation of nodes with supported relations.
    *
    * @param spark Spark session.
    * @param index Index used in transformation of plan.
@@ -265,28 +265,31 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
     // Note that we transform *only* the base relation and not other portions of the plan
     // (e.g., filters). For instance, given the following input plan:
     //        Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
     // in the presence of a suitable index, the getIndexPlan() method will emit:
     //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
     plan transformDown {
-      case baseRelation @ LogicalRelation(_: HadoopFsRelation, baseOutput, _, _) =>
+      case l: LeafNode if provider.isSupportedRelation(l) =>
+        val relation = provider.getRelation(l)
         val location = index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
         }
 
-        val relation = new IndexHadoopFsRelation(
+        val indexFsRelation = new IndexHadoopFsRelation(
           location,
           new StructType(),
-          StructType(index.schema.filter(baseRelation.schema.contains(_))),
+          StructType(index.schema.filter(relation.plan.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput =
-          baseOutput.filter(attr => relation.schema.fieldNames.contains(attr.name))
-        baseRelation.copy(relation = relation, output = updatedOutput)
+        val updatedOutput = relation.plan.output
+          .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+          .map(_.asInstanceOf[AttributeReference])
+        relation.createLogicalRelation(indexFsRelation, updatedOutput)
     }
   }
 
@@ -314,9 +317,9 @@ object RuleUtils {
     var unhandledAppendedFiles: Seq[Path] = Nil
     // Get transformed plan with index data and appended files if applicable.
     val indexPlan = plan transformUp {
-      // Use transformUp here as currently one Logical Relation is allowed (pre-requisite).
+      // Use transformUp here as currently one relation is allowed (pre-requisite).
       // The transformed plan will have LogicalRelation as a child; for example, LogicalRelation
-      // can be transformed to 'Project -> Filter -> Logical Relation'. Thus, with transformDown,
+      // can be transformed to 'Project -> Filter -> LogicalRelation'. Thus, with transformDown,
       // it will be matched again and transformed recursively which causes stack overflow exception.
       case l: LeafNode if provider.isSupportedRelation(l) =>
         val relation = provider.getRelation(l)
@@ -465,7 +468,7 @@ object RuleUtils {
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
-    // Transform the location of LogicalRelation with appended files.
+    // Transform the relation node to include appended files.
     val planForAppended = originalPlan transformDown {
       case l: LeafNode if provider.isSupportedRelation(l) =>
         val relation = provider.getRelation(l)
@@ -502,6 +505,9 @@ object RuleUtils {
 
   /**
    * Transform the plan to perform on-the-fly Shuffle the data based on bucketSpec.
+   * Note that this extractor depends on [[LogicalRelation]] with [[HadoopFsRelation]] because
+   * the given plan is the result of [[transformPlanToReadAppendedFiles]], which converts
+   * the original relation to [[LogicalRelation]] with [[HadoopFsRelation]].
    *
    * Pre-requisite
    * - The plan should be linear and include one LogicalRelation.
