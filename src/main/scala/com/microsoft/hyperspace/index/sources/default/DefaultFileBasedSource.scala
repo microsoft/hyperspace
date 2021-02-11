@@ -38,10 +38,13 @@ import com.microsoft.hyperspace.util.{CacheWithTransform, HashingUtils, Hyperspa
 /**
  * Implementation for file-based relation used by [[DefaultFileBasedSource]]
  */
-case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
+class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRelation)
     extends FileBasedRelation {
   override def options: Map[String, String] = plan.relation.asInstanceOf[HadoopFsRelation].options
 
+  /**
+   * Computes the signature of the current relation.
+   */
   override def signature: String = plan.relation match {
     case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
       val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
@@ -63,7 +66,7 @@ case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
    * The partition schema of the current relation.
    */
   def partitionSchema: StructType = plan.relation match {
-    case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+    case HadoopFsRelation(location: FileIndex, _, _, _, _, _) =>
       location.partitionSchema
   }
 
@@ -90,7 +93,7 @@ case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
    *
    * This is mainly used in conjunction with [[createLogicalRelation]].
    */
-  def createHadoopFsRelation(
+  override def createHadoopFsRelation(
       location: FileIndex,
       dataSchema: StructType,
       options: Map[String, String]): HadoopFsRelation = plan.relation match {
@@ -103,7 +106,7 @@ case class DefaultFileBasedRelation(spark: SparkSession, plan: LogicalRelation)
    *
    * This is mainly used to read the index files.
    */
-  def createLogicalRelation(
+  override def createLogicalRelation(
       hadoopFsRelation: HadoopFsRelation,
       newOutput: Seq[AttributeReference]): LogicalRelation = {
     plan.copy(relation = hadoopFsRelation, output = newOutput)
@@ -319,7 +322,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    *         Some(None) => The given location is supported but partition is not specified.
    *         None => The given location is not supported.
    */
-  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
+  def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
       case p: PartitioningAwareFileIndex if p.partitionSpec.partitions.nonEmpty =>
         // For example, we could have the following in PartitionSpec:
@@ -407,7 +410,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           _,
           _,
           _) if isSupportedFileFormat(fileFormat) =>
-      Some(DefaultFileBasedRelation(spark, l))
+      Some(new DefaultFileBasedRelation(spark, l))
     case _ => None
   }
 

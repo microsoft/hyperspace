@@ -18,24 +18,25 @@ package com.microsoft.hyperspace.index.sources.delta
 
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
 /**
  * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
  */
-case class DeltaLakeRelation(spark: SparkSession, plan: LogicalRelation)
-    extends FileBasedRelation {
-  override def options: Map[String, String] = plan.relation.asInstanceOf[HadoopFsRelation].options
+class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
+    extends DefaultFileBasedRelation(spark, plan) {
 
+  /**
+   * Computes the signature of the current relation.
+   */
   override def signature: String = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
       location.tableVersion + location.path.toString
@@ -56,44 +57,12 @@ case class DeltaLakeRelation(spark: SparkSession, plan: LogicalRelation)
   }
 
   /**
-   * The partition schema of the current relation.
-   */
-  def partitionSchema: StructType = plan.relation match {
-    case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-      location.partitionSchema
-  }
-
-  /**
    * The optional partition base path of the current relation.
    */
-  def partitionBasePath: Option[String] = plan.relation match {
+  override def partitionBasePath: Option[String] = plan.relation match {
     case HadoopFsRelation(t: TahoeLogFileIndex, _, _, _, _, _) if t.partitionSchema.nonEmpty =>
       Some(t.path.toString)
     case _ => None
-  }
-
-  /**
-   * Creates [[HadoopFsRelation]] based on the current relation.
-   *
-   * This is mainly used in conjunction with [[createLogicalRelation]].
-   */
-  def createHadoopFsRelation(
-      location: FileIndex,
-      dataSchema: StructType,
-      options: Map[String, String]): HadoopFsRelation = plan.relation match {
-    case h: HadoopFsRelation =>
-      h.copy(location = location, dataSchema = dataSchema, options = options)(spark)
-  }
-
-  /**
-   * Creates [[LogicalRelation]] based on the current relation.
-   *
-   * This is mainly used to read the index files.
-   */
-  def createLogicalRelation(
-      hadoopFsRelation: HadoopFsRelation,
-      newOutput: Seq[AttributeReference]): LogicalRelation = {
-    plan.copy(relation = hadoopFsRelation, output = newOutput)
   }
 
   private def toFileStatus(fileSize: Long, modificationTime: Long, path: Path): FileStatus = {
@@ -233,7 +202,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * @param location Partitioned data location.
    * @return basePath to read the given partitioned location.
    */
-  override def partitionBasePath(location: FileIndex): Option[Option[String]] = {
+  def partitionBasePath(location: FileIndex): Option[Option[String]] = {
     location match {
       case d: TahoeLogFileIndex if d.partitionSchema.nonEmpty =>
         Some(Some(d.path.toString))
@@ -303,7 +272,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
     case l @ LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
-      Some(DeltaLakeRelation(spark, l))
+      Some(new DeltaLakeRelation(spark, l))
     case _ => None
   }
 }
