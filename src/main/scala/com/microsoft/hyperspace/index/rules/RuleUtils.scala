@@ -179,16 +179,11 @@ object RuleUtils {
 
   /**
    * Check if an index was applied the given relation or not.
-   * This can be determined by an identifier in options field of HadoopFsRelation.
+   * This can be determined by an identifier in [[FileBasedRelation]]'s options.
    *
-   * @param relation HadoopFsRelation to check if an index is applied.
-   * @return true if the relation has index plan identifier. Otherwise false.
+   * @param relation FileBasedRelation to check if an index is already applied.
+   * @return true if an index is applied to the given relation. Otherwise false.
    */
-  // TODO: remove the following.
-  def isIndexApplied(relation: HadoopFsRelation): Boolean = {
-    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
-  }
-
   def isIndexApplied(relation: FileBasedRelation): Boolean = {
     relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
@@ -218,14 +213,14 @@ object RuleUtils {
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
     // Check pre-requisite.
-    val logicalRelation = getLogicalRelation(plan)
-    assert(logicalRelation.isDefined)
+    val relation = getRelation(spark, plan)
+    assert(relation.isDefined)
 
     // If there is no change in source data files, the index can be applied by
     // transformPlanToUseIndexOnlyScan regardless of Hybrid Scan config.
     // This tag should always exist if Hybrid Scan is enabled.
     val hybridScanRequired = HyperspaceConf.hybridScanEnabled(spark) &&
-      index.getTagValue(logicalRelation.get, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
+      index.getTagValue(relation.get.plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED).get
 
     // If the index has appended files and/or deleted files, which means the current index data
     // is outdated, Hybrid Scan should be used to handle the newly updated source files.
@@ -242,17 +237,19 @@ object RuleUtils {
   }
 
   /**
-   * Extract the LogicalRelation node if the given logical plan is linear.
+   * Extract the relation node if the given logical plan is linear.
    *
-   * @param logicalPlan given logical plan to extract LogicalRelation from.
-   * @return if the plan is linear, the LogicalRelation node; Otherwise None.
+   * @param plan Logical plan to extract a relation node from.
+   * @return If the plan is linear and the relation node is supported, the [[FileBasedRelation]]
+   *         object that wraps the relation node. Otherwise None.
    */
-  def getLogicalRelation(logicalPlan: LogicalPlan): Option[LogicalRelation] = {
-    val lrs = logicalPlan.collect { case r: LogicalRelation => r }
-    if (lrs.length == 1) {
-      Some(lrs.head)
+  def getRelation(spark: SparkSession, plan: LogicalPlan): Option[FileBasedRelation] = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
+    val leaves = plan.collectLeaves()
+    if (leaves.size == 1 && provider.isSupportedRelation(leaves.head)) {
+      Some(provider.getRelation(leaves.head))
     } else {
-      None // logicalPlan is non-linear or it has no LogicalRelation.
+      None
     }
   }
 

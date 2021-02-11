@@ -100,7 +100,7 @@ object FilterIndexRule
       filter: Filter,
       outputColumns: Seq[String],
       filterColumns: Seq[String]): Seq[IndexLogEntry] = {
-    RuleUtils.getLogicalRelation(filter) match {
+    RuleUtils.getRelation(spark, filter) match {
       case Some(r) =>
         val indexManager = Hyperspace
           .getContext(spark)
@@ -122,9 +122,9 @@ object FilterIndexRule
         // Get candidate via file-level metadata validation. This is performed after pruning
         // by column schema, as this might be expensive when there are numerous files in the
         // relation or many indexes to be checked.
-        RuleUtils.getCandidateIndexes(spark, candidateIndexes, r)
+        RuleUtils.getCandidateIndexes(spark, candidateIndexes, r.plan)
 
-      case None => Nil // There is zero or more than one LogicalRelation nodes in Filter's subplan
+      case None => Nil // There is zero or more than one supported relations in Filter's sub-plan.
     }
   }
 

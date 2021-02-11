@@ -106,9 +106,14 @@ object JoinIndexRule
    * @return true if supported. False if not.
    */
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
+    // The given plan is eligible if it is supported and index has not been applied.
+    def isEligible(p: LogicalPlan): Boolean = {
+      RuleUtils.getRelation(spark, p).map(!RuleUtils.isIndexApplied(_)).getOrElse(false)
+    }
+
     isJoinConditionSupported(condition) &&
-    RuleUtils.getLogicalRelation(l).isDefined && RuleUtils.getLogicalRelation(r).isDefined &&
-    isPlanLinear(l) && isPlanLinear(r) && !isPlanModified(l) && !isPlanModified(r) &&
+    isPlanLinear(l) && isPlanLinear(r) &&
+    isEligible(l) && isEligible(r) &&
     ensureAttributeRequirements(l, r, condition)
   }
 
@@ -156,21 +161,6 @@ object JoinIndexRule
    */
   private def isPlanLinear(plan: LogicalPlan): Boolean =
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
-
-  /**
-   * Check if the candidate plan is already modified by Hyperspace or not.
-   * This can be determined by an identifier in options field of HadoopFsRelation.
-   *
-   * @param plan Logical plan.
-   * @return true if the relation in the plan is modified by Hyperspace.
-   */
-  private def isPlanModified(plan: LogicalPlan): Boolean = {
-    plan.find {
-      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-        RuleUtils.isIndexApplied(fsRelation)
-      case _ => false
-    }.isDefined
-  }
 
   /**
    * Requirements to support join optimizations using join indexes are as follows:
@@ -319,21 +309,21 @@ object JoinIndexRule
     val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
 
-    val leftRel = RuleUtils.getLogicalRelation(left).get
-    val rightRel = RuleUtils.getLogicalRelation(right).get
+    val leftRel = RuleUtils.getRelation(spark, left).get
+    val rightRel = RuleUtils.getRelation(spark, right).get
 
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
-    val lIndexes = RuleUtils.getCandidateIndexes(spark, lUsable, leftRel)
-    val rIndexes = RuleUtils.getCandidateIndexes(spark, rUsable, rightRel)
+    val lIndexes = RuleUtils.getCandidateIndexes(spark, lUsable, leftRel.plan)
+    val rIndexes = RuleUtils.getCandidateIndexes(spark, rUsable, rightRel.plan)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
     compatibleIndexPairs.map(
       indexPairs =>
         JoinIndexRanker
-          .rank(spark, leftRel, rightRel, indexPairs)
+          .rank(spark, leftRel.plan, rightRel.plan, indexPairs)
           .head)
   }
 

@@ -55,7 +55,7 @@ trait SourceProviderBuilder {
 trait FileBasedRelation {
 
   /**
-   * Th logical plan that this FileBasedRelation wraps.
+   * The logical plan that this FileBasedRelation wraps.
    */
   def plan: LogicalPlan
 

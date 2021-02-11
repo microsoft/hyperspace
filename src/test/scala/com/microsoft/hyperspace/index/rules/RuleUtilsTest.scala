@@ -110,7 +110,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
 
   test("Verify get logical relation for non-linear plan.") {
     val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
-    val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
+    val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
   }
 
@@ -367,8 +367,8 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
-    val r = RuleUtils.getLogicalRelation(plan)
+    val r = RuleUtils.getRelation(spark, plan)
     assert(r.isDefined)
-    assert(r.get.equals(expected))
+    assert(r.get.plan.equals(expected))
   }
 }
