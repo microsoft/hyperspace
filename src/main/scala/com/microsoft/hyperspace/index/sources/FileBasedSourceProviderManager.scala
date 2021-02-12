@@ -44,15 +44,15 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     })
 
   /**
-   * Runs refreshRelation() for each provider.
+   * Runs refreshRelationMetadata() for each provider.
    *
    * @param relation [[Relation]] to refresh.
    * @return Refreshed [[Relation]].
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
+   * @throws [[HyperspaceException]] if multiple providers returns [[Some]] oe
+   *         if no providers return [[Some]].
    */
-  def refreshRelation(relation: Relation): Relation = {
-    run(p => p.refreshRelation(relation))
+  def refreshRelationMetadata(relation: Relation): Relation = {
+    run(p => p.refreshRelationMetadata(relation))
   }
 
   /**
@@ -147,8 +147,8 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    *
    * @param builderClassNames Name of classes to load as [[SourceProviderBuilder]].
    * @return [[FileBasedSourceProvider]] objects built.
-   * @throws HyperspaceException if given builders cannot be loaded or
-   *                             if builder doesn't build [[FileBasedSourceProvider]].
+   * @throws [[HyperspaceException]] if given builders cannot be loaded or
+   *         if builder doesn't build [[FileBasedSourceProvider]].
    */
   private def buildProviders(builderClassNames: String): Seq[FileBasedSourceProvider] = {
     val builders = builderClassNames.split(",").map(_.trim).map { name =>

@@ -27,34 +27,20 @@ import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
 
 /**
  * ::Experimental::
- * A trait that a data source should implement so that an index can be created/managed and
- * utilized for the data source.
+ * A trait that represents a relation for a source provider.
  *
- * @since 0.4.0
+ * @since 0.5.0
  */
-trait SourceProvider
+trait SourceRelation
 
 /**
  * ::Experimental::
- * A trait that a source provider's builder should implement. Each source provider should have an
- * accompanying builder in order to be plugged into the SourceProviderManager.
+ * A trait that a source provider should implement to represent the source relation
+ * that is based on files.
  *
- * The reason for having a builder is to inject [[SparkSession]] to the source provider if needed.
- *
- * @since 0.4.0
+ * @since 0.5.0
  */
-trait SourceProviderBuilder {
-
-  /**
-   * Builds a [[SourceProvider]].
-   *
-   * @param spark Spark session.
-   * @return [[SourceProvider]] object.
-   */
-  def build(spark: SparkSession): SourceProvider
-}
-
-trait FileBasedRelation {
+trait FileBasedRelation extends SourceRelation {
 
   /**
    * The logical plan that this FileBasedRelation wraps.
@@ -108,7 +94,8 @@ trait FileBasedRelation {
       hadoopFsRelation: HadoopFsRelation,
       newOutput: Seq[AttributeReference]): LogicalRelation
 
-  // APIs defined are below are related to index maintenance.
+  // TODO: APIs defined are below are related to index maintenance.
+  //   This can be moved out to a separate trait.
 
   /**
    * Creates [[Relation]] for IndexLogEntry using the current relation.
@@ -135,6 +122,35 @@ trait FileBasedRelation {
  *
  * @since 0.4.0
  */
+trait SourceProvider
+
+/**
+ * ::Experimental::
+ * A trait that a source provider's builder should implement. Each source provider should have an
+ * accompanying builder in order to be plugged into the SourceProviderManager.
+ *
+ * The reason for having a builder is to inject [[SparkSession]] to the source provider if needed.
+ *
+ * @since 0.4.0
+ */
+trait SourceProviderBuilder {
+
+  /**
+   * Builds a [[SourceProvider]].
+   *
+   * @param spark Spark session.
+   * @return [[SourceProvider]] object.
+   */
+  def build(spark: SparkSession): SourceProvider
+}
+
+/**
+ * ::Experimental::
+ * A trait that a data source should implement so that an index can be created/managed and
+ * utilized for the data source.
+ *
+ * @since 0.4.0
+ */
 trait FileBasedSourceProvider extends SourceProvider {
 
   /**
@@ -148,7 +164,7 @@ trait FileBasedSourceProvider extends SourceProvider {
    * @return [[Relation]] object if the given 'relation' can be processed by this provider.
    *         Otherwise, None.
    */
-  def refreshRelation(relation: Relation): Option[Relation]
+  def refreshRelationMetadata(relation: Relation): Option[Relation]
 
   /**
    * Returns a file format name to read internal data for a given [[Relation]].

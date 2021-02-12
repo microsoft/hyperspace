@@ -67,7 +67,7 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
     val latestRelation =
-      Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
+      Hyperspace.getContext(spark).sourceProviderManager.refreshRelationMetadata(relations.head)
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
     val df = spark.read
       .schema(dataSchema)
