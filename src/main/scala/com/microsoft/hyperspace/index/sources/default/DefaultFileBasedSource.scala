@@ -310,20 +310,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
-   * Retrieves all input files from the given [[LogicalRelation]].
-   *
-   * @param logicalRelation Logical relation to retrieve input files from.
-   * @return List of [[FileStatus]] for the given relation.
-   */
-  override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-        Some(filesFromIndex(location))
-      case _ => None
-    }
-  }
-
-  /**
    * Returns true if the given logical plan is a supported relation.
    *
    * @param plan Logical plan to check if it's supported.
@@ -355,31 +341,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       Some(new DefaultFileBasedRelation(spark, l))
     case _ => None
   }
-
-  private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =
-    try {
-      // Keep the `asInstanceOf` to force casting or fallback because Databrick's
-      // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
-      // standard API's `FileStatus`.
-      index.allFiles.map(_.asInstanceOf[FileStatus])
-    } catch {
-      case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
-        val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
-        val clazz = Utils.classForName(dbClassName)
-        val lengthMethod = clazz.getMethod("length")
-        val isDirMethod = clazz.getMethod("isDir")
-        val modificationTimeMethod = clazz.getMethod("modificationTime")
-        val pathMethod = clazz.getMethod("path")
-        index.allFiles.asInstanceOf[Seq[_]].map { f =>
-          new FileStatus(
-            lengthMethod.invoke(f).asInstanceOf[Long],
-            isDirMethod.invoke(f).asInstanceOf[Boolean],
-            0,
-            0,
-            modificationTimeMethod.invoke(f).asInstanceOf[Long],
-            new Path(pathMethod.invoke(f).asInstanceOf[String]))
-        }
-    }
 }
 
 /**

@@ -159,14 +159,6 @@ trait FileBasedSourceProvider extends SourceProvider {
   def internalFileFormatName(relation: Relation): Option[String]
 
   /**
-   * Retrieves all input files from the given [[LogicalRelation]].
-   *
-   * @param logicalRelation Logical relation to retrieve input files from.
-   * @return List of [[FileStatus]] for the given relation.
-   */
-  def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]]
-
-  /**
    * Returns true if the given logical plan is a supported relation.
    *
    * @param plan Logical plan to check if it's supported.

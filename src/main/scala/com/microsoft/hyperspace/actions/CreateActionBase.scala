@@ -129,7 +129,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         SaveMode.Overwrite)
   }
 
-  private def getRelation(spark: SparkSession, df: DataFrame): FileBasedRelation = {
+  protected def getRelation(spark: SparkSession, df: DataFrame): FileBasedRelation = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     val relations = df.queryExecution.optimizedPlan.collect {
       case l: LeafNode if provider.isSupportedRelation(l) =>

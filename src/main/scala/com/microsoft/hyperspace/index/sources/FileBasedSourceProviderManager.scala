@@ -18,14 +18,12 @@ package com.microsoft.hyperspace.index.sources
 
 import scala.util.{Success, Try}
 
-import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
+import com.microsoft.hyperspace.index.Relation
 import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
 
 /**
@@ -65,18 +63,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    */
   def internalFileFormatName(relation: Relation): String = {
     run(p => p.internalFileFormatName(relation))
-  }
-
-  /**
-   * Runs allFiles() for each provider.
-   *
-   * @param logicalRelation Logical relation to retrieve all input files.
-   * @return List of all input files.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
-    run(p => p.allFiles(logicalRelation))
   }
 
   /**

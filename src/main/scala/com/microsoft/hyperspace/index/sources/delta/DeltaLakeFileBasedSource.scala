@@ -155,16 +155,6 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
 class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
   private val DELTA_FORMAT_STR = "delta"
 
-  private def toFileStatus(fileSize: Long, modificationTime: Long, path: Path): FileStatus = {
-    new FileStatus(
-      /* length */ fileSize,
-      /* isDir */ false,
-      /* blockReplication */ 0,
-      /* blockSize */ 1,
-      /* modificationTime */ modificationTime,
-      path)
-  }
-
   /**
    * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
    *
@@ -191,43 +181,6 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
       Some("parquet")
     } else {
       None
-    }
-  }
-
-  /**
-   * Retrieves all input files from the given [[LogicalRelation]].
-   *
-   * @param logicalRelation Logical relation to retrieve input files from.
-   * @return List of [[FileStatus]] for the given relation.
-   */
-  override def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-        val files = location
-          .getSnapshot(stalenessAcceptable = false)
-          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
-          .files
-          .map { f =>
-            toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
-          }
-        Some(files)
-      case _ => None
-    }
-  }
-
-  /**
-   * Constructs the basePath for the given [[FileIndex]].
-   *
-   * @param location Partitioned data location.
-   * @return basePath to read the given partitioned location.
-   */
-  def partitionBasePath(location: FileIndex): Option[Option[String]] = {
-    location match {
-      case d: TahoeLogFileIndex if d.partitionSchema.nonEmpty =>
-        Some(Some(d.path.toString))
-      case _: TahoeLogFileIndex => Some(None)
-      case _ =>
-        None
     }
   }
 
