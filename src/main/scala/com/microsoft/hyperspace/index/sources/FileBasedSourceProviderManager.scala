@@ -48,7 +48,7 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    *
    * @param relation [[Relation]] to refresh.
    * @return Refreshed [[Relation]].
-   * @throws [[HyperspaceException]] if multiple providers returns [[Some]] or
+   * @throws [[HyperspaceException]] if multiple providers returns [[Some]] oe
    *         if no providers return [[Some]].
    */
   def refreshRelationMetadata(relation: Relation): Relation = {
