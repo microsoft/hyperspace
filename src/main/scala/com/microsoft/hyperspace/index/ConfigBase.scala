@@ -1,6 +1,10 @@
 package com.microsoft.hyperspace.index
 
-sealed trait IndexConfigBase {
+/**
+ * All index supported in Hyperspace whose user facing config needs to be defined needs
+ * to extend [[ConfigBase]] trait.
+ */
+sealed trait ConfigBase {
   val indexName: String
 
   def equals(obj: Any): Boolean
@@ -10,7 +14,7 @@ sealed trait IndexConfigBase {
   def toString: String
 }
 
-trait CoveringIndexConfigBase extends IndexConfigBase {
+trait CoveringIndexConfigBase extends ConfigBase {
   /*
    * Columns from which index are created.
    */
@@ -22,4 +26,4 @@ trait CoveringIndexConfigBase extends IndexConfigBase {
   val includedColumns: Seq[String]
 }
 
-trait NonCoveringIndexConfigBase extends IndexConfigBase {}
+trait NonCoveringIndexConfigBase extends ConfigBase {}

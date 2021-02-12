@@ -2,6 +2,14 @@ package com.microsoft.hyperspace.index
 
 import java.util.Locale
 
+object Config {
+
+  // TODO - prints info table about all types of index supported by hyperspace
+  def printAllIndexConfigInfo(): String = {
+    s""
+  }
+}
+
 /**
  * IndexConfig specifies the configuration of an index.
  * Associated Builder [[com.microsoft.hyperspace.index.configs.covering.IndexConfig.builder()]]
@@ -117,13 +125,5 @@ case class BloomFilterIndexConfig(
   override def toString: String = {
     s"[indexName: $indexName; indexedColumn: $indexedColumn; " +
       s"ExpectedItems: $expectedNumItems; FPP: $fpp; NumBitsUsed: $numBits;]"
-  }
-}
-
-object Config {
-
-  // TODO - prints info table about all types of index supported by hyperspace
-  def printAllIndexConfigInfo(): String = {
-    s""
   }
 }

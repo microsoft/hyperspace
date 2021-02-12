@@ -11,7 +11,7 @@ object IndexConfig {
   /**
    * Builder for [[IndexConfig]].
    */
-  private[index] class Builder {
+  class Builder {
 
     private[this] var indexedColumns: Seq[String] = Seq()
     private[this] var includedColumns: Seq[String] = Seq()

@@ -1,8 +1,8 @@
 package com.microsoft.hyperspace.index.configs.noncovering
 
 /**
- * TODO Defines [[BloomFilterIndexConfig.Builder]] and relevant helper methods for enabling builder pattern for
- *  [[BloomFilterIndexConfig]].
+ * TODO Defines [[BloomFilterIndexConfig.Builder]] and relevant helper methods for enabling
+ *  builder pattern for [[BloomFilterIndexConfig]].
  */
 object BloomFilterIndexConfig {
 
