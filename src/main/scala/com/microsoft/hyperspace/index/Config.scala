@@ -1,14 +1,22 @@
+/*
+ * Copyright (2020) The Hyperspace Project Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.microsoft.hyperspace.index
 
 import java.util.Locale
-
-object Config {
-
-  // TODO - prints info table about all types of index supported by hyperspace
-  def printAllIndexConfigInfo(): String = {
-    s""
-  }
-}
 
 /**
  * IndexConfig specifies the configuration of an index.
@@ -70,14 +78,6 @@ case class IndexConfig(
   private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
 }
 
-/**
- * TODO
- * @param indexName
- * @param indexedColumn
- * @param expectedNumItems
- * @param fpp
- * @param numBits
- */
 case class BloomFilterIndexConfig(
     indexName: String,
     indexedColumn: String,
@@ -125,5 +125,13 @@ case class BloomFilterIndexConfig(
   override def toString: String = {
     s"[indexName: $indexName; indexedColumn: $indexedColumn; " +
       s"ExpectedItems: $expectedNumItems; FPP: $fpp; NumBitsUsed: $numBits;]"
+  }
+}
+
+object Config {
+
+  // TODO - prints info table about all types of index supported by hyperspace
+  def printAllIndexConfigInfo(): String = {
+    s""
   }
 }
