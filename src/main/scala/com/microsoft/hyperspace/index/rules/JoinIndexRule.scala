@@ -21,15 +21,15 @@ import scala.util.Try
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, AttributeSet, EqualTo, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, EqualTo, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils._
 
@@ -106,10 +106,18 @@ object JoinIndexRule
    * @return true if supported. False if not.
    */
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
+    // The given plan is eligible if it is supported and index has not been applied.
+    def isEligible(optRel: Option[FileBasedRelation]): Boolean = {
+      optRel.map(!RuleUtils.isIndexApplied(_)).getOrElse(false)
+    }
+
+    lazy val optLeftRel = RuleUtils.getRelation(spark, l)
+    lazy val optRightRel = RuleUtils.getRelation(spark, r)
+
     isJoinConditionSupported(condition) &&
-    RuleUtils.getLogicalRelation(l).isDefined && RuleUtils.getLogicalRelation(r).isDefined &&
-    isPlanLinear(l) && isPlanLinear(r) && !isPlanModified(l) && !isPlanModified(r) &&
-    ensureAttributeRequirements(l, r, condition)
+    isPlanLinear(l) && isPlanLinear(r) &&
+    isEligible(optLeftRel) && isEligible(optRightRel) &&
+    ensureAttributeRequirements(optLeftRel.get, optRightRel.get, condition)
   }
 
   /**
@@ -158,21 +166,6 @@ object JoinIndexRule
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
 
   /**
-   * Check if the candidate plan is already modified by Hyperspace or not.
-   * This can be determined by an identifier in options field of HadoopFsRelation.
-   *
-   * @param plan Logical plan.
-   * @return true if the relation in the plan is modified by Hyperspace.
-   */
-  private def isPlanModified(plan: LogicalPlan): Boolean = {
-    plan.find {
-      case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
-        RuleUtils.isIndexApplied(fsRelation)
-      case _ => false
-    }.isDefined
-  }
-
-  /**
    * Requirements to support join optimizations using join indexes are as follows:
    *
    * 1. All Join condition attributes, i.e. attributes referenced in join condition
@@ -215,8 +208,8 @@ object JoinIndexRule
    *
    *
    * Algorithm:
-   * 1. Collect base table attributes from leaf LogicalRelation nodes. These are the output set
-   * from leaf nodes. (Non-[[LogicalRelation]] nodes could be in-memory tables for e.g.)
+   * 1. Collect base table attributes from the supported relation nodes. These are the output set
+   * from leaf nodes.
    * 2. Maintain a mapping of join condition attributes.
    * 3. For every equality condition (A == B), Ensure one-to-one mapping between A and B. A
    * should not be compared against any other attribute than B. B should not be compared with any
@@ -231,20 +224,20 @@ object JoinIndexRule
    * Note: this check might affect performance of query optimizer for very large query plans,
    * because of multiple collectLeaves calls. We call this method as late as possible.
    *
-   * @param l left logical plan
-   * @param r right logical plan
+   * @param l left relation
+   * @param r right relation
    * @param condition join condition
-   * @return true if all attributes in join condition are from base LogicalRelation nodes. False
+   * @return true if all attributes in join condition are from base relation nodes. False
    *         otherwise
    */
   private def ensureAttributeRequirements(
-      l: LogicalPlan,
-      r: LogicalPlan,
+      l: FileBasedRelation,
+      r: FileBasedRelation,
       condition: Expression): Boolean = {
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
-    val lBaseAttrs = relationOutputs(l).map(_.canonicalized)
-    val rBaseAttrs = relationOutputs(r).map(_.canonicalized)
+    val lBaseAttrs = l.plan.output.map(_.canonicalized)
+    val rBaseAttrs = r.plan.output.map(_.canonicalized)
 
     def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
       (lBaseAttrs.contains(c1) && rBaseAttrs.contains(c2)) ||
@@ -290,17 +283,20 @@ object JoinIndexRule
       left: LogicalPlan,
       right: LogicalPlan,
       joinCondition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val indexManager = Hyperspace
-      .getContext(spark)
-      .indexCollectionManager
+    val indexManager = Hyperspace.getContext(spark).indexCollectionManager
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
     //  See https://github.com/microsoft/hyperspace/issues/65
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val lBaseAttrs = relationOutputs(left).map(_.name)
-    val rBaseAttrs = relationOutputs(right).map(_.name)
+    // TODO: we can write an extractor that applies `isApplicable` so that we don't have to
+    //   get relations twice. Note that `getRelation` should always succeed since this has
+    //   been already checked in `isApplicable`.
+    val leftRelation = RuleUtils.getRelation(spark, left).get
+    val rightRelation = RuleUtils.getRelation(spark, right).get
+    val lBaseAttrs = leftRelation.plan.output.map(_.name)
+    val rBaseAttrs = rightRelation.plan.output.map(_.name)
 
     // Map of left resolved columns with their corresponding right resolved
     // columns from condition.
@@ -319,8 +315,8 @@ object JoinIndexRule
     val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
 
-    val leftRel = RuleUtils.getLogicalRelation(left).get
-    val rightRel = RuleUtils.getLogicalRelation(right).get
+    val leftRel = RuleUtils.getRelation(spark, left).get
+    val rightRel = RuleUtils.getRelation(spark, right).get
 
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
@@ -333,12 +329,8 @@ object JoinIndexRule
     compatibleIndexPairs.map(
       indexPairs =>
         JoinIndexRanker
-          .rank(spark, leftRel, rightRel, indexPairs)
+          .rank(spark, leftRel.plan, rightRel.plan, indexPairs)
           .head)
-  }
-
-  private def relationOutputs(l: LogicalPlan): Seq[Attribute] = {
-    l.collectLeaves().filter(_.isInstanceOf[LogicalRelation]).flatMap(_.output)
   }
 
   /**
@@ -377,10 +369,11 @@ object JoinIndexRule
    *         columns in a chosen index
    */
   private def allRequiredCols(plan: LogicalPlan): Seq[String] = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
     val cleaned = CleanupAliases(plan)
     val allReferences = cleaned.collect {
-      case _: LogicalRelation => Seq()
-      case p => p.references
+      case l: LeafNode if provider.isSupportedRelation(l) => Seq()
+      case other => other.references
     }.flatten
     val topLevelOutputs = cleaned.outputSet.toSeq
 

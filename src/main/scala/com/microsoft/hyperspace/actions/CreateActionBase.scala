@@ -18,12 +18,13 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.functions.input_file_name
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
@@ -63,19 +64,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     signatureProvider.signature(df.queryExecution.optimizedPlan) match {
       case Some(s) =>
-        val relations = sourceRelations(spark, df)
-        // Currently we only support to create an index on a LogicalRelation.
-        assert(relations.size == 1)
-
+        val relation = getRelation(spark, df)
         val sourcePlanProperties = SparkPlan.Properties(
-          relations,
+          Seq(relation.createRelationMetadata(fileIdTracker)),
           null,
           null,
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
         val coveringIndexProperties =
-          (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(spark, df)).toMap
+          (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -95,10 +93,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   }
 
   private def hasParquetAsSourceFormatProperty(
-      spark: SparkSession,
-      df: DataFrame): Option[(String, String)] = {
-    val relation = df.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation]
-    if (Hyperspace.getContext(spark).sourceProviderManager.hasParquetAsSourceFormat(relation)) {
+      relation: FileBasedRelation): Option[(String, String)] = {
+    if (relation.hasParquetAsSourceFormat) {
       Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true")
     } else {
       None
@@ -112,12 +108,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       None
     }
   }
-
-  protected def sourceRelations(spark: SparkSession, df: DataFrame): Seq[Relation] =
-    df.queryExecution.optimizedPlan.collect {
-      case p: LogicalRelation =>
-        Hyperspace.getContext(spark).sourceProviderManager.createRelation(p, fileIdTracker)
-    }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
@@ -137,6 +127,17 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         numBuckets,
         resolvedIndexedColumns,
         SaveMode.Overwrite)
+  }
+
+  protected def getRelation(spark: SparkSession, df: DataFrame): FileBasedRelation = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
+    val relations = df.queryExecution.optimizedPlan.collect {
+      case l: LeafNode if provider.isSupportedRelation(l) =>
+        provider.getRelation(l)
+    }
+    // Currently we only support creating an index on a single relation.
+    assert(relations.length == 1)
+    relations.head
   }
 
   private def resolveConfig(
@@ -169,11 +170,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
 
     val indexDF = if (hasLineage(spark)) {
+      val relation = getRelation(spark, df)
+
       // Lineage is captured using two sets of columns:
       // 1. DATA_FILE_ID_COLUMN column contains source data file id for each index record.
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
-      val missingPartitionColumns = getPartitionColumns(df).filter(
+      val partitionColumns = relation.partitionSchema.map(_.name)
+      val missingPartitionColumns = partitionColumns.filter(
         ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
 
@@ -190,9 +194,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
       import spark.implicits._
       val dataPathColumn = "_data_path"
-      val relation = df.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation]
-      val lineagePairs =
-        Hyperspace.getContext(spark).sourceProviderManager.lineagePairs(relation, fileIdTracker)
+      val lineagePairs = relation.lineagePairs(fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 
       df.withColumn(dataPathColumn, input_file_name())
@@ -205,16 +207,5 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
 
     (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
-  }
-
-  private def getPartitionColumns(df: DataFrame): Seq[String] = {
-    // Extract partition keys, if original data is partitioned.
-    val partitionSchemas = df.queryExecution.optimizedPlan.collect {
-      case LogicalRelation(HadoopFsRelation(_, pSchema, _, _, _, _), _, _, _) => pSchema
-    }
-
-    // Currently we only support creating an index on a single LogicalRelation.
-    assert(partitionSchemas.length == 1)
-    partitionSchemas.head.map(_.name)
   }
 }

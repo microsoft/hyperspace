@@ -21,11 +21,11 @@ import scala.util.Try
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
-import com.microsoft.hyperspace.util.{LogicalPlanUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.ResolverUtils
 
 class CreateAction(
     spark: SparkSession,
@@ -43,7 +43,8 @@ class CreateAction(
 
   final override def validate(): Unit = {
     // We currently only support createIndex() over HDFS file based scan nodes.
-    if (!LogicalPlanUtils.isLogicalRelation(df.queryExecution.optimizedPlan)) {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
+    if (!provider.isSupportedRelation(df.queryExecution.optimizedPlan)) {
       throw HyperspaceException(
         "Only creating index over HDFS file based scan nodes is supported.")
     }
