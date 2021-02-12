@@ -46,19 +46,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     })
 
   /**
-   * Runs createRelation() for each provider.
-   *
-   * @param logicalRelation Logical relation to create [[Relation]] from.
-   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
-   * @return [[Relation]] created from the given logical relation.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def createRelation(logicalRelation: LogicalRelation, fileIdTracker: FileIdTracker): Relation = {
-    run(p => p.createRelation(logicalRelation, fileIdTracker))
-  }
-
-  /**
    * Runs refreshRelation() for each provider.
    *
    * @param relation [[Relation]] to refresh.
@@ -90,31 +77,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    */
   def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
     run(p => p.allFiles(logicalRelation))
-  }
-
-  /**
-   * Runs lineagePairs() for each provider.
-   *
-   * @param logicalRelation Logical Relation to check the relation type.
-   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
-   * @return List of (file path, file id).
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def lineagePairs(
-      logicalRelation: LogicalRelation,
-      fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    run(p => p.lineagePairs(logicalRelation, fileIdTracker))
-  }
-
-  /**
-   * Returns whether the given relation has parquet source files or not.
-   *
-   * @param logicalRelation Logical Relation to check the source file format.
-   * @return True if source files in the given relation are parquet.
-   */
-  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Boolean = {
-    run(p => p.hasParquetAsSourceFormat(logicalRelation))
   }
 
   /**

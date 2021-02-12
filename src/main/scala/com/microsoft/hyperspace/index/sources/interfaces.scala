@@ -107,6 +107,25 @@ trait FileBasedRelation {
   def createLogicalRelation(
       hadoopFsRelation: HadoopFsRelation,
       newOutput: Seq[AttributeReference]): LogicalRelation
+
+  // APIs defined are below are related to index maintenance.
+
+  /**
+   * Creates [[Relation]] for IndexLogEntry using the current relation.
+   */
+  def createRelationMetadata(fileIdTracker: FileIdTracker): Relation
+
+  /**
+   * Returns whether the current relation has parquet source files or not.
+   *
+   * @return True if source files of the current relation are parquet.
+   */
+  def hasParquetAsSourceFormat: Boolean
+
+  /**
+   * Returns list of pairs of (file path, file id) to build lineage column.
+   */
+  def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)]
 }
 
 /**
@@ -117,22 +136,6 @@ trait FileBasedRelation {
  * @since 0.4.0
  */
 trait FileBasedSourceProvider extends SourceProvider {
-
-  /**
-   * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
-   *
-   * This API is used when an index is created.
-   *
-   * If the given logical relation does not belong to this provider, None should be returned.
-   *
-   * @param logicalRelation Logical relation to derive [[Relation]] from.
-   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
-   * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  def createRelation(
-      logicalRelation: LogicalRelation,
-      fileIdTracker: FileIdTracker): Option[Relation]
 
   /**
    * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
@@ -162,27 +165,6 @@ trait FileBasedSourceProvider extends SourceProvider {
    * @return List of [[FileStatus]] for the given relation.
    */
   def allFiles(logicalRelation: LogicalRelation): Option[Seq[FileStatus]]
-
-  /**
-   * Returns list of pairs of (file path, file id) to build lineage column.
-   *
-   * File paths should be the same format with "input_file_name()" of the given relation type.
-   *
-   * @param logicalRelation Logical relation to check the relation type.
-   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
-   * @return List of pairs of (file path, file id).
-   */
-  def lineagePairs(
-      logicalRelation: LogicalRelation,
-      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]]
-
-  /**
-   * Returns whether the given relation has parquet source files or not.
-   *
-   * @param logicalRelation Logical Relation to check the source file format.
-   * @return True if source files in the given relation are parquet.
-   */
-  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean]
 
   /**
    * Returns true if the given logical plan is a supported relation.

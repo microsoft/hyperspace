@@ -65,7 +65,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   /**
    * The partition schema of the current relation.
    */
-  def partitionSchema: StructType = plan.relation match {
+  override def partitionSchema: StructType = plan.relation match {
     case HadoopFsRelation(location: FileIndex, _, _, _, _, _) =>
       location.partitionSchema
   }
@@ -73,7 +73,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   /**
    * The optional partition base path of the current relation.
    */
-  def partitionBasePath: Option[String] = plan.relation match {
+  override def partitionBasePath: Option[String] = plan.relation match {
     case HadoopFsRelation(p: PartitioningAwareFileIndex, _, _, _, _, _)
         if p.partitionSpec.partitions.nonEmpty =>
       // For example, we could have the following in PartitionSpec:
@@ -112,71 +112,21 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
     plan.copy(relation = hadoopFsRelation, output = newOutput)
   }
 
-  private def fingerprint(fileStatus: FileStatus): String = {
-    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
-      fileStatus.getPath.toString
-  }
-
-  private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] =
-    try {
-      // Keep the `asInstanceOf` to force casting or fallback because Databricks
-      // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
-      // standard API's `FileStatus`.
-      index.allFiles.map(_.asInstanceOf[FileStatus])
-    } catch {
-      case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
-        val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
-        val clazz = Utils.classForName(dbClassName)
-        val lengthMethod = clazz.getMethod("length")
-        val isDirMethod = clazz.getMethod("isDir")
-        val modificationTimeMethod = clazz.getMethod("modificationTime")
-        val pathMethod = clazz.getMethod("path")
-        index.allFiles.asInstanceOf[Seq[_]].map { f =>
-          new FileStatus(
-            lengthMethod.invoke(f).asInstanceOf[Long],
-            isDirMethod.invoke(f).asInstanceOf[Boolean],
-            0,
-            0,
-            modificationTimeMethod.invoke(f).asInstanceOf[Long],
-            new Path(pathMethod.invoke(f).asInstanceOf[String]))
-        }
-    }
-}
-
-/**
- * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
- *
- * This source can support relations that meet the following criteria:
- *   - The relation is [[HadoopFsRelation]] with [[PartitioningAwareFileIndex]] as file index.
- *   - Its file format implements [[DataSourceRegister]].
- */
-class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
-  private val supportedFormats: CacheWithTransform[String, Set[String]] =
-    new CacheWithTransform[String, Set[String]]({ () =>
-      HyperspaceConf.supportedFileFormatsForDefaultFileBasedSource(spark)
-    }, { formats =>
-      formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
-    })
-
   /**
-   * Creates [[Relation]] for IndexLogEntry using the given [[LogicalRelation]].
+   * Creates [[Relation]] for IndexLogEntry for the current relation.
    *
-   * @param logicalRelation Logical relation to derive [[Relation]] from.
    * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
-   * @return [[Relation]] object if the given 'logicalRelation' can be processed by this provider.
-   *         Otherwise, None.
+   * @return [[Relation]] object that describes the current relation.
    */
-  override def createRelation(
-      logicalRelation: LogicalRelation,
-      fileIdTracker: FileIdTracker): Option[Relation] = {
-    logicalRelation.relation match {
+  override def createRelationMetadata(fileIdTracker: FileIdTracker): Relation = {
+    plan.relation match {
       case HadoopFsRelation(
           location: PartitioningAwareFileIndex,
           _,
           dataSchema,
           _,
           fileFormat,
-          options) if isSupportedFileFormat(fileFormat) =>
+          options) =>
         val files = filesFromIndex(location)
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
@@ -193,7 +143,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
         }
 
         // Get basePath of hive-partitioned data sources, if applicable.
-        val basePathOpt = partitionBasePath(location).flatten.map("basePath" -> _)
+        val basePathOpt = partitionBasePath.map("basePath" -> _)
 
         // "path" key in options can incur multiple data read unexpectedly.
         val opts = caseSensitiveOptions - "path" ++ basePathOpt
@@ -228,11 +178,82 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
           case _ => location.rootPaths.map(_.toString)
         }
 
-        Some(
-          Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json, fileFormatName, opts))
-      case _ => None
+        Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json, fileFormatName, opts)
     }
   }
+
+  private def fingerprint(fileStatus: FileStatus): String = {
+    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
+      fileStatus.getPath.toString
+  }
+
+  private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] = {
+    try {
+      // Keep the `asInstanceOf` to force casting or fallback because Databricks
+      // `InMemoryFileIndex` implementation returns `SerializableFileStatus` instead of the
+      // standard API's `FileStatus`.
+      index.allFiles.map(_.asInstanceOf[FileStatus])
+    } catch {
+      case e: ClassCastException if e.getMessage.contains("SerializableFileStatus") =>
+        val dbClassName = "org.apache.spark.sql.execution.datasources.SerializableFileStatus"
+        val clazz = Utils.classForName(dbClassName)
+        val lengthMethod = clazz.getMethod("length")
+        val isDirMethod = clazz.getMethod("isDir")
+        val modificationTimeMethod = clazz.getMethod("modificationTime")
+        val pathMethod = clazz.getMethod("path")
+        index.allFiles.asInstanceOf[Seq[_]].map { f =>
+          new FileStatus(
+            lengthMethod.invoke(f).asInstanceOf[Long],
+            isDirMethod.invoke(f).asInstanceOf[Boolean],
+            0,
+            0,
+            modificationTimeMethod.invoke(f).asInstanceOf[Long],
+            new Path(pathMethod.invoke(f).asInstanceOf[String]))
+        }
+    }
+  }
+
+  /**
+   * Returns whether the current relation has parquet source files or not.
+   *
+   * @return True if source files of the current relation are parquet.
+   */
+  def hasParquetAsSourceFormat: Boolean = plan.relation match {
+    case h: HadoopFsRelation =>
+      h.fileFormat.asInstanceOf[DataSourceRegister].shortName.equals("parquet")
+  }
+
+  /**
+   * Returns list of pairs of (file path, file id) to build lineage column.
+   *
+   * File paths should be the same format as "input_file_name()" of the given relation type.
+   * For [[DefaultFileBasedRelation]], each file path should be in this format:
+   *   `file:///path/to/file`
+   *
+   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
+   * @return List of pairs of (file path, file id).
+   */
+  override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
+    fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+      (kv._1._1.replace("file:/", "file:///"), kv._2)
+    }
+  }
+}
+
+/**
+ * Default implementation for file-based Spark built-in sources such as parquet, csv, json, etc.
+ *
+ * This source can support relations that meet the following criteria:
+ *   - The relation is [[HadoopFsRelation]] with [[PartitioningAwareFileIndex]] as file index.
+ *   - Its file format implements [[DataSourceRegister]].
+ */
+class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
+  private val supportedFormats: CacheWithTransform[String, Set[String]] =
+    new CacheWithTransform[String, Set[String]]({ () =>
+      HyperspaceConf.supportedFileFormatsForDefaultFileBasedSource(spark)
+    }, { formats =>
+      formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
+    })
 
   /**
    * Returns true if the given [[FileFormat]] is supported, false otherwise.
@@ -289,17 +310,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
-   * Fingerprints a file.
-   *
-   * @param fileStatus File status.
-   * @return The fingerprint of a file.
-   */
-  private def fingerprint(fileStatus: FileStatus): String = {
-    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
-      fileStatus.getPath.toString
-  }
-
-  /**
    * Retrieves all input files from the given [[LogicalRelation]].
    *
    * @param logicalRelation Logical relation to retrieve input files from.
@@ -310,74 +320,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
         Some(filesFromIndex(location))
       case _ => None
-    }
-  }
-
-  /**
-   * Constructs the basePath for the given [[FileIndex]].
-   *
-   * @param location Partitioned data location.
-   * @return Optional basePath to read the given partitioned location as explained below:
-   *         Some(Some(path)) => The given location is supported and partition is specified.
-   *         Some(None) => The given location is supported but partition is not specified.
-   *         None => The given location is not supported.
-   */
-  def partitionBasePath(location: FileIndex): Option[Option[String]] = {
-    location match {
-      case p: PartitioningAwareFileIndex if p.partitionSpec.partitions.nonEmpty =>
-        // For example, we could have the following in PartitionSpec:
-        //   - partition columns = "col1", "col2"
-        //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
-        // , and going up the same number of directory levels as the number of partition columns
-        // will compute the base path. Note that PartitionSpec.partitions will always contain
-        // all the partitions in the path, so "partitions.head" is taken as an initial value.
-        val basePath = p.partitionSpec.partitionColumns
-          .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
-        Some(Some(basePath.toString))
-      case _: PartitioningAwareFileIndex => Some(None)
-      case _ => None
-    }
-  }
-
-  /**
-   * Returns list of pairs of (file path, file id) to build lineage column.
-   *
-   * File paths should be the same format as "input_file_name()" of the given relation type.
-   * For [[DefaultFileBasedSource]], each file path should be in this format:
-   *   `file:///path/to/file`
-   *
-   * @param logicalRelation Logical relation to check the relation type.
-   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
-   * @return List of pairs of (file path, file id).
-   */
-  override def lineagePairs(
-      logicalRelation: LogicalRelation,
-      fileIdTracker: FileIdTracker): Option[Seq[(String, Long)]] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-          if isSupportedFileFormat(format) =>
-        Some(fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-          (kv._1._1.replace("file:/", "file:///"), kv._2)
-        })
-      case _ =>
-        None
-    }
-  }
-
-  /**
-   * Returns whether the given relation has parquet source files or not.
-   *
-   * @param logicalRelation Logical Relation to check the source file format.
-   * @return True if source files in the given relation are parquet.
-   */
-  override def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Option[Boolean] = {
-    logicalRelation.relation match {
-      case HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, format, _)
-          if isSupportedFileFormat(format) =>
-        val fileFormatName = format.asInstanceOf[DataSourceRegister].shortName
-        Some(fileFormatName.equals("parquet"))
-      case _ =>
-        None
     }
   }
 
