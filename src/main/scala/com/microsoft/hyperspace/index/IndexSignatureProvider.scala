@@ -22,7 +22,7 @@ import com.microsoft.hyperspace.util.HashingUtils
 
 /**
  * [[IndexSignatureProvider]] provides signature for a logical plan based on:
- *  1- Files and their properties in LogicalRelation operator(s) of the plan;
+ *  1- Files and their properties in relations of the plan;
  *  2- Overall structure of the plan w.r.t its operators' types.
  *
  * [[FileBasedSignatureProvider]] is used for (1) and [[PlanSignatureProvider]] is used for (2).

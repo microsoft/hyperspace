@@ -18,13 +18,12 @@ package com.microsoft.hyperspace.index.sources
 
 import scala.util.{Success, Try}
 
-import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.{FileIndex, LogicalRelation}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
+import com.microsoft.hyperspace.index.Relation
 import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
 
 /**
@@ -45,28 +44,15 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     })
 
   /**
-   * Runs createRelation() for each provider.
-   *
-   * @param logicalRelation Logical relation to create [[Relation]] from.
-   * @param fileIdTracker [[FileIdTracker]] to use when populating the data of [[Relation]].
-   * @return [[Relation]] created from the given logical relation.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def createRelation(logicalRelation: LogicalRelation, fileIdTracker: FileIdTracker): Relation = {
-    run(p => p.createRelation(logicalRelation, fileIdTracker))
-  }
-
-  /**
-   * Runs refreshRelation() for each provider.
+   * Runs refreshRelationMetadata() for each provider.
    *
    * @param relation [[Relation]] to refresh.
    * @return Refreshed [[Relation]].
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
+   * @throws [[HyperspaceException]] if multiple providers returns [[Some]] or
+   *         if no providers return [[Some]].
    */
-  def refreshRelation(relation: Relation): Relation = {
-    run(p => p.refreshRelation(relation))
+  def refreshRelationMetadata(relation: Relation): Relation = {
+    run(p => p.refreshRelationMetadata(relation))
   }
 
   /**
@@ -80,70 +66,35 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
-   * Runs signature() for each provider.
+   * Returns true if the given logical plan is a supported relation. If all of the registered
+   * providers return None, this returns false. (e.g, the given plan could be RDD-based relation,
+   * which is not applicable).
    *
-   * @param logicalRelation Logical relation to compute signature from.
-   * @return Computed signature.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
+   * @param plan Logical plan to check if it's supported.
+   * @return True if the given plan is a supported relation.
    */
-  def signature(logicalRelation: LogicalRelation): String = {
-    run(p => p.signature(logicalRelation))
+  def isSupportedRelation(plan: LogicalPlan): Boolean = {
+    runWithDefault(p => p.isSupportedRelation(plan))(false)
   }
 
   /**
-   * Runs allFiles() for each provider.
+   * Returns the [[FileBasedRelation]] that wraps the given logical plan.
+   * If you are using this from an extractor, check if the logical plan
+   * is supported first by using [[isSupportedRelation]]. Otherwise, HyperspaceException can be
+   * thrown if none of the registered providers supports the given plan.
    *
-   * @param logicalRelation Logical relation to retrieve all input files.
-   * @return List of all input files.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
+   * @param plan Logical plan to wrap to [[FileBasedRelation]]
+   * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
-  def allFiles(logicalRelation: LogicalRelation): Seq[FileStatus] = {
-    run(p => p.allFiles(logicalRelation))
-  }
-
-  /**
-   * Runs partitionBasePath() for each provider.
-   *
-   * @param location Partitioned location.
-   * @return Optional basePath string to read the given partitioned location.
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def partitionBasePath(location: FileIndex): Option[String] = {
-    run(p => p.partitionBasePath(location))
-  }
-
-  /**
-   * Runs lineagePairs() for each provider.
-   *
-   * @param logicalRelation Logical Relation to check the relation type.
-   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
-   * @return List of (file path, file id).
-   * @throws HyperspaceException if multiple providers returns [[Some]] or
-   *                             if no providers return [[Some]].
-   */
-  def lineagePairs(
-      logicalRelation: LogicalRelation,
-      fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    run(p => p.lineagePairs(logicalRelation, fileIdTracker))
-  }
-
-  /**
-   * Returns whether the given relation has parquet source files or not.
-   *
-   * @param logicalRelation Logical Relation to check the source file format.
-   * @return True if source files in the given relation are parquet.
-   */
-  def hasParquetAsSourceFormat(logicalRelation: LogicalRelation): Boolean = {
-    run(p => p.hasParquetAsSourceFormat(logicalRelation))
+  def getRelation(plan: LogicalPlan): FileBasedRelation = {
+    run(p => p.getRelation(plan))
   }
 
   /**
    * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
    * [[Option]] for each provider built. This function ensures that only one provider returns
-   * [[Some]] when 'f' is executed.
+   * [[Some]] when 'f' is executed. If all of the providers return None, it will throw
+   * HyperspaceException.
    *
    * @param f Function that runs a [[FileBasedSourceProvider]]'s API that returns [[Option]]
    *          given a provider.
@@ -151,6 +102,24 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * @return The object in [[Some]] that 'f' returns.
    */
   private def run[A](f: FileBasedSourceProvider => Option[A]): A = {
+    runWithDefault(f) {
+      throw HyperspaceException("No source provider returned valid results.")
+    }
+  }
+
+  /**
+   * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
+   * [[Option]] for each provider built. This function ensures that only one provider returns
+   * [[Some]] when 'f' is executed. If all of the providers return None, it will return the given
+   * default value.
+   *
+   * @param f Function that runs a [[FileBasedSourceProvider]]'s API that returns [[Option]]
+   *          given a provider.
+   * @param default Expression to compute the default value.
+   * @tparam A Type of the object that 'f' returns, wrapped in [[Option]].
+   * @return The object in [[Some]] that 'f' returns.
+   */
+  private def runWithDefault[A](f: FileBasedSourceProvider => Option[A])(default: => A): A = {
     sourceProviders
       .load()
       .foldLeft(Option.empty[(A, FileBasedSourceProvider)]) { (result, provider) =>
@@ -168,7 +137,7 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
       }
       .map(_._1)
       .getOrElse {
-        throw HyperspaceException("No source provider returned valid results.")
+        default
       }
   }
 
@@ -178,8 +147,8 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    *
    * @param builderClassNames Name of classes to load as [[SourceProviderBuilder]].
    * @return [[FileBasedSourceProvider]] objects built.
-   * @throws HyperspaceException if given builders cannot be loaded or
-   *                             if builder doesn't build [[FileBasedSourceProvider]].
+   * @throws [[HyperspaceException]] if given builders cannot be loaded or
+   *         if builder doesn't build [[FileBasedSourceProvider]].
    */
   private def buildProviders(builderClassNames: String): Seq[FileBasedSourceProvider] = {
     val builders = builderClassNames.split(",").map(_.trim).map { name =>
