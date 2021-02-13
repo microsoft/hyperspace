@@ -58,7 +58,7 @@ trait Action extends HyperspaceEventLogging with Logging with ActiveSparkSession
   def op(): Unit
 
   private def end(): Unit = {
-    val newId = baseId + 2
+    val newId = endId
     val entry = logEntry
     entry.state = finalState
     entry.id = newId

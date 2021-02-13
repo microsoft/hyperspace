@@ -78,14 +78,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
         val coveringIndexProperties =
-          (hasLineageProperty(spark) ++
-            hasParquetAsSourceFormatProperty(relation)).toMap ++
-            Hyperspace
-              .getContext(spark)
-              .sourceProviderManager
-              .enrichIndexProperties(
-                sourcePlanProperties.relations.head,
-                prevIndexProperties() + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString))
+          Hyperspace
+            .getContext(spark)
+            .sourceProviderManager
+            .enrichIndexProperties(
+              sourcePlanProperties.relations.head,
+              prevIndexProperties() + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
+                ++ hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation))
 
         IndexLogEntry(
           indexConfig.indexName,
