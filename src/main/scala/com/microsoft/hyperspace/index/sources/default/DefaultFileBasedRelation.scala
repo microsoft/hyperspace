@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HashingUtils
@@ -235,4 +235,21 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
       (kv._1._1.replace("file:/", "file:///"), kv._2)
     }
   }
+
+  /**
+   * Returns IndexLogEntry of the closest index version for the given relation.
+   *
+   * curFiles is used to calculate the similarity with each index version data.
+   * Currently, this provider just returns the latest version of index.
+   *
+   * @param curFiles List of FileInfo for the source files in the relation.
+   * @param index Candidate index to be applied.
+   * @return IndexLogEntry of the closest version among available index versions.
+   */
+  override def closestIndexVersion(
+      curFiles: Seq[FileInfo],
+      index: IndexLogEntry): IndexLogEntry = {
+    index
+  }
+
 }

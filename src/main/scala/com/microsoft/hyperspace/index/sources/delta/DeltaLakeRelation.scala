@@ -22,7 +22,8 @@ import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
+import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -30,7 +31,7 @@ import com.microsoft.hyperspace.util.PathUtils
  * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
  */
 class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
-  extends DefaultFileBasedRelation(spark, plan) {
+    extends DefaultFileBasedRelation(spark, plan) {
 
   /**
    * Computes the signature of the current relation.
@@ -82,7 +83,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
-        Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = "delta"
 
         // Use case-sensitive map if the provided options are case insensitive.
@@ -141,5 +142,87 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
       /* blockSize */ 1,
       /* modificationTime */ modificationTime,
       path)
+  }
+
+  private def deltaLakeVersionHistory(index: IndexLogEntry): Seq[(Int, Int)] = {
+    val versions =
+      index.derivedDataset.properties.properties
+        .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
+
+    versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (list, versionStr) =>
+      val pair = versionStr.split(":")
+      val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
+      if (list.nonEmpty && list.head._2 == deltaTableVersion) {
+        // Omit if the delta lake version is the same. In this case, we only take the higher
+        // index log version as this is usually from index optimizations.
+        list
+      } else {
+        (indexLogVersion, deltaTableVersion) +: list
+      }
+    }
+  }
+
+  /**
+   * Returns IndexLogEntry of the closest index version for the given relation.
+   *
+   * curFiles is used to calculate the similarity with each index version data.
+   * Delta Lake source provider utilizes the history information of DELTA_VERSION_HISTORY_PROPERTY
+   * to find the closet version of the index.
+   *
+   * @param curFiles List of FileInfo for the source files in the relation.
+   * @param index Candidate index to be applied.
+   * @return IndexLogEntry of the closest version among available index versions.
+   */
+  override def closestIndexVersion(
+      curFiles: Seq[FileInfo],
+      index: IndexLogEntry): IndexLogEntry = {
+    // Seq of ( index log version, delta lake table version )
+    val versions = deltaLakeVersionHistory(index)
+    lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
+    def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
+      indexManager
+        .getLogManager(index.name)
+        .get
+        .getLog(logVersion)
+        .get
+        .asInstanceOf[IndexLogEntry]
+    }
+
+    plan.relation match {
+      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+        val equalOrLessLastIndex = versions.lastIndexWhere(location.tableVersion >= _._2)
+        if (equalOrLessLastIndex == versions.size - 1) {
+          // Use the latest version.
+          index
+        } else if (equalOrLessLastIndex == -1) {
+          getIndexLogEntry(versions.head._1)
+        } else if (versions(equalOrLessLastIndex)._2 == location.tableVersion) {
+          getIndexLogEntry(versions(equalOrLessLastIndex)._1)
+        } else {
+          val prevPair = versions(equalOrLessLastIndex)
+          val nextPair = versions(equalOrLessLastIndex + 1)
+
+          val prevLog = getIndexLogEntry(prevPair._1)
+          val nextLog = getIndexLogEntry(nextPair._1)
+
+          val curFilesSize = curFiles.map(_.size).sum
+
+          val prevCommonBytes =
+            curFiles.filter(prevLog.sourceFileInfoSet.contains).map(_.size).sum
+          val prevAppendedBytes = curFilesSize - prevCommonBytes
+          val prevDeletedBytes = prevLog.sourceFilesSizeInBytes - prevCommonBytes
+
+          val nextCommonBytes =
+            curFiles.filter(nextLog.sourceFileInfoSet.contains).map(_.size).sum
+          val nextAppendedBytes = curFilesSize - nextCommonBytes
+          val nextDeletedBytes = nextLog.sourceFilesSizeInBytes - nextCommonBytes
+
+          if ((prevAppendedBytes + prevDeletedBytes) < (nextAppendedBytes + nextDeletedBytes)) {
+            prevLog
+          } else {
+            nextLog
+          }
+        }
+    }
   }
 }

@@ -48,11 +48,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     HyperspaceConf.indexLineageEnabled(spark)
   }
 
+  protected def prevIndexProperties(): Map[String, String] = {
+    Map()
+  }
+
   protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
       indexConfig: IndexConfig,
-      path: Path): IndexLogEntry = {
+      path: Path,
+      versionId: Int): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path, spark.sessionState.newHadoopConf())
     val numBuckets = numBucketsForIndex(spark)
 
@@ -73,7 +78,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
         val coveringIndexProperties =
-          (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
+          (hasLineageProperty(spark) ++
+            hasParquetAsSourceFormatProperty(relation)).toMap ++
+            Hyperspace
+              .getContext(spark)
+              .sourceProviderManager
+              .enrichIndexProperties(
+                sourcePlanProperties.relations.head,
+                prevIndexProperties() + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString))
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -177,8 +189,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
       val partitionColumns = relation.partitionSchema.map(_.name)
-      val missingPartitionColumns = partitionColumns.filter(
-        ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
+      val missingPartitionColumns =
+        partitionColumns.filter(ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
 
       // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a

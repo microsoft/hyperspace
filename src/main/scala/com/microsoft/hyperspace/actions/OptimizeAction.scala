@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, OPTIMIZING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
@@ -132,6 +132,10 @@ class OptimizeAction(
     (filesToOptimize.flatten.toSeq, singleFilesToIgnore.flatten.toSeq ++ largeFilesToIgnore)
   }
 
+  override protected def prevIndexProperties(): Map[String, String] = {
+    previousIndexLogEntry.derivedDataset.properties.properties
+  }
+
   override def logEntry: LogEntry = {
     // Update `previousIndexLogEntry` to keep `filesToIngore` files and append to it
     // the list of newly created index files.
@@ -139,6 +143,17 @@ class OptimizeAction(
     val absolutePath = PathUtils.makeAbsolute(indexDataPath.toString, hadoopConf)
     val newContent =
       Content.fromDirectory(absolutePath, fileIdTracker, hadoopConfiguration = hadoopConf)
+    val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.copy(
+      properties = previousIndexLogEntry.derivedDataset.properties
+        .copy(
+          properties =
+              Hyperspace
+                .getContext(spark)
+                .sourceProviderManager
+                .enrichIndexProperties(
+                  previousIndexLogEntry.relations.head,
+                  prevIndexProperties() + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
+
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {
         val fs = new Path(filesToIgnore.head.name).getFileSystem(hadoopConf)
@@ -148,9 +163,9 @@ class OptimizeAction(
         Directory.fromLeafFiles(filesToIgnoreStatuses, fileIdTracker)
       }
       val mergedContent = Content(newContent.root.merge(filesToIgnoreDirectory))
-      previousIndexLogEntry.copy(content = mergedContent)
+      previousIndexLogEntry.copy(derivedDataset = updatedDerivedDataset, content = mergedContent)
     } else {
-      previousIndexLogEntry.copy(content = newContent)
+      previousIndexLogEntry.copy(derivedDataset = updatedDerivedDataset, content = newContent)
     }
   }
 

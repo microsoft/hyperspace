@@ -56,9 +56,6 @@ object RuleUtils {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
 
-    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
-    val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
-
     def signatureValid(entry: IndexLogEntry): Boolean = {
       entry.withCachedTag(relation.plan, IndexLogEntryTags.SIGNATURE_MATCHED) {
         val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
@@ -76,18 +73,20 @@ object RuleUtils {
       }
     }
 
-    def isHybridScanCandidate(
-        entry: IndexLogEntry,
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
+    val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
+
+    def getHybridScanCandidate(
+        index: IndexLogEntry,
         inputSourceFiles: Seq[FileInfo],
-        inputSourceFilesSizeInBytes: Long): Boolean = {
-      // TODO: Some threshold about the similarity of source data files - number of common files or
-      //  total size of common files.
-      //  See https://github.com/microsoft/hyperspace/issues/159
+        inputSourceFilesSizeInBytes: Long): Option[IndexLogEntry] = {
       // TODO: As in [[PlanSignatureProvider]], Source plan signature comparison is required to
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
+      val entry = relation.closestIndexVersion(inputSourceFiles, index)
+
+      if (entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
         // Find the number of common files between the source relation and index source files.
         // The total size of common files are collected and tagged for candidate.
         val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
@@ -126,6 +125,10 @@ object RuleUtils {
             !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
         }
         isCandidate
+      }) {
+        Some(entry)
+      } else {
+        None
       }
     }
 
@@ -164,8 +167,14 @@ object RuleUtils {
       }
       prepareHybridScanCandidateSelection(spark, relation.plan, indexes)
       val totalSizeInBytes = inputSourceFiles.map(_.size).sum
-      indexes.filter(index =>
-        index.created && isHybridScanCandidate(index, inputSourceFiles, totalSizeInBytes))
+
+      indexes.flatMap { index =>
+        if (index.created) {
+          getHybridScanCandidate(index, inputSourceFiles, totalSizeInBytes)
+        } else {
+          None
+        }
+      }
     } else {
       indexes.filter(index => index.created && signatureValid(index))
     }

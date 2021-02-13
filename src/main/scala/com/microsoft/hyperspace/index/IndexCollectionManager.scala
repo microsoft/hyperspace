@@ -151,7 +151,7 @@ class IndexCollectionManager(
       indexLogManagerFactory.create(path, hadoopConf))
   }
 
-  private def getLogManager(indexName: String): Option[IndexLogManager] = {
+  private[hyperspace] def getLogManager(indexName: String): Option[IndexLogManager] = {
     val hadoopConf = spark.sessionState.newHadoopConf()
     val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
       .getIndexPath(indexName)

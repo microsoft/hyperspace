@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
+import com.microsoft.hyperspace.index.{FileIdTracker, FileInfo, IndexLogEntry, Relation}
 
 /**
  * ::Experimental::
@@ -113,6 +113,19 @@ trait FileBasedRelation extends SourceRelation {
    * Returns list of pairs of (file path, file id) to build lineage column.
    */
   def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)]
+
+  /**
+   * Returns IndexLogEntry of the closest index version for the given relation.
+   *
+   * curFiles is used to calculate the similarity with each index version data.
+   *
+   * @param curFiles List of FileInfo for the source files in the relation.
+   * @param index Candidate index to be applied.
+   * @return IndexLogEntry of the closest version among available index versions.
+   */
+  def closestIndexVersion(
+      curFiles: Seq[FileInfo],
+      index: IndexLogEntry): IndexLogEntry
 }
 
 /**
@@ -190,4 +203,15 @@ trait FileBasedSourceProvider extends SourceProvider {
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation]
+
+  /**
+   * Returns enriched index properties.
+   *
+   * @param relation Logical relation to retrieve necessary information.
+   * @param previousProperties Index properties of previous index version.
+   * @return Updated index properties for index creation or refreshment.
+   */
+  def enrichIndexProperties(
+      relation: Relation,
+      previousProperties: Map[String, String]): Option[Map[String, String]]
 }

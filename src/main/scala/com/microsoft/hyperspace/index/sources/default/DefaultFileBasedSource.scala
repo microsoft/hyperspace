@@ -128,6 +128,26 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
       Some(new DefaultFileBasedRelation(spark, l))
     case _ => None
   }
+
+  /**
+   * Returns enriched index properties.
+   *
+   * Currently, there is no update for this provider.
+   *
+   * @param relation Logical relation to retrieve necessary information.
+   * @param previousProperties Index properties of previous index version.
+   * @return Updated index properties for index creation or refreshment.
+   */
+  override def enrichIndexProperties(
+      relation: Relation,
+      previousProperties: Map[String, String]): Option[Map[String, String]] = {
+    if (isSupportedFileFormatName(relation.fileFormat)) {
+      Some(previousProperties)
+    } else {
+      None
+    }
+  }
+
 }
 
 /**

@@ -104,4 +104,6 @@ trait IndexManager {
    * @return Index metadata and statistics as a [[DataFrame]].
    */
   def index(indexName: String): DataFrame
+
+  private[hyperspace] def getLogManager(indexName: String): Option[IndexLogManager]
 }

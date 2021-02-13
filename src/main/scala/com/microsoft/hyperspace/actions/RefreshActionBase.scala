@@ -63,6 +63,10 @@ private[actions] abstract class RefreshActionBase(
     previousIndexLogEntry.hasLineageColumn
   }
 
+  override protected def prevIndexProperties(): Map[String, String] = {
+    previousIndexLogEntry.derivedDataset.properties.properties
+  }
+
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations

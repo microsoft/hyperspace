@@ -91,6 +91,19 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
+   * Returns enriched index properties.
+   *
+   * @param relation Logical relation to retrieve necessary information.
+   * @param previousProperties Index properties of previous index version.
+   * @return New property entries for index creation or refreshment.
+   */
+  def enrichIndexProperties(
+      relation: Relation,
+      previousProperties: Map[String, String]): Map[String, String] = {
+    run(p => p.enrichIndexProperties(relation, previousProperties))
+  }
+
+  /**
    * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
    * [[Option]] for each provider built. This function ensures that only one provider returns
    * [[Some]] when 'f' is executed. If all of the providers return None, it will throw
