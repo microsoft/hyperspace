@@ -388,8 +388,6 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
 
           // Get the timestamp string for time travel query using "timestampAsOf" option.
           val timestampStr = getSparkFormattedTimestamps(System.currentTimeMillis).head
-          // Sleep 1 second because the unit of commit timestamp is second.
-          Thread.sleep(1000)
 
           if (doRefresh) {
             hyperspace.refreshIndex("deltaIndex", mode = "full")
@@ -450,8 +448,6 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
 
         // Get the timestamp string for time travel query using "timestampAsOf" option.
         val timestampStr = getSparkFormattedTimestamps(System.currentTimeMillis).head
-        // Sleep 1 second because the unit of commit timestamp is second.
-        Thread.sleep(1000)
 
         if (doRefresh) {
           hyperspace.refreshIndex(indexName, mode = "incremental")
