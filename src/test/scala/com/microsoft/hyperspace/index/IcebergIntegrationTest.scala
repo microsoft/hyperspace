@@ -406,7 +406,7 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
         .append("<----:     +- *(1) Filter isnotnull(Col1#1)---->")
         .append(defaultDisplayMode.newLine)
         .append("<----:        +- *(1) ScanV2 iceberg[Col1#, Col2#] (Filters: [isnotnull(Col1#)], Options: " +
-            truncate(s"[path=$dataPath,paths=[]]") + ")---->")
+          truncate(s"[path=$dataPath,paths=[]]") + ")---->")
         .append(defaultDisplayMode.newLine)
         .append("<----+- *(2) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
         .append(defaultDisplayMode.newLine)
@@ -415,7 +415,7 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
         .append("      <----+- *(2) Filter isnotnull(Col1#)---->")
         .append(defaultDisplayMode.newLine)
         .append("         <----+- *(2) ScanV2 iceberg[Col1#, Col2#] (Filters: [isnotnull(Col1#)], Options: " +
-            truncate(s"[path=$dataPath,paths=[]]") + ")---->")
+          truncate(s"[path=$dataPath,paths=[]]") + ")---->")
         .append(defaultDisplayMode.newLine)
         .append(defaultDisplayMode.newLine)
         .append("=============================================================")

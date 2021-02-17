@@ -17,28 +17,22 @@
 package com.microsoft.hyperspace.index.sources.iceberg
 
 import collection.JavaConverters._
-import java.io.IOException
 import org.apache.hadoop.fs.{FileStatus, Path}
-import org.apache.iceberg.{CombinedScanTask, FileScanTask, Table, TableProperties, TableScan}
+import org.apache.iceberg.{FileScanTask, Schema, Table}
 import org.apache.iceberg.catalog.TableIdentifier
-import org.apache.iceberg.expressions.Expressions
 import org.apache.iceberg.hadoop.HadoopTables
 import org.apache.iceberg.hive.HiveCatalogs
-import org.apache.iceberg.spark.{SparkFilters, SparkSchemaUtil}
+import org.apache.iceberg.spark.SparkSchemaUtil
 import org.apache.iceberg.spark.source.IcebergSource
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
-import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.sources.v2.DataSourceOptions
-import org.apache.spark.sql.sources.v2.reader.SupportsPushDownFilters
 import org.apache.spark.sql.types.StructType
-import scala.util.Try
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, IndexLogEntry, Relation}
-import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -46,31 +40,24 @@ import com.microsoft.hyperspace.util.PathUtils
  * Implementation for file-based relation used by [[IcebergFileBasedSource]]
  */
 class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relation)
-  extends FileBasedRelation {
+    extends FileBasedRelation {
 
   /**
    * Computes the signature of the current relation.
    */
   override def signature: String = plan.source match {
     case _: IcebergSource =>
-      val table = findTable(new DataSourceOptions(plan.options.asJava))
-      val snapshotId = plan.options.getOrElse("snapshot-id",
-        table.currentSnapshot().snapshotId())
+      val table = loadIcebergTable
+      val snapshotId = plan.options.getOrElse("snapshot-id", table.currentSnapshot().snapshotId())
       snapshotId + table.location()
   }
 
   /**
-   * All the files that the current relation references to.
+   * All the files that the current Iceberg table uses for read.
    */
   override def allFiles: Seq[FileStatus] = plan.source match {
-    case source: IcebergSource =>
-      val dsOpts = new DataSourceOptions(plan.options.asJava)
-      val table = findTable(dsOpts)
-      val reader = source.createReader(dsOpts)
-      val filters = reader.asInstanceOf[SupportsPushDownFilters].pushedFilters()
-      tasks(table, dsOpts, filters, reader.readSchema()).flatMap { t =>
-        t.files().asScala.map(toFileStatus)
-      }
+    case _: IcebergSource =>
+      loadIcebergTable.newScan().planFiles().iterator().asScala.toSeq.map(toFileStatus)
   }
 
   /**
@@ -78,16 +65,12 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    */
   override def partitionBasePath: Option[String] = plan.source match {
     case _: IcebergSource =>
-      val table = Try(findTable(new DataSourceOptions(plan.options.asJava))).toOption
-      table match {
-        case Some(t) =>
-          if (t.spec().isUnpartitioned) {
-            None
-          } else {
-            Some(
-              PathUtils.makeAbsolute(t.location(), spark.sessionState.newHadoopConf()).toString)
-          }
-        case _ => None
+      val table = loadIcebergTable
+      if (table.spec().isUnpartitioned) {
+        None
+      } else {
+        Some(
+          PathUtils.makeAbsolute(table.location(), spark.sessionState.newHadoopConf()).toString)
       }
     case _ => None
   }
@@ -102,7 +85,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     plan.source match {
       case source: IcebergSource =>
         val dsOpts = new DataSourceOptions(plan.options.asJava)
-        val table = findTable(dsOpts)
+        val table = loadIcebergTable
         val reader = source.createReader(dsOpts)
         val files = allFiles
 
@@ -110,15 +93,17 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
           Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = "iceberg"
         val currentSnapshot = table.currentSnapshot()
-        val basePathOpt = partitionBasePath.map(e => Map("basePath" -> e)).getOrElse(Map.empty)
+        val basePathOpt = partitionBasePath.map(p => Map("basePath" -> p)).getOrElse(Map.empty)
         val opts = plan.options - "path" +
-            ("snapshot-id" -> currentSnapshot.snapshotId().toString) +
-            ("as-of-timestamp" -> currentSnapshot.timestampMillis().toString) ++
-            basePathOpt
+          ("snapshot-id" -> currentSnapshot.snapshotId().toString) +
+          ("as-of-timestamp" -> currentSnapshot.timestampMillis().toString) ++
+          basePathOpt
 
         Relation(
-          Seq(PathUtils.makeAbsolute(table.location(),
-            spark.sessionState.newHadoopConf()).toString),
+          Seq(
+            PathUtils
+              .makeAbsolute(table.location(), spark.sessionState.newHadoopConf())
+              .toString),
           Hdfs(sourceDataProperties),
           reader.readSchema().json,
           fileFormatName,
@@ -129,7 +114,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
   /**
    * Returns whether the current relation has parquet source files or not.
    *
-   * @return Always true since delta lake files are stored as Parquet.
+   * @return Always true since Iceberg table files are stored as Parquet.
    */
   override def hasParquetAsSourceFormat: Boolean = true
 
@@ -145,7 +130,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    */
   override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
     fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-      (kv._1._1, kv._2)
+      (kv._1._1.replaceAll("^file:/{1,3}", "/"), kv._2)
     }
   }
 
@@ -159,10 +144,12 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    */
   override def partitionSchema: StructType = plan.source match {
     case _: IcebergSource =>
-      val dsOpts = new DataSourceOptions(plan.options.asJava)
-      val table = findTable(dsOpts)
-      SparkSchemaUtil.convert(table.spec().schema())
-
+      val tbl = loadIcebergTable
+      val fields = tbl.spec().fields().asScala.map { p =>
+        tbl.schema().findField(p.name())
+      }
+      val schema = new Schema(fields.asJava)
+      SparkSchemaUtil.convert(schema)
   }
 
   /**
@@ -170,13 +157,14 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    *
    * This is mainly used in conjunction with [[createLogicalRelation]].
    */
-  override def createHadoopFsRelation(location: FileIndex,
+  override def createHadoopFsRelation(
+      location: FileIndex,
       dataSchema: StructType,
       options: Map[String, String]): HadoopFsRelation = plan.source match {
     case _: IcebergSource =>
       HadoopFsRelation(
         location,
-        new StructType(),
+        partitionSchema,
         dataSchema,
         None,
         new ParquetFileFormat,
@@ -196,7 +184,8 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     new LogicalRelation(hadoopFsRelation, updatedOutput, None, false)
   }
 
-  private def findTable(options: DataSourceOptions): Table = {
+  private def loadIcebergTable: Table = {
+    val options = new DataSourceOptions(plan.options.asJava)
     val conf = spark.sessionState.newHadoopConf()
     val path = options.get("path")
     if (!path.isPresent) {
@@ -205,87 +194,25 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     if (path.get.contains("/")) {
       val tables = new HadoopTables(conf)
       tables.load(path.get)
-    }
-    else {
+    } else {
       val hiveCatalog = HiveCatalogs.loadCatalog(conf)
       val tableIdentifier = TableIdentifier.parse(path.get)
       hiveCatalog.loadTable(tableIdentifier)
     }
   }
 
-  // TODO: need Iceberg's `tasks()` method to be public to get rid of this method
-  private def tasks(table: Table, options: DataSourceOptions, pushedFilters: Seq[Filter],
-      requestedSchema: StructType): Seq[CombinedScanTask] = {
-
-    val caseSensitive = spark.conf.get("spark.sql.caseSensitive").toBoolean
-    val snapshotId = Try(options.get("snapshot-id").get().toLong).toOption
-    val asOfTimestamp = Try(options.get("as-of-timestamp").get().toLong).toOption
-    val startSnapshotId = Try(options.get("start-snapshot-id").get().toLong).toOption
-    val endSnapshotId = Try(options.get("end-snapshot-id").get().toLong).toOption
-    val splitSize = Try(options.get("split-size").get().toLong).toOption
-    val splitLookBack = Try(options.get("lookback").get().toInt).toOption
-    val splitOpenFileCost = Try(options.get("file-open-cost").get().toLong).toOption
-    val pushedExpressions = pushedFilters.map(SparkFilters.convert)
-    val lazySchema = if (requestedSchema != null) {
-      SparkSchemaUtil.prune(
-        table.schema,
-        requestedSchema,
-        pushedExpressions.reduceOption(Expressions.and).getOrElse(Expressions.alwaysTrue()),
-        caseSensitive)
-    } else {
-      table.schema
-    }
-
-    var scan: TableScan = table.newScan.caseSensitive(caseSensitive).project(lazySchema)
-
-    if (snapshotId.isDefined) {
-      scan = scan.useSnapshot(snapshotId.get)
-    }
-    if (asOfTimestamp.isDefined) {
-      scan = scan.asOfTime(asOfTimestamp.get)
-    }
-    if (startSnapshotId.isDefined) {
-      if (endSnapshotId.isDefined) {
-        scan = scan.appendsBetween(startSnapshotId.get, endSnapshotId.get)
-      } else {
-        scan = scan.appendsAfter(startSnapshotId.get)
-      }
-    }
-    if (splitSize.isDefined) {
-      scan = scan.option(TableProperties.SPLIT_SIZE, splitSize.get.toString)
-    }
-    if (splitLookBack.isDefined) {
-      scan = scan.option(TableProperties.SPLIT_LOOKBACK, splitLookBack.get.toString)
-    }
-    if (splitOpenFileCost.isDefined) {
-      scan = scan.option(TableProperties.SPLIT_OPEN_FILE_COST, splitOpenFileCost.get.toString)
-    }
-
-    pushedExpressions.foreach { f =>
-      scan = scan.filter(f)
-    }
-
-    try {
-      scan.planTasks().asScala.toSeq
-    } catch {
-      case e: IOException =>
-        throw new RuntimeException(s"Failed to close table scan: $scan", e)
-    }
-  }
-
   private def toFileStatus(fileScanTask: FileScanTask): FileStatus = {
-    val jPath = new Path(fileScanTask.file().path().toString)
-    val fs = jPath.getFileSystem(spark.sessionState.newHadoopConf())
-    val fullPath = if (!jPath.isAbsolute) {
-      new Path(s"${fs.getWorkingDirectory.toString}/${jPath.toString}")
+    val path = PathUtils.makeAbsolute(
+      new Path(fileScanTask.file().path().toString),
+      spark.sessionState.newHadoopConf())
+    val fs = path.getFileSystem(spark.sessionState.newHadoopConf())
+    val fullPath = if (!path.isAbsolute) {
+      new Path(s"${fs.getWorkingDirectory.toString}/${path.toString}")
     } else {
-      jPath
+      path
     }
     val modTime = fs.listStatus(fullPath).head.getModificationTime
-    toFileStatus(
-      fileScanTask.file().fileSizeInBytes(),
-      modTime,
-      fullPath)
+    toFileStatus(fileScanTask.file().fileSizeInBytes(), modTime, fullPath)
   }
 
   private def toFileStatus(fileSize: Long, modificationTime: Long, path: Path): FileStatus = {

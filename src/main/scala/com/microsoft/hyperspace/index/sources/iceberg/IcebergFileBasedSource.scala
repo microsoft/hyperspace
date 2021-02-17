@@ -29,9 +29,9 @@ import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourc
  *
  * This source can support relations that meet the following criteria:
  *   - The relation is with [[DataSourceV2Relation]]
+ *   - The source of [[DataSourceV2Relation]] is an [[IcebergSource]]
  */
-class IcebergFileBasedSource(private val spark: SparkSession)
-    extends FileBasedSourceProvider {
+class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
 
   private val ICEBERG_FORMAT_STR = "iceberg"
 
@@ -64,15 +64,14 @@ class IcebergFileBasedSource(private val spark: SparkSession)
     }
   }
 
-
   /**
-   * Returns true if the given logical plan is a relation for Delta Lake.
+   * Returns true if the given logical plan is a relation for Iceberg.
    *
    * @param plan Logical plan to check if it's supported.
    * @return Some(true) if the given plan is a supported relation, otherwise None.
    */
-  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
-    case _ @ DataSourceV2Relation(_: IcebergSource, _, _, _, _) =>
+  override def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
+    case _ @DataSourceV2Relation(_: IcebergSource, _, _, _, _) =>
       Some(true)
     case _ => None
   }
@@ -84,7 +83,7 @@ class IcebergFileBasedSource(private val spark: SparkSession)
    * @param plan Logical plan to wrap to [[FileBasedRelation]]
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
-  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
+  override def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
     case l @ DataSourceV2Relation(_: IcebergSource, _, _, _, _) =>
       Some(new IcebergRelation(spark, l))
     case _ => None
