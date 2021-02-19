@@ -20,12 +20,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
 
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
 class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -35,7 +37,13 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private var testLogEntry: LogEntry = _
 
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
-    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(spark, df)
+    def getSourceRelations(df: DataFrame): Seq[Relation] = {
+      val provider = new FileBasedSourceProviderManager(spark)
+      df.queryExecution.optimizedPlan.collect {
+        case l: LeafNode if provider.isSupportedRelation(l) =>
+          provider.getRelation(l).createRelationMetadata(fileIdTracker)
+      }
+    }
   }
 
   private def updateSourceFiles(): Unit = {

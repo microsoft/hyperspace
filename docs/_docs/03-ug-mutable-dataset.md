@@ -23,7 +23,8 @@ Now, we offer several options to handle above scenario more efficiently.
 
 1. [Refresh Index](#refresh-index)
   - [Full Mode](#refresh-index---full-mode)
-  - [Incremental Mode](#refresh-index---full-mode)
+  - [Incremental Mode](#refresh-index---incremental-mode)
+  - [Quick Mode](#refresh-index---quick-mode)
 2. [Hybrid Scan](#hybrid-scan)
   - [Append-only](#append-only-dataset)
   - [Append and Delete](#append-and-delete-dataset)
@@ -43,10 +44,24 @@ after deleting some source data files, then you do not need to enable lineage fo
 
 ### Refresh Index
 You can refresh an index according to its latest source data files by running the `refreshIndex` command.
-Hyperspace provide several modes to refresh an index. These modes differ in terms of the way they update the index and the amount of data scans and shuffle each does.
+Hyperspace provides several modes to refresh an index. These modes differ in terms of the way they update the index data, the amount of data scans and shuffle each does.
 You should pick a mode for refreshing an index according to its current size and total amount of data deleted from or appended to its source data files.
 You can specify the mode as an argument when calling the `refreshIndex` command.
-Currently, there are two refresh modes available for an index: `"full"` and `"incremental"`.
+Currently, there are 3 refresh modes available for an index: `"full"`, `"incremental"` and `"quick"`.
+
+#### Refresh Modes
+
+|          |                | Full - Rebuild                                        | Incremental - Quick Query                                                                 | Quick - Fast Refresh                                                                        |
+|----------|----------------|-------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Append   | Characteristic | Slowest refresh/fastest query                         | Slow refresh/fast query                                                                    | Fast refresh/moderately fast query                                                          |
+|          | API            | refreshIndex(mode="full")                             | refreshIndex(mode="incremental")                                                           | refreshIndex(mode="quick")                                                                  |
+|          | What it does?  | Rebuilds the index                                    | Builds index on newly added data                                                           | Captures meta-data for appended  files and leverages hybrid scan                            |
+|          | When to use?   | Underlying source data is  relatively stable          | Infrequently appending large  amounts of data                                              | Frequently appending small  amounts of data                                                 |
+| Delete   | Characteristic | Creates a new index (by  reshuffling the source data) | Slow refresh/fast query                                                                    | Fast refresh/moderately fast query                                                          |
+|          | API            |                                                       | refreshIndex(mode="incremental")                                                           | refreshIndex(mode="quick")                                                                  |
+|          | What it does?  |                                                       | Deletes rows from index immediately; Avoids  shuffling the source data using index lineage | Captures file/partition predicates  and deletes entries at query time                       |
+|          | When to use?   |                                                       | Infrequently deleting large  amount of data                                                | Frequently deleting small  amounts of data                                                  |
+
 
 #### Refresh Index - Full Mode
 After some changes in an index's original dataset files, using `refreshIndex` with the `"full"` mode causes
@@ -106,6 +121,31 @@ hs = Hyperspace(spark)
 hs.refreshIndex("empIndex", "incremental")
 ```
 
+#### Refresh Index - Quick Mode
+
+Refresh Quick mode is a metadata only operation. It collects the list of appended and deleted source data files at refresh time, and does not update any index data.
+To leverage the difference of source data files, Hyperspace utilizes [Hybrid Scan](#hybrid-scan) when applying the index, even if Hybrid Scan is disabled.
+It relies on on-the-fly shuffle and merge for appended files and injected filter condition for deleted files.
+
+To handle deleted files, [Lineage column](#lineage) is required as in [incremental mode](#refresh-index---incremental-mode) or Hybrid Scan.
+
+Scala:
+```scala
+import com.microsoft.hyperspace._
+
+val hs = new Hyperspace(spark)
+hs.refreshIndex("empIndex", "quick")
+``` 
+
+Python:
+
+```python
+from hyperspace import Hyperspace
+
+hs = Hyperspace(spark)
+hs.refreshIndex("empIndex", "quick")
+```
+
 ### Hybrid Scan
 
 Hybrid Scan utilizes existing index data along with newly appended source files and/or deleted
@@ -117,12 +157,8 @@ deleted files in the index data. This requires enabling lineage for the index at
 Currently, HybridScan is disabled by default. You can check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/)
 page to see how it can be enabled.
 
-If a dataset has many deleted source files, query performance could degrade when Hybrid Scan is
-enforcing deletes at the query runtime. Hyperspace provides two different configurations to tune
-this behavior. 
-You can use them to enable supporting deletes during Hybrid Scan (`spark.hyperspace.index.hybridscan.delete.maxNumDeleted`)
-and determine when it should be applied, depending on the total number of deleted source files (`spark.hyperspace.index.hybridscan.delete.enabled`).
-You can check the detail in [Append and Delete](#append-and-delete-dataset) section.
+Hyperspace provides two threshold configurations (`spark.hyperspace.index.hybridscan.maxDeletedRatio`, `spark.hyperspace.index.hybridscan.maxAppendedRatio`)
+to determine whether we apply the candidate index with Hybrid Scan or not depending on the amount of appended data and deleted data.
 
 #### Append-only dataset
 
@@ -134,17 +170,21 @@ and any other pre-requisite.
 ###### How to enable
 
 You can use the following configurations to enable Hybrid Scan for indexes on an append-only dataset.
+We provide a threshold config for the amount of appended data (`spark.hyperspace.index.hybridscan.maxAppendedRatio`, 0.0 to 1.0).
+It indicates the maximum ratio of *total size of appended files files* to *total size of all source files
+covered by the candidate index*. If there's more appended data than this threshold, Hybrid scan won't be applied.
+As Hybrid Scan causes some regression depending on workload types, we allow 30% (0.3) of appended data by default.
 
 Scala:
 ```scala
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) // false by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) // 30% by default
 ```
 
 Python:
 ```python
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", false) # false by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) # 30% by default
 ```
 
 ###### Example
@@ -199,35 +239,35 @@ query.show
 #### Append and Delete dataset
 
 Now, we can consider handling deleted files. Basically, Hybrid Scan excludes indexed data from deleted source files
-by scanning all index rows and verifying whether each is coming from a deleted source file or not.
+by scanning all index rows and verifying whether each row is coming from a deleted source file or not.
 In order to trace which source file each row is from, you need to enable linage column config before creating an index.
-Check the [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how lineage is
-enabled when creating an index.
+Check [configuration](https://microsoft.github.io/hyperspace/docs/ug-configuration/) page to see how to enable the lineage column at index creation.
 
 Due to the way Hybrid Scan enforces deletes at the query time, supporting deletes is more expensive than appended
-files. The more deleted files it has, the more overhead it will incur to filter the rows.
+files. The more deleted files it has, the more overhead it will incur to filter the rows, and the benefit from the index will decrease.
 Therefore, you need to be aware of possible performance regression from it.
-
-We will provide several threshold configs after some experiments and optimizations.
 
 ###### How to enable
 
 You can use the following configurations to enable Hybrid Scan for indexes on a dataset with both append and delete files.
 
-We currently provide one threshold config:
-`spark.hyperspace.index.hybridscan.delete.maxNumDeleted`. If there are more deleted files than the config value,
-we do not perform Hybrid Scan for the index.
+Similar to appended files, we provide the threshold config for deleted files:
+`spark.hyperspace.index.hybridscan.maxDeletedRatio`
+
+It indicates the maximum ratio of *total size of deleted files* to *total size of all source files
+covered by the candidate index*.  If there's more deleted data than this threshold, Hybrid scan won't be applied. Currently it's 0.2 (20%) by default.
+To apply Hybrid Scan, both appended & deleted threshold conditions should be met.
 
 Scala:
 ```scala
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) // 30 by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) // 30% by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxDeletedRatio", 0.2) // 20% by default
 ```
 
 Python:
 ```python
 spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.enabled", true)
-spark.conf.set("spark.hyperspace.index.hybridscan.delete.maxNumDeleted", 30) # 30 by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) # 30% by default
+spark.conf.set("spark.hyperspace.index.hybridscan.maxDeletedRatio", 0.2) # 20% by default
 ```

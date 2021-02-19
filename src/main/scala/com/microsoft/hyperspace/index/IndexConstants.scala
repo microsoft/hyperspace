@@ -32,27 +32,25 @@ object IndexConstants {
   val INDEX_NUM_BUCKETS_DEFAULT: Int = SQLConf.SHUFFLE_PARTITIONS.defaultValue.get
 
   // This config enables Hybrid scan on mutable dataset at query time.
-  // Currently, this config allows to perform Hybrid scan on append-only dataset.
-  // For delete dataset, "spark.hyperspace.index.hybridscan.delete.enabled" is
-  // also needed to be set.
   val INDEX_HYBRID_SCAN_ENABLED = "spark.hyperspace.index.hybridscan.enabled"
   val INDEX_HYBRID_SCAN_ENABLED_DEFAULT = "false"
 
-  // This is a temporary config to support Hybrid scan on both append & delete dataset.
-  // The config does not work without the Hybrid scan config -
-  // "spark.hyperspace.index.hybridscan.enabled"
-  // and will be removed after performance validation and optimization.
-  // See https://github.com/microsoft/hyperspace/issues/184
-  val INDEX_HYBRID_SCAN_DELETE_ENABLED = "spark.hyperspace.index.hybridscan.delete.enabled"
-  val INDEX_HYBRID_SCAN_DELETE_ENABLED_DEFAULT = "false"
+  // If the ratio of deleted files to all source files of a candidate index is greater than this
+  // threshold, the index won't be applied even with Hybrid Scan.
+  val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD =
+    "spark.hyperspace.index.hybridscan.maxDeletedRatio"
+  val INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD_DEFAULT = "0.2"
 
-  // While the performance validation of Hybrid scan for delete files described above,
-  // we limit the number of deleted files to avoid regression from Hybrid scan.
-  // If the number of deleted files is larger than this config, the index is disabled and
-  // cannot be a candidate for Hybrid Scan.
-  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES =
-    "spark.hyperspace.index.hybridscan.delete.maxNumDeletedFiles"
-  val INDEX_HYBRID_SCAN_DELETE_MAX_NUM_FILES_DEFAULT = "30"
+  // If the ratio of newly appended files to all source files in the given relation is greater than
+  // this threshold, the index won't be applied even with Hybrid Scan.
+  val INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD =
+    "spark.hyperspace.index.hybridscan.maxAppendedRatio"
+  val INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD_DEFAULT = "0.3"
+
+  // Config used to set bucketSpec for Filter rule. If bucketSpec is used, Spark can prune
+  // not applicable buckets, so it can read less files in case of a highly selective query.
+  val INDEX_FILTER_RULE_USE_BUCKET_SPEC = "spark.hyperspace.index.filterRule.useBucketSpec"
+  val INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT = "false"
 
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.

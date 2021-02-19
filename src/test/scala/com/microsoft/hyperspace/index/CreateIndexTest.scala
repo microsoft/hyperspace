@@ -44,7 +44,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     super.beforeAll()
 
     hyperspace = new Hyperspace(spark)
-    FileUtils.delete(new Path(testDir), true)
+    FileUtils.delete(new Path(testDir), isRecursive = true)
 
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
     // save test data non-partitioned.
@@ -57,7 +57,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(new Path(testDir), true)
+    FileUtils.delete(new Path(testDir), isRecursive = true)
     super.afterAll()
   }
 

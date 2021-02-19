@@ -37,8 +37,7 @@ libraryDependencies ++= Seq(
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "test" classifier "tests",
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-hive" % sparkVersion.value % "test" classifier "tests"
+  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests"
 )
 
 assemblyMergeStrategy in assembly := {
@@ -92,6 +91,10 @@ fork in Test := true
 javaOptions in Test ++= Seq(
   "-Dspark.ui.enabled=false",
   "-Dspark.ui.showConsoleProgress=false",
+  "-Dspark.databricks.delta.snapshotPartitions=2",
+  "-Dspark.sql.shuffle.partitions=5",
+  "-Ddelta.log.cacheSize=3",
+  "-Dspark.sql.sources.parallelPartitionDiscovery.parallelism=5",
   "-Xmx1024m"
 )
 
@@ -137,12 +140,6 @@ developers := List(
     url   = url("https://github.com/pirz")
   ),
   Developer(
-    id    = "thrajput",
-    name  = "Tarun Rajput",
-    email = "",
-    url   = url("https://github.com/thrajput")
-  ),
-  Developer(
     id    = "AFFogarty",
     name  = "Andrew Fogarty",
     email = "",
@@ -159,6 +156,12 @@ developers := List(
     name  = "Eunjin Song",
     email = "",
     url   = url("https://github.com/sezruby")
+  ),
+  Developer(
+    id    = "thugsatbay",
+    name  = "Gurleen Singh",
+    email = "",
+    url   = url("https://github.com/thugsatbay")
   )
 )
 

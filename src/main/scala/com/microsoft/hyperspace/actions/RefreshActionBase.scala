@@ -17,7 +17,6 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
@@ -68,7 +67,7 @@ private[actions] abstract class RefreshActionBase(
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
     val latestRelation =
-      Hyperspace.getContext(spark).sourceProviderManager.refreshRelation(relations.head)
+      Hyperspace.getContext(spark).sourceProviderManager.refreshRelationMetadata(relations.head)
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
     val df = spark.read
       .schema(dataSchema)
@@ -121,15 +120,9 @@ private[actions] abstract class RefreshActionBase(
    * Build Set[FileInfo] to compare the source file list with the previous index version.
    */
   protected lazy val currentFiles: Set[FileInfo] = {
-    val curFiles = df.queryExecution.optimizedPlan.collect {
-      case relation: LogicalRelation =>
-        Hyperspace
-          .getContext(spark)
-          .sourceProviderManager
-          .allFiles(relation)
-          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
-    }
-    curFiles.head.toSet
+    getRelation(spark, df).allFiles
+      .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
+      .toSet
   }
 
   /**

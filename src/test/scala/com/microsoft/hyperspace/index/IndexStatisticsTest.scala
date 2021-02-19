@@ -36,14 +36,14 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     super.beforeAll()
 
     hyperspace = new Hyperspace(spark)
-    FileUtils.delete(new Path(dataPath), true)
+    FileUtils.delete(new Path(dataPath), isRecursive = true)
 
     SampleData.save(spark, dataPath, dataColumns)
     dataDF = spark.read.parquet(dataPath)
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(new Path(dataPath), true)
+    FileUtils.delete(new Path(dataPath), isRecursive = true)
     super.afterAll()
   }
 

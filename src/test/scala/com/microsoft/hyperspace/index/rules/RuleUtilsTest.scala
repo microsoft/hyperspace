@@ -90,14 +90,16 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
     val indexManager = IndexCollectionManager(spark)
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1ProjectNode).length === 3)
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2ProjectNode).length === 2)
+    val t1Relation = RuleUtils.getRelation(spark, t1ProjectNode).get
+    val t2Relation = RuleUtils.getRelation(spark, t2ProjectNode).get
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1Relation).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2Relation).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
     val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1ProjectNode).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1Relation).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -110,7 +112,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
 
   test("Verify get logical relation for non-linear plan.") {
     val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
-    val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
+    val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
   }
 
@@ -121,11 +123,16 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
       val dataPath = tempPath.getAbsolutePath
       df.write.parquet(dataPath)
 
-      withIndex("index1") {
+      val indexNameWithLineage = "index1"
+      val indexNameWithoutLineage = "index2"
+      withIndex(indexNameWithLineage, indexNameWithoutLineage) {
         val readDf = spark.read.parquet(dataPath)
         val expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+          indexManager.create(readDf, IndexConfig(indexNameWithLineage, Seq("id")))
+        }
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "false") {
+          indexManager.create(readDf, IndexConfig(indexNameWithoutLineage, Seq("id")))
         }
         val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
@@ -133,24 +140,28 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
             hybridScanDeleteEnabled: Boolean,
-            expectCandidateIndex: Boolean,
+            expectedCandidateIndexes: Seq[String],
             expectedHybridScanTag: Option[Boolean],
             expectedCommonSourceBytes: Option[Long]): Unit = {
           withSQLConf(
-            "spark.hyperspace.index.hybridscan.enabled" -> hybridScanEnabled.toString,
-            "spark.hyperspace.index.hybridscan.delete.enabled" ->
-              hybridScanDeleteEnabled.toString) {
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> hybridScanEnabled.toString,
+            IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+              (if (hybridScanDeleteEnabled) "0.99" else "0")) {
+            val relation = RuleUtils.getRelation(spark, plan).get
             val indexes = RuleUtils
-              .getCandidateIndexes(spark, allIndexes, plan)
-            if (expectCandidateIndex) {
-              assert(indexes.length === 1)
-              assert(indexes.head.name === "index1")
-              assert(
-                indexes.head.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
-                  === expectedHybridScanTag)
-              assert(
-                indexes.head.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
-                  === expectedCommonSourceBytes)
+              .getCandidateIndexes(spark, allIndexes, relation)
+            if (expectedCandidateIndexes.nonEmpty) {
+              assert(indexes.length === expectedCandidateIndexes.length)
+              assert(indexes.map(_.name).toSet.equals(expectedCandidateIndexes.toSet))
+              indexes.foreach { index =>
+                assert(
+                  index.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
+                    === expectedHybridScanTag)
+                assert(
+                  index.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+                    === expectedCommonSourceBytes)
+              }
             } else {
               assert(indexes.isEmpty)
             }
@@ -165,14 +176,14 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = true,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = true,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
             expectedHybridScanTag = Some(false),
             expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
@@ -186,14 +197,14 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = true,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
             expectedHybridScanTag = Some(true),
             expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
@@ -210,21 +221,21 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
-            expectCandidateIndex = true,
+            expectedCandidateIndexes = Seq(indexNameWithLineage),
             expectedHybridScanTag = Some(true),
             expectedCommonSourceBytes = Some(updatedExpectedCommonSourceBytes))
         }
@@ -238,16 +249,65 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             optimizedPlan,
             hybridScanEnabled = false,
             hybridScanDeleteEnabled = false,
-            expectCandidateIndex = false,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
           verify(
             optimizedPlan,
             hybridScanEnabled = true,
             hybridScanDeleteEnabled = true,
-            expectCandidateIndex = false,
+            expectedCandidateIndexes = Seq(),
             expectedHybridScanTag = None,
             expectedCommonSourceBytes = None)
+        }
+      }
+    }
+  }
+
+  test("Verify Hybrid Scan candidate tags work as expected.") {
+    withTempPath { tempPath =>
+      val indexManager = IndexCollectionManager(spark)
+      val df = spark.range(1, 10).toDF("id")
+      val dataPath = tempPath.getAbsolutePath
+      df.write.parquet(dataPath)
+
+      withIndex("index1") {
+        val readDf = spark.read.parquet(dataPath)
+        val expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        }
+
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+        df.limit(5).write.mode("append").parquet(dataPath)
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        val relation = RuleUtils.getRelation(spark, optimizedPlan).get
+
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
+            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            assert(
+              indexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
+                .get)
+            assert(
+              indexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
+                .get == Seq("0.99", "0.2"))
+          }
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.2") {
+            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            assert(indexes.isEmpty)
+            assert(
+              !allIndexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
+                .get)
+            assert(
+              allIndexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
+                .get == Seq("0.2", "0.2"))
+          }
         }
       }
     }
@@ -311,8 +371,8 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
-    val r = RuleUtils.getLogicalRelation(plan)
+    val r = RuleUtils.getRelation(spark, plan)
     assert(r.isDefined)
-    assert(r.get.equals(expected))
+    assert(r.get.plan.equals(expected))
   }
 }
