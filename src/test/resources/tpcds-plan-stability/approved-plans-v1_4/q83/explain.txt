@@ -1,0 +1,69 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,sr_item_qty#2 ASC NULLS FIRST], output=[item_id#1,sr_item_qty#2,sr_dev#3,cr_item_qty#4,cr_dev#5,wr_item_qty#6,wr_dev#7,average#8])
++- *(18) Project [item_id#1, sr_item_qty#2, (((cast(sr_item_qty#2 as double) / cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as double)) / 3.0) * 100.0) AS sr_dev#3, cr_item_qty#4, (((cast(cr_item_qty#4 as double) / cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as double)) / 3.0) * 100.0) AS cr_dev#5, wr_item_qty#6, (((cast(wr_item_qty#6 as double) / cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as double)) / 3.0) * 100.0) AS wr_dev#7, CheckOverflow((promote_precision(cast(cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as decimal(20,0)) as decimal(21,1))) / 3.0), DecimalType(27,6)) AS average#8]
+   +- *(18) BroadcastHashJoin [item_id#1], [item_id#9], Inner, BuildRight
+      :- *(18) Project [item_id#1, sr_item_qty#2, cr_item_qty#4]
+      :  +- *(18) BroadcastHashJoin [item_id#1], [item_id#10], Inner, BuildRight
+      :     :- *(18) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(sr_return_quantity#12 as bigint))])
+      :     :  +- Exchange hashpartitioning(i_item_id#11, 200)
+      :     :     +- *(5) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(sr_return_quantity#12 as bigint))])
+      :     :        +- *(5) Project [sr_return_quantity#12, i_item_id#11]
+      :     :           +- *(5) BroadcastHashJoin [sr_returned_date_sk#13], [cast(d_date_sk#14 as bigint)], Inner, BuildRight
+      :     :              :- *(5) Project [sr_returned_date_sk#13, sr_return_quantity#12, i_item_id#11]
+      :     :              :  +- *(5) BroadcastHashJoin [sr_item_sk#15], [cast(i_item_sk#16 as bigint)], Inner, BuildRight
+      :     :              :     :- *(5) Project [sr_returned_date_sk#13, sr_item_sk#15, sr_return_quantity#12]
+      :     :              :     :  +- *(5) Filter (isnotnull(sr_item_sk#15) && isnotnull(sr_returned_date_sk#13))
+      :     :              :     :     +- *(5) FileScan parquet default.store_returns[sr_returned_date_sk#13,sr_item_sk#15,sr_return_quantity#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_returns], PartitionFilters: [], PushedFilters: [IsNotNull(sr_item_sk), IsNotNull(sr_returned_date_sk)], ReadSchema: struct<sr_returned_date_sk:bigint,sr_item_sk:bigint,sr_return_quantity:int>
+      :     :              :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :     :              :        +- *(1) Project [i_item_sk#16, i_item_id#11]
+      :     :              :           +- *(1) Filter (isnotnull(i_item_sk#16) && isnotnull(i_item_id#11))
+      :     :              :              +- *(1) FileScan parquet default.item[i_item_sk#16,i_item_id#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_item_id)], ReadSchema: struct<i_item_sk:int,i_item_id:string>
+      :     :              +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :     :                 +- *(4) Project [d_date_sk#14]
+      :     :                    +- *(4) BroadcastHashJoin [d_date#17], [d_date#17#18], LeftSemi, BuildRight
+      :     :                       :- *(4) Project [d_date_sk#14, d_date#17]
+      :     :                       :  +- *(4) Filter isnotnull(d_date_sk#14)
+      :     :                       :     +- *(4) FileScan parquet default.date_dim[d_date_sk#14,d_date#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
+      :     :                       +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, date, true]))
+      :     :                          +- *(3) Project [d_date#17 AS d_date#17#18]
+      :     :                             +- *(3) BroadcastHashJoin [d_week_seq#19], [d_week_seq#19#20], LeftSemi, BuildRight
+      :     :                                :- *(3) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<d_date:date,d_week_seq:int>
+      :     :                                +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :     :                                   +- *(2) Project [d_week_seq#19 AS d_week_seq#19#20]
+      :     :                                      +- *(2) Filter cast(d_date#17 as string) IN (2000-06-30,2000-09-27,2000-11-17)
+      :     :                                         +- *(2) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<d_date:date,d_week_seq:int>
+      :     +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true]))
+      :        +- *(11) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(cr_return_quantity#21 as bigint))])
+      :           +- Exchange hashpartitioning(i_item_id#11, 200)
+      :              +- *(10) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(cr_return_quantity#21 as bigint))])
+      :                 +- *(10) Project [cr_return_quantity#21, i_item_id#11]
+      :                    +- *(10) BroadcastHashJoin [cr_returned_date_sk#22], [d_date_sk#14], Inner, BuildRight
+      :                       :- *(10) Project [cr_returned_date_sk#22, cr_return_quantity#21, i_item_id#11]
+      :                       :  +- *(10) BroadcastHashJoin [cr_item_sk#23], [i_item_sk#16], Inner, BuildRight
+      :                       :     :- *(10) Project [cr_returned_date_sk#22, cr_item_sk#23, cr_return_quantity#21]
+      :                       :     :  +- *(10) Filter (isnotnull(cr_item_sk#23) && isnotnull(cr_returned_date_sk#22))
+      :                       :     :     +- *(10) FileScan parquet default.catalog_returns[cr_returned_date_sk#22,cr_item_sk#23,cr_return_quantity#21] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/catalog_returns], PartitionFilters: [], PushedFilters: [IsNotNull(cr_item_sk), IsNotNull(cr_returned_date_sk)], ReadSchema: struct<cr_returned_date_sk:int,cr_item_sk:int,cr_return_quantity:int>
+      :                       :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :                       :        +- *(6) Project [i_item_sk#16, i_item_id#11]
+      :                       :           +- *(6) Filter (isnotnull(i_item_sk#16) && isnotnull(i_item_id#11))
+      :                       :              +- *(6) FileScan parquet default.item[i_item_sk#16,i_item_id#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_item_id)], ReadSchema: struct<i_item_sk:int,i_item_id:string>
+      :                       +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :                          +- *(9) Project [d_date_sk#14]
+      :                             +- *(9) BroadcastHashJoin [d_date#17], [d_date#17#24], LeftSemi, BuildRight
+      :                                :- *(9) Project [d_date_sk#14, d_date#17]
+      :                                :  +- *(9) Filter isnotnull(d_date_sk#14)
+      :                                :     +- *(9) FileScan parquet default.date_dim[d_date_sk#14,d_date#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
+      :                                +- ReusedExchange [d_date#17#24], BroadcastExchange HashedRelationBroadcastMode(List(input[0, date, true]))
+      +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true]))
+         +- *(17) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(wr_return_quantity#25 as bigint))])
+            +- Exchange hashpartitioning(i_item_id#11, 200)
+               +- *(16) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(wr_return_quantity#25 as bigint))])
+                  +- *(16) Project [wr_return_quantity#25, i_item_id#11]
+                     +- *(16) BroadcastHashJoin [wr_returned_date_sk#26], [cast(d_date_sk#14 as bigint)], Inner, BuildRight
+                        :- *(16) Project [wr_returned_date_sk#26, wr_return_quantity#25, i_item_id#11]
+                        :  +- *(16) BroadcastHashJoin [wr_item_sk#27], [cast(i_item_sk#16 as bigint)], Inner, BuildRight
+                        :     :- *(16) Project [wr_returned_date_sk#26, wr_item_sk#27, wr_return_quantity#25]
+                        :     :  +- *(16) Filter (isnotnull(wr_item_sk#27) && isnotnull(wr_returned_date_sk#26))
+                        :     :     +- *(16) FileScan parquet default.web_returns[wr_returned_date_sk#26,wr_item_sk#27,wr_return_quantity#25] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/web_returns], PartitionFilters: [], PushedFilters: [IsNotNull(wr_item_sk), IsNotNull(wr_returned_date_sk)], ReadSchema: struct<wr_returned_date_sk:bigint,wr_item_sk:bigint,wr_return_quantity:int>
+                        :     +- ReusedExchange [i_item_sk#16, i_item_id#11], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                        +- ReusedExchange [d_date_sk#14], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))

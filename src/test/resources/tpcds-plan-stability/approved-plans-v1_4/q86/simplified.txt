@@ -1,0 +1,35 @@
+TakeOrderedAndProject [i_category,total_sum,rank_within_parent,lochierarchy,i_class]
+  WholeStageCodegen
+    Project [i_category,total_sum,rank_within_parent,lochierarchy,i_class]
+      InputAdapter
+        Window [_w3,_w1,_w2]
+          WholeStageCodegen
+            Sort [_w1,_w2,_w3]
+              InputAdapter
+                Exchange [_w1,_w2] #1
+                  WholeStageCodegen
+                    HashAggregate [i_category,sum(UnscaledValue(ws_net_paid)),sum,i_class,spark_grouping_id] [_w1,total_sum,sum(UnscaledValue(ws_net_paid)),sum,_w2,lochierarchy,_w3]
+                      InputAdapter
+                        Exchange [i_category,i_class,spark_grouping_id] #2
+                          WholeStageCodegen
+                            HashAggregate [i_category,sum,ws_net_paid,i_class,sum,spark_grouping_id] [sum,sum]
+                              Expand [ws_net_paid,i_category,i_class]
+                                Project [ws_net_paid,i_category,i_class]
+                                  BroadcastHashJoin [ws_item_sk,i_item_sk]
+                                    Project [ws_item_sk,ws_net_paid]
+                                      BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
+                                        Project [ws_sold_date_sk,ws_item_sk,ws_net_paid]
+                                          Filter [ws_sold_date_sk,ws_item_sk]
+                                            Scan parquet default.web_sales [ws_sold_date_sk,ws_item_sk,ws_net_paid] [ws_sold_date_sk,ws_item_sk,ws_net_paid]
+                                        InputAdapter
+                                          BroadcastExchange #3
+                                            WholeStageCodegen
+                                              Project [d_date_sk]
+                                                Filter [d_month_seq,d_date_sk]
+                                                  Scan parquet default.date_dim [d_date_sk,d_month_seq] [d_date_sk,d_month_seq]
+                                    InputAdapter
+                                      BroadcastExchange #4
+                                        WholeStageCodegen
+                                          Project [i_item_sk,i_class,i_category]
+                                            Filter [i_item_sk]
+                                              Scan parquet default.item [i_item_sk,i_class,i_category] [i_item_sk,i_class,i_category]

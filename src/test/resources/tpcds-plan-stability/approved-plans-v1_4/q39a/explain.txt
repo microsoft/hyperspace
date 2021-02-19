@@ -1,0 +1,51 @@
+== Physical Plan ==
+*(11) Sort [w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST], true, 0
++- Exchange rangepartitioning(w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST, 200)
+   +- *(10) BroadcastHashJoin [i_item_sk#2, w_warehouse_sk#1], [i_item_sk#9, w_warehouse_sk#10], Inner, BuildRight
+      :- *(10) Project [w_warehouse_sk#1, i_item_sk#2, d_moy#3, mean#4, CASE WHEN (mean#4 = 0.0) THEN null ELSE (stdev#11 / mean#4) END AS cov#5]
+      :  +- *(10) Filter (CASE WHEN (mean#4 = 0.0) THEN 0.0 ELSE (stdev#11 / mean#4) END > 1.0)
+      :     +- *(10) HashAggregate(keys=[w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3], functions=[stddev_samp(cast(inv_quantity_on_hand#13 as double)), avg(cast(inv_quantity_on_hand#13 as bigint))])
+      :        +- Exchange hashpartitioning(w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3, 200)
+      :           +- *(4) HashAggregate(keys=[w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3], functions=[partial_stddev_samp(cast(inv_quantity_on_hand#13 as double)), partial_avg(cast(inv_quantity_on_hand#13 as bigint))])
+      :              +- *(4) Project [inv_quantity_on_hand#13, i_item_sk#2, w_warehouse_sk#1, w_warehouse_name#12, d_moy#3]
+      :                 +- *(4) BroadcastHashJoin [inv_date_sk#14], [d_date_sk#15], Inner, BuildRight
+      :                    :- *(4) Project [inv_date_sk#14, inv_quantity_on_hand#13, i_item_sk#2, w_warehouse_sk#1, w_warehouse_name#12]
+      :                    :  +- *(4) BroadcastHashJoin [inv_warehouse_sk#16], [w_warehouse_sk#1], Inner, BuildRight
+      :                    :     :- *(4) Project [inv_date_sk#14, inv_warehouse_sk#16, inv_quantity_on_hand#13, i_item_sk#2]
+      :                    :     :  +- *(4) BroadcastHashJoin [inv_item_sk#17], [i_item_sk#2], Inner, BuildRight
+      :                    :     :     :- *(4) Project [inv_date_sk#14, inv_item_sk#17, inv_warehouse_sk#16, inv_quantity_on_hand#13]
+      :                    :     :     :  +- *(4) Filter ((isnotnull(inv_item_sk#17) && isnotnull(inv_warehouse_sk#16)) && isnotnull(inv_date_sk#14))
+      :                    :     :     :     +- *(4) FileScan parquet default.inventory[inv_date_sk#14,inv_item_sk#17,inv_warehouse_sk#16,inv_quantity_on_hand#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/inventory], PartitionFilters: [], PushedFilters: [IsNotNull(inv_item_sk), IsNotNull(inv_warehouse_sk), IsNotNull(inv_date_sk)], ReadSchema: struct<inv_date_sk:int,inv_item_sk:int,inv_warehouse_sk:int,inv_quantity_on_hand:int>
+      :                    :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :                    :     :        +- *(1) Project [i_item_sk#2]
+      :                    :     :           +- *(1) Filter isnotnull(i_item_sk#2)
+      :                    :     :              +- *(1) FileScan parquet default.item[i_item_sk#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int>
+      :                    :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :                    :        +- *(2) Project [w_warehouse_sk#1, w_warehouse_name#12]
+      :                    :           +- *(2) Filter isnotnull(w_warehouse_sk#1)
+      :                    :              +- *(2) FileScan parquet default.warehouse[w_warehouse_sk#1,w_warehouse_name#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/warehouse], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int,w_warehouse_name:string>
+      :                    +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+      :                       +- *(3) Project [d_date_sk#15, d_moy#3]
+      :                          +- *(3) Filter ((((isnotnull(d_year#18) && isnotnull(d_moy#3)) && (d_year#18 = 2001)) && (d_moy#3 = 1)) && isnotnull(d_date_sk#15))
+      :                             +- *(3) FileScan parquet default.date_dim[d_date_sk#15,d_year#18,d_moy#3] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,2001), EqualTo(d_moy,1), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
+      +- BroadcastExchange HashedRelationBroadcastMode(List((shiftleft(cast(input[1, int, true] as bigint), 32) | (cast(input[0, int, true] as bigint) & 4294967295))))
+         +- *(9) Project [w_warehouse_sk#10, i_item_sk#9, d_moy#6, mean#7, CASE WHEN (mean#7 = 0.0) THEN null ELSE (stdev#19 / mean#7) END AS cov#8]
+            +- *(9) Filter (CASE WHEN (mean#7 = 0.0) THEN 0.0 ELSE (stdev#19 / mean#7) END > 1.0)
+               +- *(9) HashAggregate(keys=[w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6], functions=[stddev_samp(cast(inv_quantity_on_hand#13 as double)), avg(cast(inv_quantity_on_hand#13 as bigint))])
+                  +- Exchange hashpartitioning(w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6, 200)
+                     +- *(8) HashAggregate(keys=[w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6], functions=[partial_stddev_samp(cast(inv_quantity_on_hand#13 as double)), partial_avg(cast(inv_quantity_on_hand#13 as bigint))])
+                        +- *(8) Project [inv_quantity_on_hand#13, i_item_sk#9, w_warehouse_sk#10, w_warehouse_name#20, d_moy#6]
+                           +- *(8) BroadcastHashJoin [inv_date_sk#14], [d_date_sk#21], Inner, BuildRight
+                              :- *(8) Project [inv_date_sk#14, inv_quantity_on_hand#13, i_item_sk#9, w_warehouse_sk#10, w_warehouse_name#20]
+                              :  +- *(8) BroadcastHashJoin [inv_warehouse_sk#16], [w_warehouse_sk#10], Inner, BuildRight
+                              :     :- *(8) Project [inv_date_sk#14, inv_warehouse_sk#16, inv_quantity_on_hand#13, i_item_sk#9]
+                              :     :  +- *(8) BroadcastHashJoin [inv_item_sk#17], [i_item_sk#9], Inner, BuildRight
+                              :     :     :- *(8) Project [inv_date_sk#14, inv_item_sk#17, inv_warehouse_sk#16, inv_quantity_on_hand#13]
+                              :     :     :  +- *(8) Filter ((isnotnull(inv_item_sk#17) && isnotnull(inv_warehouse_sk#16)) && isnotnull(inv_date_sk#14))
+                              :     :     :     +- *(8) FileScan parquet default.inventory[inv_date_sk#14,inv_item_sk#17,inv_warehouse_sk#16,inv_quantity_on_hand#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/inventory], PartitionFilters: [], PushedFilters: [IsNotNull(inv_item_sk), IsNotNull(inv_warehouse_sk), IsNotNull(inv_date_sk)], ReadSchema: struct<inv_date_sk:int,inv_item_sk:int,inv_warehouse_sk:int,inv_quantity_on_hand:int>
+                              :     :     +- ReusedExchange [i_item_sk#9], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                              :     +- ReusedExchange [w_warehouse_sk#10, w_warehouse_name#20], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                              +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                                 +- *(7) Project [d_date_sk#21, d_moy#6]
+                                    +- *(7) Filter ((((isnotnull(d_year#22) && isnotnull(d_moy#6)) && (d_year#22 = 2001)) && (d_moy#6 = 2)) && isnotnull(d_date_sk#21))
+                                       +- *(7) FileScan parquet default.date_dim[d_date_sk#21,d_year#22,d_moy#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,2001), EqualTo(d_moy,2), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>

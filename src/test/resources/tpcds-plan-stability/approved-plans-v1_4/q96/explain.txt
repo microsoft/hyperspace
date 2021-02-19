@@ -1,0 +1,26 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[count(1)#1 ASC NULLS FIRST], output=[count(1)#1])
++- *(5) HashAggregate(keys=[], functions=[count(1)])
+   +- Exchange SinglePartition
+      +- *(4) HashAggregate(keys=[], functions=[partial_count(1)])
+         +- *(4) Project
+            +- *(4) BroadcastHashJoin [ss_store_sk#2], [s_store_sk#3], Inner, BuildRight
+               :- *(4) Project [ss_store_sk#2]
+               :  +- *(4) BroadcastHashJoin [ss_sold_time_sk#4], [t_time_sk#5], Inner, BuildRight
+               :     :- *(4) Project [ss_sold_time_sk#4, ss_store_sk#2]
+               :     :  +- *(4) BroadcastHashJoin [ss_hdemo_sk#6], [hd_demo_sk#7], Inner, BuildRight
+               :     :     :- *(4) Project [ss_sold_time_sk#4, ss_hdemo_sk#6, ss_store_sk#2]
+               :     :     :  +- *(4) Filter ((isnotnull(ss_hdemo_sk#6) && isnotnull(ss_sold_time_sk#4)) && isnotnull(ss_store_sk#2))
+               :     :     :     +- *(4) FileScan parquet default.store_sales[ss_sold_time_sk#4,ss_hdemo_sk#6,ss_store_sk#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_hdemo_sk), IsNotNull(ss_sold_time_sk), IsNotNull(ss_store_sk)], ReadSchema: struct<ss_sold_time_sk:int,ss_hdemo_sk:int,ss_store_sk:int>
+               :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+               :     :        +- *(1) Project [hd_demo_sk#7]
+               :     :           +- *(1) Filter ((isnotnull(hd_dep_count#8) && (hd_dep_count#8 = 7)) && isnotnull(hd_demo_sk#7))
+               :     :              +- *(1) FileScan parquet default.household_demographics[hd_demo_sk#7,hd_dep_count#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/household_demographics], PartitionFilters: [], PushedFilters: [IsNotNull(hd_dep_count), EqualTo(hd_dep_count,7), IsNotNull(hd_demo_sk)], ReadSchema: struct<hd_demo_sk:int,hd_dep_count:int>
+               :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+               :        +- *(2) Project [t_time_sk#5]
+               :           +- *(2) Filter ((((isnotnull(t_hour#9) && isnotnull(t_minute#10)) && (t_hour#9 = 20)) && (t_minute#10 >= 30)) && isnotnull(t_time_sk#5))
+               :              +- *(2) FileScan parquet default.time_dim[t_time_sk#5,t_hour#9,t_minute#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/time_dim], PartitionFilters: [], PushedFilters: [IsNotNull(t_hour), IsNotNull(t_minute), EqualTo(t_hour,20), GreaterThanOrEqual(t_minute,30), IsN..., ReadSchema: struct<t_time_sk:int,t_hour:int,t_minute:int>
+               +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                  +- *(3) Project [s_store_sk#3]
+                     +- *(3) Filter ((isnotnull(s_store_name#11) && (s_store_name#11 = ese)) && isnotnull(s_store_sk#3))
+                        +- *(3) FileScan parquet default.store[s_store_sk#3,s_store_name#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_name), EqualTo(s_store_name,ese), IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int,s_store_name:string>

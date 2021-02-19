@@ -1,0 +1,154 @@
+WholeStageCodegen
+  Project
+    Subquery #1
+      WholeStageCodegen
+        HashAggregate [count,count(1)] [count(1),count(1),count]
+          InputAdapter
+            Exchange #1
+              WholeStageCodegen
+                HashAggregate [count,count] [count,count]
+                  Project
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity] [ss_quantity]
+    Subquery #2
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_ext_discount_amt))] [avg(UnscaledValue(ss_ext_discount_amt)),avg(ss_ext_discount_amt),sum,count]
+          InputAdapter
+            Exchange #2
+              WholeStageCodegen
+                HashAggregate [sum,ss_ext_discount_amt,sum,count,count] [sum,count,sum,count]
+                  Project [ss_ext_discount_amt]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
+    Subquery #3
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_net_paid))] [avg(UnscaledValue(ss_net_paid)),avg(ss_net_paid),sum,count]
+          InputAdapter
+            Exchange #3
+              WholeStageCodegen
+                HashAggregate [sum,count,ss_net_paid,sum,count] [sum,count,sum,count]
+                  Project [ss_net_paid]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
+    Subquery #4
+      WholeStageCodegen
+        HashAggregate [count,count(1)] [count(1),count(1),count]
+          InputAdapter
+            Exchange #4
+              WholeStageCodegen
+                HashAggregate [count,count] [count,count]
+                  Project
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity] [ss_quantity]
+    Subquery #5
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_ext_discount_amt))] [avg(UnscaledValue(ss_ext_discount_amt)),avg(ss_ext_discount_amt),sum,count]
+          InputAdapter
+            Exchange #5
+              WholeStageCodegen
+                HashAggregate [count,sum,count,ss_ext_discount_amt,sum] [sum,count,sum,count]
+                  Project [ss_ext_discount_amt]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
+    Subquery #6
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_net_paid))] [avg(UnscaledValue(ss_net_paid)),avg(ss_net_paid),sum,count]
+          InputAdapter
+            Exchange #6
+              WholeStageCodegen
+                HashAggregate [sum,sum,ss_net_paid,count,count] [sum,count,sum,count]
+                  Project [ss_net_paid]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
+    Subquery #7
+      WholeStageCodegen
+        HashAggregate [count,count(1)] [count(1),count(1),count]
+          InputAdapter
+            Exchange #7
+              WholeStageCodegen
+                HashAggregate [count,count] [count,count]
+                  Project
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity] [ss_quantity]
+    Subquery #8
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_ext_discount_amt))] [avg(UnscaledValue(ss_ext_discount_amt)),avg(ss_ext_discount_amt),sum,count]
+          InputAdapter
+            Exchange #8
+              WholeStageCodegen
+                HashAggregate [sum,ss_ext_discount_amt,count,count,sum] [sum,count,sum,count]
+                  Project [ss_ext_discount_amt]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
+    Subquery #9
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_net_paid))] [avg(UnscaledValue(ss_net_paid)),avg(ss_net_paid),sum,count]
+          InputAdapter
+            Exchange #9
+              WholeStageCodegen
+                HashAggregate [sum,count,count,sum,ss_net_paid] [sum,count,sum,count]
+                  Project [ss_net_paid]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
+    Subquery #10
+      WholeStageCodegen
+        HashAggregate [count,count(1)] [count(1),count(1),count]
+          InputAdapter
+            Exchange #10
+              WholeStageCodegen
+                HashAggregate [count,count] [count,count]
+                  Project
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity] [ss_quantity]
+    Subquery #11
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_ext_discount_amt))] [avg(UnscaledValue(ss_ext_discount_amt)),avg(ss_ext_discount_amt),sum,count]
+          InputAdapter
+            Exchange #11
+              WholeStageCodegen
+                HashAggregate [ss_ext_discount_amt,sum,count,count,sum] [sum,count,sum,count]
+                  Project [ss_ext_discount_amt]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
+    Subquery #12
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_net_paid))] [avg(UnscaledValue(ss_net_paid)),avg(ss_net_paid),sum,count]
+          InputAdapter
+            Exchange #12
+              WholeStageCodegen
+                HashAggregate [count,sum,ss_net_paid,count,sum] [sum,count,sum,count]
+                  Project [ss_net_paid]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
+    Subquery #13
+      WholeStageCodegen
+        HashAggregate [count,count(1)] [count(1),count(1),count]
+          InputAdapter
+            Exchange #13
+              WholeStageCodegen
+                HashAggregate [count,count] [count,count]
+                  Project
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity] [ss_quantity]
+    Subquery #14
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_ext_discount_amt))] [avg(UnscaledValue(ss_ext_discount_amt)),avg(ss_ext_discount_amt),sum,count]
+          InputAdapter
+            Exchange #14
+              WholeStageCodegen
+                HashAggregate [sum,ss_ext_discount_amt,sum,count,count] [sum,count,sum,count]
+                  Project [ss_ext_discount_amt]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
+    Subquery #15
+      WholeStageCodegen
+        HashAggregate [sum,count,avg(UnscaledValue(ss_net_paid))] [avg(UnscaledValue(ss_net_paid)),avg(ss_net_paid),sum,count]
+          InputAdapter
+            Exchange #15
+              WholeStageCodegen
+                HashAggregate [count,ss_net_paid,sum,count,sum] [sum,count,sum,count]
+                  Project [ss_net_paid]
+                    Filter [ss_quantity]
+                      Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
+    Filter [r_reason_sk]
+      Scan parquet default.reason [r_reason_sk] [r_reason_sk]

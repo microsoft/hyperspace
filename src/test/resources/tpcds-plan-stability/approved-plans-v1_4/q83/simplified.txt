@@ -1,0 +1,94 @@
+TakeOrderedAndProject [wr_item_qty,cr_item_qty,wr_dev,sr_dev,sr_item_qty,average,item_id,cr_dev]
+  WholeStageCodegen
+    Project [item_id,sr_item_qty,cr_item_qty,wr_item_qty]
+      BroadcastHashJoin [item_id,item_id]
+        Project [item_id,sr_item_qty,cr_item_qty]
+          BroadcastHashJoin [item_id,item_id]
+            HashAggregate [i_item_id,sum,sum(cast(sr_return_quantity as bigint))] [sum(cast(sr_return_quantity as bigint)),item_id,sr_item_qty,sum]
+              InputAdapter
+                Exchange [i_item_id] #1
+                  WholeStageCodegen
+                    HashAggregate [i_item_id,sr_return_quantity,sum,sum] [sum,sum]
+                      Project [sr_return_quantity,i_item_id]
+                        BroadcastHashJoin [sr_returned_date_sk,d_date_sk]
+                          Project [sr_returned_date_sk,sr_return_quantity,i_item_id]
+                            BroadcastHashJoin [sr_item_sk,i_item_sk]
+                              Project [sr_returned_date_sk,sr_item_sk,sr_return_quantity]
+                                Filter [sr_item_sk,sr_returned_date_sk]
+                                  Scan parquet default.store_returns [sr_returned_date_sk,sr_item_sk,sr_return_quantity] [sr_returned_date_sk,sr_item_sk,sr_return_quantity]
+                              InputAdapter
+                                BroadcastExchange #2
+                                  WholeStageCodegen
+                                    Project [i_item_sk,i_item_id]
+                                      Filter [i_item_sk,i_item_id]
+                                        Scan parquet default.item [i_item_sk,i_item_id] [i_item_sk,i_item_id]
+                          InputAdapter
+                            BroadcastExchange #3
+                              WholeStageCodegen
+                                Project [d_date_sk]
+                                  BroadcastHashJoin [d_date,d_date]
+                                    Project [d_date_sk,d_date]
+                                      Filter [d_date_sk]
+                                        Scan parquet default.date_dim [d_date_sk,d_date] [d_date_sk,d_date]
+                                    InputAdapter
+                                      BroadcastExchange #4
+                                        WholeStageCodegen
+                                          Project [d_date]
+                                            BroadcastHashJoin [d_week_seq,d_week_seq]
+                                              Scan parquet default.date_dim [d_date,d_week_seq] [d_date,d_week_seq]
+                                              InputAdapter
+                                                BroadcastExchange #5
+                                                  WholeStageCodegen
+                                                    Project [d_week_seq]
+                                                      Filter [d_date]
+                                                        Scan parquet default.date_dim [d_date,d_week_seq] [d_date,d_week_seq]
+            InputAdapter
+              BroadcastExchange #6
+                WholeStageCodegen
+                  HashAggregate [i_item_id,sum,sum(cast(cr_return_quantity as bigint))] [sum(cast(cr_return_quantity as bigint)),item_id,cr_item_qty,sum]
+                    InputAdapter
+                      Exchange [i_item_id] #7
+                        WholeStageCodegen
+                          HashAggregate [i_item_id,cr_return_quantity,sum,sum] [sum,sum]
+                            Project [cr_return_quantity,i_item_id]
+                              BroadcastHashJoin [cr_returned_date_sk,d_date_sk]
+                                Project [cr_returned_date_sk,cr_return_quantity,i_item_id]
+                                  BroadcastHashJoin [cr_item_sk,i_item_sk]
+                                    Project [cr_returned_date_sk,cr_item_sk,cr_return_quantity]
+                                      Filter [cr_item_sk,cr_returned_date_sk]
+                                        Scan parquet default.catalog_returns [cr_returned_date_sk,cr_item_sk,cr_return_quantity] [cr_returned_date_sk,cr_item_sk,cr_return_quantity]
+                                    InputAdapter
+                                      BroadcastExchange #8
+                                        WholeStageCodegen
+                                          Project [i_item_sk,i_item_id]
+                                            Filter [i_item_sk,i_item_id]
+                                              Scan parquet default.item [i_item_sk,i_item_id] [i_item_sk,i_item_id]
+                                InputAdapter
+                                  BroadcastExchange #9
+                                    WholeStageCodegen
+                                      Project [d_date_sk]
+                                        BroadcastHashJoin [d_date,d_date]
+                                          Project [d_date_sk,d_date]
+                                            Filter [d_date_sk]
+                                              Scan parquet default.date_dim [d_date_sk,d_date] [d_date_sk,d_date]
+                                          InputAdapter
+                                            ReusedExchange [d_date] [d_date] #4
+        InputAdapter
+          BroadcastExchange #10
+            WholeStageCodegen
+              HashAggregate [i_item_id,sum,sum(cast(wr_return_quantity as bigint))] [sum(cast(wr_return_quantity as bigint)),item_id,wr_item_qty,sum]
+                InputAdapter
+                  Exchange [i_item_id] #11
+                    WholeStageCodegen
+                      HashAggregate [i_item_id,wr_return_quantity,sum,sum] [sum,sum]
+                        Project [wr_return_quantity,i_item_id]
+                          BroadcastHashJoin [wr_returned_date_sk,d_date_sk]
+                            Project [wr_returned_date_sk,wr_return_quantity,i_item_id]
+                              BroadcastHashJoin [wr_item_sk,i_item_sk]
+                                Project [wr_returned_date_sk,wr_item_sk,wr_return_quantity]
+                                  Filter [wr_item_sk,wr_returned_date_sk]
+                                    Scan parquet default.web_returns [wr_returned_date_sk,wr_item_sk,wr_return_quantity] [wr_returned_date_sk,wr_item_sk,wr_return_quantity]
+                                InputAdapter
+                                  ReusedExchange [i_item_sk,i_item_id] [i_item_sk,i_item_id] #2
+                            InputAdapter
+                              ReusedExchange [d_date_sk] [d_date_sk] #3
