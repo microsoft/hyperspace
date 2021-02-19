@@ -25,9 +25,6 @@ CollectLimit 100
       :                          :     +- *(3) FileScan parquet default.catalog_sales[cs_sold_date_sk#2,cs_item_sk#5,cs_ext_discount_amt#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/catalog_sales], PartitionFilters: [], PushedFilters: [IsNotNull(cs_sold_date_sk), IsNotNull(cs_item_sk)], ReadSchema: struct<cs_sold_date_sk:int,cs_item_sk:int,cs_ext_discount_amt:decimal(7,2)>
       :                          +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
       :                             +- *(2) Project [d_date_sk#3]
-      :                                +- *(2) Filter (((isnotnull(d_date#10) && (cast(d_date#10 as string) >= 2000-01-27])) && (d_date#10 <= 11073)) && isnotnull(d_date_sk#3))
+      :                                +- *(2) Filter (((isnotnull(d_date#10) && (cast(d_date#10 as string) >= 2000-01-27)) && (d_date#10 <= 11073)) && isnotnull(d_date_sk#3))
       :                                   +- *(2) FileScan parquet default.date_dim[d_date_sk#3,d_date#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date), LessThanOrEqual(d_date,2000-04-26), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
-      +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
-         +- *(5) Project [d_date_sk#3]
-            +- *(5) Filter (((isnotnull(d_date#10) && (cast(d_date#10 as string) >= 2000-01-27)) && (d_date#10 <= 11073)) && isnotnull(d_date_sk#3))
-               +- *(5) FileScan parquet default.date_dim[d_date_sk#3,d_date#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date), LessThanOrEqual(d_date,2000-04-26), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
+      +- ReusedExchange [d_date_sk#3], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))

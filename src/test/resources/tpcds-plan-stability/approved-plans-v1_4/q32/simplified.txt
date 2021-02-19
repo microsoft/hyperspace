@@ -36,8 +36,4 @@ CollectLimit
                                           Filter [d_date,d_date_sk]
                                             Scan parquet default.date_dim [d_date_sk,d_date] [d_date_sk,d_date]
         InputAdapter
-          BroadcastExchange #5
-            WholeStageCodegen
-              Project [d_date_sk]
-                Filter [d_date,d_date_sk]
-                  Scan parquet default.date_dim [d_date_sk,d_date] [d_date_sk,d_date]
+          ReusedExchange [d_date_sk] [d_date_sk] #4
