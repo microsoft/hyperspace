@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources(),
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources(),
   "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources(),
-  "org.apache.iceberg" % "iceberg-spark-runtime" % "0.10.0" % "provided" withSources(),
+  "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources(),
 
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
