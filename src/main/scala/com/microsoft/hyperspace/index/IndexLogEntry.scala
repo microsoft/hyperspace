@@ -343,16 +343,56 @@ object FileInfo {
   }
 }
 
-// IndexLogEntry-specific CoveringIndex that represents derived dataset.
-case class CoveringIndex(properties: CoveringIndex.Properties) {
-  val kind = "CoveringIndex"
-  val kindAbbr = "CI"
+trait HyperSpaceIndex {
+  def getKind(): String
+
+  def getKindAbbr(): String
 }
+
+trait NonClusteredIndex extends HyperSpaceIndex {
+  object Kinds extends Enumeration {
+    type Kinds = String
+    val covering = "CoveringIndex"
+    val nonCovering = "NonCoveringIndex"
+  }
+}
+
+// IndexLogEntry-specific CoveringIndex that represents derived dataset.
+case class CoveringIndex(properties: CoveringIndex.Properties) extends NonClusteredIndex {
+  private val kind: String = Kinds.covering
+  private val kindAbbr: String = "CI"
+
+  override def getKind(): String = {
+    this.kind
+  }
+
+  override def getKindAbbr(): String = {
+    this.kindAbbr
+  }
+}
+
+case class BloomFilterIndex(properties: CoveringIndex.BFProperties) extends NonClusteredIndex {
+  private val kind: String = Kinds.nonCovering
+  private val kindAbbr: String = "BF"
+
+  override def getKind(): String = {
+    this.kind
+  }
+
+  override def getKindAbbr(): String = {
+    this.kindAbbr
+  }
+}
+
 object CoveringIndex {
   case class Properties(columns: Properties.Columns,
     schemaString: String,
     numBuckets: Int,
     properties: Map[String, String])
+
+  case class BFProperties(columns: Properties.Columns,
+                        schemaString: String,
+                        properties: Map[String, String])
 
   object Properties {
     case class Columns(indexed: Seq[String], included: Seq[String])

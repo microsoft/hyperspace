@@ -88,7 +88,7 @@ private[hyperspace] object IndexStatistics {
         entry.derivedDataset.properties.schemaString,
         indexDirPath(entry),
         entry.state,
-        entry.derivedDataset.kind,
+        entry.derivedDataset.getKind(),
         entry.hasLineageColumn,
         entry.content.fileInfos.size,
         entry.content.fileInfos.foldLeft(0L)(_ + _.size),
