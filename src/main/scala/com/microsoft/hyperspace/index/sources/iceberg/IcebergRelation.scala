@@ -123,7 +123,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
    * For [[IcebergRelation]], each file path should be in this format:
-   *   `file:/path/to/file`
+   *   `/path/to/file`
    *
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of pairs of (file path, file id).
