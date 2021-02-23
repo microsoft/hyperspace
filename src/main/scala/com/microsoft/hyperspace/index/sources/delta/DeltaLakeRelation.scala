@@ -46,8 +46,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   override def allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
       location
-        .getSnapshot(stalenessAcceptable = false)
-        .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+        .getSnapshot
+        .filesForScan(projection = Nil, location.partitionFilters)
         .files
         .map { f =>
           toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
@@ -73,8 +73,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     plan.relation match {
       case HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, _, options) =>
         val files = location
-          .getSnapshot(stalenessAcceptable = false)
-          .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
+          .getSnapshot
+          .filesForScan(projection = Nil, location.partitionFilters)
           .files
           .map { f =>
             toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))

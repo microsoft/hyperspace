@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.index.sources.default
 
 import org.apache.hadoop.fs.{FileStatus, Path}
-import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.deploy.hyperspace.SparkHadoopUtil
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
@@ -159,7 +159,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
               .map { path =>
                 val hdfsPath = new Path(path)
                 val qualified = hdfsPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
-                qualified.toString -> SparkHadoopUtil.get.globPathIfNecessary(fs, qualified)
+                qualified.toString -> SparkHadoopUtil.globPathIfNecessary(fs, qualified)
               }
               .toMap
 

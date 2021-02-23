@@ -16,7 +16,7 @@
 
 name := "hyperspace-core"
 
-sparkVersion := "3.0.0"
+sparkVersion := "3.0.1"
 
 scalaVersion := "2.12.10"
 
@@ -24,8 +24,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources (),
   "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources (),
   "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources (),
-  "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
-  "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources (),
+  "io.delta" %% "delta-core" % "0.8.0" % "provided" withSources (),
+  "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.0" % "provided" withSources (),
   // Test dependencies
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
