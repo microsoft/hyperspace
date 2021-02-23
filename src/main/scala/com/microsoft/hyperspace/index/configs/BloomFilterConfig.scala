@@ -14,19 +14,18 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.configs.noncovering
+package com.microsoft.hyperspace.index.configs
 
 import com.microsoft.hyperspace.index.BloomFilterIndexConfig
-import com.microsoft.hyperspace.index.configs.covering.IndexConfig
 
 /**
- * TODO Defines [[BloomFilterIndexConfig.Builder]] and relevant helper methods for enabling
- *  builder pattern for [[BloomFilterIndexConfig]].
+ * TODO Defines [[BloomFilterConfig.Builder]] and relevant helper methods for enabling
+ *  builder pattern for [[BloomFilterConfig]].
  */
-object BloomFilterIndexConfig {
+object BloomFilterConfig {
 
   /**
-   * Builder for [[BloomFilterIndexConfig]].
+   * Builder for [[BloomFilterConfig]].
    */
   private[index] class Builder {
 
@@ -37,10 +36,10 @@ object BloomFilterIndexConfig {
     private[this] var numBits: Long = -1
 
     /**
-     * Updates index name for [[IndexConfig]].
+     * Updates index name for [[CoveringConfig]].
      *
-     * @param indexName index name for the [[BloomFilterIndexConfig]].
-     * @return an [[BloomFilterIndexConfig.Builder]] object with updated index name.
+     * @param indexName index name for the [[BloomFilterConfig]].
+     * @return an [[BloomFilterConfig.Builder]] object with updated index name.
      */
     def init(indexName: String, indexedColumn: String): Builder = {
       if (this.indexName.nonEmpty || this.indexedColumn.nonEmpty) {
@@ -107,9 +106,9 @@ object BloomFilterIndexConfig {
   }
 
   /**
-   * Creates new [[BloomFilterIndexConfig.Builder]] for constructing an [[BloomFilterIndexConfig]].
+   * Creates new [[BloomFilterConfig.Builder]] for constructing an [[BloomFilterConfig]].
    *
-   * @return an [[BloomFilterIndexConfig.Builder]] object.
+   * @return an [[BloomFilterConfig.Builder]] object.
    */
   def builder(): Builder = new Builder
 }

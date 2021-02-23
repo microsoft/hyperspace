@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.configs.covering
+package com.microsoft.hyperspace.index.configs
 
 import com.microsoft.hyperspace.index.IndexConfig
 
 /**
- * Defines [[IndexConfig.Builder]] and relevant helper methods for enabling builder pattern for
- * [[IndexConfig]].
+ * Defines [[CoveringConfig.Builder]] and relevant helper methods for enabling builder
+ * pattern for [[CoveringConfig]].
  */
-object IndexConfig {
+object CoveringConfig {
 
   /**
-   * Builder for [[IndexConfig]].
+   * Builder for [[CoveringConfig]].
    */
   class Builder {
 
@@ -34,10 +34,10 @@ object IndexConfig {
     private[this] var indexName: String = ""
 
     /**
-     * Updates index name for [[IndexConfig]].
+     * Updates index name for [[CoveringConfig]].
      *
-     * @param indexName index name for the [[IndexConfig]].
-     * @return an [[IndexConfig.Builder]] object with updated index name.
+     * @param indexName index name for the [[CoveringConfig]].
+     * @return an [[CoveringConfig.Builder]] object with updated index name.
      */
     def indexName(indexName: String): Builder = {
       if (this.indexName.nonEmpty) {
@@ -53,13 +53,13 @@ object IndexConfig {
     }
 
     /**
-     * Updates column names for [[IndexConfig]].
+     * Updates column names for [[CoveringConfig]].
      *
      * Note: API signature supports passing one or more argument.
      *
-     * @param indexedColumn indexed column for the [[IndexConfig]].
-     * @param indexedColumns indexed columns for the [[IndexConfig]].
-     * @return an [[IndexConfig.Builder]] object with updated indexed columns.
+     * @param indexedColumn  indexed column for the [[CoveringConfig]].
+     * @param indexedColumns indexed columns for the [[CoveringConfig]].
+     * @return an [[CoveringConfig.Builder]] object with updated indexed columns.
      */
     def indexBy(indexedColumn: String, indexedColumns: String*): Builder = {
       if (this.indexedColumns.nonEmpty) {
@@ -71,13 +71,13 @@ object IndexConfig {
     }
 
     /**
-     * Updates included columns for [[IndexConfig]].
+     * Updates included columns for [[CoveringConfig]].
      *
      * Note: API signature supports passing one or more argument.
      *
-     * @param includedColumn included column for [[IndexConfig]].
-     * @param includedColumns included columns for [[IndexConfig]].
-     * @return an [[IndexConfig.Builder]] object with updated included columns.
+     * @param includedColumn  included column for [[CoveringConfig]].
+     * @param includedColumns included columns for [[CoveringConfig]].
+     * @return an [[CoveringConfig.Builder]] object with updated included columns.
      */
     def include(includedColumn: String, includedColumns: String*): Builder = {
       if (this.includedColumns.nonEmpty) {
@@ -90,19 +90,19 @@ object IndexConfig {
 
     /**
      * Creates IndexConfig from supplied index name, indexed columns and included columns
-     * to [[IndexConfig.Builder]].
+     * to [[CoveringConfig.Builder]].
      *
-     * @return an [[IndexConfig]] object.
+     * @return an [[CoveringConfig]] object.
      */
     def build(): IndexConfig = {
-      new IndexConfig(indexName, indexedColumns, includedColumns)
+      IndexConfig(indexName, indexedColumns, includedColumns)
     }
   }
 
   /**
-   *  Creates new [[IndexConfig.Builder]] for constructing an [[IndexConfig]].
+   *  Creates new [[CoveringConfig.Builder]] for constructing an [[CoveringConfig]].
    *
-   * @return an [[IndexConfig.Builder]] object.
+   * @return an [[CoveringConfig.Builder]] object.
    */
   def builder(): Builder = new Builder
 }

@@ -38,7 +38,7 @@ trait IndexManager {
    * @param indexConfig the configuration of index to be created.
    * @return Index object that stores information about index created.
    */
-  def create(df: DataFrame, indexConfig: IndexConfig): Unit
+  def create(df: DataFrame, indexConfig: HyperSpaceIndexConfig): Unit
 
   /**
    * Soft deletes the index with given index name.

@@ -18,10 +18,10 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.SparkFunSuite
 
-import com.microsoft.hyperspace.index.configs.covering
+import com.microsoft.hyperspace.index.configs.CoveringConfig
 
 class IndexConfigTest extends SparkFunSuite {
-  val CoveringIndexConfigBuilder: covering.IndexConfig.type = covering.IndexConfig
+  val CoveringIndexConfigBuilder: CoveringConfig.type = configs.CoveringConfig
 
   test("Empty index name is not allowed.") {
 

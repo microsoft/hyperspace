@@ -39,9 +39,9 @@ class IndexTest extends SparkFunSuite {
 
     val entry = IndexLogEntry(
       config.indexName,
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
+      HyperSpaceIndex.CoveringIndex(
+        HyperSpaceIndex.Properties.Covering(
+          HyperSpaceIndex.Properties.CommonProperties
             .Columns(config.indexedColumns, config.includedColumns),
           IndexLogEntry.schemaString(schema),
           numBuckets,

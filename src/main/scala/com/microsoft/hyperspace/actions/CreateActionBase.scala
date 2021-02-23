@@ -51,7 +51,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig,
+      indexConfig: HyperSpaceIndexConfig,
       path: Path): IndexLogEntry = {
     val absolutePath = PathUtils.makeAbsolute(path, spark.sessionState.newHadoopConf())
     val numBuckets = numBucketsForIndex(spark)
@@ -72,18 +72,29 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
-        val coveringIndexProperties =
+        val indexProperties =
           (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
 
         IndexLogEntry(
           indexConfig.indexName,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
-                .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
-              IndexLogEntry.schemaString(indexDataFrame.schema),
-              numBuckets,
-              coveringIndexProperties)),
+          indexConfig match {
+            case _: IndexConfig =>
+              HyperSpaceIndex.CoveringIndex(
+                HyperSpaceIndex.Properties.Covering(
+                  HyperSpaceIndex.Properties.CommonProperties
+                    .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
+                  IndexLogEntry.schemaString(indexDataFrame.schema),
+                  numBuckets,
+                  indexProperties))
+            case _: HyperSpaceIndexConfig =>
+              HyperSpaceIndex.BloomFilterIndex(
+                HyperSpaceIndex.Properties.BloomFilter(
+                  HyperSpaceIndex.Properties.CommonProperties
+                    .Columns(resolvedIncludedColumns, resolvedIncludedColumns),
+                  IndexLogEntry.schemaString(indexDataFrame.schema),
+                  indexProperties))
+            case _ => throw HyperspaceException("Invalid Index Config.")
+          },
           Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
@@ -140,7 +151,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     relations.head
   }
 
-  private def resolveConfig(
+  private def resolveCoveringIndexConfig(
       df: DataFrame,
       indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
     val spark = df.sparkSession
@@ -162,14 +173,28 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  private def prepareIndexDataFrame(
+  private def resolveBloomFilterIndexConfig(
+      df: DataFrame,
+      indexConfig: BloomFilterIndexConfig): String = {
+    val spark = df.sparkSession
+    val dfColumnNames = df.schema.fieldNames
+    val indexedColumn = indexConfig.indexedColumn
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumn, dfColumnNames)
+
+    resolvedIndexedColumns match {
+      case Some(indexed) => indexed
+      case _ =>
+        throw HyperspaceException(
+          s"Columns '${indexedColumn}' could not be resolved " +
+            s"from available source columns '${dfColumnNames.mkString(",")}'")
+    }
+  }
+
+  private def resolveDataFrameForLineage(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
-    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
-
-    val indexDF = if (hasLineage(spark)) {
+      providedIndexColumns: Seq[String]): DataFrame = {
+    if (hasLineage(spark)) {
       val relation = getRelation(spark, df)
 
       // Lineage is captured using two sets of columns:
@@ -177,9 +202,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
       val partitionColumns = relation.partitionSchema.map(_.name)
-      val missingPartitionColumns = partitionColumns.filter(
-        ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
-      val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
+      val missingPartitionColumns =
+        partitionColumns.filter(ResolverUtils.resolve(spark, _, providedIndexColumns).isEmpty)
+      val allIndexColumns = providedIndexColumns ++ missingPartitionColumns
 
       // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a
       // Long data type value. Each source data file has a unique file id, assigned by
@@ -202,10 +227,29 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .select(
           allIndexColumns.head,
           allIndexColumns.tail :+ IndexConstants.DATA_FILE_NAME_ID: _*)
-    } else {
-      df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
     }
 
-    (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
+    df.select(providedIndexColumns.head, providedIndexColumns.tail: _*)
+  }
+
+  private def prepareIndexDataFrame(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: HyperSpaceIndexConfig): (DataFrame, Seq[String], Seq[String]) = {
+
+    indexConfig match {
+      case coveringIndexConfig: IndexConfig =>
+        val (resolvedIndexedColumns, resolvedIncludedColumns) =
+          resolveCoveringIndexConfig(df, coveringIndexConfig)
+        val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
+        val indexDF = resolveDataFrameForLineage(spark, df, columnsFromIndexConfig)
+
+        (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
+      case bloomIndexConfig: BloomFilterIndexConfig =>
+        val resolvedIndexColumn = Seq(resolveBloomFilterIndexConfig(df, bloomIndexConfig))
+        val indexDF = resolveDataFrameForLineage(spark, df, resolvedIndexColumn)
+
+        (indexDF, resolvedIndexColumn, Seq())
+    }
   }
 }

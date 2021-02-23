@@ -16,10 +16,9 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.util.Try
-
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types.StructType
+import scala.util.Try
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
@@ -30,7 +29,7 @@ import com.microsoft.hyperspace.util.ResolverUtils
 class CreateAction(
     spark: SparkSession,
     df: DataFrame,
-    indexConfig: IndexConfig,
+    indexConfig: HyperSpaceIndexConfig,
     final override protected val logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
@@ -50,7 +49,7 @@ class CreateAction(
     }
 
     // schema validity checks
-    if (!isValidIndexSchema(indexConfig, df.schema)) {
+    if (!isValidIndexSchema(indexConfig.asInstanceOf[IndexConfig], df.schema)) {
       throw HyperspaceException("Index config is not applicable to dataframe schema.")
     }
 
@@ -73,11 +72,16 @@ class CreateAction(
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
-  final override def op(): Unit = write(spark, df, indexConfig)
+  final override def op(): Unit = write(spark, df, indexConfig.asInstanceOf[IndexConfig])
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.
     val index = Try(logEntry.asInstanceOf[IndexLogEntry]).toOption
-    CreateActionEvent(appInfo, indexConfig, index, df.queryExecution.logical.toString, message)
+    CreateActionEvent(
+      appInfo,
+      indexConfig.asInstanceOf[IndexConfig],
+      index,
+      df.queryExecution.logical.toString,
+      message)
   }
 }

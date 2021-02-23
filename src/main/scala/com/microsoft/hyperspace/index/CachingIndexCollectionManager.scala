@@ -73,7 +73,7 @@ class CachingIndexCollectionManager(
     indexCache.clear()
   }
 
-  override def create(df: DataFrame, indexConfig: IndexConfig): Unit = {
+  override def create(df: DataFrame, indexConfig: HyperSpaceIndexConfig): Unit = {
     clearCache()
     super.create(df, indexConfig)
   }

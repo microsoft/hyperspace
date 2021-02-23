@@ -42,7 +42,7 @@ class IndexHadoopFsRelation(
       options)(spark) {
 
   val indexPlanStr: String = {
-    s"Hyperspace(Type: ${index.derivedDataset.getKindAbbr()}, " +
+    s"Hyperspace(Type: ${index.derivedDataset.kindAbbr}, " +
       s"Name: ${index.name}, LogVersion: ${index.id})"
   }
   override def toString(): String = indexPlanStr

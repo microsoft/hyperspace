@@ -18,9 +18,39 @@ package com.microsoft.hyperspace.index
 
 import java.util.Locale
 
+import com.microsoft.hyperspace.index.configs.CoveringConfig
+
+/**
+ * All index supported in Hyperspace whose user facing config needs to be defined needs
+ * to extend [[HyperSpaceIndexConfig]] trait.
+ */
+sealed trait HyperSpaceIndexConfig {
+  val indexName: String
+
+  def equals(obj: Any): Boolean
+
+  def hashCode(): Int
+
+  def toString: String
+}
+
+trait CoveringIndexConfig extends HyperSpaceIndexConfig {
+  /*
+   * Columns from which index are created.
+   */
+  val indexedColumns: Seq[String]
+
+  /*
+   * Columns to be included with the indexed columns.
+   */
+  val includedColumns: Seq[String]
+}
+
+trait NonCoveringIndexConfig extends HyperSpaceIndexConfig {}
+
 /**
  * IndexConfig specifies the configuration of an index.
- * Associated Builder [[com.microsoft.hyperspace.index.configs.covering.IndexConfig.builder()]]
+ * Associated Builder [[CoveringConfig.builder()]]
  *
  * @param indexName Index name.
  * @param indexedColumns Columns from which an index is created.
@@ -30,7 +60,7 @@ case class IndexConfig(
     indexName: String,
     indexedColumns: Seq[String],
     includedColumns: Seq[String] = Seq())
-    extends CoveringIndexConfigBase {
+    extends CoveringIndexConfig {
   if (indexName.isEmpty || indexedColumns.isEmpty) {
     throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")
   }
@@ -84,7 +114,7 @@ case class BloomFilterIndexConfig(
     expectedNumItems: Long,
     fpp: Double = -1,
     numBits: Long = -1)
-    extends NonCoveringIndexConfigBase {
+    extends NonCoveringIndexConfig {
   if (indexName.isEmpty || indexedColumn.isEmpty || expectedNumItems < 1) {
     throw new IllegalArgumentException(
       "Empty index name or indexed column or expected items less than 1 are not allowed.")
@@ -128,7 +158,7 @@ case class BloomFilterIndexConfig(
   }
 }
 
-object Config {
+object HyperSpaceIndexConfigs {
 
   // TODO - prints info table about all types of index supported by hyperspace
   def printAllIndexConfigInfo(): String = {
