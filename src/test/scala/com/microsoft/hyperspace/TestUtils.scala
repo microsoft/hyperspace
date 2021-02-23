@@ -16,9 +16,13 @@
 
 package com.microsoft.hyperspace
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileStatus, Path}
 
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.MockEventLogger.reset
+import com.microsoft.hyperspace.index.{FileIdTracker, IndexConfig, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
+import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 object TestUtils {
   def copyWithState(index: IndexLogEntry, state: String): IndexLogEntry = {
@@ -44,4 +48,74 @@ object TestUtils {
       path.getName +: splitPath(path.getParent)
     }
   }
+
+  /**
+   * Delete files from a given path.
+   *
+   * @param path Path to the folder containing files.
+   * @param pattern File name pattern to delete.
+   * @param numFilesToDelete Number of files to delete.
+   * @return Deleted files' FileStatus.
+   */
+  def deleteFiles(path: String, pattern: String, numFilesToDelete: Int): Seq[FileStatus] = {
+    val pathToDelete = new Path(path, pattern)
+    val files = pathToDelete
+      .getFileSystem(new Configuration)
+      .globStatus(pathToDelete)
+
+    assert(files.length >= numFilesToDelete)
+    val filesToDelete = files.take(numFilesToDelete)
+    filesToDelete.foreach(f => FileUtils.delete(f.getPath))
+
+    filesToDelete
+  }
+
+  def logManager(systemPath: Path, indexName: String): IndexLogManager = {
+    val indexPath = PathUtils.makeAbsolute(s"$systemPath/$indexName")
+    IndexLogManagerFactoryImpl.create(indexPath)
+  }
+
+  def latestIndexLogEntry(systemPath: Path, indexName: String): IndexLogEntry = {
+    logManager(systemPath, indexName)
+      .getLatestStableLog()
+      .get
+      .asInstanceOf[IndexLogEntry]
+  }
+
+  def getFileIdTracker(systemPath: Path, indexConfig: IndexConfig): FileIdTracker = {
+    latestIndexLogEntry(systemPath, indexConfig.indexName).fileIdTracker
+  }
+}
+
+/**
+ * This class can be used to test emitted events from Hyperspace actions.
+ */
+class MockEventLogger extends EventLogger {
+  import com.microsoft.hyperspace.MockEventLogger.emittedEvents
+  // Reset events.
+  reset()
+
+  override def logEvent(event: HyperspaceEvent): Unit = {
+    emittedEvents :+= event
+  }
+}
+
+object MockEventLogger {
+  var emittedEvents: Seq[HyperspaceEvent] = Seq()
+
+  def reset(): Unit = {
+    emittedEvents = Seq()
+  }
+}
+
+object TestConfig {
+  val HybridScanEnabled = Seq(
+    IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+    IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99")
+
+  val HybridScanEnabledAppendOnly = Seq(
+    IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+    IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0")
 }

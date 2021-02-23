@@ -19,12 +19,14 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
@@ -48,19 +50,22 @@ object FilterIndexRule
     //  1. The index covers all columns from the filter predicate and output columns list, and
     //  2. Filter predicate's columns include the first 'indexed' column of the index.
     plan transformDown {
-      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns, _, fsRelation) =>
+      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns) =>
         try {
           val candidateIndexes =
-            findCoveringIndexes(filter, outputColumns, filterColumns, fsRelation)
-          rank(candidateIndexes) match {
+            findCoveringIndexes(filter, outputColumns, filterColumns)
+          FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
-              // Do not set BucketSpec to avoid limiting Spark's degree of parallelism.
+              // As FilterIndexRule is not intended to support bucketed scan, we set
+              // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
+              // unnecessary shuffle for appended data to apply BucketUnion for merging data.
               val transformedPlan =
                 RuleUtils.transformPlanToUseIndex(
                   spark,
                   index,
                   originalPlan,
-                  useBucketSpec = false)
+                  useBucketSpec = HyperspaceConf.useBucketSpecForFilterRule(spark),
+                  useBucketUnionForAppended = false)
               logEvent(
                 HyperspaceIndexUsageEvent(
                   AppInfo(
@@ -89,32 +94,37 @@ object FilterIndexRule
    * @param filter Filter node in the subplan that is being optimized.
    * @param outputColumns List of output columns in subplan.
    * @param filterColumns List of columns in filter predicate.
-   * @param fsRelation Input relation in the subplan.
    * @return List of available candidate indexes on fsRelation for the given columns.
    */
   private def findCoveringIndexes(
       filter: Filter,
       outputColumns: Seq[String],
-      filterColumns: Seq[String],
-      fsRelation: HadoopFsRelation): Seq[IndexLogEntry] = {
-    RuleUtils.getLogicalRelation(filter) match {
+      filterColumns: Seq[String]): Seq[IndexLogEntry] = {
+    RuleUtils.getRelation(spark, filter) match {
       case Some(r) =>
         val indexManager = Hyperspace
           .getContext(spark)
           .indexCollectionManager
-        val candidateIndexes =
-          RuleUtils.getCandidateIndexes(indexManager, r, HyperspaceConf.hybridScanEnabled(spark))
 
-        candidateIndexes.filter { index =>
+        // TODO: the following check only considers indexes in ACTIVE state for usage. Update
+        //  the code to support indexes in transitioning states as well.
+        //  See https://github.com/microsoft/hyperspace/issues/65
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+
+        val candidateIndexes = allIndexes.filter { index =>
           indexCoversPlan(
             outputColumns,
             filterColumns,
             index.indexedColumns,
-            index.includedColumns,
-            fsRelation.fileFormat)
+            index.includedColumns)
         }
 
-      case None => Nil // There is zero or more than one LogicalRelation nodes in Filter's subplan
+        // Get candidate via file-level metadata validation. This is performed after pruning
+        // by column schema, as this might be expensive when there are numerous files in the
+        // relation or many indexes to be checked.
+        RuleUtils.getCandidateIndexes(spark, candidateIndexes, r)
+
+      case None => Nil // There is zero or more than one supported relations in Filter's sub-plan.
     }
   }
 
@@ -135,27 +145,13 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       indexedColumns: Seq[String],
-      includedColumns: Seq[String],
-      fileFormat: FileFormat): Boolean = {
+      includedColumns: Seq[String]): Boolean = {
     val allColumnsInPlan = outputColumns ++ filterColumns
     val allColumnsInIndex = indexedColumns ++ includedColumns
 
     // TODO: Normalize predicates into CNF and incorporate more conditions.
     ResolverUtils.resolve(spark, indexedColumns.head, filterColumns).isDefined &&
     ResolverUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex).isDefined
-  }
-
-  /**
-   * @param candidates List of all indexes that fully cover logical plan.
-   * @return top-most index which is expected to maximize performance gain
-   *         according to ranking algorithm.
-   */
-  private def rank(candidates: Seq[IndexLogEntry]): Option[IndexLogEntry] = {
-    // TODO: Add ranking algorithm to sort candidates.
-    candidates match {
-      case Nil => None
-      case _ => Some(candidates.head)
-    }
   }
 }
 
@@ -164,17 +160,11 @@ object ExtractFilterNode {
       LogicalPlan, // original plan
       Filter,
       Seq[String], // output columns
-      Seq[String], // filter columns
-      LogicalRelation,
-      HadoopFsRelation)
+      Seq[String]) // filter columns
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
-    case project @ Project(
-          _,
-          filter @ Filter(
-            condition: Expression,
-            logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)))
-        if !RuleUtils.isIndexApplied(fsRelation) =>
+    case project @ Project(_, filter @ Filter(condition: Expression, ExtractRelation(relation)))
+        if !RuleUtils.isIndexApplied(relation) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
@@ -182,17 +172,26 @@ object ExtractFilterNode {
         .flatMap(_.toSeq)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(project, filter, projectColumnNames, filterColumnNames, logicalRelation, fsRelation)
+      Some(project, filter, projectColumnNames, filterColumnNames)
 
-    case filter @ Filter(
-          condition: Expression,
-          logicalRelation @ LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))
-        if !RuleUtils.isIndexApplied(fsRelation) =>
-      val relationColumnsName = logicalRelation.output.map(_.name)
+    case filter @ Filter(condition: Expression, ExtractRelation(relation))
+        if !RuleUtils.isIndexApplied(relation) =>
+      val relationColumnsName = relation.plan.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
-      Some(filter, filter, relationColumnsName, filterColumnNames, logicalRelation, fsRelation)
+      Some(filter, filter, relationColumnsName, filterColumnNames)
 
     case _ => None // plan does not match with any of filter index rule patterns
+  }
+}
+
+object ExtractRelation extends ActiveSparkSession {
+  def unapply(plan: LeafNode): Option[FileBasedRelation] = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
+    if (provider.isSupportedRelation(plan)) {
+      Some(provider.getRelation(plan))
+    } else {
+      None
+    }
   }
 }

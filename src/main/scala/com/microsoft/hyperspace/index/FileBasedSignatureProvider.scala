@@ -16,17 +16,16 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.hadoop.fs.FileStatus
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.util.HashingUtils
 
 /**
  * [[FileBasedSignatureProvider]] provides the logical plan signature based on files in the
- * logical relation. File metadata, eg. size, modification time and path, of each file in the
- * FileIndex will be used to generate the signature.
- * If the logical plan does not have any LogicalRelation operator, no signature is provided.
+ * relation. File metadata, eg. size, modification time and path, of each file in the
+ * relation will be used to generate the signature.
+ * If the given logical plan does not have any supported relations, no signature is provided.
  */
 class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
 
@@ -34,7 +33,7 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Generate the signature of logical plan.
    *
    * @param logicalPlan logical plan of data frame.
-   * @return signature, if the logical plan has some LogicalRelation operator(s); Otherwise None.
+   * @return signature, if the logical plan has supported relations; Otherwise None.
    */
   def signature(logicalPlan: LogicalPlan): Option[String] = {
     fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
@@ -44,20 +43,14 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * Visit logical plan and collect info needed for fingerprint.
    *
    * @param logicalPlan logical plan of data frame.
-   * @return fingerprint, if the logical plan has some LogicalRelation operator(s); Otherwise None.
+   * @return fingerprint, if the logical plan has supported relations; Otherwise None.
    */
   private def fingerprintVisitor(logicalPlan: LogicalPlan): Option[String] = {
+    val provider = Hyperspace.getContext.sourceProviderManager
     var fingerprint = ""
     logicalPlan.foreachUp {
-      // Currently we are only collecting plan fingerprint from hdfs file based scan nodes.
-      case LogicalRelation(
-          HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
-        fingerprint ++= location.allFiles.foldLeft("")(
-          (accumulate: String, fileStatus: FileStatus) =>
-            HashingUtils.md5Hex(accumulate + getFingerprint(fileStatus)))
+      case l: LeafNode if provider.isSupportedRelation(l) =>
+        fingerprint ++= provider.getRelation(l).signature
       case _ =>
     }
 
@@ -65,16 +58,5 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
       case "" => None
       case _ => Some(fingerprint)
     }
-  }
-
-  /**
-   * Get the fingerprint of a file.
-   *
-   * @param fileStatus file status.
-   * @return the fingerprint of a file.
-   */
-  private def getFingerprint(fileStatus: FileStatus): String = {
-    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
-      fileStatus.getPath.toString
   }
 }

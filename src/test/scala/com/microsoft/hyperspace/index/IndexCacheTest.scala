@@ -17,6 +17,7 @@
 package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.yarn.util.Clock
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
@@ -29,7 +30,6 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
   val sampleParquetDataLocation = "src/test/resources/sampleparquet"
   val indexSystemPath = "src/test/resources/indexLocation"
   val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
-  val indexConfig2 = IndexConfig("index2", Seq("Date"), Seq("RGUID"))
 
   before {
     FileUtils.delete(new Path(indexSystemPath))
@@ -42,11 +42,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
     super.afterAll()
   }
 
-  def testIndex(
-      config: IndexConfig,
-      numBuckets: Int,
-      schema: StructType,
-      indexDir: String): IndexLogEntry = {
+  def testIndex(schema: StructType, indexDir: String): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
       Seq(),
       null,
@@ -61,7 +57,8 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
           CoveringIndex.Properties
             .Columns(Seq("RGUID"), Seq("Date")),
           IndexLogEntry.schemaString(schema),
-          10)),
+          10,
+          Map())),
       Content(Directory(indexDir)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
@@ -70,18 +67,14 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   val index1 = testIndex(
-    indexConfig1,
-    50,
     StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType))),
     "path1")
   val index2 = testIndex(
-    indexConfig2,
-    10,
     StructType(Seq(StructField("Date", StringType), StructField("RGUID", StringType))),
     "plan")
 
   test("Verify CreationTimeBasedIndexCache APIs.") {
-    val indexCache = new CreationTimeBasedIndexCache(spark)
+    val indexCache = new CreationTimeBasedIndexCache(spark, new MockClock(1))
 
     val initialEntry = indexCache.get()
     assert(initialEntry.isEmpty, "Cache initially has to be empty.")
@@ -98,7 +91,8 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("verify CreationTimeBasedIndexCache expiry configuration.") {
     spark.conf.set(IndexConstants.INDEX_CACHE_EXPIRY_DURATION_SECONDS, "6000")
-    val indexCache = new CreationTimeBasedIndexCache(spark)
+    val clock = new MockClock(1)
+    val indexCache = new CreationTimeBasedIndexCache(spark, clock)
 
     indexCache.set(Seq(index1))
     assert(indexCache.get().isDefined)
@@ -106,15 +100,12 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
     // Change cache expiry configuration and wait enough so cache entry expires.
     spark.conf.set(IndexConstants.INDEX_CACHE_EXPIRY_DURATION_SECONDS, "1")
 
-    // TODO: Instead of sleep, use a clock trait in cache and wrap below call.
-    Thread.sleep(1500L)
+    clock.advanceTime(1000)
 
     assert(indexCache.get().isEmpty, "Cache entry should have been expired.")
   }
 
   test("verify CachingIndexCollectionManager APIs thru Cache.") {
-    // TODO: Use Mockito and change IndexCacheFactoryImpl to return
-    //   CreationTimeBasedIndexCache with custom clock.
 
     val mockIndexCacheFactory = new MockIndexCacheFactoryImpl(spark)
     val entry = Seq(index1)
@@ -166,12 +157,26 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
 }
 
 /**
+ * Mock for testing purposes so we can validate and invalidate entries based on time.
+
+ * @param time Current time.
+ */
+class MockClock(private var time: Long = 0L) extends Clock {
+  override def getTime: Long = time
+
+  def advanceTime(value: Long): Unit = {
+    time = time + value
+  }
+}
+
+/**
  * Mock IndexCacheFactory so test code can directly access single index cache instance and
  * validate/modify cache entry in different scenarios.
+ *
  * @param spark Spark session
  */
 class MockIndexCacheFactoryImpl(spark: SparkSession) extends IndexCacheFactory {
-  val indexCache = new CreationTimeBasedIndexCache(spark)
+  val indexCache = new CreationTimeBasedIndexCache(spark, new MockClock(1))
 
   override def create(spark: SparkSession, cacheType: String): Cache[Seq[IndexLogEntry]] = {
     cacheType match {

@@ -15,6 +15,12 @@ docs:
         url: /docs/ug-quick-start-guide/
       - title: "Configuration"
         url: /docs/ug-configuration/
+      - title: "Mutable dataset"
+        url: /docs/ug-mutable-dataset/
+      - title: "Optimize index"
+        url: /docs/ug-optimize-index/
+      - title: "Supported data formats"
+        url: /docs/ug-supported-data-formats/
       - title: "Release Notes"
         url: https://github.com/microsoft/hyperspace/releases
 # Needs to be written later

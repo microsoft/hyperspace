@@ -32,17 +32,87 @@ object HyperspaceConf {
       .toBoolean
   }
 
-  def refreshDeleteEnabled(spark: SparkSession): Boolean = {
+  def hybridScanDeleteEnabled(spark: SparkSession): Boolean = {
+    hybridScanDeletedRatioThreshold(spark) > 0.0
+  }
+
+  def optimizeFileSizeThreshold(spark: SparkSession): Long = {
     spark.conf
-      .get(IndexConstants.REFRESH_DELETE_ENABLED,
-        IndexConstants.REFRESH_DELETE_ENABLED_DEFAULT)
+      .get(
+        IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD,
+        IndexConstants.OPTIMIZE_FILE_SIZE_THRESHOLD_DEFAULT.toString)
+      .toLong
+  }
+
+  def hybridScanDeletedRatioThreshold(spark: SparkSession): Double = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD,
+        IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD_DEFAULT)
+      .toDouble
+  }
+
+  def hybridScanAppendedRatioThreshold(spark: SparkSession): Double = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD,
+        IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD_DEFAULT)
+      .toDouble
+  }
+
+  def useBucketSpecForFilterRule(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_FILTER_RULE_USE_BUCKET_SPEC,
+        IndexConstants.INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT)
       .toBoolean
   }
 
-  def refreshAppendEnabled(spark: SparkSession): Boolean = {
-    spark.conf
-      .get(IndexConstants.REFRESH_APPEND_ENABLED,
-        IndexConstants.REFRESH_APPEND_ENABLED_DEFAULT)
+  def numBucketsForIndex(spark: SparkSession): Int = {
+    getConfStringWithMultipleKeys(
+      spark,
+      Seq(IndexConstants.INDEX_NUM_BUCKETS, IndexConstants.INDEX_NUM_BUCKETS_LEGACY),
+      IndexConstants.INDEX_NUM_BUCKETS_DEFAULT.toString).toInt
+  }
+
+  def indexLineageEnabled(spark: SparkSession): Boolean = {
+    spark.sessionState.conf
+      .getConfString(
+        IndexConstants.INDEX_LINEAGE_ENABLED,
+        IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
       .toBoolean
+  }
+
+  def fileBasedSourceBuilders(spark: SparkSession): String = {
+    spark.sessionState.conf
+      .getConfString(
+        "spark.hyperspace.index.sources.fileBasedBuilders",
+        "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder")
+  }
+
+  def supportedFileFormatsForDefaultFileBasedSource(spark: SparkSession): String = {
+    spark.sessionState.conf
+      .getConfString(
+        "spark.hyperspace.index.sources.defaultFileBasedSource.supportedFileFormats",
+        "avro,csv,json,orc,parquet,text")
+  }
+
+  /**
+   * Returns the config value whose key matches the first key given multiple keys. If no keys are
+   * matched, the given default value is returned.
+   *
+   * @param spark Spark session.
+   * @param keys Config keys to look up.
+   * @param defaultValue Default value to fall back if no config keys are matched.
+   * @return Config value found. 'default' if no config value is found for the given keys.
+   */
+  private def getConfStringWithMultipleKeys(
+      spark: SparkSession,
+      keys: Seq[String],
+      defaultValue: String): String = {
+    keys
+      .find(spark.sessionState.conf.contains)
+      .map(spark.sessionState.conf.getConfString)
+      .getOrElse(defaultValue)
   }
 }

@@ -36,11 +36,20 @@ class RefreshAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager) {
 
-  final override def op(): Unit = {
-    // TODO: The current implementation picks the number of buckets from session config.
-    //   This should be user-configurable to allow maintain the existing bucket numbers
-    //   in the index log entry.
-    write(spark, df, indexConfig)
+  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+
+  final override def op(): Unit = write(spark, df, indexConfig)
+
+  /**
+   * Validate index is in active state for refreshing and there are some changes in
+   * source data file(s).
+   */
+  final override def validate(): Unit = {
+    super.validate()
+
+    if (currentFiles.equals(previousIndexLogEntry.sourceFileInfoSet)) {
+      throw NoChangesException("Refresh full aborted as no source data changed.")
+    }
   }
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {

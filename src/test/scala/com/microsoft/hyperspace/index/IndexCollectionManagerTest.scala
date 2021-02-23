@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.spark.SparkFunSuite
 import org.mockito.ArgumentMatchers.any
@@ -23,11 +24,12 @@ import org.mockito.Mockito.{mock, when}
 
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 
 class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   private val indexSystemPath = "src/test/resources/indexLocation"
   private val testLogManagerFactory: IndexLogManagerFactory = new IndexLogManagerFactory {
-    override def create(indexPath: Path): IndexLogManager =
+    override def create(indexPath: Path, hadoopConfiguration: Configuration): IndexLogManager =
       new IndexLogManager {
         override def getLog(id: Int): Option[LogEntry] = Some(testLogEntry)
         override def getLatestId(): Option[Int] = Some(0)
@@ -51,9 +53,9 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
                 CoveringIndex.Properties
                   .Columns(Seq("RGUID"), Seq("Date")),
                 "",
-                10)),
-            Content(
-              Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
+                10,
+                Map())),
+            Content(Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
             Source(SparkPlan(sourcePlanProperties)),
             Map())
           entry.state = Constants.States.ACTIVE
@@ -69,7 +71,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
-    when(mockFileSystemFactory.create(any[Path])).thenReturn(mockFileSystem)
+    when(mockFileSystemFactory.create(any[Path], any[Configuration])).thenReturn(mockFileSystem)
 
     indexCollectionManager = new IndexCollectionManager(
       spark,
@@ -104,7 +106,8 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
             CoveringIndex.Properties
               .Columns(Seq("RGUID"), Seq("Date")),
             "",
-            10)),
+            10,
+            Map())),
         Content(Directory(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
         Source(SparkPlan(sourcePlanProperties)),
         Map())
@@ -132,8 +135,14 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
     intercept[HyperspaceException](indexCollectionManager.restore("idx4"))
   }
 
-  test("refresh() throws exception if index is not found") {
+  test("refresh() with mode = 'full' throws exception if index is not found") {
     when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
-    intercept[HyperspaceException](indexCollectionManager.refresh("idx4"))
+    intercept[HyperspaceException](indexCollectionManager.refresh("idx4", REFRESH_MODE_FULL))
+  }
+
+  test("refresh() with mode = 'incremental' throws exception if index is not found") {
+    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    intercept[HyperspaceException](
+      indexCollectionManager.refresh("idx4", REFRESH_MODE_INCREMENTAL))
   }
 }

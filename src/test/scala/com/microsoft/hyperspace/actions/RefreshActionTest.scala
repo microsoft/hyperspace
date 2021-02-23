@@ -20,12 +20,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
 
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
 class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
@@ -34,9 +36,26 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
   private var testLogEntry: LogEntry = _
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
+  object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    def getSourceRelations(df: DataFrame): Seq[Relation] = {
+      val provider = new FileBasedSourceProviderManager(spark)
+      df.queryExecution.optimizedPlan.collect {
+        case l: LeafNode if provider.isSupportedRelation(l) =>
+          provider.getRelation(l).createRelationMetadata(fileIdTracker)
+      }
+    }
+  }
 
+  private def updateSourceFiles(): Unit = {
+    import spark.implicits._
+    SampleData.testData
+      .toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      .write
+      .mode("append")
+      .parquet(sampleParquetDataLocation)
+  }
+
+  before {
     when(mockLogManager.getLatestId()).thenReturn(None)
     when(mockDataManager.getLatestVersionId()).thenReturn(None)
     when(mockDataManager.getPath(anyInt)).thenReturn(new Path("indexPath"))
@@ -55,7 +74,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   def testEntry(df: DataFrame): IndexLogEntry = {
     val sourcePlanProperties = SparkPlan.Properties(
-      Seq(),
+      CreateActionBaseWrapper.getSourceRelations(df),
       null,
       null,
       LogicalPlanFingerprint(
@@ -68,7 +87,8 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
           CoveringIndex.Properties
             .Columns(Seq("clicks"), Seq()),
           "schema",
-          10)),
+          10,
+          Map())),
       Content(Directory("dirPath")),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
@@ -83,6 +103,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("validate() passes if old index logs are found with ACTIVE state") {
     testLogEntry.state = ACTIVE
+    updateSourceFiles()
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
     val action = new RefreshAction(spark, mockLogManager, mockDataManager)
     action.validate()
@@ -90,9 +111,18 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("validate() fails if old index logs found with non-ACTIVE state") {
     testLogEntry.state = CREATING
+    updateSourceFiles()
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
     val action = new RefreshAction(spark, mockLogManager, mockDataManager)
     val ex = intercept[HyperspaceException](action.validate())
     assert(ex.getMessage.contains("Refresh is only supported in ACTIVE state"))
+  }
+
+  test("validate() fails if there is no source data change.") {
+    testLogEntry.state = ACTIVE
+    when(mockLogManager.getLog(anyInt)).thenReturn(Some(testLogEntry))
+    val action = new RefreshAction(spark, mockLogManager, mockDataManager)
+    val ex = intercept[NoChangesException](action.validate())
+    assert(ex.getMessage.contains("Refresh full aborted as no source data changed."))
   }
 }

@@ -106,25 +106,35 @@ case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
     extends HyperspaceIndexCRUDEvent
 
 /**
- * Index Refresh Event for deleted source files. Emitted when refresh is called on an index
- * with config flag set to remove index entries for deleted source data files.
+ * Index Refresh Event for incremental mode. Emitted when refresh is called on an index
+ * with "incremental" mode to handle appended/deleted source data files.
  *
  * @param appInfo AppInfo for spark application.
  * @param index Related index.
  * @param message Message about event.
  */
-case class RefreshDeleteActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-    extends HyperspaceIndexCRUDEvent
+case class RefreshIncrementalActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+  extends HyperspaceIndexCRUDEvent
 
 /**
- * Index Refresh Event for appended source files. Emitted when refresh is called on an index
- * with config flag set to create index for appended source data files.
+ * Index Refresh Event for quick mode. Emitted when refresh is called on an index
+ * with "quick" mode to update index metadata only for appended/deleted source data files.
  *
  * @param appInfo AppInfo for spark application.
  * @param index Related index.
  * @param message Message about event.
  */
-case class RefreshAppendActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+case class RefreshQuickActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+  extends HyperspaceIndexCRUDEvent
+
+/**
+ * Index Optimize Event for index files.
+ *
+ * @param appInfo AppInfo for spark application.
+ * @param index Related index.
+ * @param message Message about event.
+ */
+case class OptimizeActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
   extends HyperspaceIndexCRUDEvent
 
 /**

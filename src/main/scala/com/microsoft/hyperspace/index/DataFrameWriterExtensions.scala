@@ -50,7 +50,8 @@ object DataFrameWriterExtensions {
         df: DataFrame,
         path: String,
         numBuckets: Int,
-        bucketByColNames: Seq[String]): Unit = {
+        bucketByColNames: Seq[String],
+        mode: SaveMode): Unit = {
       require(numBuckets > 0, "The number of buckets must be a positive integer.")
 
       runCommand(df.sparkSession) {
@@ -61,7 +62,7 @@ object DataFrameWriterExtensions {
           // the "bucketBy" and "sortBy" columns are the same.
           bucketSpec = Some(BucketSpec(numBuckets, bucketByColNames, bucketByColNames)),
           options = HashMap("path" -> path))
-          .planForWriting(SaveMode.Overwrite, df.queryExecution.analyzed)
+          .planForWriting(mode, df.queryExecution.analyzed)
       }
     }
 

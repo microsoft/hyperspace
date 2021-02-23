@@ -22,7 +22,8 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
-import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.actions.Constants.States.DOESNOTEXIST
+import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 
 class IndexCollectionManager(
     spark: SparkSession,
@@ -33,11 +34,14 @@ class IndexCollectionManager(
   private val conf: SQLConf = spark.sessionState.conf
 
   override def create(df: DataFrame, indexConfig: IndexConfig): Unit = {
-    val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexConfig.indexName)
-    val dataManager = indexDataManagerFactory.create(indexPath)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+      .getIndexPath(indexConfig.indexName)
+    val dataManager =
+      indexDataManagerFactory.create(indexPath, hadoopConf)
     val logManager = getLogManager(indexConfig.indexName) match {
       case Some(manager) => manager
-      case None => indexLogManagerFactory.create(indexPath)
+      case None => indexLogManagerFactory.create(indexPath, hadoopConf)
     }
 
     new CreateAction(spark, df, indexConfig, logManager, dataManager).run()
@@ -57,23 +61,42 @@ class IndexCollectionManager(
 
   override def vacuum(indexName: String): Unit = {
     withLogManager(indexName) { logManager =>
-      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-      val dataManager = indexDataManagerFactory.create(indexPath)
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
       new VacuumAction(logManager, dataManager).run()
     }
   }
 
-  override def refresh(indexName: String): Unit = {
+  override def refresh(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
-      val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-      val dataManager = indexDataManagerFactory.create(indexPath)
-      if (HyperspaceConf.refreshDeleteEnabled(spark)) {
-        new RefreshDeleteAction(spark, logManager, dataManager).run()
-      } else if (HyperspaceConf.refreshAppendEnabled(spark)) {
-        new RefreshAppendAction(spark, logManager, dataManager).run()
-      } else {
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
+      if (mode.equalsIgnoreCase(REFRESH_MODE_INCREMENTAL)) {
+        new RefreshIncrementalAction(spark, logManager, dataManager).run()
+      } else if (mode.equalsIgnoreCase(REFRESH_MODE_FULL)) {
         new RefreshAction(spark, logManager, dataManager).run()
+      } else if (mode.equalsIgnoreCase(REFRESH_MODE_QUICK)) {
+        new RefreshQuickAction(spark, logManager, dataManager).run()
+      } else {
+        throw HyperspaceException(s"Unsupported refresh mode '$mode' found.")
       }
+    }
+  }
+
+  override def optimize(indexName: String, mode: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
+      new OptimizeAction(spark, logManager, dataManager, mode).run()
     }
   }
 
@@ -86,9 +109,12 @@ class IndexCollectionManager(
   override def indexes: DataFrame = {
     import spark.implicits._
     getIndexes()
-      .filter(!_.state.equals(Constants.States.DOESNOTEXIST))
-      .map(IndexSummary(spark, _))
+      .filter(!_.state.equals(DOESNOTEXIST))
+      .map(IndexStatistics(_))
       .toDF()
+      .select(
+        IndexStatistics.INDEX_SUMMARY_COLUMNS.head,
+        IndexStatistics.INDEX_SUMMARY_COLUMNS.tail: _*)
   }
 
   override def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
@@ -100,31 +126,47 @@ class IndexCollectionManager(
       .map(toIndexLogEntry)
   }
 
+  override def index(indexName: String): DataFrame = {
+    withLogManager(indexName) { logManager =>
+      logManager.getLatestStableLog().filter(!_.state.equalsIgnoreCase(DOESNOTEXIST)) match {
+        case Some(l) =>
+          import spark.implicits._
+          Seq(IndexStatistics(toIndexLogEntry(l), extended = true)).toDF()
+        case None =>
+          throw HyperspaceException(s"No latest stable log found for index $indexName.")
+      }
+    }
+  }
+
   private def indexLogManagers: Seq[IndexLogManager] = {
-    val rootPath = PathResolver(conf).systemPath
-    val fs = fileSystemFactory.create(rootPath)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val rootPath = PathResolver(conf, hadoopConf).systemPath
+    val fs = fileSystemFactory.create(rootPath, hadoopConf)
     val indexPaths: Seq[Path] = if (fs.exists(rootPath)) {
       fs.listStatus(rootPath).map(_.getPath)
     } else {
       Seq()
     }
-    indexPaths.map(path => indexLogManagerFactory.create(path))
+    indexPaths.map(path =>
+      indexLogManagerFactory.create(path, hadoopConf))
   }
 
   private def getLogManager(indexName: String): Option[IndexLogManager] = {
-    val indexPath = PathResolver(spark.sessionState.conf).getIndexPath(indexName)
-    val fs = fileSystemFactory.create(indexPath)
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+      .getIndexPath(indexName)
+    val fs = fileSystemFactory.create(indexPath, hadoopConf)
     if (fs.exists(indexPath)) {
-      Some(indexLogManagerFactory.create(indexPath))
+      Some(indexLogManagerFactory.create(indexPath, hadoopConf))
     } else {
       None
     }
   }
 
-  private def withLogManager(indexName: String)(f: IndexLogManager => Unit): Unit = {
+  private def withLogManager[T](indexName: String)(f: IndexLogManager => T): T = {
     getLogManager(indexName) match {
       case Some(logManager) => f(logManager)
-      case None => throw HyperspaceException(s"Index with name $indexName could not be found")
+      case None => throw HyperspaceException(s"Index with name $indexName could not be found.")
     }
   }
 
@@ -140,59 +182,4 @@ object IndexCollectionManager {
       IndexLogManagerFactoryImpl,
       IndexDataManagerFactoryImpl,
       FileSystemFactoryImpl)
-}
-
-/**
- * Case class representing index summary
- *
- * TODO: Finalize about adding these: data location, signatures, file lists etc.
- *
- * @param name index name
- * @param indexedColumns indexed columns
- * @param includedColumns included columns
- * @param numBuckets number of buckets
- * @param schema index schema json
- * @param indexLocation index location
- * @param state index state
- */
-private[hyperspace] case class IndexSummary(
-    name: String,
-    indexedColumns: Seq[String],
-    includedColumns: Seq[String],
-    numBuckets: Int,
-    schema: String,
-    indexLocation: String,
-    state: String)
-
-private[hyperspace] object IndexSummary {
-  def apply(spark: SparkSession, entry: IndexLogEntry): IndexSummary = {
-    IndexSummary(
-      entry.name,
-      entry.derivedDataset.properties.columns.indexed,
-      entry.derivedDataset.properties.columns.included,
-      entry.numBuckets,
-      entry.derivedDataset.properties.schemaString,
-      indexDirPath(entry),
-      entry.state)
-  }
-
-  /**
-   * This method extracts the most top-level (or top-most) index directory which
-   * has either
-   * - at least one leaf file, or
-   * - more than one subdirectories, or
-   * - no files and no subdirectories (this case will not happen for real index scenarios).
-   *
-   * @param entry Index log entry.
-   * @return Path to the first leaf directory starting from the root.
-   */
-  private def indexDirPath(entry: IndexLogEntry): String = {
-    var root = entry.content.root
-    var indexDirPath = new Path(entry.content.root.name)
-    while (root.files.isEmpty && root.subDirs.size == 1) {
-      root = root.subDirs.head
-      indexDirPath = new Path(indexDirPath, root.name)
-    }
-    indexDirPath.toString
-  }
 }

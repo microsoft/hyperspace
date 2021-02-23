@@ -103,15 +103,27 @@ class Hyperspace:
         """
         self.hyperspace.vacuumIndex(indexName)
 
-    def refreshIndex(self, indexName):
+    def refreshIndex(self, indexName, mode='full'):
         """
         Update indexes for the latest version of the data.
         :param indexName: index name
+        :param mode: refresh mode 'incremental' or 'full'
 
         >>> hyperspace = Hyperspace(spark)
-        >>> hyperspace.refreshIndex("indexname")
+        >>> hyperspace.refreshIndex("indexname", "incremental")
         """
-        self.hyperspace.refreshIndex(indexName)
+        self.hyperspace.refreshIndex(indexName, mode)
+
+    def optimizeIndex(self, indexName, mode='quick'):
+        """
+        Optimize index by changing the underlying index data layout (e.g., compaction).
+        :param indexName: index name
+        :param mode: optimize mode 'quick' or 'full'
+
+        >>> hyperspace = Hyperspace(spark)
+        >>> hyperspace.optimizeIndex("indexname", "quick")
+        """
+        self.hyperspace.optimizeIndex(indexName, mode)
 
     def cancel(self, indexName):
         """
@@ -137,6 +149,14 @@ class Hyperspace:
         result_string = analyzer.explainString(df._jdf, self.spark._jsparkSession,
                                                self.hyperspace.indexes(), verbose)
         redirectFunc(result_string)
+
+    def index(self, indexName):
+        """
+        Get index metadata and detailed index statistics for a given index.
+        :param indexName: index name
+        :return: dataFrame object containing the index metadata and detailed index statistics.
+        """
+        return DataFrame(self.hyperspace.index(indexName), self.spark._wrapped)
 
     @staticmethod
     def enable(spark):

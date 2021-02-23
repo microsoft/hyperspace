@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.PathUtils
 
-class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
+class FilterIndexRuleTest extends HyperspaceRuleSuite {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexTest")
   val indexName1 = "filterIxTestIndex1"
   val indexName2 = "filterIxTestIndex2"
@@ -51,10 +51,10 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
     scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
 
     val indexPlan = Project(Seq(c1, c2, c3), scanNode)
-    createIndex(indexName1, Seq(c3, c2), Seq(c1), indexPlan)
+    createIndexLogEntry(indexName1, Seq(c3, c2), Seq(c1), indexPlan)
 
     val index2Plan = Project(Seq(c1, c2, c3, c4), scanNode)
-    createIndex(indexName2, Seq(c4, c2), Seq(c1, c3), index2Plan)
+    createIndexLogEntry(indexName2, Seq(c4, c2), Seq(c1, c3), index2Plan)
   }
 
   before {
@@ -134,9 +134,7 @@ class FilterIndexRuleTest extends HyperspaceRuleTestSuite {
     // Mark the relation that the rule is applied and verify the plan does not change.
     val newPlan = plan transform {
       case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
-        r.copy(
-          relation =
-            h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
+        r.copy(relation = h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
     assert(FilterIndexRule(newPlan).equals(newPlan))
   }

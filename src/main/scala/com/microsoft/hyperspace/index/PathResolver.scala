@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import java.util.{Locale, NoSuchElementException}
+import java.util.Locale
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
@@ -27,7 +27,7 @@ import org.apache.spark.sql.internal.SQLConf
  *
  * @param conf SQL Configuration
  */
-private[hyperspace] class PathResolver(conf: SQLConf) {
+private[hyperspace] class PathResolver(conf: SQLConf, hadoopConf: Configuration) {
 
   /**
    * Get path for the given index name. It enumerates the file system to resolve
@@ -38,7 +38,7 @@ private[hyperspace] class PathResolver(conf: SQLConf) {
    */
   def getIndexPath(name: String): Path = {
     val root = systemPath
-    val fs = root.getFileSystem(new Configuration)
+    val fs = root.getFileSystem(hadoopConf)
     if (fs.exists(root)) {
       // Note that fs.exists() is case-sensitive in some platforms and case-insensitive
       // in others, thus the check is manually done to make the comparison case-insensitive.
@@ -67,40 +67,10 @@ private[hyperspace] class PathResolver(conf: SQLConf) {
       new Path(conf.getConfString("spark.sql.warehouse.dir"), "indexes")
     new Path(conf.getConfString(IndexConstants.INDEX_SYSTEM_PATH, defaultIndexesPath.toString))
   }
-
-  /**
-   * Get the Hyperspace index creation path.
-   *
-   * @return Hyperspace index creation path.
-   */
-  def indexCreationPath: Path = {
-    getOption(IndexConstants.INDEX_CREATION_PATH)
-      .map(new Path(_, IndexConstants.INDEXES_DIR))
-      .getOrElse(new Path(systemPath, IndexConstants.INDEXES_DIR))
-  }
-
-  /**
-   * Get the Hyperspace index search paths.
-   *
-   * @return Hyperspace index search paths.
-   */
-  def indexSearchPaths: Option[Seq[String]] = {
-    getOption(IndexConstants.INDEX_SEARCH_PATHS)
-      .map(_.split(',').toSeq)
-  }
-
-  private def getOption(key: String): Option[String] = {
-    try {
-      Some(conf.getConfString(key))
-    } catch {
-      case _: NoSuchElementException =>
-        None
-    }
-  }
 }
 
 object PathResolver {
-  def apply(conf: SQLConf): PathResolver = {
-    new PathResolver(conf)
+  def apply(conf: SQLConf, hadoopConf: Configuration): PathResolver = {
+    new PathResolver(conf, hadoopConf)
   }
 }

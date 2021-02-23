@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.hyperspace.utils.DataFrameUtils
+import org.apache.spark.sql.hyperspace.utils.logicalPlanToDataFrame
 
 import com.microsoft.hyperspace.{HyperspaceException, Implicits}
 import com.microsoft.hyperspace.index.IndexConstants
@@ -36,18 +37,21 @@ object PlanAnalyzer {
   /**
    * Constructs string that explains how indexes will be applied to the given dataframe.
    *
-   * @param df dataFrame query.
-   * @param spark sparkSession.
-   * @param indexes dataFrame with list of all indexes available.
-   * @param verbose flag to enable verbose mode.
-   * @return explain string.
+   * @param originalDf DataFrame query.
+   * @param spark SparkSession.
+   * @param indexes DataFrame with list of all indexes available.
+   * @param verbose Flag to enable verbose mode.
+   * @return Explain string.
    */
   def explainString(
-      df: DataFrame,
+      originalDf: DataFrame,
       spark: SparkSession,
       indexes: DataFrame,
       verbose: Boolean): String = {
     val displayMode = getDisplayMode(spark)
+    // Create a new df from the original df's logical plan. This ensures a deterministic optimized
+    // plan creation when running Hyperspace rules.
+    val df = logicalPlanToDataFrame(spark, originalDf.queryExecution.logical)
     val withoutHyperspaceContext = initializeContext(spark, df, false, displayMode)
     val withHyperspaceContext = initializeContext(spark, df, true, displayMode)
 
@@ -109,7 +113,7 @@ object PlanAnalyzer {
     outputStream.writeLine(withoutHyperspaceContext.toString)
 
     buildHeader(outputStream, "Indexes used:")
-    writeUsedIndexes(withHyperspaceContext.originalPlan, spark, indexes, outputStream)
+    writeUsedIndexes(withHyperspaceContext.originalPlan, indexes, outputStream)
     outputStream.writeLine()
 
     if (verbose) {
@@ -203,12 +207,10 @@ object PlanAnalyzer {
    * Write used indexes (if any) to bufferStream.
    *
    * @param plan sparkPlan with indexes.
-   * @param spark sparkSession.
    * @param indexes all available indexes for the use.
    */
   private def writeUsedIndexes(
       plan: SparkPlan,
-      spark: SparkSession,
       indexes: DataFrame,
       bufferStream: BufferStream): Unit = {
     val usedIndexes = indexes.filter(indexes("indexLocation").isin(getPaths(plan): _*))

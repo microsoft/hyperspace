@@ -10,7 +10,7 @@ header:
       url: "/docs/ug-quick-start-guide/"
 excerpt: >
   A simple system that allows users to build, maintain and leverage indexes automagically for query/workload acceleration.<br />
-  <small><a href="https://github.com/microsoft/hyperspace/releases/tag/v0.2.0">Latest release v0.2.0</a></small>
+  <small><a href="https://github.com/microsoft/hyperspace/releases/tag/v0.4.0">Latest release v0.4.0</a></small>
 features:
   - image_path: /assets/images/hyperspace-overview-simple.png
     alt: "simple"

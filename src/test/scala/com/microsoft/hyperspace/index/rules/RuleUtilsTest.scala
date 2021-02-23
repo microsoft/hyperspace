@@ -20,14 +20,15 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, JoinHint, LogicalPlan, Project, RepartitionByExpression}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig}
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
+class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -78,23 +79,27 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
     //  +- Filter isnotnull(t2c1#4)
     //   +- Relation[t2c1#4,t2c2#5,t2c3#6,t2c4#7] parquet
 
-    createIndex("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
-    createIndex("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
-    createIndex("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t1i1", Seq(t1c1), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i2", Seq(t1c1, t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t1i3", Seq(t1c2), Seq(t1c3), t1ProjectNode)
+    createIndexLogEntry("t2i1", Seq(t2c1), Seq(t2c3), t2ProjectNode)
+    createIndexLogEntry("t2i2", Seq(t2c1, t2c2), Seq(t2c3), t2ProjectNode)
   }
 
   test("Verify indexes are matched by signature correctly.") {
     val indexManager = IndexCollectionManager(spark)
+    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, false).length === 3)
-    assert(RuleUtils.getCandidateIndexes(indexManager, t2ProjectNode, false).length === 2)
+    val t1Relation = RuleUtils.getRelation(spark, t1ProjectNode).get
+    val t2Relation = RuleUtils.getRelation(spark, t2ProjectNode).get
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1Relation).length === 3)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2Relation).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
+    val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(indexManager, t1ProjectNode, false).length === 2)
+    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1Relation).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -107,7 +112,7 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
   test("Verify get logical relation for non-linear plan.") {
     val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None, JoinHint.NONE)
-    val r = RuleUtils.getLogicalRelation(Project(Seq(t1c3, t2c3), joinNode))
+    val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
   }
 
@@ -118,22 +123,48 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
       val dataPath = tempPath.getAbsolutePath
       df.write.parquet(dataPath)
 
-      withIndex("index1") {
+      val indexNameWithLineage = "index1"
+      val indexNameWithoutLineage = "index2"
+      withIndex(indexNameWithLineage, indexNameWithoutLineage) {
         val readDf = spark.read.parquet(dataPath)
-        val indexFile = readDf.inputFiles.head
-        indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        val expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig(indexNameWithLineage, Seq("id")))
+        }
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "false") {
+          indexManager.create(readDf, IndexConfig(indexNameWithoutLineage, Seq("id")))
+        }
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
         def verify(
             plan: LogicalPlan,
             hybridScanEnabled: Boolean,
-            expectCandidateIndex: Boolean): Unit = {
-          val indexes = RuleUtils
-            .getCandidateIndexes(indexManager, plan, hybridScanEnabled)
-          if (expectCandidateIndex) {
-            assert(indexes.length == 1)
-            assert(indexes.head.name == "index1")
-          } else {
-            assert(indexes.isEmpty)
+            hybridScanDeleteEnabled: Boolean,
+            expectedCandidateIndexes: Seq[String],
+            expectedHybridScanTag: Option[Boolean],
+            expectedCommonSourceBytes: Option[Long]): Unit = {
+          withSQLConf(
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> hybridScanEnabled.toString,
+            IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
+            IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+              (if (hybridScanDeleteEnabled) "0.99" else "0")) {
+            val relation = RuleUtils.getRelation(spark, plan).get
+            val indexes = RuleUtils
+              .getCandidateIndexes(spark, allIndexes, relation)
+            if (expectedCandidateIndexes.nonEmpty) {
+              assert(indexes.length === expectedCandidateIndexes.length)
+              assert(indexes.map(_.name).toSet.equals(expectedCandidateIndexes.toSet))
+              indexes.foreach { index =>
+                assert(
+                  index.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
+                    === expectedHybridScanTag)
+                assert(
+                  index.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+                    === expectedCommonSourceBytes)
+              }
+            } else {
+              assert(indexes.isEmpty)
+            }
           }
         }
 
@@ -141,8 +172,20 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
         // hybrid scan is enabled or not.
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = true)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
+            expectedHybridScanTag = Some(false),
+            expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
 
         // Scenario #1: Append new files.
@@ -150,20 +193,51 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = true)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(),
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(indexNameWithLineage, indexNameWithoutLineage),
+            expectedHybridScanTag = Some(true),
+            expectedCommonSourceBytes = Some(expectedCommonSourceBytes))
         }
 
         // Scenario #2: Delete 1 file.
-        {
-          FileUtils.delete(new Path(indexFile), isRecursive = false)
-        }
+        val deleteFilePath = new Path(readDf.inputFiles.head)
+        val updatedExpectedCommonSourceBytes = expectedCommonSourceBytes - FileUtils
+          .getDirectorySize(deleteFilePath)
+        FileUtils.delete(deleteFilePath)
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          // TODO: expectedCandidateIndex = true once delete dataset is supported.
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(),
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(),
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectedCandidateIndexes = Seq(indexNameWithLineage),
+            expectedHybridScanTag = Some(true),
+            expectedCommonSourceBytes = Some(updatedExpectedCommonSourceBytes))
         }
 
         // Scenario #3: Replace all files.
@@ -171,8 +245,69 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
 
         {
           val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-          verify(optimizedPlan, hybridScanEnabled = false, expectCandidateIndex = false)
-          verify(optimizedPlan, hybridScanEnabled = true, expectCandidateIndex = false)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = false,
+            hybridScanDeleteEnabled = false,
+            expectedCandidateIndexes = Seq(),
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
+          verify(
+            optimizedPlan,
+            hybridScanEnabled = true,
+            hybridScanDeleteEnabled = true,
+            expectedCandidateIndexes = Seq(),
+            expectedHybridScanTag = None,
+            expectedCommonSourceBytes = None)
+        }
+      }
+    }
+  }
+
+  test("Verify Hybrid Scan candidate tags work as expected.") {
+    withTempPath { tempPath =>
+      val indexManager = IndexCollectionManager(spark)
+      val df = spark.range(1, 10).toDF("id")
+      val dataPath = tempPath.getAbsolutePath
+      df.write.parquet(dataPath)
+
+      withIndex("index1") {
+        val readDf = spark.read.parquet(dataPath)
+        val expectedCommonSourceBytes = FileUtils.getDirectorySize(new Path(dataPath))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(readDf, IndexConfig("index1", Seq("id")))
+        }
+
+        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+        df.limit(5).write.mode("append").parquet(dataPath)
+        val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+        val relation = RuleUtils.getRelation(spark, optimizedPlan).get
+
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
+            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            assert(
+              indexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
+                .get)
+            assert(
+              indexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
+                .get == Seq("0.99", "0.2"))
+          }
+
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.2") {
+            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            assert(indexes.isEmpty)
+            assert(
+              !allIndexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
+                .get)
+            assert(
+              allIndexes.head
+                .getTagValue(relation.plan, IndexLogEntryTags.HYBRIDSCAN_RELATED_CONFIGS)
+                .get == Seq("0.2", "0.2"))
+          }
         }
       }
     }
@@ -236,8 +371,8 @@ class RuleUtilsTest extends HyperspaceRuleTestSuite with SQLHelper {
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
-    val r = RuleUtils.getLogicalRelation(plan)
+    val r = RuleUtils.getRelation(spark, plan)
     assert(r.isDefined)
-    assert(r.get.equals(expected))
+    assert(r.get.plan.equals(expected))
   }
 }

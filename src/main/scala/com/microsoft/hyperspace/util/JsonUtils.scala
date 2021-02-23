@@ -18,8 +18,8 @@ package com.microsoft.hyperspace.util
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.hyperspace.module.scala.ScalaObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 /**
  * Useful json functions used around the Hyperspace codebase.

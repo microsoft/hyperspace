@@ -20,11 +20,13 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
+import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.mockito.Mockito._
 
 import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 import com.microsoft.hyperspace.util.FileUtils
 
 class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHelper {
@@ -38,7 +40,13 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
 
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
-    def getSourceRelations(df: DataFrame): Seq[Relation] = sourceRelations(df)
+    def getSourceRelations(df: DataFrame): Seq[Relation] = {
+      val provider = new FileBasedSourceProviderManager(spark)
+      df.queryExecution.optimizedPlan.collect {
+        case l: LeafNode if provider.isSupportedRelation(l) =>
+          provider.getRelation(l).createRelationMetadata(fileIdTracker)
+      }
+    }
   }
 
   override def beforeAll(): Unit = {
