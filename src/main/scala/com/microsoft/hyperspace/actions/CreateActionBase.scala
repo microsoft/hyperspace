@@ -136,7 +136,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       spark: SparkSession,
       df: DataFrame,
       indexConfig: BloomFilterIndexConfig): Unit = {
-    val (indexDataFrame, resolvedIndexedColumn, _) =
+    val (_, resolvedIndexedColumn, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
 
     require(
@@ -153,10 +153,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val globalBF = BloomFilter.create(expectedGlobalItems, resolvedNumBits)
     assert(globalBF.isCompatible(BloomFilter.create(indexConfig.expectedNumItems, resolvedNumBits)))
 
-    // Begin has this op as relation is created there
+    // TODO Begin has this op as relation is created there
+    // TODO Maybe use lineage to make file smaller
     import spark.implicits._
     val relations = getRelation(spark, df).createRelationMetadata(fileIdTracker)
-    val resultColSeq = Seq("path", "BFData", "Active")
+    val resultColSeq = Seq("Path", "BFData", "Active")
     val result = Seq.empty[(String, String, String)].toDF(resultColSeq: _*)
     relations.rootPaths.foreach(path => {
       val bfByteStream = new ByteArrayOutputStream()
@@ -177,6 +178,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       result.union(
         Seq(path, bfByteStream.toByteArray.map(_.toChar).mkString, "1").toDF(resultColSeq: _*))
     })
+    val gbfByteStream = new ByteArrayOutputStream()
+    globalBF.writeTo(gbfByteStream)
+    gbfByteStream.close()
+    result.union(
+      Seq("GLOBAL", gbfByteStream.toByteArray.map(_.toChar).mkString, "1").toDF(resultColSeq: _*))
+    result.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
   }
 
   private def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

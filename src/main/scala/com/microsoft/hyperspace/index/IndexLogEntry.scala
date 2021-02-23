@@ -16,17 +16,19 @@
 
 package com.microsoft.hyperspace.index
 
-import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonSubTypes.Type
+import com.fasterxml.jackson.annotation.{JsonIgnore, JsonSubTypes, JsonTypeInfo}
+
 import java.io.FileNotFoundException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.{HashMap, ListBuffer}
-
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.PathUtils
@@ -342,6 +344,16 @@ object FileInfo {
 }
 
 object HyperSpaceIndex {
+
+  @JsonTypeInfo(
+    use = JsonTypeInfo.Id.NAME,
+    include = JsonTypeInfo.As.PROPERTY,
+    property = "type"
+  )
+  @JsonSubTypes(Array(
+    new Type(value = classOf[CoveringIndex], name = "coveringIndex"),
+    new Type(value = classOf[BloomFilterIndex], name = "bloomFilterIndex")
+  ))
   trait IndexType {
     def kind: String
 
