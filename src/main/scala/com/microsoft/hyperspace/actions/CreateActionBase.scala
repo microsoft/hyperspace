@@ -16,16 +16,17 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.sql.catalyst.plans.logical.LeafNode
-import org.apache.spark.sql.functions.input_file_name
-
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
-import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import org.apache.commons.io.output.ByteArrayOutputStream
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.catalyst.plans.logical.LeafNode
+import org.apache.spark.sql.functions.{approx_count_distinct, input_file_name}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.util.sketch.BloomFilter
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -120,7 +121,65 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
+  protected def write(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: HyperSpaceIndexConfig): Unit = {
+    indexConfig match {
+      case ind: IndexConfig => write(spark, df, ind)
+      case ind: BloomFilterIndexConfig => write(spark, df, ind)
+      case _ => HyperspaceException("No write op supported")
+    }
+  }
+
+  private def write(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: BloomFilterIndexConfig): Unit = {
+    val (indexDataFrame, resolvedIndexedColumn, _) =
+      prepareIndexDataFrame(spark, df, indexConfig)
+
+    require(
+      resolvedIndexedColumn.size == 1,
+      "Resolved indexed columns for Bloom Filter can only be 1")
+
+    val resolvedNumBits = indexConfig.numBits match {
+      case -1 => BloomFilter.create(indexConfig.expectedNumItems).bitSize()
+      case _ => indexConfig.numBits
+    }
+
+    val expectedGlobalItems: Long =
+      df.agg(approx_count_distinct(resolvedIndexedColumn.head)).collect()(0)(0).asInstanceOf[Long]
+    val globalBF = BloomFilter.create(expectedGlobalItems, resolvedNumBits)
+    assert(globalBF.isCompatible(BloomFilter.create(indexConfig.expectedNumItems, resolvedNumBits)))
+
+    // Begin has this op as relation is created there
+    import spark.implicits._
+    val relations = getRelation(spark, df).createRelationMetadata(fileIdTracker)
+    val resultColSeq = Seq("path", "BFData", "Active")
+    val result = Seq.empty[(String, String, String)].toDF(resultColSeq: _*)
+    relations.rootPaths.foreach(path => {
+      val bfByteStream = new ByteArrayOutputStream()
+      val localBF = spark.read
+        .schema(df.schema)
+        .format(relations.fileFormat)
+        .options(relations.options)
+        .load(path)
+        .select(resolvedIndexedColumn.head)
+        .stat
+        .bloomFilter(
+          resolvedIndexedColumn.head,
+          indexConfig.expectedNumItems,
+          resolvedNumBits)
+      localBF.writeTo(bfByteStream)
+      bfByteStream.close()
+      globalBF.mergeInPlace(localBF)
+      result.union(
+        Seq(path, bfByteStream.toByteArray.map(_.toChar).mkString, "1").toDF(resultColSeq: _*))
+    })
+  }
+
+  private def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
     val (indexDataFrame, resolvedIndexedColumns, _) =

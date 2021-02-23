@@ -72,7 +72,7 @@ class CreateAction(
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
-  final override def op(): Unit = write(spark, df, indexConfig.asInstanceOf[IndexConfig])
+  final override def op(): Unit = write(spark, df, indexConfig)
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.

@@ -112,7 +112,7 @@ case class BloomFilterIndexConfig(
     indexName: String,
     indexedColumn: String,
     expectedNumItems: Long,
-    fpp: Double = -1,
+    fpp: Double = 0.03, // DEFAULT FPP in Apache Spark Bloom Filter Implementation
     numBits: Long = -1)
     extends NonCoveringIndexConfig {
   if (indexName.isEmpty || indexedColumn.isEmpty || expectedNumItems < 1) {
