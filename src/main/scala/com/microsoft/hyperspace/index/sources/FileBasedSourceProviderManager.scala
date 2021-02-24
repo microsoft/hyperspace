@@ -19,12 +19,13 @@ package com.microsoft.hyperspace.index.sources
 import scala.util.{Success, Try}
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.Relation
-import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
+import com.microsoft.hyperspace.index.rules.ExtractFilterNode
+import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf, SchemaUtils}
 
 /**
  * [[FileBasedSourceProviderManager]] is responsible for loading source providers which implements
@@ -88,6 +89,41 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    */
   def getRelation(plan: LogicalPlan): FileBasedRelation = {
     run(p => p.getRelation(plan))
+  }
+
+  /**
+   * Returns true if the given project is a supported project. If all of the registered
+   * providers return None, this returns false.
+   *
+   * @param project Project to check if it's supported.
+   * @return True if the given project is a supported relation.
+   */
+  def isSupportedProject(project: Project): Boolean = {
+    val containsNestedFields = SchemaUtils.hasNestedFields(
+      project.projectList.flatMap(ExtractFilterNode.extractNamesFromExpression))
+    var containsNestedChildren = false
+    project.child.foreach {
+      case f: Filter =>
+        containsNestedChildren = containsNestedChildren || {
+          SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(
+            ExtractFilterNode.extractNamesFromExpression(f.condition).toSeq))
+        }
+      case _ =>
+    }
+    containsNestedFields || containsNestedChildren
+  }
+
+  /**
+   * Returns true if the given filter is a supported filter. If all of the registered
+   * providers return None, this returns false.
+   *
+   * @param filter Filter to check if it's supported.
+   * @return True if the given project is a supported relation.
+   */
+  def isSupportedFilter(filter: Filter): Boolean = {
+    val containsNestedFields = SchemaUtils.hasNestedFields(
+      ExtractFilterNode.extractNamesFromExpression(filter.condition).toSeq)
+    containsNestedFields
   }
 
   /**

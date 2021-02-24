@@ -25,7 +25,7 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.{ResolverUtils, SchemaUtils}
 
 class CreateAction(
     spark: SparkSession,
@@ -65,9 +65,15 @@ class CreateAction(
   }
 
   private def isValidIndexSchema(config: IndexConfig, schema: StructType): Boolean = {
+    // Flatten the schema to support nested fields
+    val fields = SchemaUtils.escapeFieldNames(SchemaUtils.flatten(schema))
     // Resolve index config columns from available column names present in the schema.
     ResolverUtils
-      .resolve(spark, config.indexedColumns ++ config.includedColumns, schema.fieldNames)
+      .resolve(
+        spark,
+        SchemaUtils.escapeFieldNames(config.indexedColumns)
+          ++ SchemaUtils.escapeFieldNames(config.includedColumns),
+        fields)
       .isDefined
   }
 

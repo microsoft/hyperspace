@@ -16,11 +16,14 @@
 
 package com.microsoft.hyperspace.index.rules
 
+import scala.util.Try
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, GetStructField}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
@@ -28,7 +31,7 @@ import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils, SchemaUtils}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -113,8 +116,8 @@ object FilterIndexRule
 
         val candidateIndexes = allIndexes.filter { index =>
           indexCoversPlan(
-            outputColumns,
-            filterColumns,
+            SchemaUtils.escapeFieldNames(outputColumns),
+            SchemaUtils.escapeFieldNames(filterColumns),
             index.indexedColumns,
             index.includedColumns)
         }
@@ -168,9 +171,17 @@ object ExtractFilterNode {
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
-        .map(_.references.map(_.asInstanceOf[AttributeReference].name))
+        .map(extractNamesFromExpression)
         .flatMap(_.toSeq)
-      val filterColumnNames = condition.references.map(_.name).toSeq
+      val filterColumnNames = extractNamesFromExpression(condition).toSeq
+        .sortBy(-_.length)
+        .foldLeft(Seq.empty[String]) { (acc, e) =>
+          if (!acc.exists(i => i.startsWith(e))) {
+            acc :+ e
+          } else {
+            acc
+          }
+        }
 
       Some(project, filter, projectColumnNames, filterColumnNames)
 
@@ -182,6 +193,96 @@ object ExtractFilterNode {
       Some(filter, filter, relationColumnsName, filterColumnNames)
 
     case _ => None // plan does not match with any of filter index rule patterns
+  }
+
+  def extractNamesFromExpression(exp: Expression): Set[String] = {
+    exp match {
+      case AttributeReference(name, _, _, _) =>
+        Set(s"$name")
+      case otherExp =>
+        otherExp.containsChild.map {
+          case g: GetStructField =>
+            s"${getChildNameFromStruct(g)}"
+          case e: Expression =>
+            extractNamesFromExpression(e).filter(_.nonEmpty).mkString(".")
+          case _ => ""
+        }
+    }
+  }
+
+  def getChildNameFromStruct(field: GetStructField): String = {
+    field.child match {
+      case f: GetStructField =>
+        s"${getChildNameFromStruct(f)}.${field.name.get}"
+      case a: AttributeReference =>
+        s"${a.name}.${field.name.get}"
+      case _ =>
+        s"${field.name.get}"
+    }
+  }
+
+  def extractSearchQuery(exp: Expression, name: String): (Expression, Expression) = {
+    val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
+    val expFound = exp.find {
+      case a: AttributeReference if splits.forall(s => a.name.contains(s)) => true
+      case f: GetStructField if splits.forall(s => f.toString().contains(s)) => true
+      case _ => false
+    }.get
+    val parent = exp.find {
+      case e: Expression if e.containsChild.contains(expFound) => true
+      case _ => false
+    }.get
+    (parent, expFound)
+  }
+
+  def replaceInSearchQuery(
+      parent: Expression,
+      needle: Expression,
+      repl: Expression): Expression = {
+    parent.mapChildren { c =>
+      if (c == needle) {
+        repl
+      } else {
+        c
+      }
+    }
+  }
+
+  def extractAttributeRef(exp: Expression, name: String): AttributeReference = {
+    val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
+    val elem = exp.find {
+      case a: AttributeReference if splits.contains(a.name) => true
+      case _ => false
+    }
+    elem.get.asInstanceOf[AttributeReference]
+  }
+
+  def extractTypeFromExpression(exp: Expression, name: String): DataType = {
+    val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
+    val elem = exp.flatMap {
+      case a: AttributeReference =>
+        if (splits.forall(s => a.name == s)) {
+          Some((name, a.dataType))
+        } else {
+          Try({
+            val h :: t = splits.toList
+            if (a.name == h && a.dataType.isInstanceOf[StructType]) {
+              val currentDataType = a.dataType.asInstanceOf[StructType]
+              val foldedFields = t.foldLeft(Seq.empty[(String, DataType)]) { (acc, i) =>
+                val idx = currentDataType.indexWhere(_.name.equalsIgnoreCase(i))
+                acc :+ (i, currentDataType(idx).dataType)
+              }
+              Some(foldedFields.last)
+            } else {
+              None
+            }
+          }).getOrElse(None)
+        }
+      case f: GetStructField if splits.forall(s => f.toString().contains(s)) =>
+        Some((name, f.dataType))
+      case _ => None
+    }
+    elem.find(e => e._1 == name || e._1 == splits.last).get._2
   }
 }
 
