@@ -21,34 +21,6 @@ import java.util.Locale
 import com.microsoft.hyperspace.index.configs.CoveringConfig
 
 /**
- * All index supported in Hyperspace whose user facing config needs to be defined needs
- * to extend [[HyperSpaceIndexConfig]] trait.
- */
-sealed trait HyperSpaceIndexConfig {
-  val indexName: String
-
-  def equals(obj: Any): Boolean
-
-  def hashCode(): Int
-
-  def toString: String
-}
-
-trait CoveringIndexConfig extends HyperSpaceIndexConfig {
-  /*
-   * Columns from which index are created.
-   */
-  val indexedColumns: Seq[String]
-
-  /*
-   * Columns to be included with the indexed columns.
-   */
-  val includedColumns: Seq[String]
-}
-
-trait NonCoveringIndexConfig extends HyperSpaceIndexConfig {}
-
-/**
  * IndexConfig specifies the configuration of an index.
  * Associated Builder [[CoveringConfig.builder()]]
  *
@@ -158,7 +130,7 @@ case class BloomFilterIndexConfig(
   }
 }
 
-object HyperSpaceIndexConfigs {
+object Configs {
 
   // TODO - prints info table about all types of index supported by hyperspace
   def printAllIndexConfigInfo(): String = {

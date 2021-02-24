@@ -31,13 +31,18 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
   private val testDir = "src/test/resources/createIndexTests/"
   private val nonPartitionedDataPath = testDir + "sampleparquet"
   private val partitionedDataPath = testDir + "samplepartitionedparquet"
+  private val comicDataDir = testDir + "comics/"
+  private val dcDataPath = comicDataDir + "dc"
+  private val marvelDataPath = comicDataDir + "marvel"
   private val partitionKeys = Seq("Date", "Query")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
   private val indexConfig4 = IndexConfig("index4", Seq("Date", "Query"), Seq("clicks"))
+  private val bloomIndexConfig = BloomFilterIndexConfig("indexBF1", "Affiliation", 10)
   private var nonPartitionedDataDF: DataFrame = _
   private var partitionedDataDF: DataFrame = _
+  private var comicDataDF: DataFrame = _
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
@@ -47,6 +52,8 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(new Path(testDir), isRecursive = true)
 
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
+    val comicDataColumns = Seq("Year", "Name", "Power", "Affiliation", "Universe")
+
     // save test data non-partitioned.
     SampleData.save(spark, nonPartitionedDataPath, dataColumns)
     nonPartitionedDataDF = spark.read.parquet(nonPartitionedDataPath)
@@ -54,6 +61,11 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     // save test data partitioned.
     SampleData.save(spark, partitionedDataPath, dataColumns, Some(partitionKeys))
     partitionedDataDF = spark.read.parquet(partitionedDataPath)
+
+    // save test data comic.
+    SampleData.saveComics(spark, SampleData.testDataMarvel, marvelDataPath, comicDataColumns)
+    SampleData.saveComics(spark, SampleData.testDataDC, dcDataPath, comicDataColumns)
+    comicDataDF = spark.read.parquet(marvelDataPath, dcDataPath)
   }
 
   override def afterAll(): Unit = {
@@ -65,10 +77,14 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(systemPath)
   }
 
-  test("Creating one index.") {
+  test("Creating one covering index.") {
     hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     val count = hyperspace.indexes.where(s"name = '${indexConfig1.indexName}' ").count
     assert(count == 1)
+  }
+
+  test("Creating one bloom filter index.") {
+    hyperspace.createIndex(comicDataDF, bloomIndexConfig)
   }
 
   test("Creating index with existing index name fails.") {

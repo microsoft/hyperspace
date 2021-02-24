@@ -151,7 +151,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val expectedGlobalItems: Long =
       df.agg(approx_count_distinct(resolvedIndexedColumn.head)).collect()(0)(0).asInstanceOf[Long]
     val globalBF = BloomFilter.create(expectedGlobalItems, resolvedNumBits)
-    assert(globalBF.isCompatible(BloomFilter.create(indexConfig.expectedNumItems, resolvedNumBits)))
+    assert(
+      globalBF.isCompatible(BloomFilter.create(indexConfig.expectedNumItems, resolvedNumBits)))
 
     // TODO Begin has this op as relation is created there
     // TODO Maybe use lineage to make file smaller
@@ -168,21 +169,20 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .load(path)
         .select(resolvedIndexedColumn.head)
         .stat
-        .bloomFilter(
-          resolvedIndexedColumn.head,
-          indexConfig.expectedNumItems,
-          resolvedNumBits)
+        .bloomFilter(resolvedIndexedColumn.head, indexConfig.expectedNumItems, resolvedNumBits)
       localBF.writeTo(bfByteStream)
       bfByteStream.close()
       globalBF.mergeInPlace(localBF)
-      result.union(
-        Seq(path, bfByteStream.toByteArray.map(_.toChar).mkString, "1").toDF(resultColSeq: _*))
+      val bfBinaryCharStream = bfByteStream.toByteArray.map(_.toChar).mkString
+      val bfRecord = Seq((path, bfBinaryCharStream, "1")).toDF(resultColSeq: _*)
+      result.union(bfRecord)
     })
     val gbfByteStream = new ByteArrayOutputStream()
     globalBF.writeTo(gbfByteStream)
     gbfByteStream.close()
-    result.union(
-      Seq("GLOBAL", gbfByteStream.toByteArray.map(_.toChar).mkString, "1").toDF(resultColSeq: _*))
+    val globalBFRecord = Seq(("GLOBAL", gbfByteStream.toByteArray.map(_.toChar).mkString, "1"))
+      .toDF(resultColSeq: _*)
+    result.union(globalBFRecord)
     result.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
   }
 

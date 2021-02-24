@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.telemetry
 
-import com.microsoft.hyperspace.index.{IndexConfig, IndexLogEntry}
+import com.microsoft.hyperspace.index.{IndexConfig, IndexConfigBundle, IndexLogEntry}
 
 /**
  * Class for common app info.
@@ -47,11 +47,11 @@ trait HyperspaceIndexCRUDEvent extends HyperspaceEvent
  * @param message Message about event.
  */
 case class CreateActionEvent(
-    appInfo: AppInfo,
-    indexConfig: IndexConfig,
-    index: Option[IndexLogEntry],
-    originalPlan: String,
-    message: String)
+                              appInfo: AppInfo,
+                              indexConfig: IndexConfigBundle,
+                              index: Option[IndexLogEntry],
+                              originalPlan: String,
+                              message: String)
     extends HyperspaceIndexCRUDEvent
 
 /**

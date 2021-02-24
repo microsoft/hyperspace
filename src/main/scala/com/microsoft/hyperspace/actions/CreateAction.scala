@@ -16,15 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.types.StructType
-import scala.util.Try
-
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.util.Try
 
 class CreateAction(
     spark: SparkSession,
@@ -49,7 +49,7 @@ class CreateAction(
     }
 
     // schema validity checks
-    if (!isValidIndexSchema(indexConfig.asInstanceOf[IndexConfig], df.schema)) {
+    if (!isValidIndexSchema(indexConfig, df.schema)) {
       throw HyperspaceException("Index config is not applicable to dataframe schema.")
     }
 
@@ -63,11 +63,20 @@ class CreateAction(
     }
   }
 
-  private def isValidIndexSchema(config: IndexConfig, schema: StructType): Boolean = {
+  private def isValidIndexSchema(config: HyperSpaceIndexConfig, schema: StructType): Boolean = {
     // Resolve index config columns from available column names present in the schema.
-    ResolverUtils
-      .resolve(spark, config.indexedColumns ++ config.includedColumns, schema.fieldNames)
-      .isDefined
+    config match {
+      case indexConfig: IndexConfig =>
+        ResolverUtils
+          .resolve(
+            spark,
+            indexConfig.indexedColumns ++ indexConfig.includedColumns,
+            schema.fieldNames)
+          .isDefined
+      case indexConfig: BloomFilterIndexConfig =>
+        ResolverUtils.resolve(spark, indexConfig.indexedColumn, schema.fieldNames).isDefined
+    }
+
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
@@ -76,10 +85,11 @@ class CreateAction(
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.
+
     val index = Try(logEntry.asInstanceOf[IndexLogEntry]).toOption
     CreateActionEvent(
       appInfo,
-      indexConfig.asInstanceOf[IndexConfig],
+      IndexConfigBundle(indexConfig),
       index,
       df.queryExecution.logical.toString,
       message)
