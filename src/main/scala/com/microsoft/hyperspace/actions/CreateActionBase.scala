@@ -293,9 +293,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .select(
           allIndexColumns.head,
           allIndexColumns.tail :+ IndexConstants.DATA_FILE_NAME_ID: _*)
+    } else {
+      df.select(providedIndexColumns.head, providedIndexColumns.tail: _*)
     }
-
-    df.select(providedIndexColumns.head, providedIndexColumns.tail: _*)
   }
 
   private def prepareIndexDataFrame(

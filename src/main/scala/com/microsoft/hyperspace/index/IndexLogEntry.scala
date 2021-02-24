@@ -18,20 +18,19 @@ package com.microsoft.hyperspace.index
 
 import com.fasterxml.jackson.annotation.JsonSubTypes.Type
 import com.fasterxml.jackson.annotation.{JsonIgnore, JsonSubTypes, JsonTypeInfo}
-
-import java.io.FileNotFoundException
+import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.util.PathUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import java.io.FileNotFoundException
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.{HashMap, ListBuffer}
-import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
