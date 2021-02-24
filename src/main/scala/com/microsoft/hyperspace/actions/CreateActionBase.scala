@@ -88,7 +88,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
                   IndexLogEntry.schemaString(indexDataFrame.schema),
                   numBuckets,
                   indexProperties))
-            case _: HyperSpaceIndexConfig =>
+            case _: BloomFilterIndexConfig =>
               HyperSpaceIndex.BloomFilterIndex(
                 HyperSpaceIndex.Properties.BloomFilter(
                   HyperSpaceIndex.Properties.CommonProperties

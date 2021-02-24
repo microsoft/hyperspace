@@ -72,8 +72,7 @@ object SampleData {
     (1939, "Batman", "None", "Justice League", "DC"),
     (1940, "Joker", "Chemist Engineer", "Injustice League", "DC"),
     (1992, "Harley Quinn", "Gymnast", "Suicide Squad", "DC"),
-    (1950, "Deadshot", "Marksman", "Suicide Squad", "DC")
-  )
+    (1950, "Deadshot", "Marksman", "Suicide Squad", "DC"))
 
   def save(
       spark: SparkSession,
@@ -91,11 +90,11 @@ object SampleData {
   }
 
   def saveComics(
-            spark: SparkSession,
-            data: Seq[(Int, String, String, String, String)],
-            path: String,
-            columns: Seq[String],
-            partitionColumns: Option[Seq[String]] = None): Unit = {
+      spark: SparkSession,
+      data: Seq[(Int, String, String, String, String)],
+      path: String,
+      columns: Seq[String],
+      partitionColumns: Option[Seq[String]] = None): Unit = {
     import spark.implicits._
     val df = data.toDF(columns: _*)
     partitionColumns match {

@@ -33,11 +33,11 @@ object Kinds extends Enumeration {
   val covering: Kinds = nonClustered + "-CoveringIndex"
   val nonCovering: Kinds = nonClustered + "-NonCoveringIndex"
 
-  def identifyKind(provided: Kinds): Kinds = {
-    if (provided.contains(clustered)) {
-      clustered
-    } else {
+  def identifyBaseKind(provided: Kinds): Kinds = {
+    if (provided.contains(nonClustered)) {
       nonClustered
+    } else {
+      clustered
     }
   }
 }
