@@ -16,15 +16,15 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.StructType
+import scala.util.Try
+
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
 import com.microsoft.hyperspace.util.ResolverUtils
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
-
-import scala.util.Try
 
 class CreateAction(
     spark: SparkSession,

@@ -85,6 +85,8 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
 
   test("Creating one bloom filter index.") {
     hyperspace.createIndex(comicDataDF, bloomIndexConfig)
+    val count = hyperspace.indexes.where(s"name = '${bloomIndexConfig.indexName}' ").count
+    assert(count == 1)
   }
 
   test("Creating index with existing index name fails.") {

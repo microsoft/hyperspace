@@ -16,17 +16,18 @@
 
 package com.microsoft.hyperspace.actions
 
-import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import org.apache.commons.io.output.ByteArrayOutputStream
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.functions.{approx_count_distinct, input_file_name}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.util.sketch.BloomFilter
+
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
