@@ -61,9 +61,19 @@ trait FileBasedRelation extends SourceRelation {
   def signature: String
 
   /**
-   * All the files that the current relation references to.
+   * FileStatus list for all source files that the current relation references to.
    */
-  def allFiles: Seq[FileStatus]
+  val allFiles: Seq[FileStatus]
+
+  /**
+   * FileInfo list for all source files that the current relation references to.
+   */
+  val allFileInfos: Seq[FileInfo]
+
+  /**
+   * Summation of all source file size.
+   */
+  val allFileSizeInBytes: Long
 
   /**
    * The partition schema of the current relation.
@@ -119,13 +129,10 @@ trait FileBasedRelation extends SourceRelation {
    *
    * curFiles is used to calculate the similarity with each index version data.
    *
-   * @param curFiles List of FileInfo for the source files in the relation.
    * @param index Candidate index to be applied.
    * @return IndexLogEntry of the closest version among available index versions.
    */
-  def closestIndexVersion(
-      curFiles: Seq[FileInfo],
-      index: IndexLogEntry): IndexLogEntry
+  def closestIndexVersion(index: IndexLogEntry): IndexLogEntry
 }
 
 /**

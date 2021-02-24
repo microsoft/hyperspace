@@ -105,5 +105,7 @@ trait IndexManager {
    */
   def index(indexName: String): DataFrame
 
-  private[hyperspace] def getLogManager(indexName: String): Option[IndexLogManager]
+  private[hyperspace] def getIndexLogEntry(
+      indexName: String,
+      logVersion: Int): Option[IndexLogEntry]
 }

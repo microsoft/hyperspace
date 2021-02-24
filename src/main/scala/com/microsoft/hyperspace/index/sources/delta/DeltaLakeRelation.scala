@@ -44,7 +44,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   /**
    * All the files that the current relation references to.
    */
-  override def allFiles: Seq[FileStatus] = plan.relation match {
+  lazy override val allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
       location
         .getSnapshot(stalenessAcceptable = false)
@@ -149,6 +149,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
       index.derivedDataset.properties.properties
         .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
 
+    // The value is comma separated versions - <index log version>:<delta table version>.
+    // e.g. "1:2,3:5,5:9"
     versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (list, versionStr) =>
       val pair = versionStr.split(":")
       val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
@@ -169,54 +171,61 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * Delta Lake source provider utilizes the history information of DELTA_VERSION_HISTORY_PROPERTY
    * to find the closet version of the index.
    *
-   * @param curFiles List of FileInfo for the source files in the relation.
    * @param index Candidate index to be applied.
    * @return IndexLogEntry of the closest version among available index versions.
    */
-  override def closestIndexVersion(
-      curFiles: Seq[FileInfo],
-      index: IndexLogEntry): IndexLogEntry = {
-    // Seq of ( index log version, delta lake table version )
+  override def closestIndexVersion(index: IndexLogEntry): IndexLogEntry = {
+    // Seq of (index log version, delta lake table version)
     val versions = deltaLakeVersionHistory(index)
+
     lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
     def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
       indexManager
-        .getLogManager(index.name)
-        .get
-        .getLog(logVersion)
+        .getIndexLogEntry(index.name, logVersion)
         .get
         .asInstanceOf[IndexLogEntry]
     }
+    // TODO: Currently assume all versions of index data exist.
+    //  Need to check and remove candidate indexes.
 
     plan.relation match {
       case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
         val equalOrLessLastIndex = versions.lastIndexWhere(location.tableVersion >= _._2)
         if (equalOrLessLastIndex == versions.size - 1) {
+          // The given table version is equal or larger than the latest index's.
           // Use the latest version.
           index
         } else if (equalOrLessLastIndex == -1) {
+          // The given table version is smaller than the version at index creation.
+          // Use the initial version.
           getIndexLogEntry(versions.head._1)
         } else if (versions(equalOrLessLastIndex)._2 == location.tableVersion) {
+          // There is the index version that built for the given table version.
+          // Use the exact version.
           getIndexLogEntry(versions(equalOrLessLastIndex)._1)
         } else {
+          // Now, there are 2 candidate versions for the given table version:
+          // prevPair(indexVer1, tablePrevVersion), nextPair(indexVer2, tableNextVersion)
+          // which is (tablePrevVersion < TimeTravel table version < tableNextVersion).
           val prevPair = versions(equalOrLessLastIndex)
           val nextPair = versions(equalOrLessLastIndex + 1)
 
           val prevLog = getIndexLogEntry(prevPair._1)
           val nextLog = getIndexLogEntry(nextPair._1)
 
-          val curFilesSize = curFiles.map(_.size).sum
+          val curFilesSize = allFileInfos.map(_.size).sum
 
           val prevCommonBytes =
-            curFiles.filter(prevLog.sourceFileInfoSet.contains).map(_.size).sum
+            allFileInfos.filter(prevLog.sourceFileInfoSet.contains).map(_.size).sum
           val prevAppendedBytes = curFilesSize - prevCommonBytes
           val prevDeletedBytes = prevLog.sourceFilesSizeInBytes - prevCommonBytes
 
           val nextCommonBytes =
-            curFiles.filter(nextLog.sourceFileInfoSet.contains).map(_.size).sum
+            allFileInfos.filter(nextLog.sourceFileInfoSet.contains).map(_.size).sum
           val nextAppendedBytes = curFilesSize - nextCommonBytes
           val nextDeletedBytes = nextLog.sourceFilesSizeInBytes - nextCommonBytes
 
+          // Pick one with less diff bytes, so as to reduce the regression from Hybrid Scan.
           if ((prevAppendedBytes + prevDeletedBytes) < (nextAppendedBytes + nextDeletedBytes)) {
             prevLog
           } else {

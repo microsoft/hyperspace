@@ -554,7 +554,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   }
 
   private def getSparkFormattedTimestamps(values: Long*): Seq[String] = {
-    // Simulates getting timestamps directly from Spark SQL
+    // Simulates getting timestamps directly from Spark SQL.
     import spark.implicits._
     values
       .map(new Timestamp(_))

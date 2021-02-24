@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexLogEntry, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexConstants, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HashingUtils
@@ -52,11 +52,31 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   }
 
   /**
-   * All the files that the current relation references to.
+   * FileStatus list for all source files that the current relation references to.
    */
-  override def allFiles: Seq[FileStatus] = plan.relation match {
+  override lazy val allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
       filesFromIndex(location)
+  }
+
+  /**
+   * FileInfo list for all source files that the current relation references to.
+   */
+  lazy override val allFileInfos: Seq[FileInfo] = {
+    allFiles.map { f =>
+      FileInfo(
+        f.getPath.toString,
+        f.getLen,
+        f.getModificationTime,
+        IndexConstants.UNKNOWN_FILE_ID)
+    }
+  }
+
+  /**
+   * Summation of all source file size.
+   */
+  lazy override val allFileSizeInBytes: Long = {
+    allFileInfos.map(_.size).sum
   }
 
   /**
@@ -242,12 +262,10 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
    * curFiles is used to calculate the similarity with each index version data.
    * Currently, this provider just returns the latest version of index.
    *
-   * @param curFiles List of FileInfo for the source files in the relation.
    * @param index Candidate index to be applied.
    * @return IndexLogEntry of the closest version among available index versions.
    */
   override def closestIndexVersion(
-      curFiles: Seq[FileInfo],
       index: IndexLogEntry): IndexLogEntry = {
     index
   }
