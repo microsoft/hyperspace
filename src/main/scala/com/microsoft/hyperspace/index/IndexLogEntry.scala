@@ -17,19 +17,16 @@
 package com.microsoft.hyperspace.index
 
 import java.io.FileNotFoundException
-
 import scala.annotation.tailrec
 import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.mutable
-
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
-
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -437,6 +434,13 @@ case class IndexLogEntry(
     source: Source,
     properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
+
+  /*
+   * Include the project version in the index log entry file.
+   * This may help prevent in mismatching of project version and index
+   * log entry files.
+   */
+  val projectVersion: String = BuildInfo.version
 
   def schema: StructType =
     DataType.fromJson(derivedDataset.properties.schemaString).asInstanceOf[StructType]
