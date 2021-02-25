@@ -21,7 +21,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.functions.input_file_name
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import com.microsoft.hyperspace.{BuildInfo, Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
@@ -72,6 +72,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
+        /*
+         * Include the project version in the index log entry file.
+         * This may help prevent in mismatching of project version and index
+         * log entry files.
+         */
+        val projectVersion: Option[(String, String)] = Some("projectVersion", BuildInfo.version)
+
         val coveringIndexProperties =
           (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
 
@@ -86,7 +93,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               coveringIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
-          Map())
+          projectVersion.toMap)
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
