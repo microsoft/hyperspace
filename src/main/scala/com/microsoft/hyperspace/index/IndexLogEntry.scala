@@ -16,16 +16,18 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.FileNotFoundException
 import scala.annotation.tailrec
 import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.mutable
+
 import com.fasterxml.jackson.annotation.JsonIgnore
+import java.io.FileNotFoundException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
+
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.PathUtils
