@@ -63,9 +63,8 @@ private[hyperspace] class PathResolver(conf: SQLConf, hadoopConf: Configuration)
    * @return Hyperspace index system path.
    */
   def systemPath: Path = {
-    val defaultIndexesPath =
-      new Path(conf.getConfString("spark.sql.warehouse.dir"), "indexes")
-    new Path(conf.getConfString(IndexConstants.INDEX_SYSTEM_PATH, defaultIndexesPath.toString))
+    val defaultIndexesPath = conf.getConfString("spark.sql.warehouse.dir")
+    new Path(conf.getConfString(IndexConstants.INDEX_SYSTEM_PATH, defaultIndexesPath), "indexes")
   }
 }
 
