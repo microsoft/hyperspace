@@ -630,8 +630,7 @@ object IndexLogEntry {
   def apply(name: String,
             derivedDataset: CoveringIndex,
             content: Content,
-            source: Source
-           ): IndexLogEntry = {
+            source: Source): IndexLogEntry = {
     new IndexLogEntry(
       name,
       derivedDataset,
