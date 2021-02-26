@@ -629,14 +629,12 @@ object IndexLogEntry {
             content: Content,
             source: Source
            ): IndexLogEntry = {
-
-    val properties = Map((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
     new IndexLogEntry(
       name,
       derivedDataset,
       content,
       source,
-      properties
+      Map((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
     )
   }
 }
