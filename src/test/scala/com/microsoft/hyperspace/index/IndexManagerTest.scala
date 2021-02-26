@@ -798,8 +798,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
               s"$systemPath/${indexConfig.indexName}" +
                 s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
             fileIdTracker),
-          Source(SparkPlan(sourcePlanProperties)),
-          Map())
+          Source(SparkPlan(sourcePlanProperties)))
         entry.state = state
         entry
       case None => fail("Invalid plan for index dataFrame.")

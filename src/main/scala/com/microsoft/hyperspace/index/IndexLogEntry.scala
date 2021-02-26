@@ -624,6 +624,9 @@ object IndexLogEntry {
 
   def schemaString(schema: StructType): String = schema.json
 
+  /*
+   * Default IndexLogEntry Properties
+   */
   def apply(name: String,
             derivedDataset: CoveringIndex,
             content: Content,
