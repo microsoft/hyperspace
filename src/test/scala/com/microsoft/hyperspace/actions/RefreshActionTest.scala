@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
@@ -93,7 +91,7 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
           Map())),
       Content(Directory("dirPath")),
       Source(SparkPlan(sourcePlanProperties)),
-      mutable.Map())
+      Map())
     entry.state = Constants.States.ACTIVE
     entry
   }

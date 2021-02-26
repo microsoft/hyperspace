@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.spark.SparkFunSuite
@@ -59,7 +57,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
                 Map())),
             Content(Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
             Source(SparkPlan(sourcePlanProperties)),
-            mutable.Map())
+            Map())
           entry.state = Constants.States.ACTIVE
           entry
         }
@@ -112,7 +110,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
             Map())),
         Content(Directory(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
         Source(SparkPlan(sourcePlanProperties)),
-        mutable.Map())
+        Map())
       entry.state = Constants.States.ACTIVE
       entry
     }

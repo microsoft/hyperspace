@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
@@ -88,7 +86,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               coveringIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
-          mutable.Map())
+          Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }

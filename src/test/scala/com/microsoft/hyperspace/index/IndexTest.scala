@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import scala.collection.mutable
-
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
@@ -50,7 +48,7 @@ class IndexTest extends SparkFunSuite {
           Map())),
       Content(Directory(path)),
       Source(SparkPlan(sourcePlanProperties)),
-      mutable.Map())
+      Map())
     entry.state = Constants.States.ACTIVE
     entry
   }

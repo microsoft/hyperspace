@@ -435,18 +435,18 @@ case class IndexLogEntry(
     derivedDataset: CoveringIndex,
     content: Content,
     source: Source,
-    properties: mutable.Map[String, String])
+    properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
+  /*
+   * Include the project version in the index log entry file.
+   * This may help prevent in mismatching of project version and index
+   * log entry files.
+   * TODO: breaking change remove if condition. Since currently there are index
+   *  files that don't have project version info and we need to support them as well.
+   */
   if (properties.contains(IndexLogEntry.HYPERSPACE_PROJECT_VERSION)) {
     require(properties(IndexLogEntry.HYPERSPACE_PROJECT_VERSION) == BuildInfo.version)
-  } else {
-    /*
-     * Include the project version in the index log entry file.
-     * This may help prevent in mismatching of project version and index
-     * log entry files.
-     */
-    properties.put(IndexLogEntry.HYPERSPACE_PROJECT_VERSION, BuildInfo.version)
   }
 
   def schema: StructType =
@@ -623,6 +623,20 @@ object IndexLogEntry {
   val HYPERSPACE_PROJECT_VERSION: String = "hyperspaceVersion"
 
   def schemaString(schema: StructType): String = schema.json
+
+  def apply(name: String,
+            derivedDataset: CoveringIndex,
+            content: Content,
+            source: Source,
+            properties: Map[String, String]): IndexLogEntry = {
+    new IndexLogEntry(
+      name,
+      derivedDataset,
+      content,
+      source,
+      properties + ((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
+    )
+  }
 }
 
 /**

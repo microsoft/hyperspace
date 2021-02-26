@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
@@ -801,7 +799,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
                 s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
             fileIdTracker),
           Source(SparkPlan(sourcePlanProperties)),
-          mutable.Map())
+          Map())
         entry.state = state
         entry
       case None => fail("Invalid plan for index dataFrame.")

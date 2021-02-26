@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.util
 
-import scala.collection.mutable
-
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
@@ -49,7 +47,7 @@ class JsonUtilsTest extends SparkFunSuite {
           Map())),
       Content(Directory("path")),
       Source(SparkPlan(sourcePlanProperties)),
-      mutable.Map())
+      Map())
     index.state = Constants.States.ACTIVE
 
     val deserializedIndex =

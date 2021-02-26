@@ -20,8 +20,6 @@ import java.io.{File, FileNotFoundException}
 import java.nio.file
 import java.nio.file.{Files, Paths}
 
-import scala.collection.mutable
-
 import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
@@ -96,7 +94,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         Map())),
     Content(Directory("rootContentPath")),
     Source(SparkPlan(expectedSourcePlanProperties)),
-    mutable.Map())
+    Map())
   val buildVersion: String = BuildInfo.version
   val buildVersionKey: String = IndexLogEntry.HYPERSPACE_PROJECT_VERSION
 
@@ -238,7 +236,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |}""".stripMargin
 
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
-    assert(actual.equals(expected))
+    assert(!actual.equals(expected))
     assert(actual.sourceFilesSizeInBytes == 200L)
   }
 
