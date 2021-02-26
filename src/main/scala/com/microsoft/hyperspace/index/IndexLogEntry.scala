@@ -627,14 +627,16 @@ object IndexLogEntry {
   def apply(name: String,
             derivedDataset: CoveringIndex,
             content: Content,
-            source: Source,
-            properties: Map[String, String]): IndexLogEntry = {
+            source: Source
+           ): IndexLogEntry = {
+
+    val properties = Map((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
     new IndexLogEntry(
       name,
       derivedDataset,
       content,
       source,
-      properties + ((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
+      properties
     )
   }
 }

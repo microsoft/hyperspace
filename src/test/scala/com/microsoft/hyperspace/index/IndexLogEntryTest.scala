@@ -93,8 +93,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         200,
         Map())),
     Content(Directory("rootContentPath")),
-    Source(SparkPlan(expectedSourcePlanProperties)),
-    Map())
+    Source(SparkPlan(expectedSourcePlanProperties)))
   val buildVersion: String = BuildInfo.version
   val buildVersionKey: String = IndexLogEntry.HYPERSPACE_PROJECT_VERSION
 

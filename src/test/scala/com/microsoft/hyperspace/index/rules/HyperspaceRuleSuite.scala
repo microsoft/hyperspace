@@ -68,8 +68,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
               numBuckets,
               Map())),
           Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
-          Source(SparkPlan(sourcePlanProperties)),
-          Map())
+          Source(SparkPlan(sourcePlanProperties)))
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
         indexLogEntry.state = Constants.States.ACTIVE

@@ -16,12 +16,14 @@
 
 package com.microsoft.hyperspace.actions
 
+import scala.collection.mutable
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.functions.input_file_name
-
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
@@ -85,8 +87,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               numBuckets,
               coveringIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker),
-          Source(SparkPlan(sourcePlanProperties)),
-          Map())
+          Source(SparkPlan(sourcePlanProperties)))
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
