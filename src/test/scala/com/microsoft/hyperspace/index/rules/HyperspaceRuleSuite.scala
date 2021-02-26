@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index.rules
 
+import scala.collection.mutable
+
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -69,7 +71,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
               Map())),
           Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
           Source(SparkPlan(sourcePlanProperties)),
-          Map())
+          mutable.Map())
 
         val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
         indexLogEntry.state = Constants.States.ACTIVE

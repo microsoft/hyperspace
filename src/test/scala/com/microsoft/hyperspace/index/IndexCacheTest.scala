@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import scala.collection.mutable
+
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.yarn.util.Clock
 import org.apache.spark.SparkFunSuite
@@ -61,7 +63,7 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
           Map())),
       Content(Directory(indexDir)),
       Source(SparkPlan(sourcePlanProperties)),
-      Map())
+      mutable.Map())
     entry.state = Constants.States.ACTIVE
     entry
   }

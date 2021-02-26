@@ -20,6 +20,8 @@ import java.io.{File, FileNotFoundException}
 import java.nio.file
 import java.nio.file.{Files, Paths}
 
+import scala.collection.mutable
+
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
@@ -42,6 +44,58 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   var emptyDir: file.Path = _
   var fs: FileSystem = _
   var fileIdTracker: FileIdTracker = _
+  val schemaString: String =
+    """{\"type\":\"struct\",
+      |\"fields\":[
+      |{\"name\":\"RGUID\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},
+      |{\"name\":\"Date\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}
+      |""".stripMargin.replaceAll("\r", "").replaceAll("\n", "")
+  val schema: StructType =
+    StructType(Array(StructField("RGUID", StringType), StructField("Date", StringType)))
+  val expectedSourcePlanProperties: SparkPlan.Properties = SparkPlan.Properties(
+    Seq(
+      Relation(
+        Seq("rootpath"),
+        Hdfs(
+          Hdfs.Properties(
+            Content(
+              Directory(
+                "test",
+                Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 100L, 200L, 1)),
+                Seq()
+              )
+            ),
+            Some(
+              Update(
+                None,
+                Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2)))))
+              )
+            )
+          )
+        ),
+        "schema",
+        "type",
+        Map()
+      )
+    ),
+    null,
+    null,
+    LogicalPlanFingerprint(
+      LogicalPlanFingerprint
+        .Properties(Seq(Signature("provider", "signatureValue")))
+    ))
+  val expected: IndexLogEntry = IndexLogEntry(
+    "indexName",
+    CoveringIndex(
+      CoveringIndex.Properties(
+        CoveringIndex.Properties
+          .Columns(Seq("col1"), Seq("col2", "col3")),
+        schema.json,
+        200,
+        Map())),
+    Content(Directory("rootContentPath")),
+    Source(SparkPlan(expectedSourcePlanProperties)),
+    mutable.Map())
 
   override def beforeAll(): Unit = {
     val testDirPath = Paths.get("src/test/resources/testDir")
@@ -58,6 +112,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     emptyDir = Files.createDirectories(Paths.get(testDir + "/empty"))
 
     fs = toPath(testDir).getFileSystem(new Configuration)
+
+    expected.state = "ACTIVE"
+    expected.timestamp = 1578818514080L
   }
 
   override def afterAll(): Unit = {
@@ -72,14 +129,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   private def toFileStatus(path: file.Path): FileStatus = fs.getFileStatus(toPath(path))
 
-  test("IndexLogEntry spec example") {
-    val schemaString =
-      """{\"type\":\"struct\",
-        |\"fields\":[
-        |{\"name\":\"RGUID\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},
-        |{\"name\":\"Date\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}
-        |""".stripMargin.replaceAll("\r", "").replaceAll("\n", "")
-
+  test("IndexLogEntry spec example, missing project Version") {
     val jsonString =
       s"""
          |{
@@ -184,60 +234,231 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |  "enabled" : true
          |}""".stripMargin
 
-    val schema =
-      StructType(Array(StructField("RGUID", StringType), StructField("Date", StringType)))
-
-    val expectedSourcePlanProperties = SparkPlan.Properties(
-      Seq(
-        Relation(
-          Seq("rootpath"),
-          Hdfs(
-            Hdfs.Properties(
-              Content(
-                Directory(
-                  "test",
-                  Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 100L, 200L, 1)),
-                  Seq()
-                )
-              ),
-              Some(
-                Update(
-                  None,
-                  Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2)))))
-                )
-              )
-            )
-          ),
-          "schema",
-          "type",
-          Map()
-        )
-      ),
-      null,
-      null,
-      LogicalPlanFingerprint(
-        LogicalPlanFingerprint
-          .Properties(Seq(Signature("provider", "signatureValue")))
-      ))
-
-    val expected = IndexLogEntry(
-      "indexName",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(Seq("col1"), Seq("col2", "col3")),
-          schema.json,
-          200,
-          Map())),
-      Content(Directory("rootContentPath")),
-      Source(SparkPlan(expectedSourcePlanProperties)),
-      Map())
-    expected.state = "ACTIVE"
-    expected.timestamp = 1578818514080L
-
     val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
     assert(actual.equals(expected))
     assert(actual.sourceFilesSizeInBytes == 200L)
+  }
+
+  test("Index Log Entry project version match") {
+    val jsonString =
+      s"""
+         |{
+         |  "name" : "indexName",
+         |  "derivedDataset" : {
+         |    "properties" : {
+         |      "columns" : {
+         |        "indexed" : [ "col1" ],
+         |        "included" : [ "col2", "col3" ]
+         |      },
+         |      "schemaString" : "$schemaString",
+         |      "numBuckets" : 200,
+         |      "properties" : {}
+         |    },
+         |    "kind" : "CoveringIndex"
+         |  },
+         |  "content" : {
+         |    "root" : {
+         |      "name" : "rootContentPath",
+         |      "files" : [ ],
+         |      "subDirs" : [ ]
+         |    },
+         |    "fingerprint" : {
+         |      "kind" : "NoOp",
+         |      "properties" : { }
+         |    }
+         |  },
+         |  "source" : {
+         |    "plan" : {
+         |      "properties" : {
+         |        "relations" : [ {
+         |          "rootPaths" : [ "rootpath" ],
+         |          "data" : {
+         |            "properties" : {
+         |              "content" : {
+         |                "root" : {
+         |                  "name" : "test",
+         |                  "files" : [ {
+         |                    "name" : "f1",
+         |                    "size" : 100,
+         |                    "modifiedTime" : 100,
+         |                    "id" : 0
+         |                  }, {
+         |                    "name" : "f2",
+         |                    "size" : 100,
+         |                    "modifiedTime" : 200,
+         |                    "id" : 1
+         |                  } ],
+         |                  "subDirs" : [ ]
+         |                },
+         |                "fingerprint" : {
+         |                  "kind" : "NoOp",
+         |                  "properties" : { }
+         |                }
+         |              },
+         |              "update" : {
+         |                "deletedFiles" : {
+         |                  "root" : {
+         |                    "name" : "",
+         |                    "files" : [ {
+         |                      "name" : "f1",
+         |                      "size" : 10,
+         |                      "modifiedTime" : 10,
+         |                      "id" : 2
+         |                    }],
+         |                    "subDirs" : [ ]
+         |                  },
+         |                  "fingerprint" : {
+         |                    "kind" : "NoOp",
+         |                    "properties" : { }
+         |                  }
+         |                },
+         |                "appendedFiles" : null
+         |              }
+         |            },
+         |            "kind" : "HDFS"
+         |          },
+         |          "dataSchemaJson" : "schema",
+         |          "fileFormat" : "type",
+         |          "options" : { }
+         |        } ],
+         |        "rawPlan" : null,
+         |        "sql" : null,
+         |        "fingerprint" : {
+         |          "properties" : {
+         |            "signatures" : [ {
+         |              "provider" : "provider",
+         |              "value" : "signatureValue"
+         |            } ]
+         |          },
+         |          "kind" : "LogicalPlan"
+         |        }
+         |      },
+         |      "kind" : "Spark"
+         |    }
+         |  },
+         |  "properties" : {
+         |    "projectVersion" : "0.5.0-SNAPSHOT"
+         |  },
+         |  "version" : "0.1",
+         |  "id" : 0,
+         |  "state" : "ACTIVE",
+         |  "timestamp" : 1578818514080,
+         |  "enabled" : true
+         |}""".stripMargin
+
+    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
+    assert(actual.equals(expected))
+  }
+
+  test("Index Log Entry project version mismatch") {
+    val jsonString =
+      s"""
+         |{
+         |  "name" : "indexName",
+         |  "derivedDataset" : {
+         |    "properties" : {
+         |      "columns" : {
+         |        "indexed" : [ "col1" ],
+         |        "included" : [ "col2", "col3" ]
+         |      },
+         |      "schemaString" : "$schemaString",
+         |      "numBuckets" : 200,
+         |      "properties" : {}
+         |    },
+         |    "kind" : "CoveringIndex"
+         |  },
+         |  "content" : {
+         |    "root" : {
+         |      "name" : "rootContentPath",
+         |      "files" : [ ],
+         |      "subDirs" : [ ]
+         |    },
+         |    "fingerprint" : {
+         |      "kind" : "NoOp",
+         |      "properties" : { }
+         |    }
+         |  },
+         |  "source" : {
+         |    "plan" : {
+         |      "properties" : {
+         |        "relations" : [ {
+         |          "rootPaths" : [ "rootpath" ],
+         |          "data" : {
+         |            "properties" : {
+         |              "content" : {
+         |                "root" : {
+         |                  "name" : "test",
+         |                  "files" : [ {
+         |                    "name" : "f1",
+         |                    "size" : 100,
+         |                    "modifiedTime" : 100,
+         |                    "id" : 0
+         |                  }, {
+         |                    "name" : "f2",
+         |                    "size" : 100,
+         |                    "modifiedTime" : 200,
+         |                    "id" : 1
+         |                  } ],
+         |                  "subDirs" : [ ]
+         |                },
+         |                "fingerprint" : {
+         |                  "kind" : "NoOp",
+         |                  "properties" : { }
+         |                }
+         |              },
+         |              "update" : {
+         |                "deletedFiles" : {
+         |                  "root" : {
+         |                    "name" : "",
+         |                    "files" : [ {
+         |                      "name" : "f1",
+         |                      "size" : 10,
+         |                      "modifiedTime" : 10,
+         |                      "id" : 2
+         |                    }],
+         |                    "subDirs" : [ ]
+         |                  },
+         |                  "fingerprint" : {
+         |                    "kind" : "NoOp",
+         |                    "properties" : { }
+         |                  }
+         |                },
+         |                "appendedFiles" : null
+         |              }
+         |            },
+         |            "kind" : "HDFS"
+         |          },
+         |          "dataSchemaJson" : "schema",
+         |          "fileFormat" : "type",
+         |          "options" : { }
+         |        } ],
+         |        "rawPlan" : null,
+         |        "sql" : null,
+         |        "fingerprint" : {
+         |          "properties" : {
+         |            "signatures" : [ {
+         |              "provider" : "provider",
+         |              "value" : "signatureValue"
+         |            } ]
+         |          },
+         |          "kind" : "LogicalPlan"
+         |        }
+         |      },
+         |      "kind" : "Spark"
+         |    }
+         |  },
+         |  "properties" : {
+         |    "projectVersion" : "0.6.0-SNAPSHOT"
+         |  },
+         |  "version" : "0.1",
+         |  "id" : 0,
+         |  "state" : "ACTIVE",
+         |  "timestamp" : 1578818514080,
+         |  "enabled" : true
+         |}""".stripMargin
+
+    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
+    assert(!actual.equals(expected))
   }
 
   test("Content.files api lists all files from Content object.") {

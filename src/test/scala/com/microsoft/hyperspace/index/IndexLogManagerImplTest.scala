@@ -18,6 +18,8 @@ package com.microsoft.hyperspace.index
 
 import java.util.UUID
 
+import scala.collection.mutable
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
@@ -72,7 +74,7 @@ class IndexLogManagerImplTest
         null,
         LogicalPlanFingerprint(
           LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature"))))))),
-    Map())
+    mutable.Map())
 
   private def getEntry(state: String): LogEntry = {
     TestUtils.copyWithState(sampleIndexLogEntry, state)

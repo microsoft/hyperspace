@@ -29,7 +29,7 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -435,8 +435,17 @@ case class IndexLogEntry(
     derivedDataset: CoveringIndex,
     content: Content,
     source: Source,
-    properties: Map[String, String])
+    properties: mutable.Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
+
+  if (!properties.contains(IndexLogEntry.HYPERSPACE_PROJECT_VERSION)) {
+    /*
+    * Include the project version in the index log entry file.
+    * This may help prevent in mismatching of project version and index
+    * log entry files.
+    */
+    properties.put(IndexLogEntry.HYPERSPACE_PROJECT_VERSION, BuildInfo.version)
+  }
 
   def schema: StructType =
     DataType.fromJson(derivedDataset.properties.schemaString).asInstanceOf[StructType]
@@ -517,6 +526,7 @@ case class IndexLogEntry(
         numBuckets.equals(that.numBuckets) &&
         content.root.equals(that.content.root) &&
         source.equals(that.source) &&
+        properties.equals(that.properties) &&
         state.equals(that.state)
     case _ => false
   }
@@ -607,6 +617,8 @@ case class IndexLogEntryTag[T](name: String)
 
 object IndexLogEntry {
   val VERSION: String = "0.1"
+
+  val HYPERSPACE_PROJECT_VERSION: String = "projectVersion"
 
   def schemaString(schema: StructType): String = schema.json
 }
