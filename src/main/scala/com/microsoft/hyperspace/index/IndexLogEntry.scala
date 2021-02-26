@@ -618,7 +618,7 @@ case class IndexLogEntryTag[T](name: String)
 object IndexLogEntry {
   val VERSION: String = "0.1"
 
-  val HYPERSPACE_PROJECT_VERSION: String = "projectVersion"
+  val HYPERSPACE_PROJECT_VERSION: String = "hyperspaceVersion"
 
   def schemaString(schema: StructType): String = schema.json
 }
