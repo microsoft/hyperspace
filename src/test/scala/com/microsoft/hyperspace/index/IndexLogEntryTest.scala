@@ -20,7 +20,6 @@ import java.io.{File, FileNotFoundException}
 import java.nio.file
 import java.nio.file.{Files, Paths}
 
-import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
@@ -457,13 +456,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |  "enabled" : true
          |}""".stripMargin
 
-    val exception = intercept[JsonMappingException] {
-      JsonUtils.fromJson[IndexLogEntry](jsonString)
-    }
-    assert(
-      exception.getMessage.contains(
-        "Instantiation of [simple type, class com.microsoft.hyperspace.index.IndexLogEntry]" +
-          " value failed: requirement failed"))
+    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
+    assert(!actual.equals(expected))
   }
 
   test("Content.files api lists all files from Content object.") {

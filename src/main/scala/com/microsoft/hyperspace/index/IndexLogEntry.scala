@@ -438,17 +438,6 @@ case class IndexLogEntry(
     properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
-  /*
-   * Include the project version in the index log entry file.
-   * This may help prevent in mismatching of project version and index
-   * log entry files.
-   * TODO: breaking change remove if condition. Since currently there are index
-   *  files that don't have project version info and we need to support them as well.
-   */
-  if (properties.contains(IndexLogEntry.HYPERSPACE_PROJECT_VERSION)) {
-    require(properties(IndexLogEntry.HYPERSPACE_PROJECT_VERSION) == BuildInfo.version)
-  }
-
   def schema: StructType =
     DataType.fromJson(derivedDataset.properties.schemaString).asInstanceOf[StructType]
 
