@@ -438,7 +438,9 @@ case class IndexLogEntry(
     properties: mutable.Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
-  if (!properties.contains(IndexLogEntry.HYPERSPACE_PROJECT_VERSION)) {
+  if (properties.contains(IndexLogEntry.HYPERSPACE_PROJECT_VERSION)) {
+    require(properties(IndexLogEntry.HYPERSPACE_PROJECT_VERSION) == BuildInfo.version)
+  } else {
     /*
      * Include the project version in the index log entry file.
      * This may help prevent in mismatching of project version and index

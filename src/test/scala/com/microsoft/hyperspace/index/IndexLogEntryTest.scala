@@ -22,6 +22,7 @@ import java.nio.file.{Files, Paths}
 
 import scala.collection.mutable
 
+import com.fasterxml.jackson.databind.JsonMappingException
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
@@ -30,7 +31,7 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.BeforeAndAfter
 
-import com.microsoft.hyperspace.{HyperspaceException, TestUtils}
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
@@ -96,6 +97,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     Content(Directory("rootContentPath")),
     Source(SparkPlan(expectedSourcePlanProperties)),
     mutable.Map())
+  val buildVersion: String = BuildInfo.version
+  val buildVersionKey: String = IndexLogEntry.HYPERSPACE_PROJECT_VERSION
 
   override def beforeAll(): Unit = {
     val testDirPath = Paths.get("src/test/resources/testDir")
@@ -337,7 +340,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |    }
          |  },
          |  "properties" : {
-         |    "projectVersion" : "0.5.0-SNAPSHOT"
+         |    "$buildVersionKey" : "$buildVersion"
          |  },
          |  "version" : "0.1",
          |  "id" : 0,
@@ -448,7 +451,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |    }
          |  },
          |  "properties" : {
-         |    "projectVersion" : "0.6.0-SNAPSHOT"
+         |    "$buildVersionKey" : "0.1.0-SNAPSHOT"
          |  },
          |  "version" : "0.1",
          |  "id" : 0,
@@ -457,8 +460,13 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |  "enabled" : true
          |}""".stripMargin
 
-    val actual = JsonUtils.fromJson[IndexLogEntry](jsonString)
-    assert(!actual.equals(expected))
+    val exception = intercept[JsonMappingException] {
+      JsonUtils.fromJson[IndexLogEntry](jsonString)
+    }
+    assert(
+      exception.getMessage.contains(
+        "Instantiation of [simple type, class com.microsoft.hyperspace.index.IndexLogEntry]" +
+          " value failed: requirement failed"))
   }
 
   test("Content.files api lists all files from Content object.") {
