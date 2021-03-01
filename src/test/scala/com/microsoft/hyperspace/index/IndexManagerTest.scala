@@ -784,7 +784,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
             LogicalPlanFingerprint.Properties(
               Seq(Signature(LogicalPlanSignatureProvider.create().name, s)))))
 
-        val entry = IndexLogEntry(
+        val entry = IndexLogEntry.create(
           indexConfig.indexName,
           CoveringIndex(
             CoveringIndex.Properties(

@@ -82,7 +82,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       LogicalPlanFingerprint
         .Properties(Seq(Signature("provider", "signatureValue")))
     ))
-  val expected: IndexLogEntry = IndexLogEntry(
+  val expected: IndexLogEntry = IndexLogEntry.create(
     "indexName",
     CoveringIndex(
       CoveringIndex.Properties(

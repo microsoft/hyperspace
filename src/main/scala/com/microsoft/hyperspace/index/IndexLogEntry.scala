@@ -614,18 +614,23 @@ object IndexLogEntry {
   def schemaString(schema: StructType): String = schema.json
 
   /*
-   * Default IndexLogEntry Properties
+   * Use this method to create a new IndexLogEntry. Which automatically includes
+   * all common default hyperspace project properties.
+   * TODO: force dev to use this method as this takes into account all
+   *  system properties that needed to be added by default. Currently, dev can also
+   *  create IndexLogEntry from case class.
    */
-  def apply(name: String,
+  def create(name: String,
             derivedDataset: CoveringIndex,
             content: Content,
-            source: Source): IndexLogEntry = {
+            source: Source,
+            properties: Map[String, String] = Map()): IndexLogEntry = {
     new IndexLogEntry(
       name,
       derivedDataset,
       content,
       source,
-      Map((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
+      properties + ((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
     )
   }
 }

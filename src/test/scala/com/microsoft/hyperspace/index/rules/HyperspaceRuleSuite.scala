@@ -58,7 +58,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
           new FileStatus(10, false, 1, 10, 10, path)
         }
 
-        val indexLogEntry = IndexLogEntry(
+        val indexLogEntry = IndexLogEntry.create(
           name,
           CoveringIndex(
             CoveringIndex.Properties(

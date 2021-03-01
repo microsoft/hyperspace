@@ -75,7 +75,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val coveringIndexProperties =
           (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
 
-        IndexLogEntry(
+        IndexLogEntry.create(
           indexConfig.indexName,
           CoveringIndex(
             CoveringIndex.Properties(
