@@ -619,6 +619,7 @@ object IndexLogEntry {
    * TODO: force dev to use this method as this takes into account all
    *  system properties that needed to be added by default. Currently, dev can also
    *  create IndexLogEntry from case class.
+   *  https://github.com/microsoft/hyperspace/issues/370
    */
   def create(name: String,
             derivedDataset: CoveringIndex,

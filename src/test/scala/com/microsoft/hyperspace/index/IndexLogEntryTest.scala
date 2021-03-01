@@ -128,7 +128,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   private def toFileStatus(path: file.Path): FileStatus = fs.getFileStatus(toPath(path))
 
-  test("IndexLogEntry spec example, missing project Version") {
+  test("IndexLogEntry spec example, missing project Version.") {
     val jsonString =
       s"""
          |{
@@ -238,7 +238,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.sourceFilesSizeInBytes == 200L)
   }
 
-  test("Index Log Entry project version match") {
+  test("Index Log Entry project version match.") {
     val jsonString =
       s"""
          |{
@@ -349,7 +349,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  test("Index Log Entry project version mismatch") {
+  test("Index Log Entry project version mismatch.") {
     val jsonString =
       s"""
          |{
