@@ -12,10 +12,11 @@ jobs:
       vmImage: 'ubuntu-latest'
     steps:
       - task: JavaToolInstaller@0
-          inputs:
-            versionSpec: '8'
-            jdkArchitectureOption: 'x64'
-            jdkSourceOption: 'PreInstalled'
+        displayName: 'Set Java version'
+        inputs:
+          versionSpec: '8'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'PreInstalled'
       - script: sbt ++2.11.12 clean
         displayName: 'Running $sbt clean'
       - script: sbt ++2.11.12 update
