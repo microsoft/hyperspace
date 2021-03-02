@@ -20,7 +20,7 @@ import scala.util.Try
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, GetStructField}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, Expression, GetStructField}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -200,12 +200,12 @@ object ExtractFilterNode {
       case AttributeReference(name, _, _, _) =>
         Set(s"$name")
       case otherExp =>
-        otherExp.containsChild.map {
+        otherExp.containsChild.flatMap {
           case g: GetStructField =>
-            s"${getChildNameFromStruct(g)}"
+            Set(s"${getChildNameFromStruct(g)}")
           case e: Expression =>
-            extractNamesFromExpression(e).filter(_.nonEmpty).mkString(".")
-          case _ => ""
+            extractNamesFromExpression(e).filter(_.nonEmpty)
+          case _ => Set.empty[String]
         }
     }
   }
@@ -219,20 +219,6 @@ object ExtractFilterNode {
       case _ =>
         s"${field.name.get}"
     }
-  }
-
-  def extractSearchQuery(exp: Expression, name: String): (Expression, Expression) = {
-    val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
-    val expFound = exp.find {
-      case a: AttributeReference if splits.forall(s => a.name.contains(s)) => true
-      case f: GetStructField if splits.forall(s => f.toString().contains(s)) => true
-      case _ => false
-    }.get
-    val parent = exp.find {
-      case e: Expression if e.containsChild.contains(expFound) => true
-      case _ => false
-    }.get
-    (parent, expFound)
   }
 
   def replaceInSearchQuery(
@@ -260,17 +246,26 @@ object ExtractFilterNode {
   def extractTypeFromExpression(exp: Expression, name: String): DataType = {
     val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
     val elem = exp.flatMap {
-      case a: AttributeReference =>
-        if (splits.forall(s => a.name == s)) {
-          Some((name, a.dataType))
+      case attrRef: AttributeReference =>
+        if (splits.forall(s => attrRef.name == s)) {
+          Some((name, attrRef.dataType))
         } else {
           Try({
             val h :: t = splits.toList
-            if (a.name == h && a.dataType.isInstanceOf[StructType]) {
-              val currentDataType = a.dataType.asInstanceOf[StructType]
+            if (attrRef.name == h && attrRef.dataType.isInstanceOf[StructType]) {
+              val currentDataType = attrRef.dataType.asInstanceOf[StructType]
+              var localDT = currentDataType
               val foldedFields = t.foldLeft(Seq.empty[(String, DataType)]) { (acc, i) =>
-                val idx = currentDataType.indexWhere(_.name.equalsIgnoreCase(i))
-                acc :+ (i, currentDataType(idx).dataType)
+                val collected = localDT.collect {
+                  case dt if dt.name == i =>
+                    dt.dataType match {
+                      case st: StructType =>
+                        localDT = st
+                      case _ =>
+                    }
+                    (i, dt.dataType)
+                }
+                acc ++ collected
               }
               Some(foldedFields.last)
             } else {
@@ -283,6 +278,18 @@ object ExtractFilterNode {
       case _ => None
     }
     elem.find(e => e._1 == name || e._1 == splits.last).get._2
+  }
+
+  def collectAliases(plan: LogicalPlan): Seq[(String, Attribute, Expression)] = {
+    plan
+      .collect {
+        case Project(projectList, _) =>
+          projectList.collect {
+            case a @ Alias(child, name) =>
+              (name, a.toAttribute, child)
+          }
+      }
+      .flatten
   }
 }
 

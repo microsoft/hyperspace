@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.util
 
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.types.{ArrayType, StructField, StructType}
 
 object SchemaUtils {
@@ -31,6 +32,17 @@ object SchemaUtils {
         flatten(fields, Some(prefix.map(o => s"$o.$name").getOrElse(name)))
       case other =>
         Seq(prefix.map(o => s"$o.${other.name}").getOrElse(other.name))
+    }
+  }
+
+  def flatten(attributes: Seq[Attribute]): Seq[String] = {
+    attributes.flatMap { a =>
+      a.dataType match {
+        case struct: StructType =>
+          flatten(struct, Some(a.name))
+        case _ =>
+          Seq(a.name)
+      }
     }
   }
 

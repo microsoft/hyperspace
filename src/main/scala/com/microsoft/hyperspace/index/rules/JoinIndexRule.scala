@@ -21,8 +21,8 @@ import scala.util.Try
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, EqualTo, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference, EqualTo, Expression, GetStructField, NamedExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
@@ -32,6 +32,7 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils._
+import com.microsoft.hyperspace.util.SchemaUtils
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -108,16 +109,19 @@ object JoinIndexRule
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
     // The given plan is eligible if it is supported and index has not been applied.
     def isEligible(optRel: Option[FileBasedRelation]): Boolean = {
-      optRel.map(!RuleUtils.isIndexApplied(_)).getOrElse(false)
+      optRel.exists(!RuleUtils.isIndexApplied(_))
     }
 
     lazy val optLeftRel = RuleUtils.getRelation(spark, l)
     lazy val optRightRel = RuleUtils.getRelation(spark, r)
 
+    val lProj = collectProjections(l)
+    val rProj = collectProjections(r)
+
     isJoinConditionSupported(condition) &&
     isPlanLinear(l) && isPlanLinear(r) &&
     isEligible(optLeftRel) && isEligible(optRightRel) &&
-    ensureAttributeRequirements(optLeftRel.get, optRightRel.get, condition)
+    ensureAttributeRequirements(optLeftRel.get, optRightRel.get, lProj, rProj, condition)
   }
 
   /**
@@ -226,6 +230,8 @@ object JoinIndexRule
    *
    * @param l left relation
    * @param r right relation
+   * @param lp left projections
+   * @param rp right projections
    * @param condition join condition
    * @return true if all attributes in join condition are from base relation nodes. False
    *         otherwise
@@ -233,15 +239,36 @@ object JoinIndexRule
   private def ensureAttributeRequirements(
       l: FileBasedRelation,
       r: FileBasedRelation,
+      lp: Seq[NamedExpression],
+      rp: Seq[NamedExpression],
       condition: Expression): Boolean = {
+
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
     val lBaseAttrs = l.plan.output.map(_.canonicalized)
     val rBaseAttrs = r.plan.output.map(_.canonicalized)
 
-    def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
-      (lBaseAttrs.contains(c1) && rBaseAttrs.contains(c2)) ||
-      (lBaseAttrs.contains(c2) && rBaseAttrs.contains(c1))
+    def fromDifferentBaseRelations(
+        c1: Expression,
+        c2: Expression,
+        p1: Seq[NamedExpression],
+        p2: Seq[NamedExpression]): Boolean = {
+      val cr1 = if (p1.nonEmpty) {
+        Try {
+          extractFieldFromProjection(c1, p1).get.references.head.canonicalized
+        }.getOrElse(c1)
+      } else {
+        c1
+      }
+      val cr2 = if (p2.nonEmpty) {
+        Try {
+          extractFieldFromProjection(c2, p2).get.references.head.canonicalized
+        }.getOrElse(c2)
+      } else {
+        c2
+      }
+      (lBaseAttrs.contains(cr1) && rBaseAttrs.contains(cr2)) ||
+      (lBaseAttrs.contains(cr2) && rBaseAttrs.contains(cr1))
     }
 
     // Map to maintain and check one-to-one relation between join condition attributes. For join
@@ -254,7 +281,7 @@ object JoinIndexRule
       case EqualTo(e1, e2) =>
         val (c1, c2) = (e1.canonicalized, e2.canonicalized)
         // Check 1: c1 and c2 should belong to l and r respectively, or r and l respectively.
-        if (!fromDifferentBaseRelations(c1, c2)) {
+        if (!fromDifferentBaseRelations(c1, c2, lp, rp)) {
           return false
         }
         // Check 2: c1 is compared only against c2 and vice versa.
@@ -269,6 +296,47 @@ object JoinIndexRule
         }
       case _ => throw new IllegalStateException("Unsupported condition found")
     }
+  }
+
+  /**
+   * The method extracts all the projection fields.
+   *
+   * @param plan The plan from which to extract projections
+   * @return A sequence of [[NamedExpression]]
+   */
+  private def collectProjections(plan: LogicalPlan): Seq[NamedExpression] = {
+    plan.collect {
+      case p: Project => p.projectList
+    }.flatten
+  }
+
+  /**
+   * The method tries to map any top level condition field to the fields present in relation.
+   * It does this by going through projections.
+   *
+   * @param projections The available projection expressions
+   * @return Some of the found expression when the condition field is found otherwise None
+   */
+  private def conditionFieldsToRelationFields(
+      projections: Seq[NamedExpression]): Map[Expression, Expression] = {
+    projections.collect {
+      case a: Alias =>
+        (a.toAttribute.canonicalized, a.child)
+    }.toMap
+  }
+
+  /**
+   * The method tries to return a field out of the fields present in relation.
+   *
+   * @param conditionField The field to map to
+   * @param projections The available projection expressions
+   * @return Some of the found expression when the condition field is found otherwise None
+   */
+  private def extractFieldFromProjection(
+      conditionField: Expression,
+      projections: Seq[NamedExpression]): Option[Expression] = {
+    val fields = conditionFieldsToRelationFields(projections)
+    Try(fields(conditionField.canonicalized)).toOption
   }
 
   /**
@@ -295,12 +363,14 @@ object JoinIndexRule
     //   been already checked in `isApplicable`.
     val leftRelation = RuleUtils.getRelation(spark, left).get
     val rightRelation = RuleUtils.getRelation(spark, right).get
-    val lBaseAttrs = leftRelation.plan.output.map(_.name)
-    val rBaseAttrs = rightRelation.plan.output.map(_.name)
+    val lBaseAttrs = SchemaUtils.flatten(leftRelation.plan.output)
+    val rBaseAttrs = SchemaUtils.flatten(rightRelation.plan.output)
 
     // Map of left resolved columns with their corresponding right resolved
     // columns from condition.
-    val lRMap = getLRColumnMapping(lBaseAttrs, rBaseAttrs, joinCondition)
+    val lProj = collectProjections(left)
+    val rProj = collectProjections(right)
+    val lRMap = getLRColumnMapping(lBaseAttrs, rBaseAttrs, lProj, rProj, joinCondition)
     val lRequiredIndexedCols = lRMap.keys.toSeq
     val rRequiredIndexedCols = lRMap.values.toSeq
 
@@ -370,16 +440,56 @@ object JoinIndexRule
    */
   private def allRequiredCols(plan: LogicalPlan): Seq[String] = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
-    val cleaned = CleanupAliases(plan)
-    val allReferences = cleaned.collect {
-      case l: LeafNode if provider.isSupportedRelation(l) => Seq()
-      case other => other.references
-    }.flatten
-    val topLevelOutputs = cleaned.outputSet.toSeq
+    val projectionFields = collectProjections(plan)
 
-    (allReferences ++ topLevelOutputs).distinct.collect {
-      case attr: AttributeReference => attr.name
+    val allReferences = plan.collect {
+      case l: LeafNode if provider.isSupportedRelation(l) =>
+        Seq.empty[String]
+      case other =>
+        other match {
+          case project: Project =>
+            val fields = conditionFieldsToRelationFields(project.projectList).values
+            fields.flatMap {
+              case g: GetStructField =>
+                Seq(ExtractFilterNode.getChildNameFromStruct(g))
+              case otherFieldType =>
+                ExtractFilterNode.extractNamesFromExpression(otherFieldType).toSeq
+            }
+          case filter: Filter =>
+            var acc = Seq.empty[String]
+            val fls = ExtractFilterNode
+              .extractNamesFromExpression(filter.condition)
+              .toSeq
+              .distinct
+              .sortBy(-_.length)
+              .toList
+            var h :: t = fls
+            while (t.nonEmpty) {
+              if (!t.exists(_.contains(h))) {
+                acc = acc :+ h
+              }
+              h = t.head
+              t = t.tail
+            }
+            acc
+          case o =>
+            o.references.map(_.name)
+        }
+    }.flatten
+
+    val topLevelOutputs = if (projectionFields.nonEmpty) {
+      plan.outputSet.map { i =>
+        val attr = extractFieldFromProjection(i, projectionFields)
+        val opt = attr.map { e =>
+          ExtractFilterNode.getChildNameFromStruct(e.asInstanceOf[GetStructField])
+        }
+        opt.getOrElse(i.name)
+      }
+    } else {
+      plan.outputSet.toSeq.map(_.name)
     }
+
+    (allReferences ++ topLevelOutputs).distinct
   }
 
   /**
@@ -399,18 +509,37 @@ object JoinIndexRule
   private def getLRColumnMapping(
       leftBaseAttrs: Seq[String],
       rightBaseAttrs: Seq[String],
+      lp: Seq[NamedExpression],
+      rp: Seq[NamedExpression],
       condition: Expression): Map[String, String] = {
     extractConditions(condition).map {
       case EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
+        val attrLeftName = if (lp.nonEmpty) {
+          Try {
+            val attrLeft = extractFieldFromProjection(attr1, lp).get
+            ExtractFilterNode.getChildNameFromStruct(attrLeft.asInstanceOf[GetStructField])
+          }.getOrElse(attr1.name)
+        } else {
+          attr1.name
+        }
+        val attrRightName = if (rp.nonEmpty) {
+          Try {
+            val attrRight = extractFieldFromProjection(attr2, rp).get
+            ExtractFilterNode.getChildNameFromStruct(attrRight.asInstanceOf[GetStructField])
+          }.getOrElse(attr2.name)
+        } else {
+          attr2.name
+        }
+
         Try {
           (
-            resolve(spark, attr1.name, leftBaseAttrs).get,
-            resolve(spark, attr2.name, rightBaseAttrs).get)
+            resolve(spark, attrLeftName, leftBaseAttrs).get,
+            resolve(spark, attrRightName, rightBaseAttrs).get)
         }.getOrElse {
           Try {
             (
-              resolve(spark, attr2.name, leftBaseAttrs).get,
-              resolve(spark, attr1.name, rightBaseAttrs).get)
+              resolve(spark, attrRightName, leftBaseAttrs).get,
+              resolve(spark, attrLeftName, rightBaseAttrs).get)
           }.getOrElse {
             throw new IllegalStateException("Unexpected exception while using join rule")
           }
@@ -454,8 +583,8 @@ object JoinIndexRule
 
       // All required index columns should match one-to-one with all indexed columns and
       // vice-versa. All required columns must be present in the available index columns.
-      requiredIndexCols.toSet.equals(idx.indexedColumns.toSet) &&
-      allRequiredCols.forall(allCols.contains)
+      SchemaUtils.escapeFieldNames(requiredIndexCols).toSet.equals(idx.indexedColumns.toSet) &&
+      SchemaUtils.escapeFieldNames(allRequiredCols).forall(allCols.contains)
     }
   }
 
@@ -522,10 +651,13 @@ object JoinIndexRule
       lIndex: IndexLogEntry,
       rIndex: IndexLogEntry,
       columnMapping: Map[String, String]): Boolean = {
-    require(columnMapping.keys.toSet.equals(lIndex.indexedColumns.toSet))
-    require(columnMapping.values.toSet.equals(rIndex.indexedColumns.toSet))
+    val escapedMap = columnMapping.map {
+      case (k, v) => SchemaUtils.escapeFieldName(k) -> SchemaUtils.escapeFieldName(v)
+    }
+    require(escapedMap.keys.toSet.equals(lIndex.indexedColumns.toSet))
+    require(escapedMap.values.toSet.equals(rIndex.indexedColumns.toSet))
 
-    val requiredRightIndexedCols = lIndex.indexedColumns.map(columnMapping)
+    val requiredRightIndexedCols = lIndex.indexedColumns.map(escapedMap)
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
   }
 }

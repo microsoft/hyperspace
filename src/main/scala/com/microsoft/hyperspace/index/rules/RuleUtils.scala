@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, ExprId, GetStructField, In, Literal, Not}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, GetStructField, In, IsNotNull, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
@@ -475,7 +475,21 @@ object RuleUtils {
         // Although only numBuckets of BucketSpec is used in BucketUnion*, bucketColumnNames
         // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
         // misunderstanding.
-        val bucketSpec = index.bucketSpec.copy(sortColumnNames = Nil)
+
+        val aliases = ExtractFilterNode
+          .collectAliases(plan)
+          .collect {
+            case (shortName, _, ref: GetStructField) =>
+              val escapedFieldName =
+                SchemaUtils.escapeFieldName(ExtractFilterNode.getChildNameFromStruct(ref))
+              escapedFieldName -> shortName
+          }
+          .toMap
+        val aliasBucketNames = index.bucketSpec.bucketColumnNames.map { col =>
+          aliases.getOrElse(col, col)
+        }
+        val bucketSpec =
+          index.bucketSpec.copy(bucketColumnNames = aliasBucketNames, sortColumnNames = Nil)
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(
@@ -581,7 +595,14 @@ object RuleUtils {
           plan: LogicalPlan,
           indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
         val attrMap = plan.output.attrs.map(attr => (attr.name, attr)).toMap
-        indexedColumns.map(colName => attrMap.get(colName))
+        indexedColumns.map { colName =>
+          attrMap
+            .find {
+              case (k, _) =>
+                colName.contains(k)
+            }
+            .map(_._2)
+        }
       }
     }
 
@@ -624,45 +645,66 @@ object RuleUtils {
   private def transformProject(project: Project, index: IndexLogEntry): Project = {
     val projectedFields = project.projectList.map { exp =>
       val fieldName = ExtractFilterNode.extractNamesFromExpression(exp).head
+      val shortFieldName = fieldName.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX).last
       val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
       val attr = ExtractFilterNode.extractAttributeRef(exp, fieldName)
       val fieldType = ExtractFilterNode.extractTypeFromExpression(exp, fieldName)
       val exprId = getFieldPosition(index, escapedFieldName)
-      attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
+      val attrCopy = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
         ExprId(exprId),
         attr.qualifier)
+      if (fieldName != shortFieldName) {
+        Alias(attrCopy, shortFieldName)(exprId = exp.toAttribute.exprId)
+      } else {
+        Alias(attrCopy, attrCopy.name)(exprId = exp.toAttribute.exprId)
+      }
     }
     project.copy(projectList = projectedFields)
   }
 
   private def transformFilter(filter: Filter, index: IndexLogEntry): Filter = {
-    val fieldNames = ExtractFilterNode.extractNamesFromExpression(filter.condition)
-    var mutableFilter = filter
-    fieldNames.foreach { fieldName =>
-      val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
-      val nestedFields = getNestedFields(index)
-      if (nestedFields.nonEmpty &&
-          nestedFields.exists(i => i.equalsIgnoreCase(escapedFieldName))) {
-        val (parentExpresion, exp) =
-          ExtractFilterNode.extractSearchQuery(filter.condition, fieldName)
-        val fieldType = ExtractFilterNode.extractTypeFromExpression(exp, fieldName)
-        val attr = ExtractFilterNode.extractAttributeRef(exp, fieldName)
-        val exprId = getFieldPosition(index, escapedFieldName)
-        val newAttr = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
-          ExprId(exprId),
-          attr.qualifier)
-        val newExp = exp match {
-          case _: GetStructField => newAttr
-          case other: Expression => other
-        }
-        val newParentExpression =
-          ExtractFilterNode.replaceInSearchQuery(parentExpresion, exp, newExp)
-        mutableFilter = filter.copy(condition = newParentExpression)
-      } else {
-        filter
+    val nestedFields = getNestedFields(index)
+    if (nestedFields.nonEmpty) {
+      val newCondition = filter.condition.transformDown {
+        case gsf: GetStructField =>
+          val fieldName = ExtractFilterNode.getChildNameFromStruct(gsf)
+          val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
+          if (nestedFields.contains(escapedFieldName)) {
+            val fieldType = ExtractFilterNode.extractTypeFromExpression(gsf, fieldName)
+            val attr = ExtractFilterNode.extractAttributeRef(gsf, fieldName)
+            val exprId = getFieldPosition(index, escapedFieldName)
+            val newAttr = attr.copy(name = escapedFieldName, dataType = fieldType)(
+              ExprId(exprId),
+              attr.qualifier)
+            newAttr
+          } else {
+            gsf
+          }
+        case cond @ IsNotNull(child) =>
+          val fieldName =
+            SchemaUtils.escapeFieldName(ExtractFilterNode.extractNamesFromExpression(child).head)
+          val elemFound = nestedFields.find(i => i.contains(fieldName))
+          elemFound match {
+            case Some(name) =>
+              val newChild = child match {
+                case attr: AttributeReference =>
+                  val fieldType = ExtractFilterNode.extractTypeFromExpression(
+                    cond,
+                    SchemaUtils.unescapeFieldName(name))
+                  val exprId = getFieldPosition(index, name)
+                  attr.copy(name = name, dataType = fieldType)(ExprId(exprId), attr.qualifier)
+                case other =>
+                  other
+              }
+              cond.copy(child = newChild)
+            case _ =>
+              cond
+          }
       }
+      filter.copy(condition = newCondition)
+    } else {
+      filter
     }
-    mutableFilter
   }
 
   private def getNestedFields(index: IndexLogEntry): Seq[String] = {
