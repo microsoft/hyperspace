@@ -93,7 +93,7 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   /**
    * Returns enriched index properties.
    *
-   * @param relation Logical relation to retrieve necessary information.
+   * @param relation Relation to retrieve necessary information.
    * @param previousProperties Index properties of previous index version.
    * @return New property entries for index creation or refreshment.
    */

@@ -132,7 +132,9 @@ trait FileBasedRelation extends SourceRelation {
    * @param index Candidate index to be applied.
    * @return IndexLogEntry of the closest version among available index versions.
    */
-  def closestIndexVersion(index: IndexLogEntry): IndexLogEntry
+  def closestIndexVersion(index: IndexLogEntry): IndexLogEntry = {
+    index
+  }
 }
 
 /**

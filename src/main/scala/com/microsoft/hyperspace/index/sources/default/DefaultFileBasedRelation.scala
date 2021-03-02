@@ -62,7 +62,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   /**
    * FileInfo list for all source files that the current relation references to.
    */
-  lazy override val allFileInfos: Seq[FileInfo] = {
+  override lazy val allFileInfos: Seq[FileInfo] = {
     allFiles.map { f =>
       FileInfo(
         f.getPath.toString,
@@ -75,7 +75,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   /**
    * Summation of all source file size.
    */
-  lazy override val allFileSizeInBytes: Long = {
+  override lazy val allFileSizeInBytes: Long = {
     allFileInfos.map(_.size).sum
   }
 
@@ -254,20 +254,6 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
     fileIdTracker.getFileToIdMap.toSeq.map { kv =>
       (kv._1._1.replace("file:/", "file:///"), kv._2)
     }
-  }
-
-  /**
-   * Returns IndexLogEntry of the closest index version for the given relation.
-   *
-   * curFiles is used to calculate the similarity with each index version data.
-   * Currently, this provider just returns the latest version of index.
-   *
-   * @param index Candidate index to be applied.
-   * @return IndexLogEntry of the closest version among available index versions.
-   */
-  override def closestIndexVersion(
-      index: IndexLogEntry): IndexLogEntry = {
-    index
   }
 
 }

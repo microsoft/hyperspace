@@ -100,7 +100,7 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * 1) DELTA_VERSION_HISTORY_PROPERTY logs the history of INDEX_VERSION:DELTA_TABLE_VERSION
    *    values for each index creation & refreshment.
    *
-   * @param relation Logical relation to retrieve necessary information.
+   * @param relation Relation to retrieve necessary information.
    * @param previousProperties Index properties of previous index version.
    * @return Update index properties for index creation or refreshment.
    */

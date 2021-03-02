@@ -134,7 +134,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    *
    * Currently, there is no update for this provider.
    *
-   * @param relation Logical relation to retrieve necessary information.
+   * @param relation Relation to retrieve necessary information.
    * @param previousProperties Index properties of previous index version.
    * @return Updated index properties for index creation or refreshment.
    */
