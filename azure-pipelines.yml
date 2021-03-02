@@ -11,6 +11,10 @@ jobs:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
+      - script: |
+          echo "##vso[task.setvariable variable=JAVA_HOME]$(JAVA_HOME_8_X64)"
+          echo "##vso[task.setvariable variable=PATH]$(JAVA_HOME_8_X64)\bin;$(PATH)"
+        displayName: 'Set Java version'
       - script: sbt ++2.11.12 clean
         displayName: 'Running $sbt clean'
       - script: sbt ++2.11.12 update
