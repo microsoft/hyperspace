@@ -44,7 +44,7 @@ jobs:
   - job: Build_2_12
     displayName: 'Build sources and run unit tests for Scala 2.12'
     pool:
-      vmImage: 'ubuntu-latest'
+      vmImage: 'ubuntu-18.04'
     steps:
       - script: sbt ++2.12.8 clean
         displayName: 'Running $sbt clean'
@@ -73,7 +73,7 @@ jobs:
   - job: PythonTest
     displayName: 'Run Python tests'
     pool:
-      vmImage: 'ubuntu-latest'
+      vmImage: 'ubuntu-18.04'
     steps:
       - task: UsePythonVersion@0
         displayName: 'Set Python version'
