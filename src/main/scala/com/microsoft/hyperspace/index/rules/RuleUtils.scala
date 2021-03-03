@@ -33,8 +33,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.HyperspaceConf
-import com.microsoft.hyperspace.util.SchemaUtils
+import com.microsoft.hyperspace.util.{HyperspaceConf, SchemaUtils}
 
 object RuleUtils {
 
@@ -289,7 +288,8 @@ object RuleUtils {
 
         val flatSchema = SchemaUtils.escapeFieldNames(SchemaUtils.flatten(relation.plan.schema))
         val updatedOutput =
-          if (SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(flatSchema))) {
+          if (index.usesNestedFields &&
+              SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(flatSchema))) {
             indexFsRelation.schema.flatMap { s =>
               val exprId = getFieldPosition(index, s.name)
               relation.plan.output.find(a => s.name.contains(a.name)).map { a =>
@@ -306,10 +306,10 @@ object RuleUtils {
 
         relation.createLogicalRelation(indexFsRelation, updatedOutput)
 
-      case p: Project if provider.isSupportedProject(p) =>
+      case p: Project if PlanUtils.isSupportedProject(p) =>
         transformProject(p, index)
 
-      case f: Filter if provider.isSupportedFilter(f) =>
+      case f: Filter if PlanUtils.isSupportedFilter(f) =>
         transformFilter(f, index)
     }
   }
@@ -423,7 +423,8 @@ object RuleUtils {
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val updatedOutput =
-          if (SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(flatSchema))) {
+          if (index.usesNestedFields &&
+              SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(flatSchema))) {
             indexFsRelation.schema.flatMap { s =>
               val exprId = getFieldPosition(index, s.name)
               relation.plan.output.find(a => s.name.contains(a.name)).map { a =>
@@ -449,10 +450,10 @@ object RuleUtils {
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }
 
-      case p: Project if provider.isSupportedProject(p) =>
+      case p: Project if PlanUtils.isSupportedProject(p) =>
         transformProject(p, index)
 
-      case f: Filter if provider.isSupportedFilter(f) =>
+      case f: Filter if PlanUtils.isSupportedFilter(f) =>
         transformFilter(f, index)
 
     }
@@ -476,12 +477,12 @@ object RuleUtils {
         // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
         // misunderstanding.
 
-        val aliases = ExtractFilterNode
+        val aliases = PlanUtils
           .collectAliases(plan)
           .collect {
             case (shortName, _, ref: GetStructField) =>
               val escapedFieldName =
-                SchemaUtils.escapeFieldName(ExtractFilterNode.getChildNameFromStruct(ref))
+                SchemaUtils.escapeFieldName(PlanUtils.getChildNameFromStruct(ref))
               escapedFieldName -> shortName
           }
           .toMap
@@ -642,13 +643,31 @@ object RuleUtils {
     shuffled
   }
 
+  /**
+   * Transforms the projection to use the field in the index. The nested field in the
+   * projection is different from the top level field stored in the index. For example
+   * {{{Project [
+   *   nested#536.leaf.cnt AS cnt#556,
+   *   query#533,
+   *   nested#536.leaf.id AS id#557]}}}
+   *
+   * must be transformed into something similar to this:
+   * {{{Project [
+   *   nested__leaf__cnt#0 AS cnt#653,
+   *   query#1 AS query#533,
+   *   nested__leaf__id#2 AS id#654]}}}
+   *
+   * @param project The projection we want to transform
+   * @param index The suitable index
+   * @return
+   */
   private def transformProject(project: Project, index: IndexLogEntry): Project = {
     val projectedFields = project.projectList.map { exp =>
-      val fieldName = ExtractFilterNode.extractNamesFromExpression(exp).head
+      val fieldName = PlanUtils.extractNamesFromExpression(exp).head
       val shortFieldName = fieldName.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX).last
       val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
-      val attr = ExtractFilterNode.extractAttributeRef(exp, fieldName)
-      val fieldType = ExtractFilterNode.extractTypeFromExpression(exp, fieldName)
+      val attr = PlanUtils.extractAttributeRef(exp, fieldName)
+      val fieldType = PlanUtils.extractTypeFromExpression(exp, fieldName)
       val exprId = getFieldPosition(index, escapedFieldName)
       val attrCopy = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
         ExprId(exprId),
@@ -662,16 +681,37 @@ object RuleUtils {
     project.copy(projectList = projectedFields)
   }
 
+  /**
+   * Transforms the filter to use the field in the index. The nested field in the
+   * filter is different from the top level field stored in the index. For example
+   * {{{Filter (
+   *   (isnotnull(nested#536) &&
+   *   (nested#536.leaf.cnt >= 20)) &&
+   *   (nested#536.leaf.cnt <= 40))}}}
+   *
+   * must be transformed into something similar to this:
+   * {{{Filter (
+   *   (isnotnull(nested__leaf__cnt#0) &&
+   *   (nested__leaf__cnt#0 >= 20)) &&
+   *   (nested__leaf__cnt#0 <= 40))}}}
+   *
+   * Pre-requisite
+   * - The index must have at least one nested field
+   *
+   * @param filter The filter we want to transform
+   * @param index The suitable index
+   * @return
+   */
   private def transformFilter(filter: Filter, index: IndexLogEntry): Filter = {
     val nestedFields = getNestedFields(index)
     if (nestedFields.nonEmpty) {
       val newCondition = filter.condition.transformDown {
         case gsf: GetStructField =>
-          val fieldName = ExtractFilterNode.getChildNameFromStruct(gsf)
+          val fieldName = PlanUtils.getChildNameFromStruct(gsf)
           val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
           if (nestedFields.contains(escapedFieldName)) {
-            val fieldType = ExtractFilterNode.extractTypeFromExpression(gsf, fieldName)
-            val attr = ExtractFilterNode.extractAttributeRef(gsf, fieldName)
+            val fieldType = PlanUtils.extractTypeFromExpression(gsf, fieldName)
+            val attr = PlanUtils.extractAttributeRef(gsf, fieldName)
             val exprId = getFieldPosition(index, escapedFieldName)
             val newAttr = attr.copy(name = escapedFieldName, dataType = fieldType)(
               ExprId(exprId),
@@ -682,15 +722,14 @@ object RuleUtils {
           }
         case cond @ IsNotNull(child) =>
           val fieldName =
-            SchemaUtils.escapeFieldName(ExtractFilterNode.extractNamesFromExpression(child).head)
+            SchemaUtils.escapeFieldName(PlanUtils.extractNamesFromExpression(child).head)
           val elemFound = nestedFields.find(i => i.contains(fieldName))
           elemFound match {
             case Some(name) =>
               val newChild = child match {
                 case attr: AttributeReference =>
-                  val fieldType = ExtractFilterNode.extractTypeFromExpression(
-                    cond,
-                    SchemaUtils.unescapeFieldName(name))
+                  val fieldType =
+                    PlanUtils.extractTypeFromExpression(cond, SchemaUtils.unescapeFieldName(name))
                   val exprId = getFieldPosition(index, name)
                   attr.copy(name = name, dataType = fieldType)(ExprId(exprId), attr.qualifier)
                 case other =>
@@ -707,10 +746,24 @@ object RuleUtils {
     }
   }
 
+  /**
+   * The method collects a list of nested field names from the index schema.
+   *
+   * @param index The chosen index
+   * @return A collection of nested field names
+   */
   private def getNestedFields(index: IndexLogEntry): Seq[String] = {
     index.schema.fieldNames.filter(_.contains(SchemaUtils.NESTED_FIELD_REPLACEMENT))
   }
 
+  /**
+   * Given and index and a field name it returns the position in the index schema.
+   * This method is used to properly create attributes over the index dataset.
+   *
+   * @param index The chosen index
+   * @param fieldName The field name for which we need to find its position in the index schema
+   * @return
+   */
   private def getFieldPosition(index: IndexLogEntry, fieldName: String): Int = {
     index.schema.fieldNames.indexWhere(_.equalsIgnoreCase(fieldName))
   }

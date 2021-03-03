@@ -451,13 +451,13 @@ object JoinIndexRule
             val fields = conditionFieldsToRelationFields(project.projectList).values
             fields.flatMap {
               case g: GetStructField =>
-                Seq(ExtractFilterNode.getChildNameFromStruct(g))
+                Seq(PlanUtils.getChildNameFromStruct(g))
               case otherFieldType =>
-                ExtractFilterNode.extractNamesFromExpression(otherFieldType).toSeq
+                PlanUtils.extractNamesFromExpression(otherFieldType).toSeq
             }
           case filter: Filter =>
             var acc = Seq.empty[String]
-            val fls = ExtractFilterNode
+            val fls = PlanUtils
               .extractNamesFromExpression(filter.condition)
               .toSeq
               .distinct
@@ -481,7 +481,7 @@ object JoinIndexRule
       plan.outputSet.map { i =>
         val attr = extractFieldFromProjection(i, projectionFields)
         val opt = attr.map { e =>
-          ExtractFilterNode.getChildNameFromStruct(e.asInstanceOf[GetStructField])
+          PlanUtils.getChildNameFromStruct(e.asInstanceOf[GetStructField])
         }
         opt.getOrElse(i.name)
       }
@@ -517,7 +517,7 @@ object JoinIndexRule
         val attrLeftName = if (lp.nonEmpty) {
           Try {
             val attrLeft = extractFieldFromProjection(attr1, lp).get
-            ExtractFilterNode.getChildNameFromStruct(attrLeft.asInstanceOf[GetStructField])
+            PlanUtils.getChildNameFromStruct(attrLeft.asInstanceOf[GetStructField])
           }.getOrElse(attr1.name)
         } else {
           attr1.name
@@ -525,7 +525,7 @@ object JoinIndexRule
         val attrRightName = if (rp.nonEmpty) {
           Try {
             val attrRight = extractFieldFromProjection(attr2, rp).get
-            ExtractFilterNode.getChildNameFromStruct(attrRight.asInstanceOf[GetStructField])
+            PlanUtils.getChildNameFromStruct(attrRight.asInstanceOf[GetStructField])
           }.getOrElse(attr2.name)
         } else {
           attr2.name

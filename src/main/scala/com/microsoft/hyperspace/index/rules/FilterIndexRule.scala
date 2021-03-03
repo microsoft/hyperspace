@@ -171,9 +171,11 @@ object ExtractFilterNode {
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
-        .map(extractNamesFromExpression)
+        .map(PlanUtils.extractNamesFromExpression)
         .flatMap(_.toSeq)
-      val filterColumnNames = extractNamesFromExpression(condition).toSeq
+      val filterColumnNames = PlanUtils
+        .extractNamesFromExpression(condition)
+        .toSeq
         .sortBy(-_.length)
         .foldLeft(Seq.empty[String]) { (acc, e) =>
           if (!acc.exists(i => i.startsWith(e))) {
@@ -193,103 +195,6 @@ object ExtractFilterNode {
       Some(filter, filter, relationColumnsName, filterColumnNames)
 
     case _ => None // plan does not match with any of filter index rule patterns
-  }
-
-  def extractNamesFromExpression(exp: Expression): Set[String] = {
-    exp match {
-      case AttributeReference(name, _, _, _) =>
-        Set(s"$name")
-      case otherExp =>
-        otherExp.containsChild.flatMap {
-          case g: GetStructField =>
-            Set(s"${getChildNameFromStruct(g)}")
-          case e: Expression =>
-            extractNamesFromExpression(e).filter(_.nonEmpty)
-          case _ => Set.empty[String]
-        }
-    }
-  }
-
-  def getChildNameFromStruct(field: GetStructField): String = {
-    field.child match {
-      case f: GetStructField =>
-        s"${getChildNameFromStruct(f)}.${field.name.get}"
-      case a: AttributeReference =>
-        s"${a.name}.${field.name.get}"
-      case _ =>
-        s"${field.name.get}"
-    }
-  }
-
-  def replaceInSearchQuery(
-      parent: Expression,
-      needle: Expression,
-      repl: Expression): Expression = {
-    parent.mapChildren { c =>
-      if (c == needle) {
-        repl
-      } else {
-        c
-      }
-    }
-  }
-
-  def extractAttributeRef(exp: Expression, name: String): AttributeReference = {
-    val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
-    val elem = exp.find {
-      case a: AttributeReference if splits.contains(a.name) => true
-      case _ => false
-    }
-    elem.get.asInstanceOf[AttributeReference]
-  }
-
-  def extractTypeFromExpression(exp: Expression, name: String): DataType = {
-    val splits = name.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX)
-    val elem = exp.flatMap {
-      case attrRef: AttributeReference =>
-        if (splits.forall(s => attrRef.name == s)) {
-          Some((name, attrRef.dataType))
-        } else {
-          Try({
-            val h :: t = splits.toList
-            if (attrRef.name == h && attrRef.dataType.isInstanceOf[StructType]) {
-              val currentDataType = attrRef.dataType.asInstanceOf[StructType]
-              var localDT = currentDataType
-              val foldedFields = t.foldLeft(Seq.empty[(String, DataType)]) { (acc, i) =>
-                val collected = localDT.collect {
-                  case dt if dt.name == i =>
-                    dt.dataType match {
-                      case st: StructType =>
-                        localDT = st
-                      case _ =>
-                    }
-                    (i, dt.dataType)
-                }
-                acc ++ collected
-              }
-              Some(foldedFields.last)
-            } else {
-              None
-            }
-          }).getOrElse(None)
-        }
-      case f: GetStructField if splits.forall(s => f.toString().contains(s)) =>
-        Some((name, f.dataType))
-      case _ => None
-    }
-    elem.find(e => e._1 == name || e._1 == splits.last).get._2
-  }
-
-  def collectAliases(plan: LogicalPlan): Seq[(String, Attribute, Expression)] = {
-    plan
-      .collect {
-        case Project(projectList, _) =>
-          projectList.collect {
-            case a @ Alias(child, name) =>
-              (name, a.toAttribute, child)
-          }
-      }
-      .flatten
   }
 }
 
