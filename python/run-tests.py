@@ -56,7 +56,7 @@ def test(root_dir, package):
     extra_class_path = path.join(python_root_dir, path.join("hyperspace", "testing"))
     for test_file in test_files:
         try:
-            if environ.get('SPARK_HOME') is None:
+            if environ.get('SPARK_HOME') == None:
                 print("SPARK_HOME is not set in the environment variables.")
                 sys.exit(1)
             my_env = os.environ.copy()
@@ -112,7 +112,7 @@ def run_cmd(cmd, throw_on_error=True, env=None, stream_output=False, **kwargs):
             **kwargs)
         (stdout, stderr) = child.communicate()
         exit_code = child.wait()
-        if throw_on_error and exit_code is not 0:
+        if throw_on_error and exit_code != 0:
             raise Exception(
                 "Non-zero exitcode: %s\n\nSTDOUT:\n%s\n\nSTDERR:%s" %
                 (exit_code, stdout, stderr))
