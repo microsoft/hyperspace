@@ -9,7 +9,7 @@ jobs:
   - job: Build_2_11
     displayName: 'Build sources and run unit tests for Scala 2.11'
     pool:
-      vmImage: 'ubuntu-latest'
+      vmImage: 'ubuntu-18.04'
     steps:
       - task: JavaToolInstaller@0
         displayName: 'Set Java version'
