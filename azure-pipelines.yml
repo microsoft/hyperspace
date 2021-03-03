@@ -78,7 +78,7 @@ jobs:
       - task: UsePythonVersion@0
         displayName: 'Set Python version'
         inputs:
-          versionSpec: '2.7.18'
+          versionSpec: '2.7'
           addToPath: true
       - task: JavaToolInstaller@0
         displayName: 'Set Java version'
