@@ -71,6 +71,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
+    spark.conf.set(IndexConstants.INDEX_DIR_NAME, "")
     when(mockFileSystemFactory.create(any[Path], any[Configuration])).thenReturn(mockFileSystem)
 
     indexCollectionManager = new IndexCollectionManager(

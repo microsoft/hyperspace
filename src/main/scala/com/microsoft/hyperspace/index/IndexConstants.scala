@@ -19,11 +19,13 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.sql.internal.SQLConf
 
 object IndexConstants {
-  val INDEXES_DIR = "indexes"
-
   // Config used for setting the system path, which is considered as a "root" path for Hyperspace;
   // e.g, indexes are created under the system path.
   val INDEX_SYSTEM_PATH = "spark.hyperspace.system.path"
+
+  // Config used for subdirectory name under the system path.
+  val INDEX_DIR_NAME = "spark.hyperspace.system.indexDirName"
+  val INDEX_DIR_NAME_DEFAULT = "indexes"
 
   // Config used to set the number of buckets for the index.
   val INDEX_NUM_BUCKETS_LEGACY = "spark.hyperspace.index.num.buckets"
