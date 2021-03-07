@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index.sources.iceberg
 
+import java.util.Locale
+
 import collection.JavaConverters._
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.iceberg.{FileScanTask, Schema, Table}
@@ -123,7 +125,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
    * For [[IcebergRelation]], each file path should be in this format:
-   *   `/path/to/file`
+   *   `/path/to/file` or `X:/path/to/file`
    *
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of pairs of (file path, file id).
@@ -133,10 +135,16 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     //   original file path: file:/C:/path/to/file
     //   input_file_name(): C:/path/to/file
     // For Linux,
-    //   original file path: file:///path/to/file
+    //   original file path: file:///path/to/file or file:/path/to/file
     //   input_file_name(): /path/to/file
-    fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-      (kv._1._1.replaceAll("^file:/{1,2}", ""), kv._2)
+    if (System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")) {
+      fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+        (kv._1._1.stripPrefix("file:/"), kv._2)
+      }
+    } else {
+      fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+        (kv._1._1.replaceAll("^file:/{1,3}", "/"), kv._2)
+      }
     }
   }
 
