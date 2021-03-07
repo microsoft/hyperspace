@@ -197,6 +197,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val lineagePairs = relation.lineagePairs(fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
 
+      // scalastyle:off
+      if (fileIdTracker.getFileToIdMap.nonEmpty) {
+        println("id" + fileIdTracker.getFileToIdMap.toSeq.head.toString)
+        println(lineagePairs.head.toString)
+      }
+      val res = df.limit(1).withColumn(dataPathColumn, input_file_name())
+      println(res.collect.toSeq.toString)
+
       df.withColumn(dataPathColumn, input_file_name())
         .join(lineageDF.hint("broadcast"), dataPathColumn)
         .select(
