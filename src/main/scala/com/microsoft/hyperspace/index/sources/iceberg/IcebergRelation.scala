@@ -129,8 +129,14 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    * @return List of pairs of (file path, file id).
    */
   override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
+    // For Windows,
+    //   original file path: file:/C:/path/to/file
+    //   input_file_name(): C:/path/to/file
+    // For Linux,
+    //   original file path: file:///path/to/file
+    //   input_file_name(): /path/to/file
     fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-      (kv._1._1.replaceAll("^file:/{1,3}", ""), kv._2)
+      (kv._1._1.replaceAll("^file:/{1,2}", ""), kv._2)
     }
   }
 

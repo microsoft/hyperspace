@@ -196,10 +196,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val dataPathColumn = "_data_path"
       val lineagePairs = relation.lineagePairs(fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
-      val res = df.withColumn(dataPathColumn, input_file_name())
-      // scalastyle:off
-      println(res.collect.toSeq.toString)
-      println(lineagePairs.toSeq.toString)
 
       df.withColumn(dataPathColumn, input_file_name())
         .join(lineageDF.hint("broadcast"), dataPathColumn)
