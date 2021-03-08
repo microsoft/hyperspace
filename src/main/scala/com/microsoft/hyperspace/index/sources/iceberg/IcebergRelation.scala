@@ -124,8 +124,10 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
+   * input_file_name() could be different depending on the OS and source.
+   *
    * For [[IcebergRelation]], each file path should be in this format:
-   *   `/path/to/file` or `X:/path/to/file`
+   *   `/path/to/file` or `X:/path/to/file` for Windows file system.
    *
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of pairs of (file path, file id).
@@ -137,13 +139,13 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     // For Linux,
     //   original file path: file:///path/to/file or file:/path/to/file
     //   input_file_name(): /path/to/file
-    if (System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")) {
+    if (Path.WINDOWS) {
       fileIdTracker.getFileToIdMap.toSeq.map { kv =>
         (kv._1._1.stripPrefix("file:/"), kv._2)
       }
     } else {
       fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-        (kv._1._1.replaceAll("^file:/{1,3}", "/"), kv._2)
+        (kv._1._1.replaceFirst("^file:/{1,3}", "/"), kv._2)
       }
     }
   }

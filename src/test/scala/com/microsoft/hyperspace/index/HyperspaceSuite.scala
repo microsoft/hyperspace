@@ -111,6 +111,7 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
     // "inheriting conflicting members" issue.
     val path = Utils.createTempDir()
     path.delete()
+    // Create an environment specific path string.
     val pathStr = new Path(path.toString).toString
     try f(pathStr)
     finally Utils.deleteRecursively(path)
