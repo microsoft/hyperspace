@@ -69,7 +69,38 @@ jobs:
           inputs:
             artifactName: 'hyperspace-core'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
-
+  - job: Build_2_11_WIN
+    displayName: 'Build sources and run unit tests for Scala 2.11 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - task: JavaToolInstaller@0
+        displayName: 'Set Java version'
+        inputs:
+          versionSpec: '8'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'PreInstalled'
+      - script: sbt ++2.11.12 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.11.12 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.11.12 compile
+        displayName: 'Running $sbt compile'
+      - script: sbt ++2.11.12 test
+        displayName: 'Running $sbt test'
+  - job: Build_2_12_WIN
+    displayName: 'Build sources and run unit tests for Scala 2.12 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - script: sbt ++2.12.8 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.12.8 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.12.8 compile
+        displayName: 'Running $sbt compile'
+      - script: sbt ++2.12.8 test
+        displayName: 'Running $sbt test'
   - job: PythonTest
     displayName: 'Run Python tests'
     pool:
