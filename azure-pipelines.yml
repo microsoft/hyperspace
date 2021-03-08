@@ -101,7 +101,7 @@ jobs:
       - script: sbt ++2.11.12 test
         displayName: 'Running $sbt test'
         env:
-            HADOOP_HOME: $(Build.BinariesDirectory)$(PATH_SEPARATOR)hadoop
+            HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
 
   - job: Build_2_12_WIN
     displayName: 'Build sources and run unit tests for Scala 2.12 on Windows'
