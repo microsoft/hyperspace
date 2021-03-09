@@ -224,6 +224,8 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
+   * input_file_name() could be different depending on the OS and source.
+   *
    * For [[DefaultFileBasedRelation]], each file path should be in this format:
    *   `file:///path/to/file`
    *
