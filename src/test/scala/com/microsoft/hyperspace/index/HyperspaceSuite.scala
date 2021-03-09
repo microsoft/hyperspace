@@ -111,7 +111,10 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
     // "inheriting conflicting members" issue.
     val path = Utils.createTempDir()
     path.delete()
-    // Create an environment specific path string.
+    // Create an environment specific path string. Utils.createTempDir() returns `/path/to/file`
+    // format, however some of APIs (e.g. Iceberg) cannot handle the path string properly
+    // in Windows. Therefore, convert the path string to an environment specific one by
+    // using `new Path`.
     val pathStr = new Path(path.toString).toString
     try f(pathStr)
     finally Utils.deleteRecursively(path)
