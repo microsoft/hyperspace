@@ -54,6 +54,10 @@ The goal of the proposal process is to reach general consensus about the outcome
 
 If general consensus cannot be reached, the proposal review group decides the next step by reviewing and discussing the issue and reaching a consensus among themselves. 
 
+### Submitting PRs
+
+Once the proposal is accepted, the contributor is welcomed to start submitting PRs. Since a major feature typically requires big code changes, it would be preferred if the work is divided into smaller sub-tasks, where each task maps to one PR. Please refer to this [doc](https://github.com/google/eng-practices/blob/master/review/developer/small-cls.md) why small PRs (if applicable) are preferred.
+
 ## Becoming a Hyperspace Committer
 
 The Hyperspace team will add new committers from the active contributors, based on their contributions to Hyperspace. The qualifications for new committers are derived from [Apache Spark Contributor Guide](https://spark.apache.org/contributing.html):
