@@ -1,3 +1,11 @@
+// scalastyle:off
+
+/**
+ * This trait was built upon: https://github.com/apache/spark/blob/v3.1.1/sql/core/src/test/scala/org/apache/spark/sql/TPCDSBase.scala.
+ *
+ * The below license was copied from: https://github.com/FasterXML/jackson-module-scala/blob/2.10/src/main/resources/META-INF/LICENSE
+ */
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -40,18 +48,6 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
     "q71", "q72", "q73", "q74", "q75", "q76", "q77", "q78", "q79", "q80",
     "q81", "q82", "q83", "q84", "q85", "q86", "q87", "q88", "q89", "q90",
     "q91", "q92", "q93", "q94", "q95", "q96", "q97", "q98", "q99")
-
-  // This list only includes TPCDS v2.7 queries that are different from v1.4 ones
-  val tpcdsQueriesV2_7_0 = Seq(
-    "q5a", "q6", "q10a", "q11", "q12", "q14", "q14a", "q18a",
-    "q20", "q22", "q22a", "q24", "q27a", "q34", "q35", "q35a", "q36a", "q47", "q49",
-    "q51a", "q57", "q64", "q67a", "q70a", "q72", "q74", "q75", "q77a", "q78",
-    "q80a", "q86a", "q98")
-
-  // These queries are from https://github.com/cloudera/impala-tpcds-kit/tree/master/queries
-  val modifiedTPCDSQueries = Seq(
-    "q3", "q7", "q10", "q19", "q27", "q34", "q42", "q43", "q46", "q52", "q53", "q55", "q59",
-    "q63", "q65", "q68", "q73", "q79", "q89", "q98", "ss_max")
 
   private val tableColumns = Map(
     "store_sales" ->
