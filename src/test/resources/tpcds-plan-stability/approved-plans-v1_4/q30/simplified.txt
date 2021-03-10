@@ -1,17 +1,17 @@
-TakeOrderedAndProject [ctr_total_return,c_birth_day,c_login,c_salutation,c_birth_month,c_birth_country,c_customer_id,c_last_name,c_preferred_cust_flag,c_first_name,c_email_address,c_birth_year,c_last_review_date]
+TakeOrderedAndProject [c_last_review_date,ctr_total_return,c_email_address,c_birth_month,c_login,c_last_name,c_customer_id,c_birth_country,c_birth_day,c_birth_year,c_preferred_cust_flag,c_first_name,c_salutation]
   WholeStageCodegen
-    Project [ctr_total_return,c_birth_day,c_login,c_salutation,c_birth_month,c_birth_country,c_customer_id,c_last_name,c_preferred_cust_flag,c_first_name,c_email_address,c_birth_year,c_last_review_date]
+    Project [c_last_review_date,ctr_total_return,c_email_address,c_birth_month,c_login,c_last_name,c_customer_id,c_birth_country,c_birth_day,c_birth_year,c_preferred_cust_flag,c_first_name,c_salutation]
       BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
-        Project [c_preferred_cust_flag,c_current_addr_sk,ctr_total_return,c_email_address,c_customer_id,c_birth_year,c_login,c_birth_day,c_last_review_date,c_last_name,c_birth_month,c_first_name,c_birth_country,c_salutation]
+        Project [c_birth_day,c_customer_id,c_birth_country,c_login,ctr_total_return,c_birth_year,c_last_name,c_preferred_cust_flag,c_first_name,c_email_address,c_salutation,c_current_addr_sk,c_last_review_date,c_birth_month]
           BroadcastHashJoin [ctr_customer_sk,c_customer_sk]
             Project [ctr_customer_sk,ctr_total_return]
               BroadcastHashJoin [ctr_state,ctr_state,ctr_total_return,(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))]
                 Filter [ctr_total_return]
-                  HashAggregate [wr_returning_customer_sk,ca_state,sum,sum(UnscaledValue(wr_return_amt))] [ctr_total_return,ctr_state,sum(UnscaledValue(wr_return_amt)),sum,ctr_customer_sk]
+                  HashAggregate [wr_returning_customer_sk,ca_state,sum,sum(UnscaledValue(wr_return_amt))] [sum(UnscaledValue(wr_return_amt)),ctr_state,sum,ctr_total_return,ctr_customer_sk]
                     InputAdapter
                       Exchange [wr_returning_customer_sk,ca_state] #1
                         WholeStageCodegen
-                          HashAggregate [wr_return_amt,sum,wr_returning_customer_sk,sum,ca_state] [sum,sum]
+                          HashAggregate [sum,sum,wr_returning_customer_sk,wr_return_amt,ca_state] [sum,sum]
                             Project [wr_returning_customer_sk,wr_return_amt,ca_state]
                               BroadcastHashJoin [wr_returning_addr_sk,ca_address_sk]
                                 Project [wr_returning_customer_sk,wr_returning_addr_sk,wr_return_amt]
@@ -35,16 +35,16 @@ TakeOrderedAndProject [ctr_total_return,c_birth_day,c_login,c_salutation,c_birth
                   BroadcastExchange #4
                     WholeStageCodegen
                       Filter [(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))]
-                        HashAggregate [ctr_state,sum,count,avg(ctr_total_return)] [(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6))),sum,ctr_state,avg(ctr_total_return),count]
+                        HashAggregate [ctr_state,sum,count,avg(ctr_total_return)] [sum,avg(ctr_total_return),count,ctr_state,(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))]
                           InputAdapter
                             Exchange [ctr_state] #5
                               WholeStageCodegen
-                                HashAggregate [ctr_state,count,sum,ctr_total_return,count,sum] [sum,count,sum,count]
+                                HashAggregate [sum,ctr_state,sum,ctr_total_return,count,count] [sum,count,sum,count]
                                   HashAggregate [wr_returning_customer_sk,ca_state,sum,sum(UnscaledValue(wr_return_amt))] [sum(UnscaledValue(wr_return_amt)),ctr_state,ctr_total_return,sum]
                                     InputAdapter
                                       Exchange [wr_returning_customer_sk,ca_state] #6
                                         WholeStageCodegen
-                                          HashAggregate [sum,wr_return_amt,sum,wr_returning_customer_sk,ca_state] [sum,sum]
+                                          HashAggregate [sum,sum,wr_returning_customer_sk,wr_return_amt,ca_state] [sum,sum]
                                             Project [wr_returning_customer_sk,wr_return_amt,ca_state]
                                               BroadcastHashJoin [wr_returning_addr_sk,ca_address_sk]
                                                 Project [wr_returning_customer_sk,wr_returning_addr_sk,wr_return_amt]
@@ -59,9 +59,9 @@ TakeOrderedAndProject [ctr_total_return,c_birth_day,c_login,c_salutation,c_birth
             InputAdapter
               BroadcastExchange #7
                 WholeStageCodegen
-                  Project [c_preferred_cust_flag,c_current_addr_sk,c_email_address,c_customer_id,c_birth_year,c_customer_sk,c_login,c_birth_day,c_last_review_date,c_last_name,c_birth_month,c_first_name,c_birth_country,c_salutation]
+                  Project [c_birth_day,c_customer_id,c_birth_country,c_login,c_birth_year,c_last_name,c_preferred_cust_flag,c_first_name,c_customer_sk,c_email_address,c_salutation,c_current_addr_sk,c_last_review_date,c_birth_month]
                     Filter [c_customer_sk,c_current_addr_sk]
-                      Scan parquet default.customer [c_preferred_cust_flag,c_current_addr_sk,c_email_address,c_customer_id,c_birth_year,c_customer_sk,c_login,c_birth_day,c_last_review_date,c_last_name,c_birth_month,c_first_name,c_birth_country,c_salutation] [c_preferred_cust_flag,c_current_addr_sk,c_email_address,c_customer_id,c_birth_year,c_customer_sk,c_login,c_birth_day,c_last_review_date,c_last_name,c_birth_month,c_first_name,c_birth_country,c_salutation]
+                      Scan parquet default.customer [c_birth_day,c_customer_id,c_birth_country,c_login,c_birth_year,c_last_name,c_preferred_cust_flag,c_first_name,c_customer_sk,c_email_address,c_salutation,c_current_addr_sk,c_last_review_date,c_birth_month] [c_birth_day,c_customer_id,c_birth_country,c_login,c_birth_year,c_last_name,c_preferred_cust_flag,c_first_name,c_customer_sk,c_email_address,c_salutation,c_current_addr_sk,c_last_review_date,c_birth_month]
         InputAdapter
           BroadcastExchange #8
             WholeStageCodegen

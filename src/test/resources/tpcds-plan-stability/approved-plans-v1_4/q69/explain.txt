@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[cd_gender#1 ASC NULLS FIRST,cd_marital_status#2 ASC NULLS FIRST,cd_education_status#3 ASC NULLS FIRST,cd_purchase_estimate#4 ASC NULLS FIRST,cd_credit_rating#5 ASC NULLS FIRST], output=[cd_gender#1,cd_marital_status#2,cd_education_status#3,cnt1#6,cd_purchase_estimate#4,cnt2#7,cd_credit_rating#5,cnt3#8])
 +- *(10) HashAggregate(keys=[cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5], functions=[count(1)])
-   +- Exchange hashpartitioning(cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, 200)
+   +- Exchange hashpartitioning(cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, 5)
       +- *(9) HashAggregate(keys=[cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5], functions=[partial_count(1)])
          +- *(9) Project [cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5]
             +- *(9) BroadcastHashJoin [c_current_cdemo_sk#9], [cd_demo_sk#10], Inner, BuildRight

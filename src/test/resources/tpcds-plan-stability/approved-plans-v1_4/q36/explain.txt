@@ -3,9 +3,9 @@ TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WH
 +- *(7) Project [gross_margin#4, i_category#2, i_class#5, lochierarchy#1, rank_within_parent#3]
    +- Window [rank(_w3#6) windowspecdefinition(_w1#7, _w2#8, _w3#6 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_within_parent#3], [_w1#7, _w2#8], [_w3#6 ASC NULLS FIRST]
       +- *(6) Sort [_w1#7 ASC NULLS FIRST, _w2#8 ASC NULLS FIRST, _w3#6 ASC NULLS FIRST], false, 0
-         +- Exchange hashpartitioning(_w1#7, _w2#8, 200)
+         +- Exchange hashpartitioning(_w1#7, _w2#8, 5)
             +- *(5) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[sum(UnscaledValue(ss_net_profit#10)), sum(UnscaledValue(ss_ext_sales_price#11))])
-               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 200)
+               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 5)
                   +- *(4) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[partial_sum(UnscaledValue(ss_net_profit#10)), partial_sum(UnscaledValue(ss_ext_sales_price#11))])
                      +- *(4) Expand [List(ss_ext_sales_price#11, ss_net_profit#10, i_category#12, i_class#13, 0), List(ss_ext_sales_price#11, ss_net_profit#10, i_category#12, null, 1), List(ss_ext_sales_price#11, ss_net_profit#10, null, null, 3)], [ss_ext_sales_price#11, ss_net_profit#10, i_category#2, i_class#5, spark_grouping_id#9]
                         +- *(4) Project [ss_ext_sales_price#11, ss_net_profit#10, i_category#14 AS i_category#12, i_class#15 AS i_class#13]

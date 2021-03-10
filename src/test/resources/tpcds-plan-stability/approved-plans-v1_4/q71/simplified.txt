@@ -3,12 +3,12 @@ WholeStageCodegen
     InputAdapter
       Exchange [ext_price,brand_id] #1
         WholeStageCodegen
-          HashAggregate [sum(UnscaledValue(ext_price)),sum,t_minute,t_hour,i_brand,i_brand_id] [sum(UnscaledValue(ext_price)),sum,brand,ext_price,brand_id]
+          HashAggregate [i_brand_id,sum,t_minute,t_hour,sum(UnscaledValue(ext_price)),i_brand] [ext_price,sum,brand,sum(UnscaledValue(ext_price)),brand_id]
             InputAdapter
               Exchange [i_brand,i_brand_id,t_hour,t_minute] #2
                 WholeStageCodegen
-                  HashAggregate [ext_price,sum,t_minute,t_hour,i_brand,i_brand_id,sum] [sum,sum]
-                    Project [ext_price,t_minute,i_brand_id,i_brand,t_hour]
+                  HashAggregate [i_brand_id,sum,t_minute,t_hour,sum,ext_price,i_brand] [sum,sum]
+                    Project [ext_price,t_minute,t_hour,i_brand_id,i_brand]
                       BroadcastHashJoin [time_sk,t_time_sk]
                         Project [i_brand_id,i_brand,ext_price,time_sk]
                           BroadcastHashJoin [i_item_sk,sold_item_sk]

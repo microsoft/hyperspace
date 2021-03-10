@@ -3,50 +3,50 @@ WholeStageCodegen
     InputAdapter
       Exchange [product_name,store_name,cnt] #1
         WholeStageCodegen
-          Project [cnt,b_streen_name,product_name,b_city,b_zip,syear,c_street_name,store_zip,c_street_number,s1,s3,c_zip,s3,s1,b_street_number,s2,store_name,cnt,s2,syear,c_city]
-            BroadcastHashJoin [cnt,store_zip,store_name,store_zip,store_name,item_sk,cnt,item_sk]
-              HashAggregate [d_year,ca_street_name,count,sum(UnscaledValue(ss_coupon_amt)),sum,ca_street_number,ca_street_name,sum(UnscaledValue(ss_list_price)),ca_zip,count(1),d_year,ca_city,sum,i_item_sk,sum,ca_street_number,d_year,ca_city,s_store_name,s_zip,sum(UnscaledValue(ss_wholesale_cost)),ca_zip,i_product_name] [c_city,b_streen_name,count,b_zip,sum(UnscaledValue(ss_coupon_amt)),sum,b_city,c_street_name,s3,sum(UnscaledValue(ss_list_price)),cnt,b_street_number,c_street_number,item_sk,count(1),store_zip,s2,product_name,sum,sum,store_name,c_zip,sum(UnscaledValue(ss_wholesale_cost)),s1,syear]
+          Project [b_streen_name,s2,s3,b_street_number,c_street_name,b_city,s1,syear,cnt,s2,b_zip,c_city,c_street_number,s1,syear,product_name,c_zip,store_zip,s3,cnt,store_name]
+            BroadcastHashJoin [store_zip,item_sk,cnt,item_sk,store_name,store_zip,cnt,store_name]
+              HashAggregate [ca_street_number,sum(UnscaledValue(ss_list_price)),ca_street_name,ca_city,s_store_name,s_zip,count(1),ca_street_number,ca_zip,d_year,i_item_sk,ca_city,d_year,sum,ca_street_name,sum,ca_zip,sum,d_year,sum(UnscaledValue(ss_coupon_amt)),sum(UnscaledValue(ss_wholesale_cost)),i_product_name,count] [store_name,sum(UnscaledValue(ss_list_price)),s3,b_streen_name,c_city,count(1),product_name,b_street_number,c_street_number,b_city,s1,store_zip,cnt,s2,item_sk,b_zip,c_zip,sum,sum,sum,c_street_name,syear,sum(UnscaledValue(ss_coupon_amt)),sum(UnscaledValue(ss_wholesale_cost)),count]
                 InputAdapter
-                  Exchange [d_year,ca_street_name,ca_street_number,ca_street_name,ca_zip,d_year,ca_city,i_item_sk,ca_street_number,d_year,ca_city,s_store_name,s_zip,ca_zip,i_product_name] #2
+                  Exchange [ca_street_number,ca_street_name,ca_city,s_store_name,s_zip,ca_street_number,ca_zip,d_year,i_item_sk,ca_city,d_year,ca_street_name,ca_zip,d_year,i_product_name] #2
                     WholeStageCodegen
-                      HashAggregate [d_year,ca_street_name,count,sum,sum,ca_street_number,ss_wholesale_cost,ca_street_name,sum,count,ca_zip,ss_coupon_amt,d_year,sum,ca_city,ss_list_price,sum,i_item_sk,sum,ca_street_number,d_year,ca_city,s_store_name,s_zip,ca_zip,i_product_name] [count,sum,sum,sum,count,sum,sum,sum]
-                        Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,d_year,ca_zip,ca_street_number,ca_zip,d_year,i_item_sk,ca_street_name,ca_city,i_product_name,s_zip,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                      HashAggregate [ca_street_number,count,ca_street_name,sum,ca_city,s_store_name,s_zip,ss_wholesale_cost,ss_coupon_amt,ca_street_number,sum,ca_zip,d_year,sum,i_item_sk,ca_city,d_year,sum,ca_street_name,sum,ca_zip,sum,ss_list_price,d_year,i_product_name,count] [count,sum,sum,sum,sum,sum,sum,count]
+                        Project [ca_city,d_year,i_product_name,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,s_zip,i_item_sk,ca_street_number,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                           BroadcastHashJoin [ss_item_sk,i_item_sk]
-                            Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,ca_street_number,ca_zip,d_year,ca_street_name,ca_city,s_zip,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                            Project [ca_city,d_year,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                               BroadcastHashJoin [hd_income_band_sk,ib_income_band_sk]
-                                Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,ca_street_number,ca_zip,d_year,ca_street_name,ca_city,s_zip,hd_income_band_sk,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                Project [ca_city,d_year,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,hd_income_band_sk,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                                   BroadcastHashJoin [hd_income_band_sk,ib_income_band_sk]
-                                    Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,ca_street_number,ca_zip,hd_income_band_sk,d_year,ca_street_name,ca_city,s_zip,hd_income_band_sk,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                    Project [ca_city,d_year,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,hd_income_band_sk,hd_income_band_sk,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                                       BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
-                                        Project [c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,hd_income_band_sk,d_year,ca_city,s_zip,hd_income_band_sk,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                        Project [d_year,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,hd_income_band_sk,hd_income_band_sk,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                           BroadcastHashJoin [ss_addr_sk,ca_address_sk]
-                                            Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,hd_income_band_sk,d_year,s_zip,hd_income_band_sk,d_year,ss_wholesale_cost]
+                                            Project [d_year,ss_list_price,ss_wholesale_cost,ss_addr_sk,ss_item_sk,s_zip,hd_income_band_sk,hd_income_band_sk,s_store_name,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                               BroadcastHashJoin [c_current_hdemo_sk,hd_demo_sk]
-                                                Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,hd_income_band_sk,d_year,s_zip,d_year,ss_wholesale_cost]
+                                                Project [d_year,ss_list_price,ss_wholesale_cost,ss_addr_sk,ss_item_sk,s_zip,hd_income_band_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                   BroadcastHashJoin [ss_hdemo_sk,hd_demo_sk]
-                                                    Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,d_year,ss_hdemo_sk,ss_wholesale_cost]
+                                                    Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,ss_addr_sk,ss_item_sk,s_zip,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                       BroadcastHashJoin [ss_promo_sk,p_promo_sk]
-                                                        Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,d_year,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                        Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                           BroadcastHashJoin [c_current_cdemo_sk,cd_demo_sk,cd_marital_status,cd_marital_status]
-                                                            Project [c_current_cdemo_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,cd_marital_status,d_year,s_zip,d_year,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                            Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,cd_marital_status,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                               BroadcastHashJoin [ss_cdemo_sk,cd_demo_sk]
-                                                                Project [c_current_cdemo_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,d_year,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,ss_cdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                                   BroadcastHashJoin [c_first_shipto_date_sk,d_date_sk]
-                                                                    Project [c_current_cdemo_sk,c_first_shipto_date_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                    Project [d_year,ss_list_price,ss_wholesale_cost,c_first_shipto_date_sk,ss_hdemo_sk,ss_cdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,c_current_addr_sk]
                                                                       BroadcastHashJoin [c_first_sales_date_sk,d_date_sk]
-                                                                        Project [c_current_cdemo_sk,c_first_shipto_date_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,s_zip,ss_cdemo_sk,ss_promo_sk,c_first_sales_date_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                        Project [d_year,ss_list_price,ss_wholesale_cost,c_first_shipto_date_sk,ss_hdemo_sk,ss_cdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,c_first_sales_date_sk,ss_coupon_amt,c_current_addr_sk]
                                                                           BroadcastHashJoin [ss_customer_sk,c_customer_sk]
-                                                                            Project [ss_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ss_customer_sk,s_zip,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                            Project [d_year,ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,ss_coupon_amt]
                                                                               BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                                                                Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,d_year,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                Project [d_year,ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,ss_promo_sk,ss_store_sk,ss_coupon_amt]
                                                                                   BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                                                                    Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                    Project [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
                                                                                       BroadcastHashJoin [ss_item_sk,cs_item_sk]
-                                                                                        Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                        Project [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
                                                                                           BroadcastHashJoin [ss_item_sk,ss_ticket_number,sr_item_sk,sr_ticket_number]
-                                                                                            Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost,ss_ticket_number]
-                                                                                              Filter [ss_cdemo_sk,ss_hdemo_sk,ss_sold_date_sk,ss_customer_sk,ss_promo_sk,ss_store_sk,ss_ticket_number,ss_addr_sk,ss_item_sk]
-                                                                                                Scan parquet default.store_sales [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost,ss_ticket_number] [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost,ss_ticket_number]
+                                                                                            Project [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_ticket_number,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
+                                                                                              Filter [ss_customer_sk,ss_hdemo_sk,ss_item_sk,ss_promo_sk,ss_store_sk,ss_sold_date_sk,ss_addr_sk,ss_cdemo_sk,ss_ticket_number]
+                                                                                                Scan parquet default.store_sales [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_ticket_number,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt] [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_ticket_number,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
                                                                                             InputAdapter
                                                                                               BroadcastExchange #3
                                                                                                 WholeStageCodegen
@@ -58,12 +58,12 @@ WholeStageCodegen
                                                                                             WholeStageCodegen
                                                                                               Project [cs_item_sk]
                                                                                                 Filter [sum(cs_ext_list_price),sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2)))]
-                                                                                                  HashAggregate [sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2))),cs_item_sk,sum,sum(UnscaledValue(cs_ext_list_price)),sum] [sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2))),sum(cs_ext_list_price),sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2))),sum,sum(UnscaledValue(cs_ext_list_price)),sum]
+                                                                                                  HashAggregate [sum,sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2))),cs_item_sk,sum,sum(UnscaledValue(cs_ext_list_price))] [sum,sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2))),sum(CheckOverflow((promote_precision(cast(CheckOverflow((promote_precision(cast(cr_refunded_cash as decimal(8,2))) + promote_precision(cast(cr_reversed_charge as decimal(8,2)))), DecimalType(8,2)) as decimal(9,2))) + promote_precision(cast(cr_store_credit as decimal(9,2)))), DecimalType(9,2))),sum(cs_ext_list_price),sum,sum(UnscaledValue(cs_ext_list_price))]
                                                                                                     InputAdapter
                                                                                                       Exchange [cs_item_sk] #5
                                                                                                         WholeStageCodegen
-                                                                                                          HashAggregate [sum,sum,cs_item_sk,sum,cr_refunded_cash,cr_reversed_charge,cr_store_credit,sum,cs_ext_list_price] [sum,sum,sum,sum]
-                                                                                                            Project [cr_store_credit,cs_item_sk,cr_refunded_cash,cs_ext_list_price,cr_reversed_charge]
+                                                                                                          HashAggregate [sum,cs_ext_list_price,sum,sum,cs_item_sk,cr_store_credit,cr_refunded_cash,sum,cr_reversed_charge] [sum,sum,sum,sum]
+                                                                                                            Project [cs_ext_list_price,cr_refunded_cash,cr_store_credit,cs_item_sk,cr_reversed_charge]
                                                                                                               BroadcastHashJoin [cs_item_sk,cs_order_number,cr_item_sk,cr_order_number]
                                                                                                                 Project [cs_item_sk,cs_order_number,cs_ext_list_price]
                                                                                                                   Filter [cs_item_sk,cs_order_number]
@@ -71,9 +71,9 @@ WholeStageCodegen
                                                                                                                 InputAdapter
                                                                                                                   BroadcastExchange #6
                                                                                                                     WholeStageCodegen
-                                                                                                                      Project [cr_order_number,cr_store_credit,cr_refunded_cash,cr_reversed_charge,cr_item_sk]
+                                                                                                                      Project [cr_order_number,cr_refunded_cash,cr_store_credit,cr_item_sk,cr_reversed_charge]
                                                                                                                         Filter [cr_item_sk,cr_order_number]
-                                                                                                                          Scan parquet default.catalog_returns [cr_order_number,cr_store_credit,cr_refunded_cash,cr_reversed_charge,cr_item_sk] [cr_order_number,cr_store_credit,cr_refunded_cash,cr_reversed_charge,cr_item_sk]
+                                                                                                                          Scan parquet default.catalog_returns [cr_order_number,cr_refunded_cash,cr_store_credit,cr_item_sk,cr_reversed_charge] [cr_order_number,cr_refunded_cash,cr_store_credit,cr_item_sk,cr_reversed_charge]
                                                                                     InputAdapter
                                                                                       BroadcastExchange #7
                                                                                         WholeStageCodegen
@@ -89,9 +89,9 @@ WholeStageCodegen
                                                                             InputAdapter
                                                                               BroadcastExchange #9
                                                                                 WholeStageCodegen
-                                                                                  Project [c_current_cdemo_sk,c_first_shipto_date_sk,c_current_addr_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk]
-                                                                                    Filter [c_current_cdemo_sk,c_customer_sk,c_current_hdemo_sk,c_first_sales_date_sk,c_first_shipto_date_sk,c_current_addr_sk]
-                                                                                      Scan parquet default.customer [c_current_cdemo_sk,c_first_shipto_date_sk,c_current_addr_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk] [c_current_cdemo_sk,c_first_shipto_date_sk,c_current_addr_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk]
+                                                                                  Project [c_first_shipto_date_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk,c_current_addr_sk]
+                                                                                    Filter [c_first_shipto_date_sk,c_current_hdemo_sk,c_current_cdemo_sk,c_customer_sk,c_current_addr_sk,c_first_sales_date_sk]
+                                                                                      Scan parquet default.customer [c_first_shipto_date_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk,c_current_addr_sk] [c_first_shipto_date_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk,c_current_addr_sk]
                                                                         InputAdapter
                                                                           BroadcastExchange #10
                                                                             WholeStageCodegen
@@ -125,11 +125,11 @@ WholeStageCodegen
                                             InputAdapter
                                               BroadcastExchange #14
                                                 WholeStageCodegen
-                                                  Project [ca_zip,ca_city,ca_address_sk,ca_street_number,ca_street_name]
+                                                  Project [ca_address_sk,ca_city,ca_street_number,ca_zip,ca_street_name]
                                                     Filter [ca_address_sk]
-                                                      Scan parquet default.customer_address [ca_zip,ca_city,ca_address_sk,ca_street_number,ca_street_name] [ca_zip,ca_city,ca_address_sk,ca_street_number,ca_street_name]
+                                                      Scan parquet default.customer_address [ca_address_sk,ca_city,ca_street_number,ca_zip,ca_street_name] [ca_address_sk,ca_city,ca_street_number,ca_zip,ca_street_name]
                                         InputAdapter
-                                          ReusedExchange [ca_city,ca_address_sk,ca_street_number,ca_zip,ca_street_name] [ca_city,ca_address_sk,ca_street_number,ca_zip,ca_street_name] #14
+                                          ReusedExchange [ca_city,ca_street_name,ca_address_sk,ca_street_number,ca_zip] [ca_city,ca_street_name,ca_address_sk,ca_street_number,ca_zip] #14
                                     InputAdapter
                                       BroadcastExchange #15
                                         WholeStageCodegen
@@ -147,48 +147,48 @@ WholeStageCodegen
               InputAdapter
                 BroadcastExchange #17
                   WholeStageCodegen
-                    HashAggregate [d_year,ca_street_name,count,sum(UnscaledValue(ss_coupon_amt)),ca_street_number,sum,ca_street_name,sum(UnscaledValue(ss_list_price)),ca_zip,count(1),d_year,ca_city,sum,i_item_sk,ca_street_number,sum,d_year,ca_city,s_store_name,s_zip,sum(UnscaledValue(ss_wholesale_cost)),ca_zip,i_product_name] [count,sum(UnscaledValue(ss_coupon_amt)),syear,s3,sum,sum(UnscaledValue(ss_list_price)),count(1),store_name,cnt,sum,s2,item_sk,s1,sum,store_zip,sum(UnscaledValue(ss_wholesale_cost))]
+                    HashAggregate [ca_street_number,sum(UnscaledValue(ss_list_price)),ca_street_name,ca_city,s_store_name,s_zip,count(1),sum,ca_street_number,ca_zip,d_year,sum,sum,i_item_sk,ca_city,d_year,ca_street_name,ca_zip,d_year,sum(UnscaledValue(ss_coupon_amt)),sum(UnscaledValue(ss_wholesale_cost)),i_product_name,count] [sum(UnscaledValue(ss_list_price)),s2,s3,count(1),sum,syear,cnt,store_zip,sum,item_sk,sum,store_name,s1,sum(UnscaledValue(ss_coupon_amt)),sum(UnscaledValue(ss_wholesale_cost)),count]
                       InputAdapter
-                        Exchange [d_year,ca_street_name,ca_street_number,ca_street_name,ca_zip,d_year,ca_city,i_item_sk,ca_street_number,d_year,ca_city,s_store_name,s_zip,ca_zip,i_product_name] #18
+                        Exchange [ca_street_number,ca_street_name,ca_city,s_store_name,s_zip,ca_street_number,ca_zip,d_year,i_item_sk,ca_city,d_year,ca_street_name,ca_zip,d_year,i_product_name] #18
                           WholeStageCodegen
-                            HashAggregate [d_year,ca_street_name,count,ca_street_number,ss_wholesale_cost,sum,sum,ca_street_name,count,ca_zip,ss_coupon_amt,d_year,ca_city,ss_list_price,sum,sum,i_item_sk,sum,ca_street_number,sum,d_year,ca_city,s_store_name,s_zip,ca_zip,i_product_name] [count,sum,sum,count,sum,sum,sum,sum]
-                              Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,d_year,ca_zip,ca_street_number,ca_zip,d_year,i_item_sk,ca_street_name,ca_city,i_product_name,s_zip,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                            HashAggregate [ca_street_number,count,ca_street_name,sum,ca_city,s_store_name,s_zip,sum,ss_wholesale_cost,ss_coupon_amt,ca_street_number,ca_zip,d_year,sum,sum,i_item_sk,ca_city,d_year,ca_street_name,ca_zip,sum,ss_list_price,sum,d_year,i_product_name,count] [count,sum,sum,sum,sum,sum,sum,count]
+                              Project [ca_city,d_year,i_product_name,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,s_zip,i_item_sk,ca_street_number,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                                 BroadcastHashJoin [ss_item_sk,i_item_sk]
-                                  Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,ca_street_number,ca_zip,d_year,ca_street_name,ca_city,s_zip,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                  Project [ca_city,d_year,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                                     BroadcastHashJoin [hd_income_band_sk,ib_income_band_sk]
-                                      Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,ca_street_number,ca_zip,d_year,ca_street_name,ca_city,s_zip,hd_income_band_sk,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                      Project [ca_city,d_year,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,hd_income_band_sk,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                                         BroadcastHashJoin [hd_income_band_sk,ib_income_band_sk]
-                                          Project [ca_city,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,ca_street_number,ca_zip,hd_income_band_sk,d_year,ca_street_name,ca_city,s_zip,hd_income_band_sk,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                          Project [ca_city,d_year,ca_street_name,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,hd_income_band_sk,hd_income_band_sk,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,ca_street_number,ca_zip]
                                             BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
-                                              Project [c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ca_zip,hd_income_band_sk,d_year,ca_city,s_zip,hd_income_band_sk,ca_street_number,d_year,ss_wholesale_cost,ca_street_name]
+                                              Project [d_year,ss_list_price,ss_wholesale_cost,ca_city,ss_item_sk,s_zip,ca_street_number,hd_income_band_sk,hd_income_band_sk,ca_zip,s_store_name,ca_street_name,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                 BroadcastHashJoin [ss_addr_sk,ca_address_sk]
-                                                  Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,hd_income_band_sk,d_year,s_zip,hd_income_band_sk,d_year,ss_wholesale_cost]
+                                                  Project [d_year,ss_list_price,ss_wholesale_cost,ss_addr_sk,ss_item_sk,s_zip,hd_income_band_sk,hd_income_band_sk,s_store_name,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                     BroadcastHashJoin [c_current_hdemo_sk,hd_demo_sk]
-                                                      Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,hd_income_band_sk,d_year,s_zip,d_year,ss_wholesale_cost]
+                                                      Project [d_year,ss_list_price,ss_wholesale_cost,ss_addr_sk,ss_item_sk,s_zip,hd_income_band_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                         BroadcastHashJoin [ss_hdemo_sk,hd_demo_sk]
-                                                          Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,d_year,ss_hdemo_sk,ss_wholesale_cost]
+                                                          Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,ss_addr_sk,ss_item_sk,s_zip,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                             BroadcastHashJoin [ss_promo_sk,p_promo_sk]
-                                                              Project [ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,d_year,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                              Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                                 BroadcastHashJoin [c_current_cdemo_sk,cd_demo_sk,cd_marital_status,cd_marital_status]
-                                                                  Project [c_current_cdemo_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,cd_marital_status,d_year,s_zip,d_year,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                  Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,cd_marital_status,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                                     BroadcastHashJoin [ss_cdemo_sk,cd_demo_sk]
-                                                                      Project [c_current_cdemo_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,d_year,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                      Project [d_year,ss_list_price,ss_wholesale_cost,ss_hdemo_sk,ss_cdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,d_year,c_current_addr_sk]
                                                                         BroadcastHashJoin [c_first_shipto_date_sk,d_date_sk]
-                                                                          Project [c_current_cdemo_sk,c_first_shipto_date_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,d_year,s_zip,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                          Project [d_year,ss_list_price,ss_wholesale_cost,c_first_shipto_date_sk,ss_hdemo_sk,ss_cdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,d_year,ss_coupon_amt,c_current_addr_sk]
                                                                             BroadcastHashJoin [c_first_sales_date_sk,d_date_sk]
-                                                                              Project [c_current_cdemo_sk,c_first_shipto_date_sk,ss_addr_sk,c_current_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,c_current_hdemo_sk,d_year,s_zip,ss_cdemo_sk,ss_promo_sk,c_first_sales_date_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                              Project [d_year,ss_list_price,ss_wholesale_cost,c_first_shipto_date_sk,ss_hdemo_sk,ss_cdemo_sk,c_current_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,c_current_hdemo_sk,c_first_sales_date_sk,ss_coupon_amt,c_current_addr_sk]
                                                                                 BroadcastHashJoin [ss_customer_sk,c_customer_sk]
-                                                                                  Project [ss_addr_sk,ss_coupon_amt,s_store_name,ss_list_price,ss_item_sk,d_year,ss_customer_sk,s_zip,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                  Project [d_year,ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,s_zip,ss_promo_sk,s_store_name,ss_coupon_amt]
                                                                                     BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                                                                      Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,d_year,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                      Project [d_year,ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,ss_promo_sk,ss_store_sk,ss_coupon_amt]
                                                                                         BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                                                                          Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                          Project [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
                                                                                             BroadcastHashJoin [ss_item_sk,cs_item_sk]
-                                                                                              Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost]
+                                                                                              Project [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
                                                                                                 BroadcastHashJoin [ss_item_sk,ss_ticket_number,sr_item_sk,sr_ticket_number]
-                                                                                                  Project [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost,ss_ticket_number]
-                                                                                                    Filter [ss_cdemo_sk,ss_hdemo_sk,ss_sold_date_sk,ss_customer_sk,ss_promo_sk,ss_store_sk,ss_ticket_number,ss_addr_sk,ss_item_sk]
-                                                                                                      Scan parquet default.store_sales [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost,ss_ticket_number] [ss_addr_sk,ss_coupon_amt,ss_list_price,ss_item_sk,ss_store_sk,ss_customer_sk,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk,ss_hdemo_sk,ss_wholesale_cost,ss_ticket_number]
+                                                                                                  Project [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_ticket_number,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
+                                                                                                    Filter [ss_customer_sk,ss_hdemo_sk,ss_item_sk,ss_promo_sk,ss_store_sk,ss_sold_date_sk,ss_addr_sk,ss_cdemo_sk,ss_ticket_number]
+                                                                                                      Scan parquet default.store_sales [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_ticket_number,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt] [ss_list_price,ss_wholesale_cost,ss_customer_sk,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_ticket_number,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_coupon_amt]
                                                                                                   InputAdapter
                                                                                                     ReusedExchange [sr_item_sk,sr_ticket_number] [sr_item_sk,sr_ticket_number] #3
                                                                                               InputAdapter
@@ -202,7 +202,7 @@ WholeStageCodegen
                                                                                       InputAdapter
                                                                                         ReusedExchange [s_store_sk,s_store_name,s_zip] [s_store_sk,s_store_name,s_zip] #8
                                                                                   InputAdapter
-                                                                                    ReusedExchange [c_current_cdemo_sk,c_first_shipto_date_sk,c_current_addr_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk] [c_current_cdemo_sk,c_first_shipto_date_sk,c_current_addr_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk] #9
+                                                                                    ReusedExchange [c_first_shipto_date_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk,c_current_addr_sk] [c_first_shipto_date_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_sk,c_first_sales_date_sk,c_current_addr_sk] #9
                                                                               InputAdapter
                                                                                 ReusedExchange [d_date_sk,d_year] [d_date_sk,d_year] #10
                                                                           InputAdapter
@@ -218,9 +218,9 @@ WholeStageCodegen
                                                       InputAdapter
                                                         ReusedExchange [hd_demo_sk,hd_income_band_sk] [hd_demo_sk,hd_income_band_sk] #13
                                                   InputAdapter
-                                                    ReusedExchange [ca_zip,ca_city,ca_address_sk,ca_street_number,ca_street_name] [ca_zip,ca_city,ca_address_sk,ca_street_number,ca_street_name] #14
+                                                    ReusedExchange [ca_address_sk,ca_city,ca_street_number,ca_zip,ca_street_name] [ca_address_sk,ca_city,ca_street_number,ca_zip,ca_street_name] #14
                                               InputAdapter
-                                                ReusedExchange [ca_city,ca_address_sk,ca_street_number,ca_zip,ca_street_name] [ca_city,ca_address_sk,ca_street_number,ca_zip,ca_street_name] #14
+                                                ReusedExchange [ca_city,ca_street_name,ca_address_sk,ca_street_number,ca_zip] [ca_city,ca_street_name,ca_address_sk,ca_street_number,ca_zip] #14
                                           InputAdapter
                                             ReusedExchange [ib_income_band_sk] [ib_income_band_sk] #15
                                       InputAdapter

@@ -1,8 +1,8 @@
 == Physical Plan ==
 *(9) Sort [Returns_Loss#1 DESC NULLS LAST], true, 0
-+- Exchange rangepartitioning(Returns_Loss#1 DESC NULLS LAST, 200)
++- Exchange rangepartitioning(Returns_Loss#1 DESC NULLS LAST, 5)
    +- *(8) HashAggregate(keys=[cc_call_center_id#2, cc_name#3, cc_manager#4, cd_marital_status#5, cd_education_status#6], functions=[sum(UnscaledValue(cr_net_loss#7))])
-      +- Exchange hashpartitioning(cc_call_center_id#2, cc_name#3, cc_manager#4, cd_marital_status#5, cd_education_status#6, 200)
+      +- Exchange hashpartitioning(cc_call_center_id#2, cc_name#3, cc_manager#4, cd_marital_status#5, cd_education_status#6, 5)
          +- *(7) HashAggregate(keys=[cc_call_center_id#2, cc_name#3, cc_manager#4, cd_marital_status#5, cd_education_status#6], functions=[partial_sum(UnscaledValue(cr_net_loss#7))])
             +- *(7) Project [cc_call_center_id#2, cc_name#3, cc_manager#4, cr_net_loss#7, cd_marital_status#5, cd_education_status#6]
                +- *(7) BroadcastHashJoin [c_current_hdemo_sk#8], [hd_demo_sk#9], Inner, BuildRight

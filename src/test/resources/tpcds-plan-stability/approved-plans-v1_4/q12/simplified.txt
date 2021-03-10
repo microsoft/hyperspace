@@ -1,6 +1,6 @@
-TakeOrderedAndProject [i_item_id,i_item_desc,itemrevenue,i_category,revenueratio,i_current_price,i_class]
+TakeOrderedAndProject [i_current_price,revenueratio,i_item_desc,i_item_id,i_category,itemrevenue,i_class]
   WholeStageCodegen
-    Project [i_item_id,i_item_desc,itemrevenue,_we0,i_category,i_current_price,i_class,_w0]
+    Project [i_current_price,_we0,_w0,i_item_desc,i_item_id,i_category,itemrevenue,i_class]
       InputAdapter
         Window [_w1,i_class]
           WholeStageCodegen
@@ -8,14 +8,14 @@ TakeOrderedAndProject [i_item_id,i_item_desc,itemrevenue,i_category,revenueratio
               InputAdapter
                 Exchange [i_class] #1
                   WholeStageCodegen
-                    HashAggregate [i_item_id,i_item_desc,i_category,sum,i_current_price,sum(UnscaledValue(ws_ext_sales_price)),i_class] [itemrevenue,_w1,sum,sum(UnscaledValue(ws_ext_sales_price)),_w0]
+                    HashAggregate [i_current_price,sum,i_item_desc,sum(UnscaledValue(ws_ext_sales_price)),i_item_id,i_category,i_class] [_w0,sum,_w1,sum(UnscaledValue(ws_ext_sales_price)),itemrevenue]
                       InputAdapter
-                        Exchange [i_item_id,i_item_desc,i_category,i_current_price,i_class] #2
+                        Exchange [i_current_price,i_item_desc,i_item_id,i_category,i_class] #2
                           WholeStageCodegen
-                            HashAggregate [i_item_id,i_item_desc,ws_ext_sales_price,i_category,sum,i_current_price,i_class,sum] [sum,sum]
-                              Project [i_class,i_current_price,ws_ext_sales_price,i_category,i_item_desc,i_item_id]
+                            HashAggregate [i_current_price,sum,sum,i_item_desc,ws_ext_sales_price,i_item_id,i_category,i_class] [sum,sum]
+                              Project [i_current_price,i_category,i_item_id,ws_ext_sales_price,i_class,i_item_desc]
                                 BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
-                                  Project [i_class,i_current_price,ws_ext_sales_price,ws_sold_date_sk,i_category,i_item_desc,i_item_id]
+                                  Project [i_current_price,i_category,i_item_id,ws_ext_sales_price,i_class,i_item_desc,ws_sold_date_sk]
                                     BroadcastHashJoin [ws_item_sk,i_item_sk]
                                       Project [ws_sold_date_sk,ws_item_sk,ws_ext_sales_price]
                                         Filter [ws_item_sk,ws_sold_date_sk]
@@ -23,9 +23,9 @@ TakeOrderedAndProject [i_item_id,i_item_desc,itemrevenue,i_category,revenueratio
                                       InputAdapter
                                         BroadcastExchange #3
                                           WholeStageCodegen
-                                            Project [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id]
+                                            Project [i_current_price,i_category,i_item_sk,i_item_id,i_class,i_item_desc]
                                               Filter [i_category,i_item_sk]
-                                                Scan parquet default.item [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id] [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id]
+                                                Scan parquet default.item [i_current_price,i_category,i_item_sk,i_item_id,i_class,i_item_desc] [i_current_price,i_category,i_item_sk,i_item_id,i_class,i_item_desc]
                                   InputAdapter
                                     BroadcastExchange #4
                                       WholeStageCodegen

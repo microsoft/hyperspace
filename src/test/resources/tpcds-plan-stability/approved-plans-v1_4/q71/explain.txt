@@ -1,8 +1,8 @@
 == Physical Plan ==
 *(11) Sort [ext_price#1 DESC NULLS LAST, brand_id#2 ASC NULLS FIRST], true, 0
-+- Exchange rangepartitioning(ext_price#1 DESC NULLS LAST, brand_id#2 ASC NULLS FIRST, 200)
++- Exchange rangepartitioning(ext_price#1 DESC NULLS LAST, brand_id#2 ASC NULLS FIRST, 5)
    +- *(10) HashAggregate(keys=[i_brand#3, i_brand_id#4, t_hour#5, t_minute#6], functions=[sum(UnscaledValue(ext_price#7))])
-      +- Exchange hashpartitioning(i_brand#3, i_brand_id#4, t_hour#5, t_minute#6, 200)
+      +- Exchange hashpartitioning(i_brand#3, i_brand_id#4, t_hour#5, t_minute#6, 5)
          +- *(9) HashAggregate(keys=[i_brand#3, i_brand_id#4, t_hour#5, t_minute#6], functions=[partial_sum(UnscaledValue(ext_price#7))])
             +- *(9) Project [i_brand_id#4, i_brand#3, ext_price#7, t_hour#5, t_minute#6]
                +- *(9) BroadcastHashJoin [time_sk#8], [t_time_sk#9], Inner, BuildRight

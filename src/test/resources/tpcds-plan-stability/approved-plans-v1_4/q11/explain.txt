@@ -9,7 +9,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_preferred_cust_flag#1 ASC NUL
       :     :     :- Union
       :     :     :  :- *(4) Filter (isnotnull(year_total#6) && (year_total#6 > 0.00))
       :     :     :  :  +- *(4) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
-      :     :     :  :     +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, 200)
+      :     :     :  :     +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, 5)
       :     :     :  :        +- *(3) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
       :     :     :  :           +- *(3) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ss_ext_discount_amt#19, ss_ext_list_price#18, d_year#13]
       :     :     :  :              +- *(3) BroadcastHashJoin [ss_sold_date_sk#20], [d_date_sk#21], Inner, BuildRight
@@ -30,7 +30,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_preferred_cust_flag#1 ASC NUL
       :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true]))
       :     :        +- Union
       :     :           :- *(8) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
-      :     :           :  +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, 200)
+      :     :           :  +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, 5)
       :     :           :     +- *(7) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
       :     :           :        +- *(7) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ss_ext_discount_amt#19, ss_ext_list_price#18, d_year#13]
       :     :           :           +- *(7) BroadcastHashJoin [ss_sold_date_sk#20], [d_date_sk#21], Inner, BuildRight
@@ -50,7 +50,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_preferred_cust_flag#1 ASC NUL
       :           :- LocalTableScan <empty>, [customer_id#8, year_total#4]
       :           +- *(12) Filter (isnotnull(year_total#25) && (year_total#25 > 0.00))
       :              +- *(12) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
-      :                 +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13, 200)
+      :                 +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13, 5)
       :                    +- *(11) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
       :                       +- *(11) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ws_ext_discount_amt#28, ws_ext_list_price#27, d_year#13]
       :                          +- *(11) BroadcastHashJoin [ws_sold_date_sk#29], [d_date_sk#21], Inner, BuildRight
@@ -68,7 +68,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_preferred_cust_flag#1 ASC NUL
          +- Union
             :- LocalTableScan <empty>, [customer_id#3, year_total#5]
             +- *(16) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
-               +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13, 200)
+               +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13, 5)
                   +- *(15) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
                      +- *(15) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ws_ext_discount_amt#28, ws_ext_list_price#27, d_year#13]
                         +- *(15) BroadcastHashJoin [ws_sold_date_sk#29], [d_date_sk#21], Inner, BuildRight

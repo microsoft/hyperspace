@@ -1,19 +1,19 @@
 WholeStageCodegen
-  Sort [d_moy,mean,i_item_sk,w_warehouse_sk,d_moy,mean,cov,cov]
+  Sort [mean,i_item_sk,mean,cov,d_moy,d_moy,cov,w_warehouse_sk]
     InputAdapter
-      Exchange [d_moy,mean,i_item_sk,w_warehouse_sk,d_moy,mean,cov,cov] #1
+      Exchange [mean,i_item_sk,mean,cov,d_moy,d_moy,cov,w_warehouse_sk] #1
         WholeStageCodegen
           BroadcastHashJoin [i_item_sk,w_warehouse_sk,i_item_sk,w_warehouse_sk]
-            Project [d_moy,mean,w_warehouse_sk,i_item_sk,stdev]
+            Project [w_warehouse_sk,i_item_sk,stdev,mean,d_moy]
               Filter [mean,stdev]
-                HashAggregate [m2,w_warehouse_sk,d_moy,sum,count,n,w_warehouse_name,avg,stddev_samp(cast(inv_quantity_on_hand as double)),i_item_sk,avg(cast(inv_quantity_on_hand as bigint))] [stdev,mean,m2,sum,count,n,avg,stddev_samp(cast(inv_quantity_on_hand as double)),avg(cast(inv_quantity_on_hand as bigint))]
+                HashAggregate [avg(cast(inv_quantity_on_hand as bigint)),w_warehouse_sk,count,d_moy,w_warehouse_name,avg,n,m2,sum,i_item_sk,stddev_samp(cast(inv_quantity_on_hand as double))] [avg(cast(inv_quantity_on_hand as bigint)),count,avg,n,mean,m2,sum,stdev,stddev_samp(cast(inv_quantity_on_hand as double))]
                   InputAdapter
                     Exchange [w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy] #2
                       WholeStageCodegen
-                        HashAggregate [m2,w_warehouse_sk,d_moy,m2,sum,count,n,w_warehouse_name,sum,avg,i_item_sk,inv_quantity_on_hand,avg,count,n] [m2,m2,sum,count,n,sum,avg,avg,count,n]
-                          Project [d_moy,inv_quantity_on_hand,w_warehouse_sk,i_item_sk,w_warehouse_name]
+                        HashAggregate [sum,w_warehouse_sk,count,d_moy,inv_quantity_on_hand,w_warehouse_name,avg,n,m2,n,m2,sum,count,avg,i_item_sk] [sum,count,avg,n,m2,n,m2,sum,count,avg]
+                          Project [w_warehouse_name,inv_quantity_on_hand,i_item_sk,w_warehouse_sk,d_moy]
                             BroadcastHashJoin [inv_date_sk,d_date_sk]
-                              Project [inv_quantity_on_hand,w_warehouse_sk,i_item_sk,w_warehouse_name,inv_date_sk]
+                              Project [w_warehouse_name,inv_quantity_on_hand,i_item_sk,inv_date_sk,w_warehouse_sk]
                                 BroadcastHashJoin [inv_warehouse_sk,w_warehouse_sk]
                                   Project [inv_date_sk,inv_warehouse_sk,inv_quantity_on_hand,i_item_sk]
                                     BroadcastHashJoin [inv_item_sk,i_item_sk]
@@ -41,16 +41,16 @@ WholeStageCodegen
             InputAdapter
               BroadcastExchange #6
                 WholeStageCodegen
-                  Project [i_item_sk,d_moy,mean,stdev,w_warehouse_sk]
+                  Project [d_moy,mean,i_item_sk,stdev,w_warehouse_sk]
                     Filter [mean,stdev]
-                      HashAggregate [m2,i_item_sk,sum,count,w_warehouse_name,n,d_moy,avg,stddev_samp(cast(inv_quantity_on_hand as double)),w_warehouse_sk,avg(cast(inv_quantity_on_hand as bigint))] [m2,sum,count,n,mean,avg,stddev_samp(cast(inv_quantity_on_hand as double)),stdev,avg(cast(inv_quantity_on_hand as bigint))]
+                      HashAggregate [w_warehouse_name,avg(cast(inv_quantity_on_hand as bigint)),count,d_moy,i_item_sk,avg,n,w_warehouse_sk,m2,sum,stddev_samp(cast(inv_quantity_on_hand as double))] [avg(cast(inv_quantity_on_hand as bigint)),mean,count,avg,n,m2,sum,stdev,stddev_samp(cast(inv_quantity_on_hand as double))]
                         InputAdapter
                           Exchange [w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy] #7
                             WholeStageCodegen
-                              HashAggregate [m2,m2,i_item_sk,sum,count,w_warehouse_name,n,d_moy,sum,avg,w_warehouse_sk,inv_quantity_on_hand,avg,count,n] [m2,m2,sum,count,n,sum,avg,avg,count,n]
-                                Project [w_warehouse_sk,inv_quantity_on_hand,w_warehouse_name,i_item_sk,d_moy]
+                              HashAggregate [w_warehouse_name,sum,count,d_moy,i_item_sk,inv_quantity_on_hand,avg,n,w_warehouse_sk,m2,n,m2,sum,count,avg] [sum,count,avg,n,m2,n,m2,sum,count,avg]
+                                Project [i_item_sk,w_warehouse_name,inv_quantity_on_hand,w_warehouse_sk,d_moy]
                                   BroadcastHashJoin [inv_date_sk,d_date_sk]
-                                    Project [w_warehouse_sk,inv_quantity_on_hand,w_warehouse_name,i_item_sk,inv_date_sk]
+                                    Project [i_item_sk,w_warehouse_name,inv_quantity_on_hand,w_warehouse_sk,inv_date_sk]
                                       BroadcastHashJoin [inv_warehouse_sk,w_warehouse_sk]
                                         Project [inv_date_sk,inv_warehouse_sk,inv_quantity_on_hand,i_item_sk]
                                           BroadcastHashJoin [inv_item_sk,i_item_sk]

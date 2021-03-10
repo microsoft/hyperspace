@@ -4,9 +4,9 @@ TakeOrderedAndProject(limit=100, orderBy=[avg_quarterly_sales#1 ASC NULLS FIRST,
    +- *(7) Filter (CASE WHEN (avg_quarterly_sales#1 > 0.000000) THEN CheckOverflow((promote_precision(abs(CheckOverflow((promote_precision(cast(sum_sales#2 as decimal(22,6))) - promote_precision(cast(avg_quarterly_sales#1 as decimal(22,6)))), DecimalType(22,6)))) / promote_precision(cast(avg_quarterly_sales#1 as decimal(22,6)))), DecimalType(38,16)) ELSE null END > 0.1000000000000000)
       +- Window [avg(_w0#4) windowspecdefinition(i_manufact_id#3, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS avg_quarterly_sales#1], [i_manufact_id#3]
          +- *(6) Sort [i_manufact_id#3 ASC NULLS FIRST], false, 0
-            +- Exchange hashpartitioning(i_manufact_id#3, 200)
+            +- Exchange hashpartitioning(i_manufact_id#3, 5)
                +- *(5) HashAggregate(keys=[i_manufact_id#3, d_qoy#5], functions=[sum(UnscaledValue(ss_sales_price#6))])
-                  +- Exchange hashpartitioning(i_manufact_id#3, d_qoy#5, 200)
+                  +- Exchange hashpartitioning(i_manufact_id#3, d_qoy#5, 5)
                      +- *(4) HashAggregate(keys=[i_manufact_id#3, d_qoy#5], functions=[partial_sum(UnscaledValue(ss_sales_price#6))])
                         +- *(4) Project [i_manufact_id#3, ss_sales_price#6, d_qoy#5]
                            +- *(4) BroadcastHashJoin [ss_store_sk#7], [s_store_sk#8], Inner, BuildRight

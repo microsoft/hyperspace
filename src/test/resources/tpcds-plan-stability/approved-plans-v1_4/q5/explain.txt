@@ -1,12 +1,12 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NULLS FIRST], output=[channel#1,id#2,sales#3,returns#4,profit#5])
 +- *(21) HashAggregate(keys=[channel#1, id#2, spark_grouping_id#6], functions=[sum(sales#7), sum(returns#8), sum(profit#9)])
-   +- Exchange hashpartitioning(channel#1, id#2, spark_grouping_id#6, 200)
+   +- Exchange hashpartitioning(channel#1, id#2, spark_grouping_id#6, 5)
       +- *(20) HashAggregate(keys=[channel#1, id#2, spark_grouping_id#6], functions=[partial_sum(sales#7), partial_sum(returns#8), partial_sum(profit#9)])
          +- *(20) Expand [List(sales#7, returns#8, profit#9, channel#10, id#11, 0), List(sales#7, returns#8, profit#9, channel#10, null, 1), List(sales#7, returns#8, profit#9, null, null, 3)], [sales#7, returns#8, profit#9, channel#1, id#2, spark_grouping_id#6]
             +- Union
                :- *(6) HashAggregate(keys=[s_store_id#12], functions=[sum(UnscaledValue(sales_price#13)), sum(UnscaledValue(return_amt#14)), sum(UnscaledValue(profit#15)), sum(UnscaledValue(net_loss#16))])
-               :  +- Exchange hashpartitioning(s_store_id#12, 200)
+               :  +- Exchange hashpartitioning(s_store_id#12, 5)
                :     +- *(5) HashAggregate(keys=[s_store_id#12], functions=[partial_sum(UnscaledValue(sales_price#13)), partial_sum(UnscaledValue(return_amt#14)), partial_sum(UnscaledValue(profit#15)), partial_sum(UnscaledValue(net_loss#16))])
                :        +- *(5) Project [sales_price#13, profit#15, return_amt#14, net_loss#16, s_store_id#12]
                :           +- *(5) BroadcastHashJoin [store_sk#17], [cast(s_store_sk#18 as bigint)], Inner, BuildRight
@@ -28,7 +28,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                :                    +- *(4) Filter isnotnull(s_store_sk#18)
                :                       +- *(4) FileScan parquet default.store[s_store_sk#18,s_store_id#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int,s_store_id:string>
                :- *(12) HashAggregate(keys=[cp_catalog_page_id#36], functions=[sum(UnscaledValue(sales_price#37)), sum(UnscaledValue(return_amt#38)), sum(UnscaledValue(profit#39)), sum(UnscaledValue(net_loss#40))])
-               :  +- Exchange hashpartitioning(cp_catalog_page_id#36, 200)
+               :  +- Exchange hashpartitioning(cp_catalog_page_id#36, 5)
                :     +- *(11) HashAggregate(keys=[cp_catalog_page_id#36], functions=[partial_sum(UnscaledValue(sales_price#37)), partial_sum(UnscaledValue(return_amt#38)), partial_sum(UnscaledValue(profit#39)), partial_sum(UnscaledValue(net_loss#40))])
                :        +- *(11) Project [sales_price#37, profit#39, return_amt#38, net_loss#40, cp_catalog_page_id#36]
                :           +- *(11) BroadcastHashJoin [page_sk#41], [cp_catalog_page_sk#42], Inner, BuildRight
@@ -50,7 +50,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                :                    +- *(10) Filter isnotnull(cp_catalog_page_sk#42)
                :                       +- *(10) FileScan parquet default.catalog_page[cp_catalog_page_sk#42,cp_catalog_page_id#36] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/catalog_page], PartitionFilters: [], PushedFilters: [IsNotNull(cp_catalog_page_sk)], ReadSchema: struct<cp_catalog_page_sk:int,cp_catalog_page_id:string>
                +- *(19) HashAggregate(keys=[web_site_id#58], functions=[sum(UnscaledValue(sales_price#59)), sum(UnscaledValue(return_amt#60)), sum(UnscaledValue(profit#61)), sum(UnscaledValue(net_loss#62))])
-                  +- Exchange hashpartitioning(web_site_id#58, 200)
+                  +- Exchange hashpartitioning(web_site_id#58, 5)
                      +- *(18) HashAggregate(keys=[web_site_id#58], functions=[partial_sum(UnscaledValue(sales_price#59)), partial_sum(UnscaledValue(return_amt#60)), partial_sum(UnscaledValue(profit#61)), partial_sum(UnscaledValue(net_loss#62))])
                         +- *(18) Project [sales_price#59, profit#61, return_amt#60, net_loss#62, web_site_id#58]
                            +- *(18) BroadcastHashJoin [wsr_web_site_sk#63], [web_site_sk#64], Inner, BuildRight

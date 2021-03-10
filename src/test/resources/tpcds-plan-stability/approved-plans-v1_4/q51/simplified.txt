@@ -1,4 +1,4 @@
-TakeOrderedAndProject [item_sk,store_cumulative,store_sales,web_sales,d_date,web_cumulative]
+TakeOrderedAndProject [store_cumulative,item_sk,web_cumulative,d_date,store_sales,web_sales]
   WholeStageCodegen
     Filter [web_cumulative,store_cumulative]
       InputAdapter
@@ -8,7 +8,7 @@ TakeOrderedAndProject [item_sk,store_cumulative,store_sales,web_sales,d_date,web
               InputAdapter
                 Exchange [item_sk] #1
                   WholeStageCodegen
-                    Project [d_date,d_date,item_sk,item_sk,cume_sales,cume_sales]
+                    Project [d_date,cume_sales,d_date,item_sk,item_sk,cume_sales]
                       InputAdapter
                         SortMergeJoin [item_sk,d_date,item_sk,d_date]
                           WholeStageCodegen
@@ -28,7 +28,7 @@ TakeOrderedAndProject [item_sk,store_cumulative,store_sales,web_sales,d_date,web
                                                       InputAdapter
                                                         Exchange [ws_item_sk,d_date] #4
                                                           WholeStageCodegen
-                                                            HashAggregate [sum,ws_item_sk,sum,d_date,ws_sales_price] [sum,sum]
+                                                            HashAggregate [d_date,sum,sum,ws_sales_price,ws_item_sk] [sum,sum]
                                                               Project [ws_item_sk,ws_sales_price,d_date]
                                                                 BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
                                                                   Project [ws_sold_date_sk,ws_item_sk,ws_sales_price]
@@ -57,7 +57,7 @@ TakeOrderedAndProject [item_sk,store_cumulative,store_sales,web_sales,d_date,web
                                                       InputAdapter
                                                         Exchange [ss_item_sk,d_date] #8
                                                           WholeStageCodegen
-                                                            HashAggregate [d_date,sum,ss_sales_price,sum,ss_item_sk] [sum,sum]
+                                                            HashAggregate [sum,sum,ss_item_sk,d_date,ss_sales_price] [sum,sum]
                                                               Project [ss_item_sk,ss_sales_price,d_date]
                                                                 BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                                                                   Project [ss_sold_date_sk,ss_item_sk,ss_sales_price]

@@ -1,4 +1,4 @@
-TakeOrderedAndProject [wr_item_qty,cr_item_qty,wr_dev,sr_dev,sr_item_qty,average,item_id,cr_dev]
+TakeOrderedAndProject [wr_item_qty,average,cr_dev,sr_item_qty,item_id,cr_item_qty,sr_dev,wr_dev]
   WholeStageCodegen
     Project [item_id,sr_item_qty,cr_item_qty,wr_item_qty]
       BroadcastHashJoin [item_id,item_id]

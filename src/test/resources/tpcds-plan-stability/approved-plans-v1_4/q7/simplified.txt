@@ -1,26 +1,26 @@
-TakeOrderedAndProject [agg2,i_item_id,agg1,agg4,agg3]
+TakeOrderedAndProject [agg3,agg1,agg4,agg2,i_item_id]
   WholeStageCodegen
-    HashAggregate [i_item_id,count,sum,count,avg(UnscaledValue(ss_sales_price)),sum,avg(cast(ss_quantity as bigint)),sum,sum,avg(UnscaledValue(ss_coupon_amt)),count,count,avg(UnscaledValue(ss_list_price))] [agg2,agg1,count,sum,count,avg(UnscaledValue(ss_sales_price)),sum,agg4,avg(cast(ss_quantity as bigint)),sum,sum,avg(UnscaledValue(ss_coupon_amt)),count,agg3,count,avg(UnscaledValue(ss_list_price))]
+    HashAggregate [avg(UnscaledValue(ss_coupon_amt)),avg(UnscaledValue(ss_sales_price)),count,sum,count,sum,avg(cast(ss_quantity as bigint)),count,i_item_id,sum,count,avg(UnscaledValue(ss_list_price)),sum] [avg(UnscaledValue(ss_coupon_amt)),avg(UnscaledValue(ss_sales_price)),agg3,agg1,count,sum,count,sum,agg4,agg2,avg(cast(ss_quantity as bigint)),count,sum,count,avg(UnscaledValue(ss_list_price)),sum]
       InputAdapter
         Exchange [i_item_id] #1
           WholeStageCodegen
-            HashAggregate [count,i_item_id,count,count,sum,count,sum,count,sum,sum,sum,ss_coupon_amt,count,ss_sales_price,sum,sum,ss_list_price,sum,count,ss_quantity,count] [count,count,count,sum,count,sum,count,sum,sum,sum,count,sum,sum,sum,count,count]
-              Project [ss_coupon_amt,ss_quantity,ss_list_price,ss_sales_price,i_item_id]
+            HashAggregate [count,count,count,sum,count,ss_quantity,ss_coupon_amt,sum,sum,sum,count,count,sum,count,ss_sales_price,i_item_id,sum,count,ss_list_price,sum,sum] [count,count,count,sum,count,sum,sum,sum,count,count,sum,count,sum,count,sum,sum]
+              Project [ss_list_price,ss_sales_price,ss_quantity,i_item_id,ss_coupon_amt]
                 BroadcastHashJoin [ss_promo_sk,p_promo_sk]
-                  Project [ss_coupon_amt,ss_quantity,ss_list_price,ss_sales_price,ss_promo_sk,i_item_id]
+                  Project [ss_list_price,ss_sales_price,ss_quantity,ss_promo_sk,i_item_id,ss_coupon_amt]
                     BroadcastHashJoin [ss_item_sk,i_item_sk]
-                      Project [ss_coupon_amt,ss_quantity,ss_list_price,ss_item_sk,ss_sales_price,ss_promo_sk]
+                      Project [ss_list_price,ss_sales_price,ss_item_sk,ss_quantity,ss_promo_sk,ss_coupon_amt]
                         BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                          Project [ss_coupon_amt,ss_quantity,ss_list_price,ss_item_sk,ss_sales_price,ss_sold_date_sk,ss_promo_sk]
+                          Project [ss_list_price,ss_sales_price,ss_item_sk,ss_quantity,ss_promo_sk,ss_sold_date_sk,ss_coupon_amt]
                             BroadcastHashJoin [ss_cdemo_sk,cd_demo_sk]
-                              Project [ss_coupon_amt,ss_quantity,ss_list_price,ss_item_sk,ss_sales_price,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk]
+                              Project [ss_list_price,ss_sales_price,ss_cdemo_sk,ss_item_sk,ss_quantity,ss_promo_sk,ss_sold_date_sk,ss_coupon_amt]
                                 Filter [ss_cdemo_sk,ss_sold_date_sk,ss_item_sk,ss_promo_sk]
-                                  Scan parquet default.store_sales [ss_coupon_amt,ss_quantity,ss_list_price,ss_item_sk,ss_sales_price,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk] [ss_coupon_amt,ss_quantity,ss_list_price,ss_item_sk,ss_sales_price,ss_cdemo_sk,ss_sold_date_sk,ss_promo_sk]
+                                  Scan parquet default.store_sales [ss_list_price,ss_sales_price,ss_cdemo_sk,ss_item_sk,ss_quantity,ss_promo_sk,ss_sold_date_sk,ss_coupon_amt] [ss_list_price,ss_sales_price,ss_cdemo_sk,ss_item_sk,ss_quantity,ss_promo_sk,ss_sold_date_sk,ss_coupon_amt]
                               InputAdapter
                                 BroadcastExchange #2
                                   WholeStageCodegen
                                     Project [cd_demo_sk]
-                                      Filter [cd_gender,cd_marital_status,cd_education_status,cd_demo_sk]
+                                      Filter [cd_education_status,cd_gender,cd_marital_status,cd_demo_sk]
                                         Scan parquet default.customer_demographics [cd_demo_sk,cd_gender,cd_marital_status,cd_education_status] [cd_demo_sk,cd_gender,cd_marital_status,cd_education_status]
                           InputAdapter
                             BroadcastExchange #3

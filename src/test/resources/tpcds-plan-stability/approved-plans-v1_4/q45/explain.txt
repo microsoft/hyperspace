@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[ca_zip#1 ASC NULLS FIRST,ca_city#2 ASC NULLS FIRST], output=[ca_zip#1,ca_city#2,sum(ws_sales_price)#3])
 +- *(7) HashAggregate(keys=[ca_zip#1, ca_city#2], functions=[sum(UnscaledValue(ws_sales_price#4))])
-   +- Exchange hashpartitioning(ca_zip#1, ca_city#2, 200)
+   +- Exchange hashpartitioning(ca_zip#1, ca_city#2, 5)
       +- *(6) HashAggregate(keys=[ca_zip#1, ca_city#2], functions=[partial_sum(UnscaledValue(ws_sales_price#4))])
          +- *(6) Project [ws_sales_price#4, ca_city#2, ca_zip#1]
             +- *(6) Filter (substring(ca_zip#1, 1, 5) IN (85669,86197,88274,83405,86475,85392,85460,80348,81792) || exists#5)

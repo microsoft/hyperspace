@@ -23,15 +23,15 @@ TakeOrderedAndProject [rnk,best_performing,worst_performing]
                                             InputAdapter
                                               Exchange [ss_store_sk] #3
                                                 WholeStageCodegen
-                                                  HashAggregate [count,ss_store_sk,sum,sum,count,ss_net_profit] [sum,count,sum,count]
+                                                  HashAggregate [sum,ss_net_profit,count,count,ss_store_sk,sum] [sum,count,sum,count]
                                                     Project [ss_store_sk,ss_net_profit]
                                                       Filter [ss_store_sk,ss_addr_sk]
                                                         Scan parquet default.store_sales [ss_addr_sk,ss_store_sk,ss_net_profit] [ss_addr_sk,ss_store_sk,ss_net_profit]
-                                      HashAggregate [ss_item_sk,sum,count,avg(UnscaledValue(ss_net_profit))] [avg(UnscaledValue(ss_net_profit)),rank_col,sum,avg(ss_net_profit),item_sk,count]
+                                      HashAggregate [ss_item_sk,sum,count,avg(UnscaledValue(ss_net_profit))] [avg(UnscaledValue(ss_net_profit)),rank_col,item_sk,avg(ss_net_profit),sum,count]
                                         InputAdapter
                                           Exchange [ss_item_sk] #2
                                             WholeStageCodegen
-                                              HashAggregate [ss_item_sk,sum,sum,count,count,ss_net_profit] [sum,count,sum,count]
+                                              HashAggregate [ss_item_sk,sum,sum,count,ss_net_profit,count] [sum,count,sum,count]
                                                 Project [ss_item_sk,ss_net_profit]
                                                   Filter [ss_store_sk]
                                                     Scan parquet default.store_sales [ss_item_sk,ss_store_sk,ss_net_profit] [ss_item_sk,ss_store_sk,ss_net_profit]
@@ -55,11 +55,11 @@ TakeOrderedAndProject [rnk,best_performing,worst_performing]
                                                   InputAdapter
                                                     Exchange [ss_store_sk] #6
                                                       WholeStageCodegen
-                                                        HashAggregate [count,ss_store_sk,sum,count,sum,ss_net_profit] [sum,count,sum,count]
+                                                        HashAggregate [count,sum,ss_net_profit,count,ss_store_sk,sum] [sum,count,sum,count]
                                                           Project [ss_store_sk,ss_net_profit]
                                                             Filter [ss_store_sk,ss_addr_sk]
                                                               Scan parquet default.store_sales [ss_addr_sk,ss_store_sk,ss_net_profit] [ss_addr_sk,ss_store_sk,ss_net_profit]
-                                            HashAggregate [ss_item_sk,sum,count,avg(UnscaledValue(ss_net_profit))] [avg(ss_net_profit),item_sk,count,avg(UnscaledValue(ss_net_profit)),rank_col,sum]
+                                            HashAggregate [ss_item_sk,sum,count,avg(UnscaledValue(ss_net_profit))] [item_sk,count,rank_col,sum,avg(UnscaledValue(ss_net_profit)),avg(ss_net_profit)]
                                               InputAdapter
                                                 ReusedExchange [ss_item_sk,sum,count] [ss_item_sk,sum,count] #2
             InputAdapter

@@ -1,8 +1,8 @@
-TakeOrderedAndProject [i_item_desc,i_brand,revenue,i_wholesale_cost,i_current_price,s_store_name]
+TakeOrderedAndProject [i_current_price,s_store_name,i_wholesale_cost,i_item_desc,revenue,i_brand]
   WholeStageCodegen
-    Project [i_item_desc,i_brand,revenue,i_wholesale_cost,i_current_price,s_store_name]
+    Project [i_current_price,s_store_name,i_wholesale_cost,i_item_desc,revenue,i_brand]
       BroadcastHashJoin [ss_store_sk,ss_store_sk,revenue,ave]
-        Project [s_store_name,i_current_price,ss_store_sk,revenue,i_brand,i_wholesale_cost,i_item_desc]
+        Project [i_wholesale_cost,ss_store_sk,i_current_price,i_brand,s_store_name,revenue,i_item_desc]
           BroadcastHashJoin [ss_item_sk,i_item_sk]
             Project [s_store_name,ss_store_sk,ss_item_sk,revenue]
               BroadcastHashJoin [s_store_sk,ss_store_sk]
@@ -17,7 +17,7 @@ TakeOrderedAndProject [i_item_desc,i_brand,revenue,i_wholesale_cost,i_current_pr
                           InputAdapter
                             Exchange [ss_store_sk,ss_item_sk] #2
                               WholeStageCodegen
-                                HashAggregate [ss_item_sk,sum,sum,ss_store_sk,ss_sales_price] [sum,sum]
+                                HashAggregate [ss_sales_price,ss_store_sk,sum,ss_item_sk,sum] [sum,sum]
                                   Project [ss_item_sk,ss_store_sk,ss_sales_price]
                                     BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                                       Project [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price]
@@ -32,9 +32,9 @@ TakeOrderedAndProject [i_item_desc,i_brand,revenue,i_wholesale_cost,i_current_pr
             InputAdapter
               BroadcastExchange #4
                 WholeStageCodegen
-                  Project [i_current_price,i_item_sk,i_brand,i_wholesale_cost,i_item_desc]
+                  Project [i_wholesale_cost,i_current_price,i_brand,i_item_sk,i_item_desc]
                     Filter [i_item_sk]
-                      Scan parquet default.item [i_current_price,i_item_sk,i_brand,i_wholesale_cost,i_item_desc] [i_current_price,i_item_sk,i_brand,i_wholesale_cost,i_item_desc]
+                      Scan parquet default.item [i_wholesale_cost,i_current_price,i_brand,i_item_sk,i_item_desc] [i_wholesale_cost,i_current_price,i_brand,i_item_sk,i_item_desc]
         InputAdapter
           BroadcastExchange #5
             WholeStageCodegen
@@ -42,12 +42,12 @@ TakeOrderedAndProject [i_item_desc,i_brand,revenue,i_wholesale_cost,i_current_pr
                 InputAdapter
                   Exchange [ss_store_sk] #6
                     WholeStageCodegen
-                      HashAggregate [sum,sum,count,revenue,ss_store_sk,count] [sum,count,sum,count]
+                      HashAggregate [ss_store_sk,count,revenue,count,sum,sum] [sum,count,sum,count]
                         HashAggregate [ss_store_sk,ss_item_sk,sum,sum(UnscaledValue(ss_sales_price))] [sum(UnscaledValue(ss_sales_price)),revenue,sum]
                           InputAdapter
                             Exchange [ss_store_sk,ss_item_sk] #7
                               WholeStageCodegen
-                                HashAggregate [sum,ss_store_sk,sum,ss_sales_price,ss_item_sk] [sum,sum]
+                                HashAggregate [ss_item_sk,sum,sum,ss_store_sk,ss_sales_price] [sum,sum]
                                   Project [ss_item_sk,ss_store_sk,ss_sales_price]
                                     BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                                       Project [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price]

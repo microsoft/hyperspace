@@ -1,12 +1,12 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NULLS FIRST], output=[channel#1,id#2,sales#3,returns#4,profit#5])
 +- *(23) HashAggregate(keys=[channel#1, id#2, spark_grouping_id#6], functions=[sum(sales#7), sum(returns#8), sum(profit#9)])
-   +- Exchange hashpartitioning(channel#1, id#2, spark_grouping_id#6, 200)
+   +- Exchange hashpartitioning(channel#1, id#2, spark_grouping_id#6, 5)
       +- *(22) HashAggregate(keys=[channel#1, id#2, spark_grouping_id#6], functions=[partial_sum(sales#7), partial_sum(returns#8), partial_sum(profit#9)])
          +- *(22) Expand [List(sales#7, returns#8, profit#9, channel#10, id#11, 0), List(sales#7, returns#8, profit#9, channel#10, null, 1), List(sales#7, returns#8, profit#9, null, null, 3)], [sales#7, returns#8, profit#9, channel#1, id#2, spark_grouping_id#6]
             +- Union
                :- *(7) HashAggregate(keys=[s_store_id#12], functions=[sum(UnscaledValue(ss_ext_sales_price#13)), sum(coalesce(cast(sr_return_amt#14 as decimal(12,2)), 0.00)), sum(CheckOverflow((promote_precision(cast(ss_net_profit#15 as decimal(13,2))) - promote_precision(cast(coalesce(cast(sr_net_loss#16 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)))])
-               :  +- Exchange hashpartitioning(s_store_id#12, 200)
+               :  +- Exchange hashpartitioning(s_store_id#12, 5)
                :     +- *(6) HashAggregate(keys=[s_store_id#12], functions=[partial_sum(UnscaledValue(ss_ext_sales_price#13)), partial_sum(coalesce(cast(sr_return_amt#14 as decimal(12,2)), 0.00)), partial_sum(CheckOverflow((promote_precision(cast(ss_net_profit#15 as decimal(13,2))) - promote_precision(cast(coalesce(cast(sr_net_loss#16 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)))])
                :        +- *(6) Project [ss_ext_sales_price#13, ss_net_profit#15, sr_return_amt#14, sr_net_loss#16, s_store_id#12]
                :           +- *(6) BroadcastHashJoin [ss_promo_sk#17], [p_promo_sk#18], Inner, BuildRight
@@ -42,7 +42,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                :                    +- *(5) Filter ((isnotnull(p_channel_tv#30) && (p_channel_tv#30 = N)) && isnotnull(p_promo_sk#18))
                :                       +- *(5) FileScan parquet default.promotion[p_promo_sk#18,p_channel_tv#30] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/promotion], PartitionFilters: [], PushedFilters: [IsNotNull(p_channel_tv), EqualTo(p_channel_tv,N), IsNotNull(p_promo_sk)], ReadSchema: struct<p_promo_sk:int,p_channel_tv:string>
                :- *(14) HashAggregate(keys=[cp_catalog_page_id#31], functions=[sum(UnscaledValue(cs_ext_sales_price#32)), sum(coalesce(cast(cr_return_amount#33 as decimal(12,2)), 0.00)), sum(CheckOverflow((promote_precision(cast(cs_net_profit#34 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_net_loss#35 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)))])
-               :  +- Exchange hashpartitioning(cp_catalog_page_id#31, 200)
+               :  +- Exchange hashpartitioning(cp_catalog_page_id#31, 5)
                :     +- *(13) HashAggregate(keys=[cp_catalog_page_id#31], functions=[partial_sum(UnscaledValue(cs_ext_sales_price#32)), partial_sum(coalesce(cast(cr_return_amount#33 as decimal(12,2)), 0.00)), partial_sum(CheckOverflow((promote_precision(cast(cs_net_profit#34 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_net_loss#35 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)))])
                :        +- *(13) Project [cs_ext_sales_price#32, cs_net_profit#34, cr_return_amount#33, cr_net_loss#35, cp_catalog_page_id#31]
                :           +- *(13) BroadcastHashJoin [cs_promo_sk#36], [p_promo_sk#18], Inner, BuildRight
@@ -69,7 +69,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                :              :     +- ReusedExchange [i_item_sk#20], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
                :              +- ReusedExchange [p_promo_sk#18], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
                +- *(21) HashAggregate(keys=[web_site_id#44], functions=[sum(UnscaledValue(ws_ext_sales_price#45)), sum(coalesce(cast(wr_return_amt#46 as decimal(12,2)), 0.00)), sum(CheckOverflow((promote_precision(cast(ws_net_profit#47 as decimal(13,2))) - promote_precision(cast(coalesce(cast(wr_net_loss#48 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)))])
-                  +- Exchange hashpartitioning(web_site_id#44, 200)
+                  +- Exchange hashpartitioning(web_site_id#44, 5)
                      +- *(20) HashAggregate(keys=[web_site_id#44], functions=[partial_sum(UnscaledValue(ws_ext_sales_price#45)), partial_sum(coalesce(cast(wr_return_amt#46 as decimal(12,2)), 0.00)), partial_sum(CheckOverflow((promote_precision(cast(ws_net_profit#47 as decimal(13,2))) - promote_precision(cast(coalesce(cast(wr_net_loss#48 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)))])
                         +- *(20) Project [ws_ext_sales_price#45, ws_net_profit#47, wr_return_amt#46, wr_net_loss#48, web_site_id#44]
                            +- *(20) BroadcastHashJoin [ws_promo_sk#49], [p_promo_sk#18], Inner, BuildRight

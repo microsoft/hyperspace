@@ -1,38 +1,38 @@
-TakeOrderedAndProject [as_store_returns_quantityave,catalog_sales_quantitycount,i_item_id,i_item_desc,store_sales_quantityave,store_sales_quantitycount,store_sales_quantitystdev,catalog_sales_quantitycov,s_state,store_returns_quantitycov,catalog_sales_quantityave,store_sales_quantitycov,as_store_returns_quantitystdev,as_store_returns_quantitycount,catalog_sales_quantitystdev]
+TakeOrderedAndProject [as_store_returns_quantitystdev,catalog_sales_quantitycov,store_sales_quantitycount,catalog_sales_quantityave,as_store_returns_quantitycount,catalog_sales_quantitycount,store_sales_quantitycov,s_state,store_sales_quantityave,as_store_returns_quantityave,i_item_desc,store_sales_quantitystdev,i_item_id,store_returns_quantitycov,catalog_sales_quantitystdev]
   WholeStageCodegen
-    HashAggregate [count,avg(cast(ss_quantity as bigint)),i_item_id,stddev_samp(cast(ss_quantity as double)),i_item_desc,stddev_samp(cast(sr_return_quantity as double)),m2,avg(cast(sr_return_quantity as bigint)),n,count,m2,avg,avg,s_state,count(sr_return_quantity),sum,avg,n,count,m2,count(cs_quantity),sum,stddev_samp(cast(cs_quantity as double)),avg(cast(cs_quantity as bigint)),count,n,sum,count,count(ss_quantity),count] [count,avg(cast(ss_quantity as bigint)),as_store_returns_quantityave,catalog_sales_quantitycount,stddev_samp(cast(ss_quantity as double)),stddev_samp(cast(sr_return_quantity as double)),m2,avg(cast(sr_return_quantity as bigint)),n,count,store_sales_quantityave,store_sales_quantitycount,store_sales_quantitystdev,m2,avg,avg,catalog_sales_quantitycov,count(sr_return_quantity),store_returns_quantitycov,sum,catalog_sales_quantityave,store_sales_quantitycov,avg,n,count,as_store_returns_quantitystdev,m2,count(cs_quantity),sum,stddev_samp(cast(cs_quantity as double)),avg(cast(cs_quantity as bigint)),count,as_store_returns_quantitycount,n,sum,count,count(ss_quantity),count,catalog_sales_quantitystdev]
+    HashAggregate [count,sum,stddev_samp(cast(sr_return_quantity as double)),count,avg(cast(sr_return_quantity as bigint)),sum,m2,count,count,n,n,n,s_state,m2,count,avg,sum,stddev_samp(cast(ss_quantity as double)),i_item_desc,count(ss_quantity),avg(cast(ss_quantity as bigint)),count(sr_return_quantity),stddev_samp(cast(cs_quantity as double)),avg,i_item_id,m2,avg(cast(cs_quantity as bigint)),count,avg,count(cs_quantity)] [as_store_returns_quantitystdev,catalog_sales_quantitycov,store_sales_quantitycount,catalog_sales_quantityave,count,sum,stddev_samp(cast(sr_return_quantity as double)),count,avg(cast(sr_return_quantity as bigint)),as_store_returns_quantitycount,sum,m2,catalog_sales_quantitycount,count,count,n,n,n,store_sales_quantitycov,store_sales_quantityave,m2,count,avg,sum,as_store_returns_quantityave,stddev_samp(cast(ss_quantity as double)),count(ss_quantity),store_sales_quantitystdev,avg(cast(ss_quantity as bigint)),count(sr_return_quantity),stddev_samp(cast(cs_quantity as double)),avg,m2,avg(cast(cs_quantity as bigint)),store_returns_quantitycov,catalog_sales_quantitystdev,count,avg,count(cs_quantity)]
       InputAdapter
         Exchange [i_item_id,i_item_desc,s_state] #1
           WholeStageCodegen
-            HashAggregate [count,m2,i_item_id,m2,i_item_desc,m2,count,avg,avg,m2,count,n,count,sum,n,sum,n,count,m2,avg,avg,s_state,avg,sum,sr_return_quantity,avg,count,count,count,n,count,m2,sum,count,ss_quantity,cs_quantity,n,sum,count,n,sum,count] [count,m2,m2,m2,count,avg,avg,m2,count,n,count,sum,n,sum,n,count,m2,avg,avg,avg,sum,avg,count,count,count,n,count,m2,sum,count,n,sum,count,n,sum,count]
-              Project [ss_quantity,cs_quantity,sr_return_quantity,s_state,i_item_desc,i_item_id]
+            HashAggregate [count,cs_quantity,avg,count,sum,n,sr_return_quantity,count,count,avg,sum,m2,ss_quantity,count,count,n,n,n,s_state,sum,m2,count,count,avg,sum,i_item_desc,m2,n,avg,count,n,avg,i_item_id,m2,m2,m2,sum,count,count,avg,sum,count] [count,avg,count,sum,n,count,count,avg,sum,m2,count,count,n,n,n,sum,m2,count,count,avg,sum,m2,n,avg,count,n,avg,m2,m2,m2,sum,count,count,avg,sum,count]
+              Project [cs_quantity,ss_quantity,i_item_id,sr_return_quantity,i_item_desc,s_state]
                 BroadcastHashJoin [ss_item_sk,i_item_sk]
-                  Project [ss_quantity,ss_item_sk,cs_quantity,sr_return_quantity,s_state]
+                  Project [cs_quantity,ss_item_sk,ss_quantity,sr_return_quantity,s_state]
                     BroadcastHashJoin [ss_store_sk,s_store_sk]
-                      Project [ss_quantity,ss_item_sk,cs_quantity,ss_store_sk,sr_return_quantity]
+                      Project [cs_quantity,ss_item_sk,ss_quantity,sr_return_quantity,ss_store_sk]
                         BroadcastHashJoin [cs_sold_date_sk,d_date_sk]
-                          Project [ss_quantity,ss_item_sk,cs_quantity,ss_store_sk,sr_return_quantity,cs_sold_date_sk]
+                          Project [cs_quantity,ss_item_sk,ss_quantity,cs_sold_date_sk,sr_return_quantity,ss_store_sk]
                             BroadcastHashJoin [sr_returned_date_sk,d_date_sk]
-                              Project [ss_quantity,ss_item_sk,cs_quantity,ss_store_sk,sr_return_quantity,cs_sold_date_sk,sr_returned_date_sk]
+                              Project [cs_quantity,ss_item_sk,ss_quantity,cs_sold_date_sk,sr_return_quantity,ss_store_sk,sr_returned_date_sk]
                                 BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                  Project [ss_quantity,ss_item_sk,cs_quantity,ss_store_sk,sr_return_quantity,cs_sold_date_sk,ss_sold_date_sk,sr_returned_date_sk]
+                                  Project [cs_quantity,ss_item_sk,ss_quantity,cs_sold_date_sk,ss_sold_date_sk,sr_return_quantity,ss_store_sk,sr_returned_date_sk]
                                     BroadcastHashJoin [sr_customer_sk,sr_item_sk,cs_bill_customer_sk,cs_item_sk]
-                                      Project [ss_quantity,ss_item_sk,ss_store_sk,sr_return_quantity,sr_customer_sk,sr_item_sk,ss_sold_date_sk,sr_returned_date_sk]
-                                        BroadcastHashJoin [sr_customer_sk,sr_ticket_number,ss_customer_sk,sr_item_sk,ss_ticket_number,ss_item_sk]
-                                          Project [ss_quantity,ss_item_sk,ss_store_sk,ss_customer_sk,ss_sold_date_sk,ss_ticket_number]
-                                            Filter [ss_sold_date_sk,ss_customer_sk,ss_store_sk,ss_ticket_number,ss_item_sk]
-                                              Scan parquet default.store_sales [ss_quantity,ss_item_sk,ss_store_sk,ss_customer_sk,ss_sold_date_sk,ss_ticket_number] [ss_quantity,ss_item_sk,ss_store_sk,ss_customer_sk,ss_sold_date_sk,ss_ticket_number]
+                                      Project [sr_item_sk,ss_item_sk,ss_quantity,ss_sold_date_sk,sr_return_quantity,ss_store_sk,sr_customer_sk,sr_returned_date_sk]
+                                        BroadcastHashJoin [ss_customer_sk,sr_item_sk,ss_item_sk,sr_ticket_number,sr_customer_sk,ss_ticket_number]
+                                          Project [ss_customer_sk,ss_ticket_number,ss_item_sk,ss_quantity,ss_sold_date_sk,ss_store_sk]
+                                            Filter [ss_customer_sk,ss_item_sk,ss_store_sk,ss_sold_date_sk,ss_ticket_number]
+                                              Scan parquet default.store_sales [ss_customer_sk,ss_ticket_number,ss_item_sk,ss_quantity,ss_sold_date_sk,ss_store_sk] [ss_customer_sk,ss_ticket_number,ss_item_sk,ss_quantity,ss_sold_date_sk,ss_store_sk]
                                           InputAdapter
                                             BroadcastExchange #2
                                               WholeStageCodegen
-                                                Project [sr_return_quantity,sr_customer_sk,sr_ticket_number,sr_item_sk,sr_returned_date_sk]
-                                                  Filter [sr_ticket_number,sr_customer_sk,sr_item_sk,sr_returned_date_sk]
-                                                    Scan parquet default.store_returns [sr_return_quantity,sr_customer_sk,sr_ticket_number,sr_item_sk,sr_returned_date_sk] [sr_return_quantity,sr_customer_sk,sr_ticket_number,sr_item_sk,sr_returned_date_sk]
+                                                Project [sr_ticket_number,sr_item_sk,sr_return_quantity,sr_customer_sk,sr_returned_date_sk]
+                                                  Filter [sr_ticket_number,sr_item_sk,sr_customer_sk,sr_returned_date_sk]
+                                                    Scan parquet default.store_returns [sr_ticket_number,sr_item_sk,sr_return_quantity,sr_customer_sk,sr_returned_date_sk] [sr_ticket_number,sr_item_sk,sr_return_quantity,sr_customer_sk,sr_returned_date_sk]
                                       InputAdapter
                                         BroadcastExchange #3
                                           WholeStageCodegen
                                             Project [cs_sold_date_sk,cs_bill_customer_sk,cs_item_sk,cs_quantity]
-                                              Filter [cs_bill_customer_sk,cs_item_sk,cs_sold_date_sk]
+                                              Filter [cs_item_sk,cs_bill_customer_sk,cs_sold_date_sk]
                                                 Scan parquet default.catalog_sales [cs_sold_date_sk,cs_bill_customer_sk,cs_item_sk,cs_quantity] [cs_sold_date_sk,cs_bill_customer_sk,cs_item_sk,cs_quantity]
                                   InputAdapter
                                     BroadcastExchange #4

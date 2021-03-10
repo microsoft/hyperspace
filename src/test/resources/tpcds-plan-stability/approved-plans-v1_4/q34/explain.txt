@@ -1,11 +1,11 @@
 == Physical Plan ==
 *(7) Sort [c_last_name#1 ASC NULLS FIRST, c_first_name#2 ASC NULLS FIRST, c_salutation#3 ASC NULLS FIRST, c_preferred_cust_flag#4 DESC NULLS LAST], true, 0
-+- Exchange rangepartitioning(c_last_name#1 ASC NULLS FIRST, c_first_name#2 ASC NULLS FIRST, c_salutation#3 ASC NULLS FIRST, c_preferred_cust_flag#4 DESC NULLS LAST, 200)
++- Exchange rangepartitioning(c_last_name#1 ASC NULLS FIRST, c_first_name#2 ASC NULLS FIRST, c_salutation#3 ASC NULLS FIRST, c_preferred_cust_flag#4 DESC NULLS LAST, 5)
    +- *(6) Project [c_last_name#1, c_first_name#2, c_salutation#3, c_preferred_cust_flag#4, ss_ticket_number#5, cnt#6]
       +- *(6) BroadcastHashJoin [ss_customer_sk#7], [c_customer_sk#8], Inner, BuildRight
          :- *(6) Filter ((cnt#6 >= 15) && (cnt#6 <= 20))
          :  +- *(6) HashAggregate(keys=[ss_ticket_number#5, ss_customer_sk#7], functions=[count(1)])
-         :     +- Exchange hashpartitioning(ss_ticket_number#5, ss_customer_sk#7, 200)
+         :     +- Exchange hashpartitioning(ss_ticket_number#5, ss_customer_sk#7, 5)
          :        +- *(4) HashAggregate(keys=[ss_ticket_number#5, ss_customer_sk#7], functions=[partial_count(1)])
          :           +- *(4) Project [ss_customer_sk#7, ss_ticket_number#5]
          :              +- *(4) BroadcastHashJoin [ss_hdemo_sk#9], [hd_demo_sk#10], Inner, BuildRight

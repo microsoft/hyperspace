@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[w_state#1 ASC NULLS FIRST,i_item_id#2 ASC NULLS FIRST], output=[w_state#1,i_item_id#2,sales_before#3,sales_after#4])
 +- *(6) HashAggregate(keys=[w_state#1, i_item_id#2], functions=[sum(CASE WHEN (d_date#5 < 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END), sum(CASE WHEN (d_date#5 >= 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END)])
-   +- Exchange hashpartitioning(w_state#1, i_item_id#2, 200)
+   +- Exchange hashpartitioning(w_state#1, i_item_id#2, 5)
       +- *(5) HashAggregate(keys=[w_state#1, i_item_id#2], functions=[partial_sum(CASE WHEN (d_date#5 < 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END), partial_sum(CASE WHEN (d_date#5 >= 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END)])
          +- *(5) Project [cs_sales_price#6, cr_refunded_cash#7, w_state#1, i_item_id#2, d_date#5]
             +- *(5) BroadcastHashJoin [cs_sold_date_sk#8], [d_date_sk#9], Inner, BuildRight

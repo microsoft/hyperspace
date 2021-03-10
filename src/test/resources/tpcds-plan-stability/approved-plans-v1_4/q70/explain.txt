@@ -3,9 +3,9 @@ TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WH
 +- *(11) Project [total_sum#4, s_state#2, s_county#5, lochierarchy#1, rank_within_parent#3]
    +- Window [rank(_w3#6) windowspecdefinition(_w1#7, _w2#8, _w3#6 DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_within_parent#3], [_w1#7, _w2#8], [_w3#6 DESC NULLS LAST]
       +- *(10) Sort [_w1#7 ASC NULLS FIRST, _w2#8 ASC NULLS FIRST, _w3#6 DESC NULLS LAST], false, 0
-         +- Exchange hashpartitioning(_w1#7, _w2#8, 200)
+         +- Exchange hashpartitioning(_w1#7, _w2#8, 5)
             +- *(9) HashAggregate(keys=[s_state#2, s_county#5, spark_grouping_id#9], functions=[sum(UnscaledValue(ss_net_profit#10))])
-               +- Exchange hashpartitioning(s_state#2, s_county#5, spark_grouping_id#9, 200)
+               +- Exchange hashpartitioning(s_state#2, s_county#5, spark_grouping_id#9, 5)
                   +- *(8) HashAggregate(keys=[s_state#2, s_county#5, spark_grouping_id#9], functions=[partial_sum(UnscaledValue(ss_net_profit#10))])
                      +- *(8) Expand [List(ss_net_profit#10, s_state#11, s_county#12, 0), List(ss_net_profit#10, s_state#11, null, 1), List(ss_net_profit#10, null, null, 3)], [ss_net_profit#10, s_state#2, s_county#5, spark_grouping_id#9]
                         +- *(8) Project [ss_net_profit#10, s_state#13 AS s_state#11, s_county#14 AS s_county#12]
@@ -30,7 +30,7 @@ TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WH
                                              +- Window [rank(_w2#22) windowspecdefinition(s_state#13, _w2#22 DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS ranking#21], [s_state#13], [_w2#22 DESC NULLS LAST]
                                                 +- *(5) Sort [s_state#13 ASC NULLS FIRST, _w2#22 DESC NULLS LAST], false, 0
                                                    +- *(5) HashAggregate(keys=[s_state#13], functions=[sum(UnscaledValue(ss_net_profit#10))])
-                                                      +- Exchange hashpartitioning(s_state#13, 200)
+                                                      +- Exchange hashpartitioning(s_state#13, 5)
                                                          +- *(4) HashAggregate(keys=[s_state#13], functions=[partial_sum(UnscaledValue(ss_net_profit#10))])
                                                             +- *(4) Project [ss_net_profit#10, s_state#13]
                                                                +- *(4) BroadcastHashJoin [ss_sold_date_sk#17], [d_date_sk#18], Inner, BuildRight

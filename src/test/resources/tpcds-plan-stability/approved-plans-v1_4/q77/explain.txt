@@ -1,14 +1,14 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NULLS FIRST], output=[channel#1,id#2,sales#3,returns#4,profit#5])
 +- *(25) HashAggregate(keys=[channel#1, id#2, spark_grouping_id#6], functions=[sum(sales#7), sum(returns#8), sum(profit#9)])
-   +- Exchange hashpartitioning(channel#1, id#2, spark_grouping_id#6, 200)
+   +- Exchange hashpartitioning(channel#1, id#2, spark_grouping_id#6, 5)
       +- *(24) HashAggregate(keys=[channel#1, id#2, spark_grouping_id#6], functions=[partial_sum(sales#7), partial_sum(returns#8), partial_sum(profit#9)])
          +- *(24) Expand [List(sales#7, returns#8, profit#9, channel#10, id#11, 0), List(sales#7, returns#8, profit#9, channel#10, null, 1), List(sales#7, returns#8, profit#9, null, null, 3)], [sales#7, returns#8, profit#9, channel#1, id#2, spark_grouping_id#6]
             +- Union
                :- *(8) Project [sales#7, coalesce(returns#12, 0.00) AS returns#8, CheckOverflow((promote_precision(cast(profit#13 as decimal(18,2))) - promote_precision(cast(coalesce(profit_loss#14, 0.00) as decimal(18,2)))), DecimalType(18,2)) AS profit#9, store channel AS channel#10, s_store_sk#15 AS id#11]
                :  +- *(8) BroadcastHashJoin [s_store_sk#15], [s_store_sk#16], LeftOuter, BuildRight
                :     :- *(8) HashAggregate(keys=[s_store_sk#15], functions=[sum(UnscaledValue(ss_ext_sales_price#17)), sum(UnscaledValue(ss_net_profit#18))])
-               :     :  +- Exchange hashpartitioning(s_store_sk#15, 200)
+               :     :  +- Exchange hashpartitioning(s_store_sk#15, 5)
                :     :     +- *(3) HashAggregate(keys=[s_store_sk#15], functions=[partial_sum(UnscaledValue(ss_ext_sales_price#17)), partial_sum(UnscaledValue(ss_net_profit#18))])
                :     :        +- *(3) Project [ss_ext_sales_price#17, ss_net_profit#18, s_store_sk#15]
                :     :           +- *(3) BroadcastHashJoin [ss_store_sk#19], [s_store_sk#15], Inner, BuildRight
@@ -27,7 +27,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                :     :                       +- *(2) FileScan parquet default.store[s_store_sk#15] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int>
                :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
                :        +- *(7) HashAggregate(keys=[s_store_sk#16], functions=[sum(UnscaledValue(sr_return_amt#23)), sum(UnscaledValue(sr_net_loss#24))])
-               :           +- Exchange hashpartitioning(s_store_sk#16, 200)
+               :           +- Exchange hashpartitioning(s_store_sk#16, 5)
                :              +- *(6) HashAggregate(keys=[s_store_sk#16], functions=[partial_sum(UnscaledValue(sr_return_amt#23)), partial_sum(UnscaledValue(sr_net_loss#24))])
                :                 +- *(6) Project [sr_return_amt#23, sr_net_loss#24, s_store_sk#16]
                :                    +- *(6) BroadcastHashJoin [sr_store_sk#25], [cast(s_store_sk#16 as bigint)], Inner, BuildRight
@@ -48,7 +48,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                :  +- BroadcastNestedLoopJoin BuildLeft, Inner
                :     :- BroadcastExchange IdentityBroadcastMode
                :     :  +- *(11) HashAggregate(keys=[cs_call_center_sk#33], functions=[sum(UnscaledValue(cs_ext_sales_price#35)), sum(UnscaledValue(cs_net_profit#36))])
-               :     :     +- Exchange hashpartitioning(cs_call_center_sk#33, 200)
+               :     :     +- Exchange hashpartitioning(cs_call_center_sk#33, 5)
                :     :        +- *(10) HashAggregate(keys=[cs_call_center_sk#33], functions=[partial_sum(UnscaledValue(cs_ext_sales_price#35)), partial_sum(UnscaledValue(cs_net_profit#36))])
                :     :           +- *(10) Project [cs_call_center_sk#33, cs_ext_sales_price#35, cs_net_profit#36]
                :     :              +- *(10) BroadcastHashJoin [cs_sold_date_sk#37], [d_date_sk#21], Inner, BuildRight
@@ -68,7 +68,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                +- *(23) Project [sales#41, coalesce(returns#42, 0.00) AS returns#43, CheckOverflow((promote_precision(cast(profit#44 as decimal(18,2))) - promote_precision(cast(coalesce(profit_loss#45, 0.00) as decimal(18,2)))), DecimalType(18,2)) AS profit#46, web channel AS channel#47, wp_web_page_sk#48 AS id#49]
                   +- *(23) BroadcastHashJoin [wp_web_page_sk#48], [wp_web_page_sk#50], LeftOuter, BuildRight
                      :- *(23) HashAggregate(keys=[wp_web_page_sk#48], functions=[sum(UnscaledValue(ws_ext_sales_price#51)), sum(UnscaledValue(ws_net_profit#52))])
-                     :  +- Exchange hashpartitioning(wp_web_page_sk#48, 200)
+                     :  +- Exchange hashpartitioning(wp_web_page_sk#48, 5)
                      :     +- *(18) HashAggregate(keys=[wp_web_page_sk#48], functions=[partial_sum(UnscaledValue(ws_ext_sales_price#51)), partial_sum(UnscaledValue(ws_net_profit#52))])
                      :        +- *(18) Project [ws_ext_sales_price#51, ws_net_profit#52, wp_web_page_sk#48]
                      :           +- *(18) BroadcastHashJoin [ws_web_page_sk#53], [wp_web_page_sk#48], Inner, BuildRight
@@ -84,7 +84,7 @@ TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,id#2 ASC NUL
                      :                       +- *(17) FileScan parquet default.web_page[wp_web_page_sk#48] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/web_page], PartitionFilters: [], PushedFilters: [IsNotNull(wp_web_page_sk)], ReadSchema: struct<wp_web_page_sk:int>
                      +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
                         +- *(22) HashAggregate(keys=[wp_web_page_sk#50], functions=[sum(UnscaledValue(wr_return_amt#55)), sum(UnscaledValue(wr_net_loss#56))])
-                           +- Exchange hashpartitioning(wp_web_page_sk#50, 200)
+                           +- Exchange hashpartitioning(wp_web_page_sk#50, 5)
                               +- *(21) HashAggregate(keys=[wp_web_page_sk#50], functions=[partial_sum(UnscaledValue(wr_return_amt#55)), partial_sum(UnscaledValue(wr_net_loss#56))])
                                  +- *(21) Project [wr_return_amt#55, wr_net_loss#56, wp_web_page_sk#50]
                                     +- *(21) BroadcastHashJoin [wr_web_page_sk#57], [cast(wp_web_page_sk#50 as bigint)], Inner, BuildRight

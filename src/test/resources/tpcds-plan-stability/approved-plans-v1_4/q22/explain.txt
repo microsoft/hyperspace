@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[qoh#1 ASC NULLS FIRST,i_product_name#2 ASC NULLS FIRST,i_brand#3 ASC NULLS FIRST,i_class#4 ASC NULLS FIRST,i_category#5 ASC NULLS FIRST], output=[i_product_name#2,i_brand#3,i_class#4,i_category#5,qoh#1])
 +- *(5) HashAggregate(keys=[i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6], functions=[avg(cast(inv_quantity_on_hand#7 as bigint))])
-   +- Exchange hashpartitioning(i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6, 200)
+   +- Exchange hashpartitioning(i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6, 5)
       +- *(4) HashAggregate(keys=[i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6], functions=[partial_avg(cast(inv_quantity_on_hand#7 as bigint))])
          +- *(4) Expand [List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, i_class#10, i_category#11, 0), List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, i_class#10, null, 1), List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, null, null, 3), List(inv_quantity_on_hand#7, i_product_name#8, null, null, null, 7), List(inv_quantity_on_hand#7, null, null, null, null, 15)], [inv_quantity_on_hand#7, i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6]
             +- *(4) Project [inv_quantity_on_hand#7, i_product_name#12 AS i_product_name#8, i_brand#13 AS i_brand#9, i_class#14 AS i_class#10, i_category#15 AS i_category#11]

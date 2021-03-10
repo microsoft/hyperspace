@@ -1,6 +1,6 @@
-TakeOrderedAndProject [i_class,i_category,lochierarchy,gross_margin,rank_within_parent]
+TakeOrderedAndProject [gross_margin,i_category,rank_within_parent,lochierarchy,i_class]
   WholeStageCodegen
-    Project [i_class,i_category,lochierarchy,gross_margin,rank_within_parent]
+    Project [gross_margin,i_category,rank_within_parent,lochierarchy,i_class]
       InputAdapter
         Window [_w3,_w1,_w2]
           WholeStageCodegen
@@ -8,21 +8,21 @@ TakeOrderedAndProject [i_class,i_category,lochierarchy,gross_margin,rank_within_
               InputAdapter
                 Exchange [_w1,_w2] #1
                   WholeStageCodegen
-                    HashAggregate [sum,i_class,i_category,sum,sum(UnscaledValue(ss_net_profit)),sum(UnscaledValue(ss_ext_sales_price)),spark_grouping_id] [_w2,sum,_w1,sum,lochierarchy,sum(UnscaledValue(ss_net_profit)),_w3,sum(UnscaledValue(ss_ext_sales_price)),gross_margin]
+                    HashAggregate [i_category,sum,sum,sum(UnscaledValue(ss_net_profit)),i_class,sum(UnscaledValue(ss_ext_sales_price)),spark_grouping_id] [_w2,gross_margin,_w3,sum,_w1,sum,lochierarchy,sum(UnscaledValue(ss_net_profit)),sum(UnscaledValue(ss_ext_sales_price))]
                       InputAdapter
                         Exchange [i_category,i_class,spark_grouping_id] #2
                           WholeStageCodegen
-                            HashAggregate [sum,sum,sum,i_class,i_category,sum,ss_ext_sales_price,spark_grouping_id,ss_net_profit] [sum,sum,sum,sum]
+                            HashAggregate [i_category,sum,ss_net_profit,sum,ss_ext_sales_price,sum,i_class,sum,spark_grouping_id] [sum,sum,sum,sum]
                               Expand [ss_ext_sales_price,ss_net_profit,i_category,i_class]
                                 Project [ss_ext_sales_price,ss_net_profit,i_category,i_class]
                                   BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                    Project [i_class,ss_store_sk,ss_ext_sales_price,i_category,ss_net_profit]
+                                    Project [i_category,ss_store_sk,ss_ext_sales_price,i_class,ss_net_profit]
                                       BroadcastHashJoin [ss_item_sk,i_item_sk]
                                         Project [ss_item_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit]
                                           BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                            Project [ss_item_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit,ss_sold_date_sk]
+                                            Project [ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit]
                                               Filter [ss_sold_date_sk,ss_item_sk,ss_store_sk]
-                                                Scan parquet default.store_sales [ss_item_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit,ss_sold_date_sk] [ss_item_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit,ss_sold_date_sk]
+                                                Scan parquet default.store_sales [ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit] [ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit]
                                             InputAdapter
                                               BroadcastExchange #3
                                                 WholeStageCodegen

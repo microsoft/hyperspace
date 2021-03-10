@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[i_item_id#1 ASC NULLS FIRST], output=[i_item_id#1,i_item_desc#2,i_current_price#3])
 +- *(5) HashAggregate(keys=[i_item_id#1, i_item_desc#2, i_current_price#3], functions=[])
-   +- Exchange hashpartitioning(i_item_id#1, i_item_desc#2, i_current_price#3, 200)
+   +- Exchange hashpartitioning(i_item_id#1, i_item_desc#2, i_current_price#3, 5)
       +- *(4) HashAggregate(keys=[i_item_id#1, i_item_desc#2, i_current_price#3], functions=[])
          +- *(4) Project [i_item_id#1, i_item_desc#2, i_current_price#3]
             +- *(4) BroadcastHashJoin [i_item_sk#4], [cs_item_sk#5], Inner, BuildRight

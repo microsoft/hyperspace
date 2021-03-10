@@ -1,17 +1,17 @@
-TakeOrderedAndProject [ext_price,brand_id,i_manufact,i_manufact_id,brand]
+TakeOrderedAndProject [brand_id,brand,i_manufact,ext_price,i_manufact_id]
   WholeStageCodegen
-    HashAggregate [i_manufact,sum(UnscaledValue(ss_ext_sales_price)),i_brand,i_brand_id,i_manufact_id,sum] [ext_price,brand_id,sum(UnscaledValue(ss_ext_sales_price)),brand,sum]
+    HashAggregate [i_brand_id,i_manufact,sum(UnscaledValue(ss_ext_sales_price)),sum,i_manufact_id,i_brand] [brand_id,brand,sum(UnscaledValue(ss_ext_sales_price)),ext_price,sum]
       InputAdapter
         Exchange [i_brand,i_brand_id,i_manufact_id,i_manufact] #1
           WholeStageCodegen
-            HashAggregate [i_manufact,i_brand,sum,ss_ext_sales_price,i_brand_id,i_manufact_id,sum] [sum,sum]
-              Project [i_manufact,i_manufact_id,ss_ext_sales_price,i_brand_id,i_brand]
+            HashAggregate [i_brand_id,sum,i_manufact,ss_ext_sales_price,sum,i_manufact_id,i_brand] [sum,sum]
+              Project [i_manufact_id,i_manufact,i_brand_id,i_brand,ss_ext_sales_price]
                 BroadcastHashJoin [ss_store_sk,s_store_sk,ca_zip,s_zip]
-                  Project [i_manufact,i_manufact_id,ca_zip,ss_store_sk,ss_ext_sales_price,i_brand_id,i_brand]
+                  Project [i_manufact_id,i_manufact,i_brand_id,i_brand,ca_zip,ss_store_sk,ss_ext_sales_price]
                     BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
-                      Project [c_current_addr_sk,i_manufact,i_manufact_id,ss_store_sk,ss_ext_sales_price,i_brand_id,i_brand]
+                      Project [i_manufact_id,i_manufact,i_brand_id,i_brand,ss_store_sk,ss_ext_sales_price,c_current_addr_sk]
                         BroadcastHashJoin [ss_customer_sk,c_customer_sk]
-                          Project [i_manufact,i_manufact_id,ss_store_sk,ss_customer_sk,ss_ext_sales_price,i_brand_id,i_brand]
+                          Project [i_manufact_id,i_manufact,ss_customer_sk,i_brand_id,i_brand,ss_store_sk,ss_ext_sales_price]
                             BroadcastHashJoin [ss_item_sk,i_item_sk]
                               Project [ss_item_sk,ss_customer_sk,ss_store_sk,ss_ext_sales_price]
                                 BroadcastHashJoin [d_date_sk,ss_sold_date_sk]
@@ -21,15 +21,15 @@ TakeOrderedAndProject [ext_price,brand_id,i_manufact,i_manufact_id,brand]
                                   InputAdapter
                                     BroadcastExchange #2
                                       WholeStageCodegen
-                                        Project [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk]
+                                        Project [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price]
                                           Filter [ss_sold_date_sk,ss_item_sk,ss_customer_sk,ss_store_sk]
-                                            Scan parquet default.store_sales [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk] [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk]
+                                            Scan parquet default.store_sales [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price] [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price]
                               InputAdapter
                                 BroadcastExchange #3
                                   WholeStageCodegen
-                                    Project [i_manufact,i_manufact_id,i_item_sk,i_brand_id,i_brand]
+                                    Project [i_manufact_id,i_manufact,i_brand_id,i_brand,i_item_sk]
                                       Filter [i_manager_id,i_item_sk]
-                                        Scan parquet default.item [i_manufact,i_manufact_id,i_item_sk,i_manager_id,i_brand_id,i_brand] [i_manufact,i_manufact_id,i_item_sk,i_manager_id,i_brand_id,i_brand]
+                                        Scan parquet default.item [i_manufact_id,i_manager_id,i_manufact,i_brand_id,i_brand,i_item_sk] [i_manufact_id,i_manager_id,i_manufact,i_brand_id,i_brand,i_item_sk]
                           InputAdapter
                             BroadcastExchange #4
                               WholeStageCodegen

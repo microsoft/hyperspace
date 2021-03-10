@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[sumsales#1 ASC NULLS FIRST,ss_customer_sk#2 ASC NULLS FIRST], output=[ss_customer_sk#2,sumsales#1])
 +- *(4) HashAggregate(keys=[ss_customer_sk#2], functions=[sum(act_sales#3)])
-   +- Exchange hashpartitioning(ss_customer_sk#2, 200)
+   +- Exchange hashpartitioning(ss_customer_sk#2, 5)
       +- *(3) HashAggregate(keys=[ss_customer_sk#2], functions=[partial_sum(act_sales#3)])
          +- *(3) Project [ss_customer_sk#2, CASE WHEN isnotnull(sr_return_quantity#4) THEN CheckOverflow((promote_precision(cast(cast((ss_quantity#5 - sr_return_quantity#4) as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_sales_price#6 as decimal(12,2)))), DecimalType(18,2)) ELSE CheckOverflow((promote_precision(cast(cast(ss_quantity#5 as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_sales_price#6 as decimal(12,2)))), DecimalType(18,2)) END AS act_sales#3]
             +- *(3) BroadcastHashJoin [sr_reason_sk#7], [cast(r_reason_sk#8 as bigint)], Inner, BuildRight

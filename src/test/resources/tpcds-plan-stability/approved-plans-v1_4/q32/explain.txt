@@ -16,7 +16,7 @@ CollectLimit 100
       :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[1, int, true] as bigint)))
       :        +- *(4) Filter isnotnull((CAST(1.3 AS DECIMAL(11,6)) * CAST(avg(cs_ext_discount_amt) AS DECIMAL(11,6)))#8)
       :           +- *(4) HashAggregate(keys=[cs_item_sk#5], functions=[avg(UnscaledValue(cs_ext_discount_amt#7))])
-      :              +- Exchange hashpartitioning(cs_item_sk#5, 200)
+      :              +- Exchange hashpartitioning(cs_item_sk#5, 5)
       :                 +- *(3) HashAggregate(keys=[cs_item_sk#5], functions=[partial_avg(UnscaledValue(cs_ext_discount_amt#7))])
       :                    +- *(3) Project [cs_item_sk#5, cs_ext_discount_amt#7]
       :                       +- *(3) BroadcastHashJoin [cs_sold_date_sk#2], [d_date_sk#3], Inner, BuildRight

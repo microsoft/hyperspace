@@ -1,11 +1,11 @@
 == Physical Plan ==
 *(11) Sort [w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST], true, 0
-+- Exchange rangepartitioning(w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST, 200)
++- Exchange rangepartitioning(w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST, 5)
    +- *(10) BroadcastHashJoin [i_item_sk#2, w_warehouse_sk#1], [i_item_sk#9, w_warehouse_sk#10], Inner, BuildRight
       :- *(10) Project [w_warehouse_sk#1, i_item_sk#2, d_moy#3, mean#4, CASE WHEN (mean#4 = 0.0) THEN null ELSE (stdev#11 / mean#4) END AS cov#5]
       :  +- *(10) Filter (CASE WHEN (mean#4 = 0.0) THEN 0.0 ELSE (stdev#11 / mean#4) END > 1.0)
       :     +- *(10) HashAggregate(keys=[w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3], functions=[stddev_samp(cast(inv_quantity_on_hand#13 as double)), avg(cast(inv_quantity_on_hand#13 as bigint))])
-      :        +- Exchange hashpartitioning(w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3, 200)
+      :        +- Exchange hashpartitioning(w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3, 5)
       :           +- *(4) HashAggregate(keys=[w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3], functions=[partial_stddev_samp(cast(inv_quantity_on_hand#13 as double)), partial_avg(cast(inv_quantity_on_hand#13 as bigint))])
       :              +- *(4) Project [inv_quantity_on_hand#13, i_item_sk#2, w_warehouse_sk#1, w_warehouse_name#12, d_moy#3]
       :                 +- *(4) BroadcastHashJoin [inv_date_sk#14], [d_date_sk#15], Inner, BuildRight
@@ -32,7 +32,7 @@
          +- *(9) Project [w_warehouse_sk#10, i_item_sk#9, d_moy#6, mean#7, CASE WHEN (mean#7 = 0.0) THEN null ELSE (stdev#19 / mean#7) END AS cov#8]
             +- *(9) Filter (CASE WHEN (mean#7 = 0.0) THEN 0.0 ELSE (stdev#19 / mean#7) END > 1.0)
                +- *(9) HashAggregate(keys=[w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6], functions=[stddev_samp(cast(inv_quantity_on_hand#13 as double)), avg(cast(inv_quantity_on_hand#13 as bigint))])
-                  +- Exchange hashpartitioning(w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6, 200)
+                  +- Exchange hashpartitioning(w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6, 5)
                      +- *(8) HashAggregate(keys=[w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6], functions=[partial_stddev_samp(cast(inv_quantity_on_hand#13 as double)), partial_avg(cast(inv_quantity_on_hand#13 as bigint))])
                         +- *(8) Project [inv_quantity_on_hand#13, i_item_sk#9, w_warehouse_sk#10, w_warehouse_name#20, d_moy#6]
                            +- *(8) BroadcastHashJoin [inv_date_sk#14], [d_date_sk#21], Inner, BuildRight

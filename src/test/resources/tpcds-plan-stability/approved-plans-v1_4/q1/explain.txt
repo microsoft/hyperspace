@@ -8,7 +8,7 @@ TakeOrderedAndProject(limit=100, orderBy=[c_customer_id#1 ASC NULLS FIRST], outp
       :     :  +- *(9) BroadcastHashJoin [ctr_store_sk#4], [ctr_store_sk#4#6], Inner, BuildRight, (cast(ctr_total_return#7 as decimal(24,7)) > (CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))#8)
       :     :     :- *(9) Filter isnotnull(ctr_total_return#7)
       :     :     :  +- *(9) HashAggregate(keys=[sr_customer_sk#9, sr_store_sk#10], functions=[sum(UnscaledValue(sr_return_amt#11))])
-      :     :     :     +- Exchange hashpartitioning(sr_customer_sk#9, sr_store_sk#10, 200)
+      :     :     :     +- Exchange hashpartitioning(sr_customer_sk#9, sr_store_sk#10, 5)
       :     :     :        +- *(2) HashAggregate(keys=[sr_customer_sk#9, sr_store_sk#10], functions=[partial_sum(UnscaledValue(sr_return_amt#11))])
       :     :     :           +- *(2) Project [sr_customer_sk#9, sr_store_sk#10, sr_return_amt#11]
       :     :     :              +- *(2) BroadcastHashJoin [sr_returned_date_sk#12], [cast(d_date_sk#13 as bigint)], Inner, BuildRight
@@ -22,10 +22,10 @@ TakeOrderedAndProject(limit=100, orderBy=[c_customer_id#1 ASC NULLS FIRST], outp
       :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(input[1, bigint, true]))
       :     :        +- *(6) Filter isnotnull((CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))#8)
       :     :           +- *(6) HashAggregate(keys=[ctr_store_sk#4], functions=[avg(ctr_total_return#7)])
-      :     :              +- Exchange hashpartitioning(ctr_store_sk#4, 200)
+      :     :              +- Exchange hashpartitioning(ctr_store_sk#4, 5)
       :     :                 +- *(5) HashAggregate(keys=[ctr_store_sk#4], functions=[partial_avg(ctr_total_return#7)])
       :     :                    +- *(5) HashAggregate(keys=[sr_customer_sk#9, sr_store_sk#10], functions=[sum(UnscaledValue(sr_return_amt#11))])
-      :     :                       +- Exchange hashpartitioning(sr_customer_sk#9, sr_store_sk#10, 200)
+      :     :                       +- Exchange hashpartitioning(sr_customer_sk#9, sr_store_sk#10, 5)
       :     :                          +- *(4) HashAggregate(keys=[sr_customer_sk#9, sr_store_sk#10], functions=[partial_sum(UnscaledValue(sr_return_amt#11))])
       :     :                             +- *(4) Project [sr_customer_sk#9, sr_store_sk#10, sr_return_amt#11]
       :     :                                +- *(4) BroadcastHashJoin [sr_returned_date_sk#12], [cast(d_date_sk#13 as bigint)], Inner, BuildRight

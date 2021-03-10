@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[cd_gender#1 ASC NULLS FIRST,cd_marital_status#2 ASC NULLS FIRST,cd_education_status#3 ASC NULLS FIRST,cd_purchase_estimate#4 ASC NULLS FIRST,cd_credit_rating#5 ASC NULLS FIRST,cd_dep_count#6 ASC NULLS FIRST,cd_dep_employed_count#7 ASC NULLS FIRST,cd_dep_college_count#8 ASC NULLS FIRST], output=[cd_gender#1,cd_marital_status#2,cd_education_status#3,cnt1#9,cd_purchase_estimate#4,cnt2#10,cd_credit_rating#5,cnt3#11,cd_dep_count#6,cnt4#12,cd_dep_employed_count#7,cnt5#13,cd_dep_college_count#8,cnt6#14])
 +- *(10) HashAggregate(keys=[cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, cd_dep_count#6, cd_dep_employed_count#7, cd_dep_college_count#8], functions=[count(1)])
-   +- Exchange hashpartitioning(cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, cd_dep_count#6, cd_dep_employed_count#7, cd_dep_college_count#8, 200)
+   +- Exchange hashpartitioning(cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, cd_dep_count#6, cd_dep_employed_count#7, cd_dep_college_count#8, 5)
       +- *(9) HashAggregate(keys=[cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, cd_dep_count#6, cd_dep_employed_count#7, cd_dep_college_count#8], functions=[partial_count(1)])
          +- *(9) Project [cd_gender#1, cd_marital_status#2, cd_education_status#3, cd_purchase_estimate#4, cd_credit_rating#5, cd_dep_count#6, cd_dep_employed_count#7, cd_dep_college_count#8]
             +- *(9) BroadcastHashJoin [c_current_cdemo_sk#15], [cd_demo_sk#16], Inner, BuildRight

@@ -1,11 +1,11 @@
-TakeOrderedAndProject [cnt3,cnt1,cd_purchase_estimate,cd_education_status,cd_credit_rating,cd_marital_status,cd_gender,cnt2]
+TakeOrderedAndProject [cnt2,cd_gender,cd_education_status,cd_credit_rating,cd_purchase_estimate,cd_marital_status,cnt3,cnt1]
   WholeStageCodegen
-    HashAggregate [count(1),cd_purchase_estimate,count,cd_education_status,cd_credit_rating,cd_marital_status,cd_gender] [cnt3,count(1),cnt1,count,cnt2]
+    HashAggregate [count,cd_gender,cd_education_status,cd_credit_rating,cd_purchase_estimate,cd_marital_status,count(1)] [cnt2,count,cnt3,cnt1,count(1)]
       InputAdapter
-        Exchange [cd_purchase_estimate,cd_education_status,cd_credit_rating,cd_marital_status,cd_gender] #1
+        Exchange [cd_gender,cd_education_status,cd_credit_rating,cd_purchase_estimate,cd_marital_status] #1
           WholeStageCodegen
-            HashAggregate [count,cd_purchase_estimate,count,cd_education_status,cd_credit_rating,cd_marital_status,cd_gender] [count,count]
-              Project [cd_marital_status,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status]
+            HashAggregate [count,cd_gender,cd_education_status,cd_credit_rating,cd_purchase_estimate,cd_marital_status,count] [count,count]
+              Project [cd_gender,cd_education_status,cd_marital_status,cd_credit_rating,cd_purchase_estimate]
                 BroadcastHashJoin [c_current_cdemo_sk,cd_demo_sk]
                   Project [c_current_cdemo_sk]
                     BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
@@ -59,6 +59,6 @@ TakeOrderedAndProject [cnt3,cnt1,cd_purchase_estimate,cd_education_status,cd_cre
                   InputAdapter
                     BroadcastExchange #7
                       WholeStageCodegen
-                        Project [cd_demo_sk,cd_marital_status,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status]
+                        Project [cd_gender,cd_education_status,cd_marital_status,cd_credit_rating,cd_demo_sk,cd_purchase_estimate]
                           Filter [cd_demo_sk]
-                            Scan parquet default.customer_demographics [cd_demo_sk,cd_marital_status,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status] [cd_demo_sk,cd_marital_status,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status]
+                            Scan parquet default.customer_demographics [cd_gender,cd_education_status,cd_marital_status,cd_credit_rating,cd_demo_sk,cd_purchase_estimate] [cd_gender,cd_education_status,cd_marital_status,cd_credit_rating,cd_demo_sk,cd_purchase_estimate]

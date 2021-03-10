@@ -4,7 +4,7 @@ TakeOrderedAndProject(limit=100, orderBy=[order count #1 ASC NULLS FIRST], outpu
    +- Exchange SinglePartition
       +- *(10) HashAggregate(keys=[], functions=[merge_sum(UnscaledValue(ws_ext_ship_cost#4)), merge_sum(UnscaledValue(ws_net_profit#5)), partial_count(distinct ws_order_number#6)])
          +- *(10) HashAggregate(keys=[ws_order_number#6], functions=[merge_sum(UnscaledValue(ws_ext_ship_cost#4)), merge_sum(UnscaledValue(ws_net_profit#5))])
-            +- Exchange hashpartitioning(ws_order_number#6, 200)
+            +- Exchange hashpartitioning(ws_order_number#6, 5)
                +- *(9) HashAggregate(keys=[ws_order_number#6], functions=[partial_sum(UnscaledValue(ws_ext_ship_cost#4)), partial_sum(UnscaledValue(ws_net_profit#5))])
                   +- *(9) Project [ws_order_number#6, ws_ext_ship_cost#4, ws_net_profit#5]
                      +- *(9) BroadcastHashJoin [ws_web_site_sk#7], [web_site_sk#8], Inner, BuildRight

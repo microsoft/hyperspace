@@ -5,7 +5,7 @@ TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,sr_item_qty#
       :- *(18) Project [item_id#1, sr_item_qty#2, cr_item_qty#4]
       :  +- *(18) BroadcastHashJoin [item_id#1], [item_id#10], Inner, BuildRight
       :     :- *(18) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(sr_return_quantity#12 as bigint))])
-      :     :  +- Exchange hashpartitioning(i_item_id#11, 200)
+      :     :  +- Exchange hashpartitioning(i_item_id#11, 5)
       :     :     +- *(5) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(sr_return_quantity#12 as bigint))])
       :     :        +- *(5) Project [sr_return_quantity#12, i_item_id#11]
       :     :           +- *(5) BroadcastHashJoin [sr_returned_date_sk#13], [cast(d_date_sk#14 as bigint)], Inner, BuildRight
@@ -34,7 +34,7 @@ TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,sr_item_qty#
       :     :                                         +- *(2) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<d_date:date,d_week_seq:int>
       :     +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true]))
       :        +- *(11) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(cr_return_quantity#21 as bigint))])
-      :           +- Exchange hashpartitioning(i_item_id#11, 200)
+      :           +- Exchange hashpartitioning(i_item_id#11, 5)
       :              +- *(10) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(cr_return_quantity#21 as bigint))])
       :                 +- *(10) Project [cr_return_quantity#21, i_item_id#11]
       :                    +- *(10) BroadcastHashJoin [cr_returned_date_sk#22], [d_date_sk#14], Inner, BuildRight
@@ -56,7 +56,7 @@ TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,sr_item_qty#
       :                                +- ReusedExchange [d_date#17#24], BroadcastExchange HashedRelationBroadcastMode(List(input[0, date, true]))
       +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true]))
          +- *(17) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(wr_return_quantity#25 as bigint))])
-            +- Exchange hashpartitioning(i_item_id#11, 200)
+            +- Exchange hashpartitioning(i_item_id#11, 5)
                +- *(16) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(wr_return_quantity#25 as bigint))])
                   +- *(16) Project [wr_return_quantity#25, i_item_id#11]
                      +- *(16) BroadcastHashJoin [wr_returned_date_sk#26], [cast(d_date_sk#14 as bigint)], Inner, BuildRight

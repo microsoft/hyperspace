@@ -1,22 +1,22 @@
-TakeOrderedAndProject [cs_qty,store_wholesale_cost,store_sales_price,ws_qty,ss_qty,ss_sp,other_chan_qty,store_qty,ratio,other_chan_sales_price,other_chan_wholesale_cost,ss_wc]
+TakeOrderedAndProject [store_wholesale_cost,other_chan_qty,ss_wc,cs_qty,ratio,ss_qty,other_chan_sales_price,ss_sp,other_chan_wholesale_cost,store_qty,store_sales_price,ws_qty]
   WholeStageCodegen
-    Project [ws_wc,cs_qty,ws_qty,cs_sp,ss_qty,ss_sp,ws_sp,cs_wc,ss_wc]
-      BroadcastHashJoin [ss_item_sk,ss_customer_sk,cs_customer_sk,cs_item_sk,cs_sold_year,ss_sold_year]
-        Project [ss_customer_sk,ws_sp,ws_wc,ss_wc,ss_sold_year,ss_sp,ws_qty,ss_qty,ss_item_sk]
-          BroadcastHashJoin [ss_item_sk,ss_customer_sk,ws_sold_year,ws_item_sk,ws_customer_sk,ss_sold_year]
-            HashAggregate [d_year,ss_customer_sk,sum(UnscaledValue(ss_sales_price)),sum,sum,sum(cast(ss_quantity as bigint)),sum,sum(UnscaledValue(ss_wholesale_cost)),ss_item_sk] [sum(UnscaledValue(ss_sales_price)),sum,ss_wc,sum,sum(cast(ss_quantity as bigint)),ss_sold_year,ss_sp,ss_qty,sum,sum(UnscaledValue(ss_wholesale_cost))]
+    Project [cs_wc,ws_wc,ss_wc,cs_qty,ss_qty,ss_sp,ws_sp,cs_sp,ws_qty]
+      BroadcastHashJoin [ss_sold_year,cs_sold_year,ss_customer_sk,ss_item_sk,cs_customer_sk,cs_item_sk]
+        Project [ss_customer_sk,ss_wc,ss_item_sk,ss_sold_year,ws_sp,ws_qty,ss_sp,ss_qty,ws_wc]
+          BroadcastHashJoin [ws_item_sk,ss_sold_year,ws_sold_year,ss_customer_sk,ws_customer_sk,ss_item_sk]
+            HashAggregate [ss_customer_sk,sum,sum(cast(ss_quantity as bigint)),sum,sum(UnscaledValue(ss_sales_price)),ss_item_sk,d_year,sum,sum(UnscaledValue(ss_wholesale_cost))] [sum,sum(cast(ss_quantity as bigint)),sum,sum(UnscaledValue(ss_sales_price)),ss_wc,ss_sold_year,ss_sp,ss_qty,sum,sum(UnscaledValue(ss_wholesale_cost))]
               InputAdapter
                 Exchange [d_year,ss_item_sk,ss_customer_sk] #1
                   WholeStageCodegen
-                    HashAggregate [d_year,sum,ss_wholesale_cost,ss_customer_sk,sum,sum,ss_sales_price,sum,sum,ss_quantity,sum,ss_item_sk] [sum,sum,sum,sum,sum,sum]
-                      Project [ss_quantity,ss_item_sk,d_year,ss_customer_sk,ss_sales_price,ss_wholesale_cost]
+                    HashAggregate [ss_customer_sk,sum,sum,ss_item_sk,ss_wholesale_cost,ss_quantity,d_year,ss_sales_price,sum,sum,sum,sum] [sum,sum,sum,sum,sum,sum]
+                      Project [d_year,ss_wholesale_cost,ss_sales_price,ss_customer_sk,ss_item_sk,ss_quantity]
                         BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                          Project [ss_quantity,ss_item_sk,ss_customer_sk,ss_sales_price,ss_sold_date_sk,ss_wholesale_cost]
+                          Project [ss_wholesale_cost,ss_sales_price,ss_customer_sk,ss_item_sk,ss_quantity,ss_sold_date_sk]
                             Filter [sr_ticket_number]
                               BroadcastHashJoin [ss_ticket_number,ss_item_sk,sr_ticket_number,sr_item_sk]
-                                Project [ss_quantity,ss_item_sk,ss_customer_sk,ss_sales_price,ss_sold_date_sk,ss_wholesale_cost,ss_ticket_number]
+                                Project [ss_wholesale_cost,ss_sales_price,ss_customer_sk,ss_ticket_number,ss_item_sk,ss_quantity,ss_sold_date_sk]
                                   Filter [ss_sold_date_sk,ss_item_sk,ss_customer_sk]
-                                    Scan parquet default.store_sales [ss_quantity,ss_item_sk,ss_customer_sk,ss_sales_price,ss_sold_date_sk,ss_wholesale_cost,ss_ticket_number] [ss_quantity,ss_item_sk,ss_customer_sk,ss_sales_price,ss_sold_date_sk,ss_wholesale_cost,ss_ticket_number]
+                                    Scan parquet default.store_sales [ss_wholesale_cost,ss_sales_price,ss_customer_sk,ss_ticket_number,ss_item_sk,ss_quantity,ss_sold_date_sk] [ss_wholesale_cost,ss_sales_price,ss_customer_sk,ss_ticket_number,ss_item_sk,ss_quantity,ss_sold_date_sk]
                                 InputAdapter
                                   BroadcastExchange #2
                                     WholeStageCodegen
@@ -33,19 +33,19 @@ TakeOrderedAndProject [cs_qty,store_wholesale_cost,store_sales_price,ws_qty,ss_q
               BroadcastExchange #4
                 WholeStageCodegen
                   Filter [ws_qty]
-                    HashAggregate [d_year,sum(cast(ws_quantity as bigint)),ws_item_sk,sum(UnscaledValue(ws_sales_price)),ws_bill_customer_sk,sum,sum,sum(UnscaledValue(ws_wholesale_cost)),sum] [sum(cast(ws_quantity as bigint)),sum(UnscaledValue(ws_sales_price)),ws_sp,ws_wc,sum,ws_sold_year,sum,sum(UnscaledValue(ws_wholesale_cost)),sum,ws_customer_sk,ws_qty]
+                    HashAggregate [ws_bill_customer_sk,sum(UnscaledValue(ws_wholesale_cost)),sum,sum,d_year,sum,ws_item_sk,sum(cast(ws_quantity as bigint)),sum(UnscaledValue(ws_sales_price))] [sum(UnscaledValue(ws_wholesale_cost)),ws_customer_sk,sum,sum,ws_sp,ws_qty,ws_sold_year,sum,ws_wc,sum(cast(ws_quantity as bigint)),sum(UnscaledValue(ws_sales_price))]
                       InputAdapter
                         Exchange [d_year,ws_item_sk,ws_bill_customer_sk] #5
                           WholeStageCodegen
-                            HashAggregate [d_year,ws_wholesale_cost,ws_item_sk,sum,ws_bill_customer_sk,sum,sum,sum,sum,sum,ws_sales_price,ws_quantity] [sum,sum,sum,sum,sum,sum]
-                              Project [d_year,ws_quantity,ws_wholesale_cost,ws_bill_customer_sk,ws_sales_price,ws_item_sk]
+                            HashAggregate [ws_wholesale_cost,ws_bill_customer_sk,sum,sum,sum,sum,d_year,sum,sum,ws_sales_price,ws_quantity,ws_item_sk] [sum,sum,sum,sum,sum,sum]
+                              Project [d_year,ws_bill_customer_sk,ws_sales_price,ws_quantity,ws_wholesale_cost,ws_item_sk]
                                 BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
-                                  Project [ws_quantity,ws_wholesale_cost,ws_sold_date_sk,ws_bill_customer_sk,ws_sales_price,ws_item_sk]
+                                  Project [ws_bill_customer_sk,ws_sales_price,ws_quantity,ws_wholesale_cost,ws_item_sk,ws_sold_date_sk]
                                     Filter [wr_order_number]
                                       BroadcastHashJoin [ws_order_number,ws_item_sk,wr_order_number,wr_item_sk]
-                                        Project [ws_quantity,ws_wholesale_cost,ws_order_number,ws_sold_date_sk,ws_bill_customer_sk,ws_sales_price,ws_item_sk]
+                                        Project [ws_bill_customer_sk,ws_order_number,ws_sales_price,ws_quantity,ws_wholesale_cost,ws_item_sk,ws_sold_date_sk]
                                           Filter [ws_sold_date_sk,ws_item_sk,ws_bill_customer_sk]
-                                            Scan parquet default.web_sales [ws_quantity,ws_wholesale_cost,ws_order_number,ws_sold_date_sk,ws_bill_customer_sk,ws_sales_price,ws_item_sk] [ws_quantity,ws_wholesale_cost,ws_order_number,ws_sold_date_sk,ws_bill_customer_sk,ws_sales_price,ws_item_sk]
+                                            Scan parquet default.web_sales [ws_bill_customer_sk,ws_order_number,ws_sales_price,ws_quantity,ws_wholesale_cost,ws_item_sk,ws_sold_date_sk] [ws_bill_customer_sk,ws_order_number,ws_sales_price,ws_quantity,ws_wholesale_cost,ws_item_sk,ws_sold_date_sk]
                                         InputAdapter
                                           BroadcastExchange #6
                                             WholeStageCodegen
@@ -58,19 +58,19 @@ TakeOrderedAndProject [cs_qty,store_wholesale_cost,store_sales_price,ws_qty,ss_q
           BroadcastExchange #7
             WholeStageCodegen
               Filter [cs_qty]
-                HashAggregate [d_year,sum,sum(UnscaledValue(cs_sales_price)),sum(cast(cs_quantity as bigint)),sum(UnscaledValue(cs_wholesale_cost)),cs_item_sk,cs_bill_customer_sk,sum,sum] [cs_qty,cs_wc,sum,sum(UnscaledValue(cs_sales_price)),sum(cast(cs_quantity as bigint)),cs_sold_year,cs_sp,sum(UnscaledValue(cs_wholesale_cost)),sum,cs_customer_sk,sum]
+                HashAggregate [sum,sum,cs_item_sk,sum(cast(cs_quantity as bigint)),d_year,sum(UnscaledValue(cs_wholesale_cost)),sum(UnscaledValue(cs_sales_price)),cs_bill_customer_sk,sum] [sum,cs_sp,sum,cs_qty,sum(cast(cs_quantity as bigint)),cs_customer_sk,sum(UnscaledValue(cs_wholesale_cost)),sum(UnscaledValue(cs_sales_price)),cs_sold_year,cs_wc,sum]
                   InputAdapter
                     Exchange [d_year,cs_item_sk,cs_bill_customer_sk] #8
                       WholeStageCodegen
-                        HashAggregate [d_year,sum,sum,sum,cs_item_sk,cs_bill_customer_sk,sum,sum,cs_sales_price,cs_quantity,sum,cs_wholesale_cost] [sum,sum,sum,sum,sum,sum]
-                          Project [cs_wholesale_cost,cs_quantity,d_year,cs_bill_customer_sk,cs_sales_price,cs_item_sk]
+                        HashAggregate [cs_quantity,sum,sum,cs_sales_price,cs_item_sk,d_year,sum,cs_bill_customer_sk,sum,cs_wholesale_cost,sum,sum] [sum,sum,sum,sum,sum,sum]
+                          Project [d_year,cs_quantity,cs_bill_customer_sk,cs_item_sk,cs_wholesale_cost,cs_sales_price]
                             BroadcastHashJoin [cs_sold_date_sk,d_date_sk]
-                              Project [cs_wholesale_cost,cs_quantity,cs_bill_customer_sk,cs_sales_price,cs_sold_date_sk,cs_item_sk]
+                              Project [cs_quantity,cs_bill_customer_sk,cs_item_sk,cs_sold_date_sk,cs_wholesale_cost,cs_sales_price]
                                 Filter [cr_order_number]
                                   BroadcastHashJoin [cs_order_number,cs_item_sk,cr_order_number,cr_item_sk]
-                                    Project [cs_wholesale_cost,cs_quantity,cs_bill_customer_sk,cs_sales_price,cs_sold_date_sk,cs_order_number,cs_item_sk]
+                                    Project [cs_quantity,cs_bill_customer_sk,cs_item_sk,cs_sold_date_sk,cs_wholesale_cost,cs_sales_price,cs_order_number]
                                       Filter [cs_sold_date_sk,cs_item_sk,cs_bill_customer_sk]
-                                        Scan parquet default.catalog_sales [cs_wholesale_cost,cs_quantity,cs_bill_customer_sk,cs_sales_price,cs_sold_date_sk,cs_order_number,cs_item_sk] [cs_wholesale_cost,cs_quantity,cs_bill_customer_sk,cs_sales_price,cs_sold_date_sk,cs_order_number,cs_item_sk]
+                                        Scan parquet default.catalog_sales [cs_quantity,cs_bill_customer_sk,cs_item_sk,cs_sold_date_sk,cs_wholesale_cost,cs_sales_price,cs_order_number] [cs_quantity,cs_bill_customer_sk,cs_item_sk,cs_sold_date_sk,cs_wholesale_cost,cs_sales_price,cs_order_number]
                                     InputAdapter
                                       BroadcastExchange #9
                                         WholeStageCodegen

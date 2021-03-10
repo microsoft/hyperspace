@@ -8,7 +8,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer
       :     :  :- Union
       :     :  :  :- *(4) Filter (isnotnull(year_total#8) && (year_total#8 > 0.00))
       :     :  :  :  +- *(4) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ss_net_paid#15))])
-      :     :  :  :     +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 200)
+      :     :  :  :     +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
       :     :  :  :        +- *(3) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ss_net_paid#15))])
       :     :  :  :           +- *(3) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ss_net_paid#15, d_year#14]
       :     :  :  :              +- *(3) BroadcastHashJoin [ss_sold_date_sk#16], [d_date_sk#17], Inner, BuildRight
@@ -29,7 +29,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer
       :     :  +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true]))
       :     :     +- Union
       :     :        :- *(8) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ss_net_paid#15))])
-      :     :        :  +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 200)
+      :     :        :  +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
       :     :        :     +- *(7) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ss_net_paid#15))])
       :     :        :        +- *(7) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ss_net_paid#15, d_year#14]
       :     :        :           +- *(7) BroadcastHashJoin [ss_sold_date_sk#16], [d_date_sk#17], Inner, BuildRight
@@ -49,7 +49,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer
       :           :- LocalTableScan <empty>, [customer_id#10, year_total#6]
       :           +- *(12) Filter (isnotnull(year_total#21) && (year_total#21 > 0.00))
       :              +- *(12) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ws_net_paid#24))])
-      :                 +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 200)
+      :                 +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
       :                    +- *(11) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ws_net_paid#24))])
       :                       +- *(11) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ws_net_paid#24, d_year#14]
       :                          +- *(11) BroadcastHashJoin [ws_sold_date_sk#25], [d_date_sk#17], Inner, BuildRight
@@ -67,7 +67,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer
          +- Union
             :- LocalTableScan <empty>, [customer_id#5, year_total#7]
             +- *(16) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ws_net_paid#24))])
-               +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 200)
+               +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
                   +- *(15) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ws_net_paid#24))])
                      +- *(15) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ws_net_paid#24, d_year#14]
                         +- *(15) BroadcastHashJoin [ws_sold_date_sk#25], [d_date_sk#17], Inner, BuildRight

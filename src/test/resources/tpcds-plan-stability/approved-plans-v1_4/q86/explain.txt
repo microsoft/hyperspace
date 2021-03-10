@@ -3,9 +3,9 @@ TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WH
 +- *(6) Project [total_sum#4, i_category#2, i_class#5, lochierarchy#1, rank_within_parent#3]
    +- Window [rank(_w3#6) windowspecdefinition(_w1#7, _w2#8, _w3#6 DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_within_parent#3], [_w1#7, _w2#8], [_w3#6 DESC NULLS LAST]
       +- *(5) Sort [_w1#7 ASC NULLS FIRST, _w2#8 ASC NULLS FIRST, _w3#6 DESC NULLS LAST], false, 0
-         +- Exchange hashpartitioning(_w1#7, _w2#8, 200)
+         +- Exchange hashpartitioning(_w1#7, _w2#8, 5)
             +- *(4) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[sum(UnscaledValue(ws_net_paid#10))])
-               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 200)
+               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 5)
                   +- *(3) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[partial_sum(UnscaledValue(ws_net_paid#10))])
                      +- *(3) Expand [List(ws_net_paid#10, i_category#11, i_class#12, 0), List(ws_net_paid#10, i_category#11, null, 1), List(ws_net_paid#10, null, null, 3)], [ws_net_paid#10, i_category#2, i_class#5, spark_grouping_id#9]
                         +- *(3) Project [ws_net_paid#10, i_category#13 AS i_category#11, i_class#14 AS i_class#12]

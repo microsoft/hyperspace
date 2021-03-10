@@ -1,10 +1,10 @@
 CollectLimit
   WholeStageCodegen
-    HashAggregate [sum,sum,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (isnotnull(customer_sk) && isnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (isnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint))] [store_only,sum,catalog_only,sum,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (isnotnull(customer_sk) && isnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (isnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),store_and_catalog]
+    HashAggregate [sum,sum,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (isnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (isnotnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint))] [store_and_catalog,sum,store_only,sum,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (isnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),catalog_only,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint))]
       InputAdapter
         Exchange #1
           WholeStageCodegen
-            HashAggregate [sum,sum,sum,customer_sk,sum,customer_sk,sum,sum] [sum,sum,sum,sum,sum,sum]
+            HashAggregate [sum,sum,sum,customer_sk,customer_sk,sum,sum,sum] [sum,sum,sum,sum,sum,sum]
               Project [customer_sk,customer_sk]
                 InputAdapter
                   SortMergeJoin [customer_sk,item_sk,customer_sk,item_sk]

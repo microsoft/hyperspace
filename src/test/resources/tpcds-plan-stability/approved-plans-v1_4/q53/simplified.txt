@@ -13,7 +13,7 @@ TakeOrderedAndProject [avg_quarterly_sales,sum_sales,i_manufact_id]
                         InputAdapter
                           Exchange [i_manufact_id,d_qoy] #2
                             WholeStageCodegen
-                              HashAggregate [d_qoy,sum,ss_sales_price,sum,i_manufact_id] [sum,sum]
+                              HashAggregate [sum,sum,d_qoy,ss_sales_price,i_manufact_id] [sum,sum]
                                 Project [i_manufact_id,ss_sales_price,d_qoy]
                                   BroadcastHashJoin [ss_store_sk,s_store_sk]
                                     Project [i_manufact_id,ss_store_sk,ss_sales_price,d_qoy]
@@ -22,7 +22,7 @@ TakeOrderedAndProject [avg_quarterly_sales,sum_sales,i_manufact_id]
                                           BroadcastHashJoin [i_item_sk,ss_item_sk]
                                             Project [i_item_sk,i_manufact_id]
                                               Filter [i_category,i_class,i_brand,i_item_sk]
-                                                Scan parquet default.item [i_class,i_manufact_id,i_item_sk,i_category,i_brand] [i_class,i_manufact_id,i_item_sk,i_category,i_brand]
+                                                Scan parquet default.item [i_manufact_id,i_brand,i_category,i_item_sk,i_class] [i_manufact_id,i_brand,i_category,i_item_sk,i_class]
                                             InputAdapter
                                               BroadcastExchange #3
                                                 WholeStageCodegen

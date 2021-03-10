@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[ext_price#1 DESC NULLS LAST,brand#2 ASC NULLS FIRST,brand_id#3 ASC NULLS FIRST,i_manufact_id#4 ASC NULLS FIRST,i_manufact#5 ASC NULLS FIRST], output=[brand_id#3,brand#2,i_manufact_id#4,i_manufact#5,ext_price#1])
 +- *(7) HashAggregate(keys=[i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5], functions=[sum(UnscaledValue(ss_ext_sales_price#8))])
-   +- Exchange hashpartitioning(i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5, 200)
+   +- Exchange hashpartitioning(i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5, 5)
       +- *(6) HashAggregate(keys=[i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5], functions=[partial_sum(UnscaledValue(ss_ext_sales_price#8))])
          +- *(6) Project [ss_ext_sales_price#8, i_brand_id#7, i_brand#6, i_manufact_id#4, i_manufact#5]
             +- *(6) BroadcastHashJoin [ss_store_sk#9], [s_store_sk#10], Inner, BuildRight, NOT (substring(ca_zip#11, 1, 5) = substring(s_zip#12, 1, 5))

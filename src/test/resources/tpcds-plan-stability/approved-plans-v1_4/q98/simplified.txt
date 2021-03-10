@@ -1,10 +1,10 @@
 WholeStageCodegen
-  Project [revenueratio,i_item_desc,itemrevenue,i_category,i_current_price,i_class]
-    Sort [revenueratio,i_item_id,i_item_desc,i_category,i_class]
+  Project [i_current_price,itemrevenue,revenueratio,i_item_desc,i_category,i_class]
+    Sort [revenueratio,i_item_desc,i_item_id,i_category,i_class]
       InputAdapter
-        Exchange [revenueratio,i_item_id,i_item_desc,i_category,i_class] #1
+        Exchange [revenueratio,i_item_desc,i_item_id,i_category,i_class] #1
           WholeStageCodegen
-            Project [i_item_id,i_item_desc,_w0,itemrevenue,i_category,_we0,i_current_price,i_class]
+            Project [i_current_price,itemrevenue,i_item_desc,_w0,i_item_id,i_category,_we0,i_class]
               InputAdapter
                 Window [_w1,i_class]
                   WholeStageCodegen
@@ -12,14 +12,14 @@ WholeStageCodegen
                       InputAdapter
                         Exchange [i_class] #2
                           WholeStageCodegen
-                            HashAggregate [i_item_id,i_item_desc,sum,sum(UnscaledValue(ss_ext_sales_price)),i_category,i_current_price,i_class] [sum,sum(UnscaledValue(ss_ext_sales_price)),_w0,itemrevenue,_w1]
+                            HashAggregate [i_current_price,sum(UnscaledValue(ss_ext_sales_price)),i_item_desc,i_item_id,i_category,sum,i_class] [itemrevenue,_w1,sum(UnscaledValue(ss_ext_sales_price)),_w0,sum]
                               InputAdapter
-                                Exchange [i_item_id,i_item_desc,i_category,i_current_price,i_class] #3
+                                Exchange [i_current_price,i_item_desc,i_item_id,i_category,i_class] #3
                                   WholeStageCodegen
-                                    HashAggregate [i_item_id,i_item_desc,sum,i_category,ss_ext_sales_price,sum,i_current_price,i_class] [sum,sum]
-                                      Project [i_class,i_current_price,ss_ext_sales_price,i_category,i_item_desc,i_item_id]
+                                    HashAggregate [i_current_price,sum,i_item_desc,ss_ext_sales_price,i_item_id,i_category,sum,i_class] [sum,sum]
+                                      Project [i_current_price,i_category,i_item_id,ss_ext_sales_price,i_class,i_item_desc]
                                         BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                          Project [i_class,i_current_price,ss_ext_sales_price,i_category,ss_sold_date_sk,i_item_desc,i_item_id]
+                                          Project [i_current_price,i_category,ss_sold_date_sk,i_item_id,ss_ext_sales_price,i_class,i_item_desc]
                                             BroadcastHashJoin [ss_item_sk,i_item_sk]
                                               Project [ss_sold_date_sk,ss_item_sk,ss_ext_sales_price]
                                                 Filter [ss_item_sk,ss_sold_date_sk]
@@ -27,9 +27,9 @@ WholeStageCodegen
                                               InputAdapter
                                                 BroadcastExchange #4
                                                   WholeStageCodegen
-                                                    Project [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id]
+                                                    Project [i_current_price,i_category,i_item_sk,i_item_id,i_class,i_item_desc]
                                                       Filter [i_category,i_item_sk]
-                                                        Scan parquet default.item [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id] [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id]
+                                                        Scan parquet default.item [i_current_price,i_category,i_item_sk,i_item_id,i_class,i_item_desc] [i_current_price,i_category,i_item_sk,i_item_id,i_class,i_item_desc]
                                           InputAdapter
                                             BroadcastExchange #5
                                               WholeStageCodegen

@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,col_name#2 ASC NULLS FIRST,d_year#3 ASC NULLS FIRST,d_qoy#4 ASC NULLS FIRST,i_category#5 ASC NULLS FIRST], output=[channel#1,col_name#2,d_year#3,d_qoy#4,i_category#5,sales_cnt#6,sales_amt#7])
 +- *(11) HashAggregate(keys=[channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5], functions=[count(1), sum(UnscaledValue(ext_sales_price#8))])
-   +- Exchange hashpartitioning(channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5, 200)
+   +- Exchange hashpartitioning(channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5, 5)
       +- *(10) HashAggregate(keys=[channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5], functions=[partial_count(1), partial_sum(UnscaledValue(ext_sales_price#8))])
          +- Union
             :- *(3) Project [store AS channel#1, ss_store_sk#9 AS col_name#2, d_year#3, d_qoy#4, i_category#5, ss_ext_sales_price#10 AS ext_sales_price#8]

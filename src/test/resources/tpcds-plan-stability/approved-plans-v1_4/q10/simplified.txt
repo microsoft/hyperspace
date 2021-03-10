@@ -1,11 +1,11 @@
-TakeOrderedAndProject [cnt5,cnt6,cnt1,cnt4,cd_purchase_estimate,cnt2,cnt3,cd_education_status,cd_credit_rating,cd_dep_college_count,cd_dep_count,cd_marital_status,cd_gender,cd_dep_employed_count]
+TakeOrderedAndProject [cnt5,cd_dep_employed_count,cd_gender,cd_dep_college_count,cd_education_status,cd_dep_count,cnt6,cd_credit_rating,cnt4,cd_purchase_estimate,cd_marital_status,cnt2,cnt1,cnt3]
   WholeStageCodegen
-    HashAggregate [count,count(1),cd_purchase_estimate,cd_education_status,cd_credit_rating,cd_dep_college_count,cd_dep_count,cd_marital_status,cd_gender,cd_dep_employed_count] [cnt5,cnt6,cnt1,count,cnt4,count(1),cnt2,cnt3]
+    HashAggregate [cd_dep_employed_count,cd_gender,cd_dep_college_count,cd_education_status,cd_dep_count,cd_credit_rating,cd_purchase_estimate,cd_marital_status,count,count(1)] [cnt5,cnt6,cnt4,count,count(1),cnt2,cnt1,cnt3]
       InputAdapter
-        Exchange [cd_purchase_estimate,cd_education_status,cd_credit_rating,cd_dep_college_count,cd_dep_count,cd_marital_status,cd_gender,cd_dep_employed_count] #1
+        Exchange [cd_dep_employed_count,cd_gender,cd_dep_college_count,cd_education_status,cd_dep_count,cd_credit_rating,cd_purchase_estimate,cd_marital_status] #1
           WholeStageCodegen
-            HashAggregate [count,cd_purchase_estimate,count,cd_education_status,cd_credit_rating,cd_dep_college_count,cd_dep_count,cd_marital_status,cd_gender,cd_dep_employed_count] [count,count]
-              Project [cd_dep_college_count,cd_dep_employed_count,cd_marital_status,cd_dep_count,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status]
+            HashAggregate [count,cd_dep_employed_count,cd_gender,cd_dep_college_count,cd_education_status,cd_dep_count,cd_credit_rating,cd_purchase_estimate,cd_marital_status,count] [count,count]
+              Project [cd_gender,cd_dep_count,cd_education_status,cd_dep_college_count,cd_marital_status,cd_credit_rating,cd_purchase_estimate,cd_dep_employed_count]
                 BroadcastHashJoin [c_current_cdemo_sk,cd_demo_sk]
                   Project [c_current_cdemo_sk]
                     BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
@@ -60,6 +60,6 @@ TakeOrderedAndProject [cnt5,cnt6,cnt1,cnt4,cd_purchase_estimate,cnt2,cnt3,cd_edu
                   InputAdapter
                     BroadcastExchange #7
                       WholeStageCodegen
-                        Project [cd_dep_college_count,cd_dep_employed_count,cd_demo_sk,cd_marital_status,cd_dep_count,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status]
+                        Project [cd_gender,cd_dep_count,cd_education_status,cd_dep_college_count,cd_marital_status,cd_credit_rating,cd_demo_sk,cd_purchase_estimate,cd_dep_employed_count]
                           Filter [cd_demo_sk]
-                            Scan parquet default.customer_demographics [cd_dep_college_count,cd_dep_employed_count,cd_demo_sk,cd_marital_status,cd_dep_count,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status] [cd_dep_college_count,cd_dep_employed_count,cd_demo_sk,cd_marital_status,cd_dep_count,cd_purchase_estimate,cd_gender,cd_credit_rating,cd_education_status]
+                            Scan parquet default.customer_demographics [cd_gender,cd_dep_count,cd_education_status,cd_dep_college_count,cd_marital_status,cd_credit_rating,cd_demo_sk,cd_purchase_estimate,cd_dep_employed_count] [cd_gender,cd_dep_count,cd_education_status,cd_dep_college_count,cd_marital_status,cd_credit_rating,cd_demo_sk,cd_purchase_estimate,cd_dep_employed_count]

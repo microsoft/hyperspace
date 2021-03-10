@@ -8,7 +8,7 @@ TakeOrderedAndProject(limit=100, orderBy=[c_customer_id#1 ASC NULLS FIRST,c_salu
       :     :  +- *(11) BroadcastHashJoin [ctr_state#18], [ctr_state#18#19], Inner, BuildRight, (cast(ctr_total_return#13 as decimal(24,7)) > (CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))#20)
       :     :     :- *(11) Filter isnotnull(ctr_total_return#13)
       :     :     :  +- *(11) HashAggregate(keys=[wr_returning_customer_sk#21, ca_state#22], functions=[sum(UnscaledValue(wr_return_amt#23))])
-      :     :     :     +- Exchange hashpartitioning(wr_returning_customer_sk#21, ca_state#22, 200)
+      :     :     :     +- Exchange hashpartitioning(wr_returning_customer_sk#21, ca_state#22, 5)
       :     :     :        +- *(3) HashAggregate(keys=[wr_returning_customer_sk#21, ca_state#22], functions=[partial_sum(UnscaledValue(wr_return_amt#23))])
       :     :     :           +- *(3) Project [wr_returning_customer_sk#21, wr_return_amt#23, ca_state#22]
       :     :     :              +- *(3) BroadcastHashJoin [wr_returning_addr_sk#24], [cast(ca_address_sk#15 as bigint)], Inner, BuildRight
@@ -28,10 +28,10 @@ TakeOrderedAndProject(limit=100, orderBy=[c_customer_id#1 ASC NULLS FIRST,c_salu
       :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(input[1, string, true]))
       :     :        +- *(8) Filter isnotnull((CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))#20)
       :     :           +- *(8) HashAggregate(keys=[ctr_state#18], functions=[avg(ctr_total_return#13)])
-      :     :              +- Exchange hashpartitioning(ctr_state#18, 200)
+      :     :              +- Exchange hashpartitioning(ctr_state#18, 5)
       :     :                 +- *(7) HashAggregate(keys=[ctr_state#18], functions=[partial_avg(ctr_total_return#13)])
       :     :                    +- *(7) HashAggregate(keys=[wr_returning_customer_sk#21, ca_state#22], functions=[sum(UnscaledValue(wr_return_amt#23))])
-      :     :                       +- Exchange hashpartitioning(wr_returning_customer_sk#21, ca_state#22, 200)
+      :     :                       +- Exchange hashpartitioning(wr_returning_customer_sk#21, ca_state#22, 5)
       :     :                          +- *(6) HashAggregate(keys=[wr_returning_customer_sk#21, ca_state#22], functions=[partial_sum(UnscaledValue(wr_return_amt#23))])
       :     :                             +- *(6) Project [wr_returning_customer_sk#21, wr_return_amt#23, ca_state#22]
       :     :                                +- *(6) BroadcastHashJoin [wr_returning_addr_sk#24], [cast(ca_address_sk#15 as bigint)], Inner, BuildRight
