@@ -1,33 +1,33 @@
-TakeOrderedAndProject [avg(wr_refunded_cash),avg(wr_fee),avg(ws_quantity),substring(r_reason_desc, 1, 20),aggOrder]
+TakeOrderedAndProject [avg(wr_fee),aggOrder,avg(ws_quantity),substring(r_reason_desc, 1, 20),avg(wr_refunded_cash)]
   WholeStageCodegen
-    HashAggregate [sum,avg(cast(ws_quantity as bigint)),count,r_reason_desc,count,sum,count,avg(UnscaledValue(wr_refunded_cash)),avg(UnscaledValue(wr_fee)),sum] [sum,avg(wr_refunded_cash),avg(cast(ws_quantity as bigint)),avg(wr_fee),count,count,sum,count,avg(UnscaledValue(wr_refunded_cash)),avg(UnscaledValue(wr_fee)),avg(ws_quantity),substring(r_reason_desc, 1, 20),sum,aggOrder]
+    HashAggregate [r_reason_desc,count,sum,avg(UnscaledValue(wr_fee)),avg(UnscaledValue(wr_refunded_cash)),sum,count,count,avg(cast(ws_quantity as bigint)),sum] [count,avg(wr_fee),aggOrder,avg(ws_quantity),substring(r_reason_desc, 1, 20),sum,avg(UnscaledValue(wr_fee)),avg(wr_refunded_cash),avg(UnscaledValue(wr_refunded_cash)),sum,count,count,avg(cast(ws_quantity as bigint)),sum]
       InputAdapter
         Exchange [r_reason_desc] #1
           WholeStageCodegen
-            HashAggregate [sum,sum,count,wr_refunded_cash,count,r_reason_desc,wr_fee,count,sum,sum,count,count,sum,sum,count,ws_quantity] [sum,sum,count,count,count,sum,sum,count,count,sum,sum,count]
+            HashAggregate [r_reason_desc,count,wr_refunded_cash,sum,count,wr_fee,sum,sum,sum,count,count,count,count,sum,ws_quantity,sum] [count,sum,count,sum,sum,sum,count,count,count,count,sum,sum]
               Project [ws_quantity,wr_fee,wr_refunded_cash,r_reason_desc]
                 BroadcastHashJoin [wr_reason_sk,r_reason_sk]
                   Project [ws_quantity,wr_reason_sk,wr_fee,wr_refunded_cash]
                     BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
-                      Project [wr_fee,wr_reason_sk,ws_quantity,wr_refunded_cash,ws_sold_date_sk]
+                      Project [wr_reason_sk,ws_quantity,wr_refunded_cash,ws_sold_date_sk,wr_fee]
                         BroadcastHashJoin [wr_refunded_addr_sk,ca_address_sk,ca_state,ws_net_profit]
-                          Project [wr_fee,ws_net_profit,wr_refunded_addr_sk,wr_reason_sk,ws_quantity,wr_refunded_cash,ws_sold_date_sk]
-                            BroadcastHashJoin [cd_marital_status,cd_education_status,cd_marital_status,cd_education_status,cd_demo_sk,wr_returning_cdemo_sk]
-                              Project [wr_fee,ws_net_profit,wr_returning_cdemo_sk,wr_refunded_addr_sk,cd_education_status,wr_reason_sk,cd_marital_status,ws_quantity,wr_refunded_cash,ws_sold_date_sk]
-                                BroadcastHashJoin [wr_refunded_cdemo_sk,cd_education_status,cd_demo_sk,cd_marital_status,ws_sales_price]
-                                  Project [wr_fee,ws_net_profit,wr_returning_cdemo_sk,wr_refunded_addr_sk,ws_sales_price,wr_reason_sk,ws_quantity,wr_refunded_cash,ws_sold_date_sk,wr_refunded_cdemo_sk]
+                          Project [wr_refunded_addr_sk,wr_reason_sk,ws_quantity,ws_net_profit,wr_refunded_cash,ws_sold_date_sk,wr_fee]
+                            BroadcastHashJoin [cd_education_status,cd_demo_sk,wr_returning_cdemo_sk,cd_education_status,cd_marital_status,cd_marital_status]
+                              Project [wr_refunded_addr_sk,wr_reason_sk,ws_quantity,ws_net_profit,cd_marital_status,wr_refunded_cash,ws_sold_date_sk,wr_fee,wr_returning_cdemo_sk,cd_education_status]
+                                BroadcastHashJoin [cd_education_status,ws_sales_price,cd_demo_sk,cd_marital_status,wr_refunded_cdemo_sk]
+                                  Project [wr_refunded_addr_sk,wr_reason_sk,ws_quantity,ws_net_profit,wr_refunded_cdemo_sk,wr_refunded_cash,ws_sold_date_sk,wr_fee,wr_returning_cdemo_sk,ws_sales_price]
                                     BroadcastHashJoin [ws_web_page_sk,wp_web_page_sk]
-                                      Project [wr_fee,ws_net_profit,wr_returning_cdemo_sk,wr_refunded_addr_sk,ws_web_page_sk,ws_sales_price,wr_reason_sk,ws_quantity,wr_refunded_cash,ws_sold_date_sk,wr_refunded_cdemo_sk]
+                                      Project [wr_refunded_addr_sk,wr_reason_sk,ws_web_page_sk,ws_quantity,ws_net_profit,wr_refunded_cdemo_sk,wr_refunded_cash,ws_sold_date_sk,wr_fee,wr_returning_cdemo_sk,ws_sales_price]
                                         BroadcastHashJoin [ws_item_sk,ws_order_number,wr_item_sk,wr_order_number]
-                                          Project [ws_net_profit,ws_order_number,ws_web_page_sk,ws_sales_price,ws_quantity,ws_item_sk,ws_sold_date_sk]
+                                          Project [ws_web_page_sk,ws_quantity,ws_net_profit,ws_order_number,ws_sold_date_sk,ws_sales_price,ws_item_sk]
                                             Filter [ws_item_sk,ws_order_number,ws_web_page_sk,ws_sold_date_sk]
-                                              Scan parquet default.web_sales [ws_net_profit,ws_order_number,ws_web_page_sk,ws_sales_price,ws_quantity,ws_item_sk,ws_sold_date_sk] [ws_net_profit,ws_order_number,ws_web_page_sk,ws_sales_price,ws_quantity,ws_item_sk,ws_sold_date_sk]
+                                              Scan parquet default.web_sales [ws_web_page_sk,ws_quantity,ws_net_profit,ws_order_number,ws_sold_date_sk,ws_sales_price,ws_item_sk] [ws_web_page_sk,ws_quantity,ws_net_profit,ws_order_number,ws_sold_date_sk,ws_sales_price,ws_item_sk]
                                           InputAdapter
                                             BroadcastExchange #2
                                               WholeStageCodegen
-                                                Project [wr_fee,wr_order_number,wr_returning_cdemo_sk,wr_refunded_addr_sk,wr_reason_sk,wr_item_sk,wr_refunded_cash,wr_refunded_cdemo_sk]
-                                                  Filter [wr_refunded_cdemo_sk,wr_refunded_addr_sk,wr_reason_sk,wr_item_sk,wr_order_number,wr_returning_cdemo_sk]
-                                                    Scan parquet default.web_returns [wr_fee,wr_order_number,wr_returning_cdemo_sk,wr_refunded_addr_sk,wr_reason_sk,wr_item_sk,wr_refunded_cash,wr_refunded_cdemo_sk] [wr_fee,wr_order_number,wr_returning_cdemo_sk,wr_refunded_addr_sk,wr_reason_sk,wr_item_sk,wr_refunded_cash,wr_refunded_cdemo_sk]
+                                                Project [wr_order_number,wr_refunded_addr_sk,wr_reason_sk,wr_refunded_cdemo_sk,wr_refunded_cash,wr_fee,wr_returning_cdemo_sk,wr_item_sk]
+                                                  Filter [wr_item_sk,wr_reason_sk,wr_order_number,wr_returning_cdemo_sk,wr_refunded_addr_sk,wr_refunded_cdemo_sk]
+                                                    Scan parquet default.web_returns [wr_order_number,wr_refunded_addr_sk,wr_reason_sk,wr_refunded_cdemo_sk,wr_refunded_cash,wr_fee,wr_returning_cdemo_sk,wr_item_sk] [wr_order_number,wr_refunded_addr_sk,wr_reason_sk,wr_refunded_cdemo_sk,wr_refunded_cash,wr_fee,wr_returning_cdemo_sk,wr_item_sk]
                                       InputAdapter
                                         BroadcastExchange #3
                                           WholeStageCodegen
@@ -38,13 +38,13 @@ TakeOrderedAndProject [avg(wr_refunded_cash),avg(wr_fee),avg(ws_quantity),substr
                                     BroadcastExchange #4
                                       WholeStageCodegen
                                         Project [cd_demo_sk,cd_marital_status,cd_education_status]
-                                          Filter [cd_demo_sk,cd_marital_status,cd_education_status]
+                                          Filter [cd_demo_sk,cd_education_status,cd_marital_status]
                                             Scan parquet default.customer_demographics [cd_demo_sk,cd_marital_status,cd_education_status] [cd_demo_sk,cd_marital_status,cd_education_status]
                               InputAdapter
                                 BroadcastExchange #5
                                   WholeStageCodegen
                                     Project [cd_demo_sk,cd_marital_status,cd_education_status]
-                                      Filter [cd_marital_status,cd_education_status,cd_demo_sk]
+                                      Filter [cd_education_status,cd_demo_sk,cd_marital_status]
                                         Scan parquet default.customer_demographics [cd_demo_sk,cd_marital_status,cd_education_status] [cd_demo_sk,cd_marital_status,cd_education_status]
                           InputAdapter
                             BroadcastExchange #6

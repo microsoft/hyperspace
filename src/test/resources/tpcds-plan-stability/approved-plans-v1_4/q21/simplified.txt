@@ -1,11 +1,11 @@
 TakeOrderedAndProject [w_warehouse_name,i_item_id,inv_before,inv_after]
   WholeStageCodegen
     Filter [inv_before,inv_after]
-      HashAggregate [sum(cast(CASE WHEN (d_date >= 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint)),w_warehouse_name,sum,sum,i_item_id,sum(cast(CASE WHEN (d_date < 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint))] [inv_before,sum(cast(CASE WHEN (d_date >= 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint)),sum,inv_after,sum,sum(cast(CASE WHEN (d_date < 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint))]
+      HashAggregate [i_item_id,sum(cast(CASE WHEN (d_date >= 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint)),sum,w_warehouse_name,sum(cast(CASE WHEN (d_date < 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint)),sum] [sum(cast(CASE WHEN (d_date >= 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint)),sum,inv_before,sum(cast(CASE WHEN (d_date < 11027) THEN inv_quantity_on_hand ELSE 0 END as bigint)),sum,inv_after]
         InputAdapter
           Exchange [w_warehouse_name,i_item_id] #1
             WholeStageCodegen
-              HashAggregate [sum,inv_quantity_on_hand,w_warehouse_name,sum,d_date,sum,i_item_id,sum] [sum,sum,sum,sum]
+              HashAggregate [i_item_id,sum,d_date,w_warehouse_name,sum,inv_quantity_on_hand,sum,sum] [sum,sum,sum,sum]
                 Project [inv_quantity_on_hand,w_warehouse_name,i_item_id,d_date]
                   BroadcastHashJoin [inv_date_sk,d_date_sk]
                     Project [inv_date_sk,inv_quantity_on_hand,w_warehouse_name,i_item_id]

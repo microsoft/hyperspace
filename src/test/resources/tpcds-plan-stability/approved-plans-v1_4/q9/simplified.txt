@@ -16,7 +16,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #2
               WholeStageCodegen
-                HashAggregate [count,sum,count,sum,ss_ext_discount_amt] [sum,count,sum,count]
+                HashAggregate [sum,ss_ext_discount_amt,sum,count,count] [sum,count,sum,count]
                   Project [ss_ext_discount_amt]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
@@ -26,7 +26,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #3
               WholeStageCodegen
-                HashAggregate [count,sum,ss_net_paid,sum,count] [sum,count,sum,count]
+                HashAggregate [sum,count,ss_net_paid,sum,count] [sum,count,sum,count]
                   Project [ss_net_paid]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
@@ -46,7 +46,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #5
               WholeStageCodegen
-                HashAggregate [sum,count,count,ss_ext_discount_amt,sum] [sum,count,sum,count]
+                HashAggregate [count,sum,count,ss_ext_discount_amt,sum] [sum,count,sum,count]
                   Project [ss_ext_discount_amt]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
@@ -56,7 +56,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #6
               WholeStageCodegen
-                HashAggregate [count,sum,sum,ss_net_paid,count] [sum,count,sum,count]
+                HashAggregate [sum,sum,ss_net_paid,count,count] [sum,count,sum,count]
                   Project [ss_net_paid]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
@@ -76,7 +76,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #8
               WholeStageCodegen
-                HashAggregate [sum,count,count,sum,ss_ext_discount_amt] [sum,count,sum,count]
+                HashAggregate [sum,ss_ext_discount_amt,count,count,sum] [sum,count,sum,count]
                   Project [ss_ext_discount_amt]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
@@ -86,7 +86,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #9
               WholeStageCodegen
-                HashAggregate [count,sum,sum,ss_net_paid,count] [sum,count,sum,count]
+                HashAggregate [sum,count,count,sum,ss_net_paid] [sum,count,sum,count]
                   Project [ss_net_paid]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
@@ -106,7 +106,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #11
               WholeStageCodegen
-                HashAggregate [count,sum,count,ss_ext_discount_amt,sum] [sum,count,sum,count]
+                HashAggregate [ss_ext_discount_amt,sum,count,count,sum] [sum,count,sum,count]
                   Project [ss_ext_discount_amt]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
@@ -116,7 +116,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #12
               WholeStageCodegen
-                HashAggregate [count,sum,count,ss_net_paid,sum] [sum,count,sum,count]
+                HashAggregate [count,sum,ss_net_paid,count,sum] [sum,count,sum,count]
                   Project [ss_net_paid]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]
@@ -136,7 +136,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #14
               WholeStageCodegen
-                HashAggregate [count,count,sum,sum,ss_ext_discount_amt] [sum,count,sum,count]
+                HashAggregate [sum,ss_ext_discount_amt,sum,count,count] [sum,count,sum,count]
                   Project [ss_ext_discount_amt]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_ext_discount_amt] [ss_quantity,ss_ext_discount_amt]
@@ -146,7 +146,7 @@ WholeStageCodegen
           InputAdapter
             Exchange #15
               WholeStageCodegen
-                HashAggregate [sum,count,ss_net_paid,count,sum] [sum,count,sum,count]
+                HashAggregate [count,ss_net_paid,sum,count,sum] [sum,count,sum,count]
                   Project [ss_net_paid]
                     Filter [ss_quantity]
                       Scan parquet default.store_sales [ss_quantity,ss_net_paid] [ss_quantity,ss_net_paid]

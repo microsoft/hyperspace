@@ -1,22 +1,22 @@
 WholeStageCodegen
-  HashAggregate [avg(UnscaledValue(ss_ext_wholesale_cost)),count,sum,sum,avg(cast(ss_quantity as bigint)),sum,sum,sum(UnscaledValue(ss_ext_wholesale_cost)),avg(UnscaledValue(ss_ext_sales_price)),count,count] [avg(UnscaledValue(ss_ext_wholesale_cost)),count,sum,sum(ss_ext_wholesale_cost),sum,avg(cast(ss_quantity as bigint)),avg(ss_ext_sales_price),sum,sum,avg(ss_ext_wholesale_cost),avg(ss_quantity),sum(UnscaledValue(ss_ext_wholesale_cost)),avg(UnscaledValue(ss_ext_sales_price)),count,count]
+  HashAggregate [sum,sum,sum(UnscaledValue(ss_ext_wholesale_cost)),sum,avg(cast(ss_quantity as bigint)),count,sum,avg(UnscaledValue(ss_ext_sales_price)),count,avg(UnscaledValue(ss_ext_wholesale_cost)),count] [sum,avg(ss_ext_sales_price),sum,sum(UnscaledValue(ss_ext_wholesale_cost)),sum,sum(ss_ext_wholesale_cost),avg(ss_ext_wholesale_cost),avg(cast(ss_quantity as bigint)),avg(ss_quantity),count,sum,avg(UnscaledValue(ss_ext_sales_price)),count,avg(UnscaledValue(ss_ext_wholesale_cost)),count]
     InputAdapter
       Exchange #1
         WholeStageCodegen
-          HashAggregate [sum,count,ss_quantity,count,sum,sum,count,ss_ext_sales_price,sum,sum,sum,sum,ss_ext_wholesale_cost,count,count,count,sum] [sum,count,count,sum,sum,count,sum,sum,sum,sum,count,count,count,sum]
+          HashAggregate [ss_ext_wholesale_cost,count,sum,sum,count,sum,count,sum,sum,count,sum,sum,sum,ss_ext_sales_price,count,ss_quantity,count] [count,sum,sum,count,sum,count,sum,sum,count,sum,sum,sum,count,count]
             Project [ss_quantity,ss_ext_sales_price,ss_ext_wholesale_cost]
-              BroadcastHashJoin [ss_hdemo_sk,cd_education_status,hd_demo_sk,hd_dep_count,cd_marital_status,ss_sales_price]
-                Project [ss_sales_price,ss_hdemo_sk,cd_education_status,ss_quantity,cd_marital_status,ss_ext_sales_price,ss_ext_wholesale_cost]
+              BroadcastHashJoin [hd_dep_count,ss_hdemo_sk,ss_sales_price,cd_education_status,hd_demo_sk,cd_marital_status]
+                Project [ss_quantity,cd_marital_status,ss_ext_sales_price,ss_sales_price,ss_hdemo_sk,cd_education_status,ss_ext_wholesale_cost]
                   BroadcastHashJoin [ss_cdemo_sk,cd_demo_sk]
-                    Project [ss_sales_price,ss_hdemo_sk,ss_cdemo_sk,ss_quantity,ss_ext_sales_price,ss_ext_wholesale_cost]
+                    Project [ss_quantity,ss_ext_sales_price,ss_sales_price,ss_cdemo_sk,ss_hdemo_sk,ss_ext_wholesale_cost]
                       BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                        Project [ss_sales_price,ss_hdemo_sk,ss_cdemo_sk,ss_quantity,ss_sold_date_sk,ss_ext_sales_price,ss_ext_wholesale_cost]
+                        Project [ss_quantity,ss_ext_sales_price,ss_sales_price,ss_cdemo_sk,ss_sold_date_sk,ss_hdemo_sk,ss_ext_wholesale_cost]
                           BroadcastHashJoin [ss_addr_sk,ca_address_sk,ca_state,ss_net_profit]
-                            Project [ss_sales_price,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_quantity,ss_sold_date_sk,ss_ext_sales_price,ss_net_profit,ss_ext_wholesale_cost]
+                            Project [ss_addr_sk,ss_quantity,ss_ext_sales_price,ss_sales_price,ss_net_profit,ss_cdemo_sk,ss_sold_date_sk,ss_hdemo_sk,ss_ext_wholesale_cost]
                               BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                Project [ss_sales_price,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_quantity,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit,ss_ext_wholesale_cost]
-                                  Filter [ss_hdemo_sk,ss_store_sk,ss_sold_date_sk,ss_addr_sk,ss_cdemo_sk]
-                                    Scan parquet default.store_sales [ss_sales_price,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_quantity,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit,ss_ext_wholesale_cost] [ss_sales_price,ss_hdemo_sk,ss_cdemo_sk,ss_addr_sk,ss_quantity,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price,ss_net_profit,ss_ext_wholesale_cost]
+                                Project [ss_addr_sk,ss_quantity,ss_store_sk,ss_ext_sales_price,ss_sales_price,ss_net_profit,ss_cdemo_sk,ss_sold_date_sk,ss_hdemo_sk,ss_ext_wholesale_cost]
+                                  Filter [ss_cdemo_sk,ss_hdemo_sk,ss_sold_date_sk,ss_store_sk,ss_addr_sk]
+                                    Scan parquet default.store_sales [ss_addr_sk,ss_quantity,ss_store_sk,ss_ext_sales_price,ss_sales_price,ss_net_profit,ss_cdemo_sk,ss_sold_date_sk,ss_hdemo_sk,ss_ext_wholesale_cost] [ss_addr_sk,ss_quantity,ss_store_sk,ss_ext_sales_price,ss_sales_price,ss_net_profit,ss_cdemo_sk,ss_sold_date_sk,ss_hdemo_sk,ss_ext_wholesale_cost]
                                 InputAdapter
                                   BroadcastExchange #2
                                     WholeStageCodegen

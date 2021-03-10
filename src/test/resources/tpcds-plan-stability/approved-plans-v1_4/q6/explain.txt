@@ -26,8 +26,8 @@ TakeOrderedAndProject(limit=100, orderBy=[cnt#1 ASC NULLS FIRST], output=[state#
                      :     :              +- *(2) FileScan parquet default.store_sales[ss_sold_date_sk#7,ss_item_sk#5,ss_customer_sk#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_customer_sk), IsNotNull(ss_sold_date_sk), IsNotNull(ss_item_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_item_sk:int,ss_customer_sk:int>
                      :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
                      :        +- *(3) Project [d_date_sk#8]
-                     :           +- *(3) Filter ((isnotnull(d_month_seq#13) && (d_month_seq#13 = Subquery subquery3222)) && isnotnull(d_date_sk#8))
-                     :              :  +- Subquery subquery3222
+                     :           +- *(3) Filter ((isnotnull(d_month_seq#13) && (d_month_seq#13 = Subquery subquery982)) && isnotnull(d_date_sk#8))
+                     :              :  +- Subquery subquery982
                      :              :     +- *(2) HashAggregate(keys=[d_month_seq#13], functions=[])
                      :              :        +- Exchange hashpartitioning(d_month_seq#13, 5)
                      :              :           +- *(1) HashAggregate(keys=[d_month_seq#13], functions=[])
@@ -35,7 +35,7 @@ TakeOrderedAndProject(limit=100, orderBy=[cnt#1 ASC NULLS FIRST], output=[state#
                      :              :                 +- *(1) Filter (((isnotnull(d_year#14) && isnotnull(d_moy#15)) && (d_year#14 = 2000)) && (d_moy#15 = 1))
                      :              :                    +- *(1) FileScan parquet default.date_dim[d_month_seq#13,d_year#14,d_moy#15] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,2000), EqualTo(d_moy,1)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
                      :              +- *(3) FileScan parquet default.date_dim[d_date_sk#8,d_month_seq#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_month_seq:int>
-                     :                    +- Subquery subquery3222
+                     :                    +- Subquery subquery982
                      :                       +- *(2) HashAggregate(keys=[d_month_seq#13], functions=[])
                      :                          +- Exchange hashpartitioning(d_month_seq#13, 5)
                      :                             +- *(1) HashAggregate(keys=[d_month_seq#13], functions=[])

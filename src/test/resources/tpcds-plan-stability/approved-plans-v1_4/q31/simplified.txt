@@ -3,19 +3,19 @@ WholeStageCodegen
     InputAdapter
       Exchange [ca_county] #1
         WholeStageCodegen
-          Project [d_year,store_sales,web_sales,web_sales,store_sales,ca_county,store_sales,web_sales]
-            BroadcastHashJoin [web_sales,ca_county,store_sales,store_sales,ca_county,web_sales]
-              Project [web_sales,ca_county,store_sales,web_sales,d_year,store_sales,store_sales,ca_county]
-                BroadcastHashJoin [store_sales,web_sales,store_sales,ca_county,ca_county,web_sales]
+          Project [web_sales,store_sales,store_sales,web_sales,d_year,store_sales,web_sales,ca_county]
+            BroadcastHashJoin [web_sales,ca_county,store_sales,ca_county,store_sales,web_sales]
+              Project [d_year,store_sales,store_sales,ca_county,web_sales,ca_county,store_sales,web_sales]
+                BroadcastHashJoin [ca_county,ca_county,store_sales,web_sales,store_sales,web_sales]
                   BroadcastHashJoin [ca_county,ca_county]
-                    Project [store_sales,d_year,store_sales,store_sales,ca_county]
+                    Project [d_year,store_sales,store_sales,ca_county,store_sales]
                       BroadcastHashJoin [ca_county,ca_county]
                         BroadcastHashJoin [ca_county,ca_county]
-                          HashAggregate [sum,sum(UnscaledValue(ss_ext_sales_price)),d_year,d_qoy,ca_county] [sum(UnscaledValue(ss_ext_sales_price)),store_sales,sum]
+                          HashAggregate [d_year,d_qoy,ca_county,sum,sum(UnscaledValue(ss_ext_sales_price))] [sum(UnscaledValue(ss_ext_sales_price)),store_sales,sum]
                             InputAdapter
                               Exchange [ca_county,d_qoy,d_year] #2
                                 WholeStageCodegen
-                                  HashAggregate [sum,sum,d_year,ss_ext_sales_price,d_qoy,ca_county] [sum,sum]
+                                  HashAggregate [d_year,d_qoy,sum,ca_county,sum,ss_ext_sales_price] [sum,sum]
                                     Project [ss_ext_sales_price,d_year,d_qoy,ca_county]
                                       BroadcastHashJoin [ss_addr_sk,ca_address_sk]
                                         Project [ss_addr_sk,ss_ext_sales_price,d_year,d_qoy]
@@ -38,11 +38,11 @@ WholeStageCodegen
                           InputAdapter
                             BroadcastExchange #5
                               WholeStageCodegen
-                                HashAggregate [sum(UnscaledValue(ss_ext_sales_price)),ca_county,d_year,d_qoy,sum] [sum(UnscaledValue(ss_ext_sales_price)),store_sales,sum]
+                                HashAggregate [d_qoy,d_year,sum(UnscaledValue(ss_ext_sales_price)),sum,ca_county] [sum(UnscaledValue(ss_ext_sales_price)),store_sales,sum]
                                   InputAdapter
                                     Exchange [ca_county,d_qoy,d_year] #6
                                       WholeStageCodegen
-                                        HashAggregate [ca_county,d_year,d_qoy,ss_ext_sales_price,sum,sum] [sum,sum]
+                                        HashAggregate [sum,d_qoy,d_year,sum,ss_ext_sales_price,ca_county] [sum,sum]
                                           Project [ss_ext_sales_price,d_year,d_qoy,ca_county]
                                             BroadcastHashJoin [ss_addr_sk,ca_address_sk]
                                               Project [ss_addr_sk,ss_ext_sales_price,d_year,d_qoy]
@@ -61,11 +61,11 @@ WholeStageCodegen
                         InputAdapter
                           BroadcastExchange #8
                             WholeStageCodegen
-                              HashAggregate [sum(UnscaledValue(ss_ext_sales_price)),ca_county,d_year,d_qoy,sum] [sum(UnscaledValue(ss_ext_sales_price)),store_sales,sum]
+                              HashAggregate [sum,sum(UnscaledValue(ss_ext_sales_price)),d_year,d_qoy,ca_county] [sum(UnscaledValue(ss_ext_sales_price)),store_sales,sum]
                                 InputAdapter
                                   Exchange [ca_county,d_qoy,d_year] #9
                                     WholeStageCodegen
-                                      HashAggregate [sum,ca_county,ss_ext_sales_price,d_year,d_qoy,sum] [sum,sum]
+                                      HashAggregate [sum,d_year,d_qoy,sum,ss_ext_sales_price,ca_county] [sum,sum]
                                         Project [ss_ext_sales_price,d_year,d_qoy,ca_county]
                                           BroadcastHashJoin [ss_addr_sk,ca_address_sk]
                                             Project [ss_addr_sk,ss_ext_sales_price,d_year,d_qoy]
@@ -84,11 +84,11 @@ WholeStageCodegen
                     InputAdapter
                       BroadcastExchange #11
                         WholeStageCodegen
-                          HashAggregate [ca_county,d_year,sum(UnscaledValue(ws_ext_sales_price)),sum,d_qoy] [sum(UnscaledValue(ws_ext_sales_price)),web_sales,sum]
+                          HashAggregate [sum,ca_county,d_qoy,d_year,sum(UnscaledValue(ws_ext_sales_price))] [sum(UnscaledValue(ws_ext_sales_price)),web_sales,sum]
                             InputAdapter
                               Exchange [ca_county,d_qoy,d_year] #12
                                 WholeStageCodegen
-                                  HashAggregate [ca_county,d_year,sum,d_qoy,ws_ext_sales_price,sum] [sum,sum]
+                                  HashAggregate [sum,ws_ext_sales_price,ca_county,d_qoy,d_year,sum] [sum,sum]
                                     Project [ws_ext_sales_price,d_year,d_qoy,ca_county]
                                       BroadcastHashJoin [ws_bill_addr_sk,ca_address_sk]
                                         Project [ws_bill_addr_sk,ws_ext_sales_price,d_year,d_qoy]
@@ -103,11 +103,11 @@ WholeStageCodegen
                   InputAdapter
                     BroadcastExchange #13
                       WholeStageCodegen
-                        HashAggregate [sum,sum(UnscaledValue(ws_ext_sales_price)),ca_county,d_qoy,d_year] [sum(UnscaledValue(ws_ext_sales_price)),web_sales,sum]
+                        HashAggregate [d_qoy,ca_county,d_year,sum,sum(UnscaledValue(ws_ext_sales_price))] [sum(UnscaledValue(ws_ext_sales_price)),web_sales,sum]
                           InputAdapter
                             Exchange [ca_county,d_qoy,d_year] #14
                               WholeStageCodegen
-                                HashAggregate [sum,sum,ws_ext_sales_price,ca_county,d_qoy,d_year] [sum,sum]
+                                HashAggregate [d_qoy,ca_county,d_year,ws_ext_sales_price,sum,sum] [sum,sum]
                                   Project [ws_ext_sales_price,d_year,d_qoy,ca_county]
                                     BroadcastHashJoin [ws_bill_addr_sk,ca_address_sk]
                                       Project [ws_bill_addr_sk,ws_ext_sales_price,d_year,d_qoy]
@@ -122,11 +122,11 @@ WholeStageCodegen
               InputAdapter
                 BroadcastExchange #15
                   WholeStageCodegen
-                    HashAggregate [sum,d_year,d_qoy,sum(UnscaledValue(ws_ext_sales_price)),ca_county] [sum(UnscaledValue(ws_ext_sales_price)),web_sales,sum]
+                    HashAggregate [sum,d_qoy,ca_county,d_year,sum(UnscaledValue(ws_ext_sales_price))] [sum(UnscaledValue(ws_ext_sales_price)),web_sales,sum]
                       InputAdapter
                         Exchange [ca_county,d_qoy,d_year] #16
                           WholeStageCodegen
-                            HashAggregate [sum,d_year,d_qoy,ws_ext_sales_price,sum,ca_county] [sum,sum]
+                            HashAggregate [sum,sum,d_qoy,ca_county,ws_ext_sales_price,d_year] [sum,sum]
                               Project [ws_ext_sales_price,d_year,d_qoy,ca_county]
                                 BroadcastHashJoin [ws_bill_addr_sk,ca_address_sk]
                                   Project [ws_bill_addr_sk,ws_ext_sales_price,d_year,d_qoy]

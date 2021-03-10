@@ -1,10 +1,10 @@
 TakeOrderedAndProject [sum(ss_ext_sales_price),d_year,i_category_id,i_category]
   WholeStageCodegen
-    HashAggregate [d_year,sum,i_category,i_category_id,sum(UnscaledValue(ss_ext_sales_price))] [sum(UnscaledValue(ss_ext_sales_price)),sum(ss_ext_sales_price),sum]
+    HashAggregate [sum(UnscaledValue(ss_ext_sales_price)),sum,d_year,i_category,i_category_id] [sum(UnscaledValue(ss_ext_sales_price)),sum(ss_ext_sales_price),sum]
       InputAdapter
         Exchange [d_year,i_category_id,i_category] #1
           WholeStageCodegen
-            HashAggregate [d_year,sum,ss_ext_sales_price,sum,i_category,i_category_id] [sum,sum]
+            HashAggregate [sum,d_year,sum,i_category,i_category_id,ss_ext_sales_price] [sum,sum]
               Project [d_year,ss_ext_sales_price,i_category_id,i_category]
                 BroadcastHashJoin [ss_item_sk,i_item_sk]
                   Project [d_year,ss_item_sk,ss_ext_sales_price]

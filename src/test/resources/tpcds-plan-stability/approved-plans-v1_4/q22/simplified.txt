@@ -1,14 +1,14 @@
-TakeOrderedAndProject [i_category,qoh,i_brand,i_class,i_product_name]
+TakeOrderedAndProject [i_category,i_class,i_product_name,i_brand,qoh]
   WholeStageCodegen
-    HashAggregate [i_category,avg(cast(inv_quantity_on_hand as bigint)),i_brand,sum,i_class,count,spark_grouping_id,i_product_name] [avg(cast(inv_quantity_on_hand as bigint)),qoh,sum,count]
+    HashAggregate [avg(cast(inv_quantity_on_hand as bigint)),i_category,count,spark_grouping_id,sum,i_class,i_product_name,i_brand] [avg(cast(inv_quantity_on_hand as bigint)),qoh,sum,count]
       InputAdapter
-        Exchange [i_category,i_brand,i_class,spark_grouping_id,i_product_name] #1
+        Exchange [i_category,spark_grouping_id,i_class,i_product_name,i_brand] #1
           WholeStageCodegen
-            HashAggregate [i_category,inv_quantity_on_hand,count,i_brand,sum,sum,i_class,count,spark_grouping_id,i_product_name] [sum,count,sum,count]
-              Expand [i_brand,i_product_name,inv_quantity_on_hand,i_category,i_class]
-                Project [inv_quantity_on_hand,i_category,i_brand,i_product_name,i_class]
+            HashAggregate [sum,i_category,count,count,spark_grouping_id,sum,i_class,i_product_name,inv_quantity_on_hand,i_brand] [sum,count,sum,count]
+              Expand [i_product_name,i_class,i_brand,i_category,inv_quantity_on_hand]
+                Project [i_brand,i_category,inv_quantity_on_hand,i_class,i_product_name]
                   BroadcastHashJoin [inv_warehouse_sk,w_warehouse_sk]
-                    Project [i_product_name,inv_quantity_on_hand,i_brand,i_category,inv_warehouse_sk,i_class]
+                    Project [i_class,inv_quantity_on_hand,inv_warehouse_sk,i_product_name,i_category,i_brand]
                       BroadcastHashJoin [inv_item_sk,i_item_sk]
                         Project [inv_item_sk,inv_warehouse_sk,inv_quantity_on_hand]
                           BroadcastHashJoin [inv_date_sk,d_date_sk]
@@ -24,9 +24,9 @@ TakeOrderedAndProject [i_category,qoh,i_brand,i_class,i_product_name]
                         InputAdapter
                           BroadcastExchange #3
                             WholeStageCodegen
-                              Project [i_product_name,i_brand,i_category,i_item_sk,i_class]
+                              Project [i_class,i_item_sk,i_product_name,i_category,i_brand]
                                 Filter [i_item_sk]
-                                  Scan parquet default.item [i_product_name,i_brand,i_category,i_item_sk,i_class] [i_product_name,i_brand,i_category,i_item_sk,i_class]
+                                  Scan parquet default.item [i_class,i_item_sk,i_product_name,i_category,i_brand] [i_class,i_item_sk,i_product_name,i_category,i_brand]
                     InputAdapter
                       BroadcastExchange #4
                         WholeStageCodegen

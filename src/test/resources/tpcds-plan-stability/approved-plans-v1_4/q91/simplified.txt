@@ -3,22 +3,22 @@ WholeStageCodegen
     InputAdapter
       Exchange [Returns_Loss] #1
         WholeStageCodegen
-          HashAggregate [cc_name,sum(UnscaledValue(cr_net_loss)),cc_manager,cd_education_status,cd_marital_status,sum,cc_call_center_id] [Manager,sum(UnscaledValue(cr_net_loss)),Call_Center_Name,Returns_Loss,sum,Call_Center]
+          HashAggregate [cc_call_center_id,sum(UnscaledValue(cr_net_loss)),sum,cc_name,cd_education_status,cc_manager,cd_marital_status] [sum(UnscaledValue(cr_net_loss)),sum,Manager,Call_Center_Name,Returns_Loss,Call_Center]
             InputAdapter
-              Exchange [cc_name,cc_manager,cd_education_status,cd_marital_status,cc_call_center_id] #2
+              Exchange [cc_call_center_id,cc_name,cd_education_status,cc_manager,cd_marital_status] #2
                 WholeStageCodegen
-                  HashAggregate [cc_name,cc_manager,cd_education_status,cd_marital_status,cr_net_loss,sum,cc_call_center_id,sum] [sum,sum]
-                    Project [cr_net_loss,cc_call_center_id,cc_manager,cd_education_status,cc_name,cd_marital_status]
+                  HashAggregate [cc_call_center_id,sum,cc_name,cd_education_status,cc_manager,cr_net_loss,sum,cd_marital_status] [sum,sum]
+                    Project [cr_net_loss,cd_marital_status,cc_call_center_id,cc_name,cc_manager,cd_education_status]
                       BroadcastHashJoin [c_current_hdemo_sk,hd_demo_sk]
-                        Project [cr_net_loss,cc_call_center_id,cc_manager,cd_education_status,cc_name,c_current_hdemo_sk,cd_marital_status]
+                        Project [cr_net_loss,c_current_hdemo_sk,cd_marital_status,cc_call_center_id,cc_name,cc_manager,cd_education_status]
                           BroadcastHashJoin [c_current_cdemo_sk,cd_demo_sk]
-                            Project [cr_net_loss,cc_call_center_id,cc_manager,c_current_cdemo_sk,cc_name,c_current_hdemo_sk]
+                            Project [c_current_cdemo_sk,cr_net_loss,c_current_hdemo_sk,cc_call_center_id,cc_name,cc_manager]
                               BroadcastHashJoin [c_current_addr_sk,ca_address_sk]
-                                Project [cr_net_loss,cc_call_center_id,cc_manager,c_current_cdemo_sk,cc_name,c_current_hdemo_sk,c_current_addr_sk]
+                                Project [c_current_cdemo_sk,c_current_addr_sk,cr_net_loss,c_current_hdemo_sk,cc_call_center_id,cc_name,cc_manager]
                                   BroadcastHashJoin [cr_returning_customer_sk,c_customer_sk]
-                                    Project [cr_net_loss,cc_call_center_id,cc_manager,cr_returning_customer_sk,cc_name]
+                                    Project [cr_returning_customer_sk,cr_net_loss,cc_call_center_id,cc_name,cc_manager]
                                       BroadcastHashJoin [cr_returned_date_sk,d_date_sk]
-                                        Project [cr_net_loss,cc_call_center_id,cc_manager,cr_returning_customer_sk,cc_name,cr_returned_date_sk]
+                                        Project [cr_returning_customer_sk,cr_net_loss,cc_call_center_id,cr_returned_date_sk,cc_name,cc_manager]
                                           BroadcastHashJoin [cc_call_center_sk,cr_call_center_sk]
                                             Project [cc_call_center_sk,cc_call_center_id,cc_name,cc_manager]
                                               Filter [cc_call_center_sk]

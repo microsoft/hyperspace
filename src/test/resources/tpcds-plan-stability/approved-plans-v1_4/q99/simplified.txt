@@ -1,21 +1,21 @@
-TakeOrderedAndProject [30 days ,cc_name,91 - 120 days ,61 - 90 days ,substring(w_warehouse_name, 1, 20),31 - 60 days ,sm_type,>120 days ]
+TakeOrderedAndProject [substring(w_warehouse_name, 1, 20),61 - 90 days ,cc_name,>120 days ,91 - 120 days ,30 days ,sm_type,31 - 60 days ]
   WholeStageCodegen
-    HashAggregate [sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 120) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 60) && ((cs_ship_date_sk - cs_sold_date_sk) <= 90)) THEN 1 ELSE 0 END as bigint)),cc_name,sum,sum,sum,sum,substring(w_warehouse_name, 1, 20),sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 90) && ((cs_ship_date_sk - cs_sold_date_sk) <= 120)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 30) && ((cs_ship_date_sk - cs_sold_date_sk) <= 60)) THEN 1 ELSE 0 END as bigint)),sm_type] [sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 120) THEN 1 ELSE 0 END as bigint)),30 days ,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 60) && ((cs_ship_date_sk - cs_sold_date_sk) <= 90)) THEN 1 ELSE 0 END as bigint)),sum,sum,91 - 120 days ,sum,sum,sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 90) && ((cs_ship_date_sk - cs_sold_date_sk) <= 120)) THEN 1 ELSE 0 END as bigint)),61 - 90 days ,substring(w_warehouse_name, 1, 20),31 - 60 days ,sum,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 30) && ((cs_ship_date_sk - cs_sold_date_sk) <= 60)) THEN 1 ELSE 0 END as bigint)),>120 days ]
+    HashAggregate [sum,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 30) && ((cs_ship_date_sk - cs_sold_date_sk) <= 60)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) <= 30) THEN 1 ELSE 0 END as bigint)),sum,substring(w_warehouse_name, 1, 20),sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 90) && ((cs_ship_date_sk - cs_sold_date_sk) <= 120)) THEN 1 ELSE 0 END as bigint)),sum,cc_name,sum,sm_type,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 60) && ((cs_ship_date_sk - cs_sold_date_sk) <= 90)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 120) THEN 1 ELSE 0 END as bigint)),sum] [sum,substring(w_warehouse_name, 1, 20),sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 30) && ((cs_ship_date_sk - cs_sold_date_sk) <= 60)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) <= 30) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 90) && ((cs_ship_date_sk - cs_sold_date_sk) <= 120)) THEN 1 ELSE 0 END as bigint)),61 - 90 days ,sum,>120 days ,sum,91 - 120 days ,30 days ,31 - 60 days ,sum(cast(CASE WHEN (((cs_ship_date_sk - cs_sold_date_sk) > 60) && ((cs_ship_date_sk - cs_sold_date_sk) <= 90)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 120) THEN 1 ELSE 0 END as bigint)),sum]
       InputAdapter
         Exchange [substring(w_warehouse_name, 1, 20),sm_type,cc_name] #1
           WholeStageCodegen
-            HashAggregate [cc_name,sum,sum,cs_ship_date_sk,w_warehouse_name,sum,sum,sum,sum,substring(w_warehouse_name, 1, 20),sum,sum,cs_sold_date_sk,sum,sum,sm_type] [sum,sum,sum,sum,sum,sum,substring(w_warehouse_name, 1, 20),sum,sum,sum,sum]
-              Project [w_warehouse_name,cs_ship_date_sk,sm_type,cs_sold_date_sk,cc_name]
+            HashAggregate [sum,sum,sum,substring(w_warehouse_name, 1, 20),w_warehouse_name,sum,sum,cs_sold_date_sk,sum,cc_name,sum,sum,sm_type,cs_ship_date_sk,sum,sum] [sum,sum,sum,substring(w_warehouse_name, 1, 20),sum,sum,sum,sum,sum,sum,sum]
+              Project [cs_ship_date_sk,cs_sold_date_sk,sm_type,w_warehouse_name,cc_name]
                 BroadcastHashJoin [cs_ship_date_sk,d_date_sk]
-                  Project [w_warehouse_name,cs_ship_date_sk,sm_type,cs_sold_date_sk,cc_name]
+                  Project [cs_ship_date_sk,cs_sold_date_sk,sm_type,w_warehouse_name,cc_name]
                     BroadcastHashJoin [cs_call_center_sk,cc_call_center_sk]
-                      Project [cs_call_center_sk,w_warehouse_name,cs_ship_date_sk,sm_type,cs_sold_date_sk]
+                      Project [cs_ship_date_sk,cs_sold_date_sk,sm_type,w_warehouse_name,cs_call_center_sk]
                         BroadcastHashJoin [cs_ship_mode_sk,sm_ship_mode_sk]
-                          Project [cs_call_center_sk,cs_ship_mode_sk,w_warehouse_name,cs_ship_date_sk,cs_sold_date_sk]
+                          Project [cs_ship_date_sk,cs_sold_date_sk,cs_ship_mode_sk,w_warehouse_name,cs_call_center_sk]
                             BroadcastHashJoin [cs_warehouse_sk,w_warehouse_sk]
-                              Project [cs_call_center_sk,cs_ship_mode_sk,cs_warehouse_sk,cs_ship_date_sk,cs_sold_date_sk]
+                              Project [cs_ship_date_sk,cs_warehouse_sk,cs_sold_date_sk,cs_ship_mode_sk,cs_call_center_sk]
                                 Filter [cs_warehouse_sk,cs_ship_mode_sk,cs_call_center_sk,cs_ship_date_sk]
-                                  Scan parquet default.catalog_sales [cs_call_center_sk,cs_ship_mode_sk,cs_warehouse_sk,cs_ship_date_sk,cs_sold_date_sk] [cs_call_center_sk,cs_ship_mode_sk,cs_warehouse_sk,cs_ship_date_sk,cs_sold_date_sk]
+                                  Scan parquet default.catalog_sales [cs_ship_date_sk,cs_warehouse_sk,cs_sold_date_sk,cs_ship_mode_sk,cs_call_center_sk] [cs_ship_date_sk,cs_warehouse_sk,cs_sold_date_sk,cs_ship_mode_sk,cs_call_center_sk]
                               InputAdapter
                                 BroadcastExchange #2
                                   WholeStageCodegen

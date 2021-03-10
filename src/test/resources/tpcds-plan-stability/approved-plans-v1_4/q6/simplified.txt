@@ -2,7 +2,7 @@ TakeOrderedAndProject [cnt,state]
   WholeStageCodegen
     Project [state,cnt]
       Filter [count(1)]
-        HashAggregate [ca_state,count,count(1)] [cnt,count(1),count(1),state,count]
+        HashAggregate [ca_state,count,count(1)] [state,cnt,count(1),count,count(1)]
           InputAdapter
             Exchange [ca_state] #1
               WholeStageCodegen
@@ -68,11 +68,11 @@ TakeOrderedAndProject [cnt,state]
                                   InputAdapter
                                     BroadcastExchange #7
                                       WholeStageCodegen
-                                        HashAggregate [i_category,sum,count,avg(UnscaledValue(i_current_price))] [count,i_category,avg(UnscaledValue(i_current_price)),avg(i_current_price),sum]
+                                        HashAggregate [i_category,sum,count,avg(UnscaledValue(i_current_price))] [avg(i_current_price),sum,i_category,count,avg(UnscaledValue(i_current_price))]
                                           InputAdapter
                                             Exchange [i_category] #8
                                               WholeStageCodegen
-                                                HashAggregate [count,count,i_category,i_current_price,sum,sum] [sum,count,sum,count]
+                                                HashAggregate [sum,sum,count,i_category,i_current_price,count] [sum,count,sum,count]
                                                   Project [i_current_price,i_category]
                                                     Filter [i_category]
                                                       Scan parquet default.item [i_current_price,i_category] [i_current_price,i_category]

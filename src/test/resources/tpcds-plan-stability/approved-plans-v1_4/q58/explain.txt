@@ -27,13 +27,13 @@ TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,ss_item_rev#
       :     :                          :     +- *(3) FileScan parquet default.date_dim[d_date_sk#14,d_date#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
       :     :                          +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, date, true]))
       :     :                             +- *(2) Project [d_date#17 AS d_date#17#18]
-      :     :                                +- *(2) Filter (isnotnull(d_week_seq#19) && (d_week_seq#19 = Subquery subquery14656))
-      :     :                                   :  +- Subquery subquery14656
+      :     :                                +- *(2) Filter (isnotnull(d_week_seq#19) && (d_week_seq#19 = Subquery subquery12416))
+      :     :                                   :  +- Subquery subquery12416
       :     :                                   :     +- *(1) Project [d_week_seq#19]
       :     :                                   :        +- *(1) Filter (isnotnull(d_date#17) && (cast(d_date#17 as string) = 2000-01-03))
       :     :                                   :           +- *(1) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date)], ReadSchema: struct<d_date:date,d_week_seq:int>
       :     :                                   +- *(2) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_week_seq)], ReadSchema: struct<d_date:date,d_week_seq:int>
-      :     :                                         +- Subquery subquery14656
+      :     :                                         +- Subquery subquery12416
       :     :                                            +- *(1) Project [d_week_seq#19]
       :     :                                               +- *(1) Filter (isnotnull(d_date#17) && (cast(d_date#17 as string) = 2000-01-03))
       :     :                                                  +- *(1) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date)], ReadSchema: struct<d_date:date,d_week_seq:int>
@@ -58,13 +58,13 @@ TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,ss_item_rev#
       :                                   :     +- *(7) FileScan parquet default.date_dim[d_date_sk#14,d_date#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
       :                                   +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, date, true]))
       :                                      +- *(6) Project [d_date#17 AS d_date#17#23]
-      :                                         +- *(6) Filter (isnotnull(d_week_seq#19) && (d_week_seq#19 = Subquery subquery14660))
-      :                                            :  +- Subquery subquery14660
+      :                                         +- *(6) Filter (isnotnull(d_week_seq#19) && (d_week_seq#19 = Subquery subquery12420))
+      :                                            :  +- Subquery subquery12420
       :                                            :     +- *(1) Project [d_week_seq#19]
       :                                            :        +- *(1) Filter (isnotnull(d_date#17) && (cast(d_date#17 as string) = 2000-01-03))
       :                                            :           +- *(1) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date)], ReadSchema: struct<d_date:date,d_week_seq:int>
       :                                            +- *(6) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_week_seq)], ReadSchema: struct<d_date:date,d_week_seq:int>
-      :                                                  +- Subquery subquery14660
+      :                                                  +- Subquery subquery12420
       :                                                     +- *(1) Project [d_week_seq#19]
       :                                                        +- *(1) Filter (isnotnull(d_date#17) && (cast(d_date#17 as string) = 2000-01-03))
       :                                                           +- *(1) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date)], ReadSchema: struct<d_date:date,d_week_seq:int>
@@ -89,13 +89,13 @@ TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,ss_item_rev#
                                     :     +- *(12) FileScan parquet default.date_dim[d_date_sk#14,d_date#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
                                     +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, date, true]))
                                        +- *(11) Project [d_date#17 AS d_date#17#27]
-                                          +- *(11) Filter (isnotnull(d_week_seq#19) && (d_week_seq#19 = Subquery subquery14664))
-                                             :  +- Subquery subquery14664
+                                          +- *(11) Filter (isnotnull(d_week_seq#19) && (d_week_seq#19 = Subquery subquery12424))
+                                             :  +- Subquery subquery12424
                                              :     +- *(1) Project [d_week_seq#19]
                                              :        +- *(1) Filter (isnotnull(d_date#17) && (cast(d_date#17 as string) = 2000-01-03))
                                              :           +- *(1) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date)], ReadSchema: struct<d_date:date,d_week_seq:int>
                                              +- *(11) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_week_seq)], ReadSchema: struct<d_date:date,d_week_seq:int>
-                                                   +- Subquery subquery14664
+                                                   +- Subquery subquery12424
                                                       +- *(1) Project [d_week_seq#19]
                                                          +- *(1) Filter (isnotnull(d_date#17) && (cast(d_date#17 as string) = 2000-01-03))
                                                             +- *(1) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date)], ReadSchema: struct<d_date:date,d_week_seq:int>

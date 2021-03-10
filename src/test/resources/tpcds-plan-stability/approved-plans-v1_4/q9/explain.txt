@@ -1,104 +1,104 @@
 == Physical Plan ==
-*(1) Project [CASE WHEN (Subquery subquery3390 > 62316685) THEN Subquery subquery3391 ELSE Subquery subquery3392 END AS bucket1#1, CASE WHEN (Subquery subquery3394 > 19045798) THEN Subquery subquery3395 ELSE Subquery subquery3396 END AS bucket2#2, CASE WHEN (Subquery subquery3398 > 365541424) THEN Subquery subquery3399 ELSE Subquery subquery3400 END AS bucket3#3, CASE WHEN (Subquery subquery3402 > 216357808) THEN Subquery subquery3403 ELSE Subquery subquery3404 END AS bucket4#4, CASE WHEN (Subquery subquery3406 > 184483884) THEN Subquery subquery3407 ELSE Subquery subquery3408 END AS bucket5#5]
-:  :- Subquery subquery3390
+*(1) Project [CASE WHEN (Subquery subquery1150 > 62316685) THEN Subquery subquery1151 ELSE Subquery subquery1152 END AS bucket1#1, CASE WHEN (Subquery subquery1154 > 19045798) THEN Subquery subquery1155 ELSE Subquery subquery1156 END AS bucket2#2, CASE WHEN (Subquery subquery1158 > 365541424) THEN Subquery subquery1159 ELSE Subquery subquery1160 END AS bucket3#3, CASE WHEN (Subquery subquery1162 > 216357808) THEN Subquery subquery1163 ELSE Subquery subquery1164 END AS bucket4#4, CASE WHEN (Subquery subquery1166 > 184483884) THEN Subquery subquery1167 ELSE Subquery subquery1168 END AS bucket5#5]
+:  :- Subquery subquery1150
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 1)) && (ss_quantity#6 <= 20))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,1), LessThanOrEqual(ss_quantity,20)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery3391
+:  :- Subquery subquery1151
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 1)) && (ss_quantity#6 <= 20))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,1), LessThanOrEqual(ss_quantity,20)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery3392
+:  :- Subquery subquery1152
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 1)) && (ss_quantity#6 <= 20))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,1), LessThanOrEqual(ss_quantity,20)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery3394
+:  :- Subquery subquery1154
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 21)) && (ss_quantity#6 <= 40))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,21), LessThanOrEqual(ss_quantity,40)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery3395
+:  :- Subquery subquery1155
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 21)) && (ss_quantity#6 <= 40))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,21), LessThanOrEqual(ss_quantity,40)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery3396
+:  :- Subquery subquery1156
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 21)) && (ss_quantity#6 <= 40))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,21), LessThanOrEqual(ss_quantity,40)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery3398
+:  :- Subquery subquery1158
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 41)) && (ss_quantity#6 <= 60))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,41), LessThanOrEqual(ss_quantity,60)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery3399
+:  :- Subquery subquery1159
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 41)) && (ss_quantity#6 <= 60))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,41), LessThanOrEqual(ss_quantity,60)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery3400
+:  :- Subquery subquery1160
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 41)) && (ss_quantity#6 <= 60))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,41), LessThanOrEqual(ss_quantity,60)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery3402
+:  :- Subquery subquery1162
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 61)) && (ss_quantity#6 <= 80))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,61), LessThanOrEqual(ss_quantity,80)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery3403
+:  :- Subquery subquery1163
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 61)) && (ss_quantity#6 <= 80))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,61), LessThanOrEqual(ss_quantity,80)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery3404
+:  :- Subquery subquery1164
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 61)) && (ss_quantity#6 <= 80))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,61), LessThanOrEqual(ss_quantity,80)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery3406
+:  :- Subquery subquery1166
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 81)) && (ss_quantity#6 <= 100))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,81), LessThanOrEqual(ss_quantity,100)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery3407
+:  :- Subquery subquery1167
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 81)) && (ss_quantity#6 <= 100))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,81), LessThanOrEqual(ss_quantity,100)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  +- Subquery subquery3408
+:  +- Subquery subquery1168
 :     +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :        +- Exchange SinglePartition
 :           +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])

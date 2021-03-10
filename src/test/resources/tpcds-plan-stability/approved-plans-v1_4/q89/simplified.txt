@@ -1,24 +1,24 @@
-TakeOrderedAndProject [avg_monthly_sales,d_moy,sum_sales,s_store_name,s_company_name,i_category,i_brand,i_class]
+TakeOrderedAndProject [s_company_name,d_moy,sum_sales,i_brand,i_category,avg_monthly_sales,s_store_name,i_class]
   WholeStageCodegen
-    Project [sum_sales,s_store_name,d_moy,s_company_name,i_category,avg_monthly_sales,i_brand,i_class]
+    Project [s_company_name,d_moy,sum_sales,i_brand,avg_monthly_sales,i_category,i_class,s_store_name]
       Filter [avg_monthly_sales,sum_sales]
         InputAdapter
-          Window [s_store_name,_w0,s_company_name,i_category,i_brand]
+          Window [s_company_name,i_brand,i_category,s_store_name,_w0]
             WholeStageCodegen
               Sort [i_category,i_brand,s_store_name,s_company_name]
                 InputAdapter
                   Exchange [i_category,i_brand,s_store_name,s_company_name] #1
                     WholeStageCodegen
-                      HashAggregate [sum,sum(UnscaledValue(ss_sales_price)),s_store_name,d_moy,s_company_name,i_category,i_brand,i_class] [sum(UnscaledValue(ss_sales_price)),sum_sales,_w0,sum]
+                      HashAggregate [s_company_name,d_moy,i_brand,sum(UnscaledValue(ss_sales_price)),i_category,sum,i_class,s_store_name] [sum(UnscaledValue(ss_sales_price)),sum_sales,_w0,sum]
                         InputAdapter
-                          Exchange [s_store_name,d_moy,s_company_name,i_category,i_brand,i_class] #2
+                          Exchange [s_company_name,d_moy,i_brand,i_category,i_class,s_store_name] #2
                             WholeStageCodegen
-                              HashAggregate [sum,sum,s_store_name,d_moy,ss_sales_price,s_company_name,i_category,i_brand,i_class] [sum,sum]
-                                Project [ss_sales_price,i_brand,i_category,s_company_name,s_store_name,i_class,d_moy]
+                              HashAggregate [s_company_name,d_moy,i_brand,ss_sales_price,i_category,sum,sum,i_class,s_store_name] [sum,sum]
+                                Project [i_class,s_store_name,s_company_name,d_moy,i_category,ss_sales_price,i_brand]
                                   BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                    Project [ss_sales_price,i_brand,i_category,ss_store_sk,i_class,d_moy]
+                                    Project [i_class,d_moy,ss_store_sk,i_category,ss_sales_price,i_brand]
                                       BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                        Project [ss_sales_price,i_brand,i_category,ss_sold_date_sk,ss_store_sk,i_class]
+                                        Project [i_class,ss_store_sk,i_category,ss_sales_price,ss_sold_date_sk,i_brand]
                                           BroadcastHashJoin [i_item_sk,ss_item_sk]
                                             Project [i_item_sk,i_brand,i_class,i_category]
                                               Filter [i_category,i_class,i_item_sk]

@@ -19,11 +19,11 @@ TakeOrderedAndProject [promotions,total,(CAST((CAST(CAST(promotions AS DECIMAL(1
                                     BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                                       Project [ss_sold_date_sk,ss_item_sk,ss_customer_sk,ss_ext_sales_price]
                                         BroadcastHashJoin [ss_promo_sk,p_promo_sk]
-                                          Project [ss_customer_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_ext_sales_price]
+                                          Project [ss_item_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_promo_sk]
                                             BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                              Project [ss_customer_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price]
-                                                Filter [ss_customer_sk,ss_item_sk,ss_promo_sk,ss_store_sk,ss_sold_date_sk]
-                                                  Scan parquet default.store_sales [ss_customer_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price] [ss_customer_sk,ss_item_sk,ss_promo_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price]
+                                              Project [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_promo_sk]
+                                                Filter [ss_sold_date_sk,ss_customer_sk,ss_promo_sk,ss_store_sk,ss_item_sk]
+                                                  Scan parquet default.store_sales [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_promo_sk] [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_promo_sk]
                                               InputAdapter
                                                 BroadcastExchange #2
                                                   WholeStageCodegen
@@ -77,9 +77,9 @@ TakeOrderedAndProject [promotions,total,(CAST((CAST(CAST(promotions AS DECIMAL(1
                                       BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                                         Project [ss_sold_date_sk,ss_item_sk,ss_customer_sk,ss_ext_sales_price]
                                           BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                            Project [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price]
+                                            Project [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk]
                                               Filter [ss_store_sk,ss_sold_date_sk,ss_customer_sk,ss_item_sk]
-                                                Scan parquet default.store_sales [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price] [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ext_sales_price]
+                                                Scan parquet default.store_sales [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk] [ss_item_sk,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk]
                                             InputAdapter
                                               ReusedExchange [s_store_sk] [s_store_sk] #2
                                         InputAdapter

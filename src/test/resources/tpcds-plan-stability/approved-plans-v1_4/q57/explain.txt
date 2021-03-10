@@ -21,8 +21,8 @@ TakeOrderedAndProject(limit=100, orderBy=[CheckOverflow((promote_precision(cast(
       :     :                                   :     :- *(4) Project [i_brand#5, i_category#4, cs_sold_date_sk#25, cs_call_center_sk#23, cs_sales_price#22]
       :     :                                   :     :  +- *(4) BroadcastHashJoin [i_item_sk#27], [cs_item_sk#28], Inner, BuildRight
       :     :                                   :     :     :- *(4) Project [i_item_sk#27, i_brand#5, i_category#4]
-      :     :                                   :     :     :  +- *(4) Filter ((isnotnull(i_item_sk#27) && isnotnull(i_category#4)) && isnotnull(i_brand#5))
-      :     :                                   :     :     :     +- *(4) FileScan parquet default.item[i_item_sk#27,i_brand#5,i_category#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_category), IsNotNull(i_brand)], ReadSchema: struct<i_item_sk:int,i_brand:string,i_category:string>
+      :     :                                   :     :     :  +- *(4) Filter ((isnotnull(i_item_sk#27) && isnotnull(i_brand#5)) && isnotnull(i_category#4))
+      :     :                                   :     :     :     +- *(4) FileScan parquet default.item[i_item_sk#27,i_brand#5,i_category#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_brand), IsNotNull(i_category)], ReadSchema: struct<i_item_sk:int,i_brand:string,i_category:string>
       :     :                                   :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[2, int, true] as bigint)))
       :     :                                   :     :        +- *(1) Project [cs_sold_date_sk#25, cs_call_center_sk#23, cs_item_sk#28, cs_sales_price#22]
       :     :                                   :     :           +- *(1) Filter ((isnotnull(cs_item_sk#28) && isnotnull(cs_sold_date_sk#25)) && isnotnull(cs_call_center_sk#23))

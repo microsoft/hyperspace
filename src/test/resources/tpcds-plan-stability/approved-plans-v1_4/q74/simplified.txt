@@ -1,22 +1,22 @@
 TakeOrderedAndProject [customer_id,customer_first_name,customer_last_name]
   WholeStageCodegen
     Project [customer_id,customer_first_name,customer_last_name]
-      BroadcastHashJoin [customer_id,year_total,year_total,year_total,year_total,customer_id]
-        Project [year_total,year_total,customer_id,customer_id,customer_last_name,customer_first_name,year_total]
+      BroadcastHashJoin [year_total,year_total,year_total,year_total,customer_id,customer_id]
+        Project [customer_first_name,year_total,year_total,customer_last_name,year_total,customer_id,customer_id]
           BroadcastHashJoin [customer_id,customer_id]
             BroadcastHashJoin [customer_id,customer_id]
               InputAdapter
                 Union
                   WholeStageCodegen
                     Filter [year_total]
-                      HashAggregate [sum,c_last_name,sum(UnscaledValue(ss_net_paid)),c_customer_id,d_year,c_first_name] [sum(UnscaledValue(ss_net_paid)),customer_id,year_total,sum]
+                      HashAggregate [d_year,sum(UnscaledValue(ss_net_paid)),c_customer_id,c_last_name,sum,c_first_name] [sum(UnscaledValue(ss_net_paid)),customer_id,year_total,sum]
                         InputAdapter
                           Exchange [c_customer_id,c_first_name,c_last_name,d_year] #1
                             WholeStageCodegen
-                              HashAggregate [sum,sum,c_last_name,c_customer_id,d_year,ss_net_paid,c_first_name] [sum,sum]
-                                Project [d_year,c_customer_id,c_last_name,c_first_name,ss_net_paid]
+                              HashAggregate [d_year,sum,ss_net_paid,c_customer_id,c_last_name,sum,c_first_name] [sum,sum]
+                                Project [c_customer_id,d_year,ss_net_paid,c_last_name,c_first_name]
                                   BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                    Project [c_customer_id,ss_sold_date_sk,c_last_name,c_first_name,ss_net_paid]
+                                    Project [c_customer_id,ss_net_paid,c_last_name,c_first_name,ss_sold_date_sk]
                                       BroadcastHashJoin [c_customer_sk,ss_customer_sk]
                                         Project [c_customer_sk,c_customer_id,c_first_name,c_last_name]
                                           Filter [c_customer_sk,c_customer_id]
@@ -38,14 +38,14 @@ TakeOrderedAndProject [customer_id,customer_first_name,customer_last_name]
                 BroadcastExchange #4
                   Union
                     WholeStageCodegen
-                      HashAggregate [c_last_name,sum,sum(UnscaledValue(ss_net_paid)),c_customer_id,d_year,c_first_name] [year_total,sum,sum(UnscaledValue(ss_net_paid)),customer_id,customer_last_name,customer_first_name]
+                      HashAggregate [d_year,sum(UnscaledValue(ss_net_paid)),sum,c_customer_id,c_last_name,c_first_name] [sum(UnscaledValue(ss_net_paid)),customer_first_name,sum,customer_last_name,year_total,customer_id]
                         InputAdapter
                           Exchange [c_customer_id,c_first_name,c_last_name,d_year] #5
                             WholeStageCodegen
-                              HashAggregate [c_last_name,sum,c_customer_id,d_year,ss_net_paid,sum,c_first_name] [sum,sum]
-                                Project [d_year,c_customer_id,c_last_name,c_first_name,ss_net_paid]
+                              HashAggregate [d_year,ss_net_paid,sum,c_customer_id,c_last_name,c_first_name,sum] [sum,sum]
+                                Project [c_customer_id,d_year,ss_net_paid,c_last_name,c_first_name]
                                   BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                    Project [c_customer_id,ss_sold_date_sk,c_last_name,c_first_name,ss_net_paid]
+                                    Project [c_customer_id,ss_net_paid,c_last_name,c_first_name,ss_sold_date_sk]
                                       BroadcastHashJoin [c_customer_sk,ss_customer_sk]
                                         Project [c_customer_sk,c_customer_id,c_first_name,c_last_name]
                                           Filter [c_customer_sk,c_customer_id]
@@ -65,14 +65,14 @@ TakeOrderedAndProject [customer_id,customer_first_name,customer_last_name]
                   LocalTableScan [customer_id,year_total] [customer_id,year_total]
                   WholeStageCodegen
                     Filter [year_total]
-                      HashAggregate [c_last_name,sum,c_customer_id,d_year,sum(UnscaledValue(ws_net_paid)),c_first_name] [sum(UnscaledValue(ws_net_paid)),customer_id,year_total,sum]
+                      HashAggregate [d_year,sum,sum(UnscaledValue(ws_net_paid)),c_customer_id,c_last_name,c_first_name] [sum(UnscaledValue(ws_net_paid)),customer_id,year_total,sum]
                         InputAdapter
                           Exchange [c_customer_id,c_first_name,c_last_name,d_year] #8
                             WholeStageCodegen
-                              HashAggregate [c_last_name,sum,sum,c_customer_id,d_year,c_first_name,ws_net_paid] [sum,sum]
-                                Project [ws_net_paid,d_year,c_customer_id,c_last_name,c_first_name]
+                              HashAggregate [d_year,sum,sum,ws_net_paid,c_customer_id,c_last_name,c_first_name] [sum,sum]
+                                Project [c_customer_id,ws_net_paid,d_year,c_last_name,c_first_name]
                                   BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
-                                    Project [ws_net_paid,c_customer_id,c_last_name,c_first_name,ws_sold_date_sk]
+                                    Project [c_customer_id,ws_net_paid,c_last_name,ws_sold_date_sk,c_first_name]
                                       BroadcastHashJoin [c_customer_sk,ws_bill_customer_sk]
                                         Project [c_customer_sk,c_customer_id,c_first_name,c_last_name]
                                           Filter [c_customer_sk,c_customer_id]
@@ -90,14 +90,14 @@ TakeOrderedAndProject [customer_id,customer_first_name,customer_last_name]
             Union
               LocalTableScan [customer_id,year_total] [customer_id,year_total]
               WholeStageCodegen
-                HashAggregate [c_last_name,sum,c_customer_id,d_year,sum(UnscaledValue(ws_net_paid)),c_first_name] [sum(UnscaledValue(ws_net_paid)),customer_id,year_total,sum]
+                HashAggregate [d_year,sum(UnscaledValue(ws_net_paid)),c_customer_id,c_last_name,c_first_name,sum] [sum(UnscaledValue(ws_net_paid)),customer_id,year_total,sum]
                   InputAdapter
                     Exchange [c_customer_id,c_first_name,c_last_name,d_year] #11
                       WholeStageCodegen
-                        HashAggregate [c_last_name,sum,c_customer_id,d_year,sum,c_first_name,ws_net_paid] [sum,sum]
-                          Project [ws_net_paid,d_year,c_customer_id,c_last_name,c_first_name]
+                        HashAggregate [d_year,ws_net_paid,c_customer_id,sum,c_last_name,c_first_name,sum] [sum,sum]
+                          Project [c_customer_id,ws_net_paid,d_year,c_last_name,c_first_name]
                             BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
-                              Project [ws_net_paid,c_customer_id,c_last_name,c_first_name,ws_sold_date_sk]
+                              Project [c_customer_id,ws_net_paid,c_last_name,ws_sold_date_sk,c_first_name]
                                 BroadcastHashJoin [c_customer_sk,ws_bill_customer_sk]
                                   Project [c_customer_sk,c_customer_id,c_first_name,c_last_name]
                                     Filter [c_customer_sk,c_customer_id]

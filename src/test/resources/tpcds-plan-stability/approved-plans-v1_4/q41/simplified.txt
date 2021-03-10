@@ -15,11 +15,11 @@ TakeOrderedAndProject [i_product_name]
                       WholeStageCodegen
                         Project [i_manufact]
                           Filter [alwaysTrue,item_cnt]
-                            HashAggregate [i_manufact,count,count(1)] [i_manufact,count,count(1),item_cnt,alwaysTrue]
+                            HashAggregate [i_manufact,count,count(1)] [i_manufact,alwaysTrue,item_cnt,count,count(1)]
                               InputAdapter
                                 Exchange [i_manufact] #3
                                   WholeStageCodegen
                                     HashAggregate [i_manufact,count,count] [count,count]
                                       Project [i_manufact]
-                                        Filter [i_manufact,i_size,i_color,i_category,i_units]
-                                          Scan parquet default.item [i_manufact,i_units,i_category,i_size,i_color] [i_manufact,i_units,i_category,i_size,i_color]
+                                        Filter [i_units,i_manufact,i_color,i_size,i_category]
+                                          Scan parquet default.item [i_manufact,i_units,i_size,i_category,i_color] [i_manufact,i_units,i_size,i_category,i_color]

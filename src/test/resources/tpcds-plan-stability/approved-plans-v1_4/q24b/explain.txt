@@ -1,7 +1,7 @@
 == Physical Plan ==
 *(8) Project [c_last_name#1, c_first_name#2, s_store_name#3, paid#4]
-+- *(8) Filter (isnotnull(sum(netpaid#5)#6) && (cast(sum(netpaid#5)#6 as decimal(33,8)) > cast(Subquery subquery5530 as decimal(33,8))))
-   :  +- Subquery subquery5530
++- *(8) Filter (isnotnull(sum(netpaid#5)#6) && (cast(sum(netpaid#5)#6 as decimal(33,8)) > cast(Subquery subquery3290 as decimal(33,8))))
+   :  +- Subquery subquery3290
    :     +- *(8) HashAggregate(keys=[], functions=[avg(netpaid#5)])
    :        +- Exchange SinglePartition
    :           +- *(7) HashAggregate(keys=[], functions=[partial_avg(netpaid#5)])

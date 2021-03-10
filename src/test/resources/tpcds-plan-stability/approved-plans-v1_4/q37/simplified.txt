@@ -9,11 +9,11 @@ TakeOrderedAndProject [i_item_id,i_item_desc,i_current_price]
                 BroadcastHashJoin [i_item_sk,cs_item_sk]
                   Project [i_item_sk,i_item_id,i_item_desc,i_current_price]
                     BroadcastHashJoin [inv_date_sk,d_date_sk]
-                      Project [i_current_price,i_item_sk,inv_date_sk,i_item_id,i_item_desc]
+                      Project [i_current_price,i_item_sk,inv_date_sk,i_item_desc,i_item_id]
                         BroadcastHashJoin [i_item_sk,inv_item_sk]
                           Project [i_item_sk,i_item_id,i_item_desc,i_current_price]
                             Filter [i_current_price,i_manufact_id,i_item_sk]
-                              Scan parquet default.item [i_manufact_id,i_current_price,i_item_sk,i_item_id,i_item_desc] [i_manufact_id,i_current_price,i_item_sk,i_item_id,i_item_desc]
+                              Scan parquet default.item [i_current_price,i_manufact_id,i_item_sk,i_item_desc,i_item_id] [i_current_price,i_manufact_id,i_item_sk,i_item_desc,i_item_id]
                           InputAdapter
                             BroadcastExchange #2
                               WholeStageCodegen

@@ -6,10 +6,10 @@ WholeStageCodegen
           HashAggregate [count,count] [count,count]
             HashAggregate [c_last_name,c_first_name,d_date]
               HashAggregate [c_last_name,c_first_name,d_date]
-                BroadcastHashJoin [d_date,c_last_name,d_date,c_last_name,c_first_name,c_first_name]
+                BroadcastHashJoin [c_first_name,d_date,d_date,c_last_name,c_last_name,c_first_name]
                   HashAggregate [c_last_name,c_first_name,d_date]
                     HashAggregate [c_last_name,c_first_name,d_date]
-                      BroadcastHashJoin [c_first_name,d_date,c_last_name,d_date,c_first_name,c_last_name]
+                      BroadcastHashJoin [d_date,c_last_name,c_first_name,c_last_name,c_first_name,d_date]
                         HashAggregate [c_last_name,c_first_name,d_date]
                           InputAdapter
                             Exchange [c_last_name,c_first_name,d_date] #2
