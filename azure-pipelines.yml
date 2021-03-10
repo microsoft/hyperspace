@@ -40,6 +40,12 @@ jobs:
           inputs:
             artifactName: 'hyperspace-core'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+
+  - job: Build_2_12
+    displayName: 'Build sources and run unit tests for Scala 2.12'
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
       - script: sbt ++2.12.8 clean
         displayName: 'Running $sbt clean'
       - script: sbt ++2.12.8 update
@@ -63,3 +69,37 @@ jobs:
           inputs:
             artifactName: 'hyperspace-core'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+
+  - job: PythonTest
+    displayName: 'Run Python tests'
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
+      - task: UsePythonVersion@0
+        displayName: 'Set Python version'
+        inputs:
+          versionSpec: '2.7'
+          addToPath: true
+      - task: JavaToolInstaller@0
+        displayName: 'Set Java version'
+        inputs:
+          versionSpec: '8'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'PreInstalled'
+      - script: sbt ++2.11.12 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.11.12 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.11.12 compile
+        displayName: 'Running $sbt compile'
+      - task: Bash@3
+        inputs:
+          filePath: 'script/download_spark.sh'
+        displayName: 'Downloading spark'
+      - task: PythonScript@0
+        inputs:
+          scriptSource: 'filePath'
+          scriptPath: 'run-tests.py'
+        displayName: 'Running python tests'
+        env:
+          SPARK_HOME: $(Build.SourcesDirectory)/spark-2.4.2-bin-hadoop2.7
