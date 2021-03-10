@@ -1,0 +1,26 @@
+TakeOrderedAndProject [sat_sales,fri_sales,sun_sales,s_store_id,tue_sales,mon_sales,s_store_name,thu_sales,wed_sales]
+  WholeStageCodegen
+    HashAggregate [sum,sum(UnscaledValue(CASE WHEN (d_day_name = Thursday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Sunday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Wednesday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Monday) THEN ss_sales_price ELSE null END)),sum,sum,sum,s_store_id,sum,sum,sum,sum(UnscaledValue(CASE WHEN (d_day_name = Tuesday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Friday) THEN ss_sales_price ELSE null END)),s_store_name,sum(UnscaledValue(CASE WHEN (d_day_name = Saturday) THEN ss_sales_price ELSE null END))] [sum,sum(UnscaledValue(CASE WHEN (d_day_name = Thursday) THEN ss_sales_price ELSE null END)),sat_sales,fri_sales,sum(UnscaledValue(CASE WHEN (d_day_name = Sunday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Wednesday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Monday) THEN ss_sales_price ELSE null END)),sum,sun_sales,sum,sum,sum,sum,tue_sales,mon_sales,sum,sum(UnscaledValue(CASE WHEN (d_day_name = Tuesday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Friday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Saturday) THEN ss_sales_price ELSE null END)),thu_sales,wed_sales]
+      InputAdapter
+        Exchange [s_store_name,s_store_id] #1
+          WholeStageCodegen
+            HashAggregate [sum,sum,sum,d_day_name,sum,sum,sum,sum,sum,sum,s_store_id,ss_sales_price,sum,sum,sum,sum,sum,s_store_name] [sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum]
+              Project [d_day_name,ss_sales_price,s_store_id,s_store_name]
+                BroadcastHashJoin [ss_store_sk,s_store_sk]
+                  Project [d_day_name,ss_store_sk,ss_sales_price]
+                    BroadcastHashJoin [d_date_sk,ss_sold_date_sk]
+                      Project [d_date_sk,d_day_name]
+                        Filter [d_year,d_date_sk]
+                          Scan parquet default.date_dim [d_date_sk,d_year,d_day_name] [d_date_sk,d_year,d_day_name]
+                      InputAdapter
+                        BroadcastExchange #2
+                          WholeStageCodegen
+                            Project [ss_sold_date_sk,ss_store_sk,ss_sales_price]
+                              Filter [ss_sold_date_sk,ss_store_sk]
+                                Scan parquet default.store_sales [ss_sold_date_sk,ss_store_sk,ss_sales_price] [ss_sold_date_sk,ss_store_sk,ss_sales_price]
+                  InputAdapter
+                    BroadcastExchange #3
+                      WholeStageCodegen
+                        Project [s_store_sk,s_store_id,s_store_name]
+                          Filter [s_gmt_offset,s_store_sk]
+                            Scan parquet default.store [s_store_sk,s_store_id,s_store_name,s_gmt_offset] [s_store_sk,s_store_id,s_store_name,s_gmt_offset]

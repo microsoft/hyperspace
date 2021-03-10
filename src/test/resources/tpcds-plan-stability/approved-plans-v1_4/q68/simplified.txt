@@ -1,0 +1,54 @@
+TakeOrderedAndProject [bought_city,ss_ticket_number,extended_price,list_price,c_last_name,c_first_name,extended_tax,ca_city]
+  WholeStageCodegen
+    Project [bought_city,ss_ticket_number,extended_price,list_price,c_last_name,c_first_name,extended_tax,ca_city]
+      BroadcastHashJoin [c_current_addr_sk,ca_address_sk,ca_city,bought_city]
+        Project [c_current_addr_sk,extended_price,c_last_name,list_price,c_first_name,ss_ticket_number,extended_tax,bought_city]
+          BroadcastHashJoin [ss_customer_sk,c_customer_sk]
+            HashAggregate [sum,sum,ca_city,ss_customer_sk,sum(UnscaledValue(ss_ext_tax)),sum(UnscaledValue(ss_ext_sales_price)),ss_ticket_number,ss_addr_sk,sum(UnscaledValue(ss_ext_list_price)),sum] [sum,extended_price,sum,list_price,sum(UnscaledValue(ss_ext_tax)),sum(UnscaledValue(ss_ext_sales_price)),extended_tax,sum(UnscaledValue(ss_ext_list_price)),sum,bought_city]
+              InputAdapter
+                Exchange [ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city] #1
+                  WholeStageCodegen
+                    HashAggregate [sum,ss_ext_tax,sum,ca_city,ss_customer_sk,sum,sum,sum,ss_ext_sales_price,ss_ext_list_price,ss_ticket_number,ss_addr_sk,sum] [sum,sum,sum,sum,sum,sum]
+                      Project [ss_addr_sk,ss_ext_tax,ss_customer_sk,ca_city,ss_ext_sales_price,ss_ext_list_price,ss_ticket_number]
+                        BroadcastHashJoin [ss_addr_sk,ca_address_sk]
+                          Project [ss_addr_sk,ss_ext_tax,ss_customer_sk,ss_ext_sales_price,ss_ext_list_price,ss_ticket_number]
+                            BroadcastHashJoin [ss_hdemo_sk,hd_demo_sk]
+                              Project [ss_addr_sk,ss_ext_tax,ss_customer_sk,ss_ext_sales_price,ss_hdemo_sk,ss_ext_list_price,ss_ticket_number]
+                                BroadcastHashJoin [ss_store_sk,s_store_sk]
+                                  Project [ss_addr_sk,ss_ext_tax,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_hdemo_sk,ss_ext_list_price,ss_ticket_number]
+                                    BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
+                                      Project [ss_addr_sk,ss_ext_tax,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_hdemo_sk,ss_ext_list_price,ss_ticket_number]
+                                        Filter [ss_hdemo_sk,ss_sold_date_sk,ss_customer_sk,ss_store_sk,ss_addr_sk]
+                                          Scan parquet default.store_sales [ss_addr_sk,ss_ext_tax,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_hdemo_sk,ss_ext_list_price,ss_ticket_number] [ss_addr_sk,ss_ext_tax,ss_store_sk,ss_customer_sk,ss_ext_sales_price,ss_sold_date_sk,ss_hdemo_sk,ss_ext_list_price,ss_ticket_number]
+                                      InputAdapter
+                                        BroadcastExchange #2
+                                          WholeStageCodegen
+                                            Project [d_date_sk]
+                                              Filter [d_dom,d_year,d_date_sk]
+                                                Scan parquet default.date_dim [d_date_sk,d_year,d_dom] [d_date_sk,d_year,d_dom]
+                                  InputAdapter
+                                    BroadcastExchange #3
+                                      WholeStageCodegen
+                                        Project [s_store_sk]
+                                          Filter [s_city,s_store_sk]
+                                            Scan parquet default.store [s_store_sk,s_city] [s_store_sk,s_city]
+                              InputAdapter
+                                BroadcastExchange #4
+                                  WholeStageCodegen
+                                    Project [hd_demo_sk]
+                                      Filter [hd_dep_count,hd_vehicle_count,hd_demo_sk]
+                                        Scan parquet default.household_demographics [hd_demo_sk,hd_dep_count,hd_vehicle_count] [hd_demo_sk,hd_dep_count,hd_vehicle_count]
+                          InputAdapter
+                            BroadcastExchange #5
+                              WholeStageCodegen
+                                Project [ca_address_sk,ca_city]
+                                  Filter [ca_address_sk,ca_city]
+                                    Scan parquet default.customer_address [ca_address_sk,ca_city] [ca_address_sk,ca_city]
+            InputAdapter
+              BroadcastExchange #6
+                WholeStageCodegen
+                  Project [c_customer_sk,c_current_addr_sk,c_first_name,c_last_name]
+                    Filter [c_customer_sk,c_current_addr_sk]
+                      Scan parquet default.customer [c_customer_sk,c_current_addr_sk,c_first_name,c_last_name] [c_customer_sk,c_current_addr_sk,c_first_name,c_last_name]
+        InputAdapter
+          ReusedExchange [ca_address_sk,ca_city] [ca_address_sk,ca_city] #5

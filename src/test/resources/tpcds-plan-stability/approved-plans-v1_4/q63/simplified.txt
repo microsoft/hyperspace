@@ -1,0 +1,43 @@
+TakeOrderedAndProject [i_manager_id,avg_monthly_sales,sum_sales]
+  WholeStageCodegen
+    Project [i_manager_id,sum_sales,avg_monthly_sales]
+      Filter [avg_monthly_sales,sum_sales]
+        InputAdapter
+          Window [_w0,i_manager_id]
+            WholeStageCodegen
+              Sort [i_manager_id]
+                InputAdapter
+                  Exchange [i_manager_id] #1
+                    WholeStageCodegen
+                      HashAggregate [i_manager_id,d_moy,sum,sum(UnscaledValue(ss_sales_price))] [sum(UnscaledValue(ss_sales_price)),sum_sales,_w0,sum]
+                        InputAdapter
+                          Exchange [i_manager_id,d_moy] #2
+                            WholeStageCodegen
+                              HashAggregate [d_moy,sum,ss_sales_price,i_manager_id,sum] [sum,sum]
+                                Project [i_manager_id,ss_sales_price,d_moy]
+                                  BroadcastHashJoin [ss_store_sk,s_store_sk]
+                                    Project [i_manager_id,ss_store_sk,ss_sales_price,d_moy]
+                                      BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
+                                        Project [i_manager_id,ss_sold_date_sk,ss_store_sk,ss_sales_price]
+                                          BroadcastHashJoin [i_item_sk,ss_item_sk]
+                                            Project [i_item_sk,i_manager_id]
+                                              Filter [i_category,i_class,i_brand,i_item_sk]
+                                                Scan parquet default.item [i_class,i_item_sk,i_manager_id,i_category,i_brand] [i_class,i_item_sk,i_manager_id,i_category,i_brand]
+                                            InputAdapter
+                                              BroadcastExchange #3
+                                                WholeStageCodegen
+                                                  Project [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price]
+                                                    Filter [ss_item_sk,ss_sold_date_sk,ss_store_sk]
+                                                      Scan parquet default.store_sales [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price] [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price]
+                                        InputAdapter
+                                          BroadcastExchange #4
+                                            WholeStageCodegen
+                                              Project [d_date_sk,d_moy]
+                                                Filter [d_month_seq,d_date_sk]
+                                                  Scan parquet default.date_dim [d_date_sk,d_month_seq,d_moy] [d_date_sk,d_month_seq,d_moy]
+                                    InputAdapter
+                                      BroadcastExchange #5
+                                        WholeStageCodegen
+                                          Project [s_store_sk]
+                                            Filter [s_store_sk]
+                                              Scan parquet default.store [s_store_sk] [s_store_sk]

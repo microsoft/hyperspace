@@ -1,0 +1,48 @@
+CollectLimit
+  WholeStageCodegen
+    HashAggregate [sum,sum,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (isnotnull(customer_sk) && isnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (isnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint))] [store_only,sum,catalog_only,sum,sum(cast(CASE WHEN (isnotnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (isnotnull(customer_sk) && isnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),sum,sum(cast(CASE WHEN (isnull(customer_sk) && isnotnull(customer_sk)) THEN 1 ELSE 0 END as bigint)),store_and_catalog]
+      InputAdapter
+        Exchange #1
+          WholeStageCodegen
+            HashAggregate [sum,sum,sum,customer_sk,sum,customer_sk,sum,sum] [sum,sum,sum,sum,sum,sum]
+              Project [customer_sk,customer_sk]
+                InputAdapter
+                  SortMergeJoin [customer_sk,item_sk,customer_sk,item_sk]
+                    WholeStageCodegen
+                      Sort [customer_sk,item_sk]
+                        InputAdapter
+                          Exchange [customer_sk,item_sk] #2
+                            WholeStageCodegen
+                              HashAggregate [ss_customer_sk,ss_item_sk] [customer_sk,item_sk]
+                                InputAdapter
+                                  Exchange [ss_customer_sk,ss_item_sk] #3
+                                    WholeStageCodegen
+                                      HashAggregate [ss_customer_sk,ss_item_sk]
+                                        Project [ss_item_sk,ss_customer_sk]
+                                          BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
+                                            Project [ss_sold_date_sk,ss_item_sk,ss_customer_sk]
+                                              Filter [ss_sold_date_sk]
+                                                Scan parquet default.store_sales [ss_sold_date_sk,ss_item_sk,ss_customer_sk] [ss_sold_date_sk,ss_item_sk,ss_customer_sk]
+                                            InputAdapter
+                                              BroadcastExchange #4
+                                                WholeStageCodegen
+                                                  Project [d_date_sk]
+                                                    Filter [d_month_seq,d_date_sk]
+                                                      Scan parquet default.date_dim [d_date_sk,d_month_seq] [d_date_sk,d_month_seq]
+                    WholeStageCodegen
+                      Sort [customer_sk,item_sk]
+                        InputAdapter
+                          Exchange [customer_sk,item_sk] #5
+                            WholeStageCodegen
+                              HashAggregate [cs_bill_customer_sk,cs_item_sk] [customer_sk,item_sk]
+                                InputAdapter
+                                  Exchange [cs_bill_customer_sk,cs_item_sk] #6
+                                    WholeStageCodegen
+                                      HashAggregate [cs_bill_customer_sk,cs_item_sk]
+                                        Project [cs_bill_customer_sk,cs_item_sk]
+                                          BroadcastHashJoin [cs_sold_date_sk,d_date_sk]
+                                            Project [cs_sold_date_sk,cs_bill_customer_sk,cs_item_sk]
+                                              Filter [cs_sold_date_sk]
+                                                Scan parquet default.catalog_sales [cs_sold_date_sk,cs_bill_customer_sk,cs_item_sk] [cs_sold_date_sk,cs_bill_customer_sk,cs_item_sk]
+                                            InputAdapter
+                                              ReusedExchange [d_date_sk] [d_date_sk] #4

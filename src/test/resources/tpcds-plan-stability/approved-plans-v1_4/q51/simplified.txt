@@ -1,0 +1,67 @@
+TakeOrderedAndProject [item_sk,store_cumulative,store_sales,web_sales,d_date,web_cumulative]
+  WholeStageCodegen
+    Filter [web_cumulative,store_cumulative]
+      InputAdapter
+        Window [web_sales,item_sk,d_date,store_sales]
+          WholeStageCodegen
+            Sort [item_sk,d_date]
+              InputAdapter
+                Exchange [item_sk] #1
+                  WholeStageCodegen
+                    Project [d_date,d_date,item_sk,item_sk,cume_sales,cume_sales]
+                      InputAdapter
+                        SortMergeJoin [item_sk,d_date,item_sk,d_date]
+                          WholeStageCodegen
+                            Sort [item_sk,d_date]
+                              InputAdapter
+                                Exchange [item_sk,d_date] #2
+                                  WholeStageCodegen
+                                    Project [item_sk,d_date,cume_sales]
+                                      InputAdapter
+                                        Window [_w0,ws_item_sk,d_date]
+                                          WholeStageCodegen
+                                            Sort [ws_item_sk,d_date]
+                                              InputAdapter
+                                                Exchange [ws_item_sk] #3
+                                                  WholeStageCodegen
+                                                    HashAggregate [ws_item_sk,d_date,sum,sum(UnscaledValue(ws_sales_price))] [sum(UnscaledValue(ws_sales_price)),item_sk,_w0,sum]
+                                                      InputAdapter
+                                                        Exchange [ws_item_sk,d_date] #4
+                                                          WholeStageCodegen
+                                                            HashAggregate [sum,ws_item_sk,sum,d_date,ws_sales_price] [sum,sum]
+                                                              Project [ws_item_sk,ws_sales_price,d_date]
+                                                                BroadcastHashJoin [ws_sold_date_sk,d_date_sk]
+                                                                  Project [ws_sold_date_sk,ws_item_sk,ws_sales_price]
+                                                                    Filter [ws_item_sk,ws_sold_date_sk]
+                                                                      Scan parquet default.web_sales [ws_sold_date_sk,ws_item_sk,ws_sales_price] [ws_sold_date_sk,ws_item_sk,ws_sales_price]
+                                                                  InputAdapter
+                                                                    BroadcastExchange #5
+                                                                      WholeStageCodegen
+                                                                        Project [d_date_sk,d_date]
+                                                                          Filter [d_month_seq,d_date_sk]
+                                                                            Scan parquet default.date_dim [d_date_sk,d_date,d_month_seq] [d_date_sk,d_date,d_month_seq]
+                          WholeStageCodegen
+                            Sort [item_sk,d_date]
+                              InputAdapter
+                                Exchange [item_sk,d_date] #6
+                                  WholeStageCodegen
+                                    Project [item_sk,d_date,cume_sales]
+                                      InputAdapter
+                                        Window [_w0,ss_item_sk,d_date]
+                                          WholeStageCodegen
+                                            Sort [ss_item_sk,d_date]
+                                              InputAdapter
+                                                Exchange [ss_item_sk] #7
+                                                  WholeStageCodegen
+                                                    HashAggregate [ss_item_sk,d_date,sum,sum(UnscaledValue(ss_sales_price))] [sum(UnscaledValue(ss_sales_price)),item_sk,_w0,sum]
+                                                      InputAdapter
+                                                        Exchange [ss_item_sk,d_date] #8
+                                                          WholeStageCodegen
+                                                            HashAggregate [d_date,sum,ss_sales_price,sum,ss_item_sk] [sum,sum]
+                                                              Project [ss_item_sk,ss_sales_price,d_date]
+                                                                BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
+                                                                  Project [ss_sold_date_sk,ss_item_sk,ss_sales_price]
+                                                                    Filter [ss_item_sk,ss_sold_date_sk]
+                                                                      Scan parquet default.store_sales [ss_sold_date_sk,ss_item_sk,ss_sales_price] [ss_sold_date_sk,ss_item_sk,ss_sales_price]
+                                                                  InputAdapter
+                                                                    ReusedExchange [d_date_sk,d_date] [d_date_sk,d_date] #5

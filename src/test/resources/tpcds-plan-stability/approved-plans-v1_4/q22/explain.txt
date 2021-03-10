@@ -1,0 +1,27 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[qoh#1 ASC NULLS FIRST,i_product_name#2 ASC NULLS FIRST,i_brand#3 ASC NULLS FIRST,i_class#4 ASC NULLS FIRST,i_category#5 ASC NULLS FIRST], output=[i_product_name#2,i_brand#3,i_class#4,i_category#5,qoh#1])
++- *(5) HashAggregate(keys=[i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6], functions=[avg(cast(inv_quantity_on_hand#7 as bigint))])
+   +- Exchange hashpartitioning(i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6, 200)
+      +- *(4) HashAggregate(keys=[i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6], functions=[partial_avg(cast(inv_quantity_on_hand#7 as bigint))])
+         +- *(4) Expand [List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, i_class#10, i_category#11, 0), List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, i_class#10, null, 1), List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, null, null, 3), List(inv_quantity_on_hand#7, i_product_name#8, null, null, null, 7), List(inv_quantity_on_hand#7, null, null, null, null, 15)], [inv_quantity_on_hand#7, i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6]
+            +- *(4) Project [inv_quantity_on_hand#7, i_product_name#12 AS i_product_name#8, i_brand#13 AS i_brand#9, i_class#14 AS i_class#10, i_category#15 AS i_category#11]
+               +- *(4) BroadcastHashJoin [inv_warehouse_sk#16], [w_warehouse_sk#17], Inner, BuildRight
+                  :- *(4) Project [inv_warehouse_sk#16, inv_quantity_on_hand#7, i_brand#13, i_class#14, i_category#15, i_product_name#12]
+                  :  +- *(4) BroadcastHashJoin [inv_item_sk#18], [i_item_sk#19], Inner, BuildRight
+                  :     :- *(4) Project [inv_item_sk#18, inv_warehouse_sk#16, inv_quantity_on_hand#7]
+                  :     :  +- *(4) BroadcastHashJoin [inv_date_sk#20], [d_date_sk#21], Inner, BuildRight
+                  :     :     :- *(4) Project [inv_date_sk#20, inv_item_sk#18, inv_warehouse_sk#16, inv_quantity_on_hand#7]
+                  :     :     :  +- *(4) Filter ((isnotnull(inv_date_sk#20) && isnotnull(inv_item_sk#18)) && isnotnull(inv_warehouse_sk#16))
+                  :     :     :     +- *(4) FileScan parquet default.inventory[inv_date_sk#20,inv_item_sk#18,inv_warehouse_sk#16,inv_quantity_on_hand#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/inventory], PartitionFilters: [], PushedFilters: [IsNotNull(inv_date_sk), IsNotNull(inv_item_sk), IsNotNull(inv_warehouse_sk)], ReadSchema: struct<inv_date_sk:int,inv_item_sk:int,inv_warehouse_sk:int,inv_quantity_on_hand:int>
+                  :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                  :     :        +- *(1) Project [d_date_sk#21]
+                  :     :           +- *(1) Filter (((isnotnull(d_month_seq#22) && (d_month_seq#22 >= 1200)) && (d_month_seq#22 <= 1211)) && isnotnull(d_date_sk#21))
+                  :     :              +- *(1) FileScan parquet default.date_dim[d_date_sk#21,d_month_seq#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_month_seq:int>
+                  :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                  :        +- *(2) Project [i_item_sk#19, i_brand#13, i_class#14, i_category#15, i_product_name#12]
+                  :           +- *(2) Filter isnotnull(i_item_sk#19)
+                  :              +- *(2) FileScan parquet default.item[i_item_sk#19,i_brand#13,i_class#14,i_category#15,i_product_name#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_brand:string,i_class:string,i_category:string,i_product_name:string>
+                  +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                     +- *(3) Project [w_warehouse_sk#17]
+                        +- *(3) Filter isnotnull(w_warehouse_sk#17)
+                           +- *(3) FileScan parquet default.warehouse[w_warehouse_sk#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/warehouse], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int>

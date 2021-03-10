@@ -1,0 +1,42 @@
+TakeOrderedAndProject [s_street_number,s_street_type,s_company_id,31 - 60 days ,61 - 90 days ,s_county,>120 days ,30 days ,91 - 120 days ,s_state,s_street_name,s_city,s_suite_number,s_store_name,s_zip]
+  WholeStageCodegen
+    HashAggregate [s_street_number,sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 60) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 90)) THEN 1 ELSE 0 END as bigint)),s_street_type,sum,s_company_id,sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 90) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 120)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 30) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 60)) THEN 1 ELSE 0 END as bigint)),s_county,sum,s_state,s_street_name,sum,sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 120) THEN 1 ELSE 0 END as bigint)),sum,s_city,s_suite_number,s_store_name,s_zip,sum] [sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 60) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 90)) THEN 1 ELSE 0 END as bigint)),sum,31 - 60 days ,sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 90) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 120)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 30) THEN 1 ELSE 0 END as bigint)),61 - 90 days ,sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 30) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 60)) THEN 1 ELSE 0 END as bigint)),sum,>120 days ,30 days ,91 - 120 days ,sum,sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 120) THEN 1 ELSE 0 END as bigint)),sum,sum]
+      InputAdapter
+        Exchange [s_street_number,s_street_type,s_company_id,s_county,s_state,s_street_name,s_city,s_suite_number,s_store_name,s_zip] #1
+          WholeStageCodegen
+            HashAggregate [sum,sum,s_street_number,ss_sold_date_sk,s_street_type,sum,s_company_id,sum,s_county,sum,s_state,s_street_name,sum,sum,sr_returned_date_sk,sum,sum,s_city,s_suite_number,s_store_name,s_zip,sum] [sum,sum,sum,sum,sum,sum,sum,sum,sum,sum]
+              Project [s_street_name,s_store_name,s_street_number,s_company_id,s_county,s_street_type,s_zip,s_state,s_suite_number,ss_sold_date_sk,s_city,sr_returned_date_sk]
+                BroadcastHashJoin [sr_returned_date_sk,d_date_sk]
+                  Project [s_street_name,s_store_name,s_street_number,s_company_id,s_county,s_street_type,s_zip,s_state,s_suite_number,ss_sold_date_sk,s_city,sr_returned_date_sk]
+                    BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
+                      Project [s_street_name,s_store_name,s_street_number,s_company_id,s_county,s_street_type,s_zip,s_state,s_suite_number,ss_sold_date_sk,s_city,sr_returned_date_sk]
+                        BroadcastHashJoin [ss_store_sk,s_store_sk]
+                          Project [ss_sold_date_sk,ss_store_sk,sr_returned_date_sk]
+                            BroadcastHashJoin [sr_customer_sk,sr_ticket_number,ss_customer_sk,sr_item_sk,ss_ticket_number,ss_item_sk]
+                              Project [ss_item_sk,ss_store_sk,ss_customer_sk,ss_sold_date_sk,ss_ticket_number]
+                                Filter [ss_sold_date_sk,ss_customer_sk,ss_store_sk,ss_ticket_number,ss_item_sk]
+                                  Scan parquet default.store_sales [ss_item_sk,ss_store_sk,ss_customer_sk,ss_sold_date_sk,ss_ticket_number] [ss_item_sk,ss_store_sk,ss_customer_sk,ss_sold_date_sk,ss_ticket_number]
+                              InputAdapter
+                                BroadcastExchange #2
+                                  WholeStageCodegen
+                                    Project [sr_returned_date_sk,sr_item_sk,sr_customer_sk,sr_ticket_number]
+                                      Filter [sr_ticket_number,sr_customer_sk,sr_item_sk,sr_returned_date_sk]
+                                        Scan parquet default.store_returns [sr_returned_date_sk,sr_item_sk,sr_customer_sk,sr_ticket_number] [sr_returned_date_sk,sr_item_sk,sr_customer_sk,sr_ticket_number]
+                          InputAdapter
+                            BroadcastExchange #3
+                              WholeStageCodegen
+                                Project [s_street_name,s_store_name,s_street_number,s_company_id,s_county,s_street_type,s_store_sk,s_zip,s_state,s_suite_number,s_city]
+                                  Filter [s_store_sk]
+                                    Scan parquet default.store [s_street_name,s_store_name,s_street_number,s_company_id,s_county,s_street_type,s_store_sk,s_zip,s_state,s_suite_number,s_city] [s_street_name,s_store_name,s_street_number,s_company_id,s_county,s_street_type,s_store_sk,s_zip,s_state,s_suite_number,s_city]
+                      InputAdapter
+                        BroadcastExchange #4
+                          WholeStageCodegen
+                            Project [d_date_sk]
+                              Filter [d_date_sk]
+                                Scan parquet default.date_dim [d_date_sk] [d_date_sk]
+                  InputAdapter
+                    BroadcastExchange #5
+                      WholeStageCodegen
+                        Project [d_date_sk]
+                          Filter [d_year,d_moy,d_date_sk]
+                            Scan parquet default.date_dim [d_date_sk,d_year,d_moy] [d_date_sk,d_year,d_moy]

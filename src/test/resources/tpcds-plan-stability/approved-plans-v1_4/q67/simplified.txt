@@ -1,0 +1,43 @@
+TakeOrderedAndProject [d_qoy,i_category,i_brand,i_class,d_year,d_moy,rk,i_product_name,s_store_id,sumsales]
+  WholeStageCodegen
+    Filter [rk]
+      InputAdapter
+        Window [sumsales,i_category]
+          WholeStageCodegen
+            Sort [i_category,sumsales]
+              InputAdapter
+                Exchange [i_category] #1
+                  WholeStageCodegen
+                    HashAggregate [s_store_id,sum(coalesce(CheckOverflow((promote_precision(cast(ss_sales_price as decimal(12,2))) * promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2)))), DecimalType(18,2)), 0.00)),i_category,sum,i_brand,i_product_name,spark_grouping_id,d_moy,i_class,d_year,d_qoy] [sum(coalesce(CheckOverflow((promote_precision(cast(ss_sales_price as decimal(12,2))) * promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2)))), DecimalType(18,2)), 0.00)),sumsales,sum]
+                      InputAdapter
+                        Exchange [s_store_id,i_category,i_brand,i_product_name,spark_grouping_id,d_moy,i_class,d_year,d_qoy] #2
+                          WholeStageCodegen
+                            HashAggregate [s_store_id,i_category,sum,i_brand,ss_sales_price,i_product_name,spark_grouping_id,d_moy,i_class,ss_quantity,d_year,d_qoy,sum] [sum,sum]
+                              Expand [d_year,i_class,d_qoy,d_moy,i_brand,i_category,s_store_id,i_product_name,ss_sales_price,ss_quantity]
+                                Project [d_year,d_qoy,d_moy,i_brand,s_store_id,ss_sales_price,i_category,ss_quantity,i_class,i_product_name]
+                                  BroadcastHashJoin [ss_item_sk,i_item_sk]
+                                    Project [s_store_id,d_qoy,ss_quantity,ss_item_sk,d_moy,d_year,ss_sales_price]
+                                      BroadcastHashJoin [ss_store_sk,s_store_sk]
+                                        Project [d_qoy,ss_quantity,ss_item_sk,d_moy,d_year,ss_store_sk,ss_sales_price]
+                                          BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
+                                            Project [ss_quantity,ss_item_sk,ss_store_sk,ss_sales_price,ss_sold_date_sk]
+                                              Filter [ss_sold_date_sk,ss_store_sk,ss_item_sk]
+                                                Scan parquet default.store_sales [ss_quantity,ss_item_sk,ss_store_sk,ss_sales_price,ss_sold_date_sk] [ss_quantity,ss_item_sk,ss_store_sk,ss_sales_price,ss_sold_date_sk]
+                                            InputAdapter
+                                              BroadcastExchange #3
+                                                WholeStageCodegen
+                                                  Project [d_date_sk,d_year,d_moy,d_qoy]
+                                                    Filter [d_month_seq,d_date_sk]
+                                                      Scan parquet default.date_dim [d_qoy,d_moy,d_year,d_month_seq,d_date_sk] [d_qoy,d_moy,d_year,d_month_seq,d_date_sk]
+                                        InputAdapter
+                                          BroadcastExchange #4
+                                            WholeStageCodegen
+                                              Project [s_store_sk,s_store_id]
+                                                Filter [s_store_sk]
+                                                  Scan parquet default.store [s_store_sk,s_store_id] [s_store_sk,s_store_id]
+                                    InputAdapter
+                                      BroadcastExchange #5
+                                        WholeStageCodegen
+                                          Project [i_class,i_item_sk,i_product_name,i_category,i_brand]
+                                            Filter [i_item_sk]
+                                              Scan parquet default.item [i_class,i_item_sk,i_product_name,i_category,i_brand] [i_class,i_item_sk,i_product_name,i_category,i_brand]

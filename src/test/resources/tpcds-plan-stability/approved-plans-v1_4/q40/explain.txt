@@ -1,0 +1,32 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[w_state#1 ASC NULLS FIRST,i_item_id#2 ASC NULLS FIRST], output=[w_state#1,i_item_id#2,sales_before#3,sales_after#4])
++- *(6) HashAggregate(keys=[w_state#1, i_item_id#2], functions=[sum(CASE WHEN (d_date#5 < 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END), sum(CASE WHEN (d_date#5 >= 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END)])
+   +- Exchange hashpartitioning(w_state#1, i_item_id#2, 200)
+      +- *(5) HashAggregate(keys=[w_state#1, i_item_id#2], functions=[partial_sum(CASE WHEN (d_date#5 < 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END), partial_sum(CASE WHEN (d_date#5 >= 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END)])
+         +- *(5) Project [cs_sales_price#6, cr_refunded_cash#7, w_state#1, i_item_id#2, d_date#5]
+            +- *(5) BroadcastHashJoin [cs_sold_date_sk#8], [d_date_sk#9], Inner, BuildRight
+               :- *(5) Project [cs_sold_date_sk#8, cs_sales_price#6, cr_refunded_cash#7, w_state#1, i_item_id#2]
+               :  +- *(5) BroadcastHashJoin [cs_item_sk#10], [i_item_sk#11], Inner, BuildRight
+               :     :- *(5) Project [cs_sold_date_sk#8, cs_item_sk#10, cs_sales_price#6, cr_refunded_cash#7, w_state#1]
+               :     :  +- *(5) BroadcastHashJoin [cs_warehouse_sk#12], [w_warehouse_sk#13], Inner, BuildRight
+               :     :     :- *(5) Project [cs_sold_date_sk#8, cs_warehouse_sk#12, cs_item_sk#10, cs_sales_price#6, cr_refunded_cash#7]
+               :     :     :  +- *(5) BroadcastHashJoin [cs_order_number#14, cs_item_sk#10], [cr_order_number#15, cr_item_sk#16], LeftOuter, BuildRight
+               :     :     :     :- *(5) Project [cs_sold_date_sk#8, cs_warehouse_sk#12, cs_item_sk#10, cs_order_number#14, cs_sales_price#6]
+               :     :     :     :  +- *(5) Filter ((isnotnull(cs_warehouse_sk#12) && isnotnull(cs_item_sk#10)) && isnotnull(cs_sold_date_sk#8))
+               :     :     :     :     +- *(5) FileScan parquet default.catalog_sales[cs_sold_date_sk#8,cs_warehouse_sk#12,cs_item_sk#10,cs_order_number#14,cs_sales_price#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/catalog_sales], PartitionFilters: [], PushedFilters: [IsNotNull(cs_warehouse_sk), IsNotNull(cs_item_sk), IsNotNull(cs_sold_date_sk)], ReadSchema: struct<cs_sold_date_sk:int,cs_warehouse_sk:int,cs_item_sk:int,cs_order_number:int,cs_sales_price:...
+               :     :     :     +- BroadcastExchange HashedRelationBroadcastMode(List((shiftleft(cast(input[1, int, true] as bigint), 32) | (cast(input[0, int, true] as bigint) & 4294967295))))
+               :     :     :        +- *(1) Project [cr_item_sk#16, cr_order_number#15, cr_refunded_cash#7]
+               :     :     :           +- *(1) Filter (isnotnull(cr_order_number#15) && isnotnull(cr_item_sk#16))
+               :     :     :              +- *(1) FileScan parquet default.catalog_returns[cr_item_sk#16,cr_order_number#15,cr_refunded_cash#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/catalog_returns], PartitionFilters: [], PushedFilters: [IsNotNull(cr_order_number), IsNotNull(cr_item_sk)], ReadSchema: struct<cr_item_sk:int,cr_order_number:int,cr_refunded_cash:decimal(7,2)>
+               :     :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+               :     :        +- *(2) Project [w_warehouse_sk#13, w_state#1]
+               :     :           +- *(2) Filter isnotnull(w_warehouse_sk#13)
+               :     :              +- *(2) FileScan parquet default.warehouse[w_warehouse_sk#13,w_state#1] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/warehouse], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int,w_state:string>
+               :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+               :        +- *(3) Project [i_item_sk#11, i_item_id#2]
+               :           +- *(3) Filter (((isnotnull(i_current_price#17) && (i_current_price#17 >= 0.99)) && (i_current_price#17 <= 1.49)) && isnotnull(i_item_sk#11))
+               :              +- *(3) FileScan parquet default.item[i_item_sk#11,i_item_id#2,i_current_price#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_current_price), GreaterThanOrEqual(i_current_price,0.99), LessThanOrEqual(i_current_..., ReadSchema: struct<i_item_sk:int,i_item_id:string,i_current_price:decimal(7,2)>
+               +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                  +- *(4) Project [d_date_sk#9, d_date#5]
+                     +- *(4) Filter (((isnotnull(d_date#5) && (d_date#5 >= 10997)) && (d_date#5 <= 11057)) && isnotnull(d_date_sk#9))
+                        +- *(4) FileScan parquet default.date_dim[d_date_sk#9,d_date#5] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_date), GreaterThanOrEqual(d_date,2000-02-10), LessThanOrEqual(d_date,2000-04-10), Is..., ReadSchema: struct<d_date_sk:int,d_date:date>
