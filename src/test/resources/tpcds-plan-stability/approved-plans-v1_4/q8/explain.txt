@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[s_store_name#1 ASC NULLS FIRST], output=[s_store_name#1,sum(ss_net_profit)#2])
 +- *(9) HashAggregate(keys=[s_store_name#1], functions=[sum(UnscaledValue(ss_net_profit#3))])
-   +- Exchange hashpartitioning(s_store_name#1, 200)
+   +- Exchange hashpartitioning(s_store_name#1, 5)
       +- *(8) HashAggregate(keys=[s_store_name#1], functions=[partial_sum(UnscaledValue(ss_net_profit#3))])
          +- *(8) Project [ss_net_profit#3, s_store_name#1]
             +- *(8) BroadcastHashJoin [substring(s_zip#4, 1, 2)], [substring(ca_zip#5, 1, 2)], Inner, BuildRight
@@ -22,7 +22,7 @@ TakeOrderedAndProject(limit=100, orderBy=[s_store_name#1 ASC NULLS FIRST], outpu
                :              +- *(2) FileScan parquet default.store[s_store_sk#7,s_store_name#1,s_zip#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk), IsNotNull(s_zip)], ReadSchema: struct<s_store_sk:int,s_store_name:string,s_zip:string>
                +- BroadcastExchange HashedRelationBroadcastMode(List(substring(input[0, string, true], 1, 2)))
                   +- *(7) HashAggregate(keys=[ca_zip#5], functions=[])
-                     +- Exchange hashpartitioning(ca_zip#5, 200)
+                     +- Exchange hashpartitioning(ca_zip#5, 5)
                         +- *(6) HashAggregate(keys=[ca_zip#5], functions=[])
                            +- *(6) BroadcastHashJoin [coalesce(ca_zip#5, )], [coalesce(ca_zip#12, )], LeftSemi, BuildRight, (ca_zip#5 <=> ca_zip#12)
                               :- *(6) Project [substring(ca_zip#13, 1, 5) AS ca_zip#5]
@@ -32,7 +32,7 @@ TakeOrderedAndProject(limit=100, orderBy=[s_store_name#1 ASC NULLS FIRST], outpu
                                  +- *(5) Project [ca_zip#12]
                                     +- *(5) Filter (count(1)#14 > 10)
                                        +- *(5) HashAggregate(keys=[ca_zip#13], functions=[count(1)])
-                                          +- Exchange hashpartitioning(ca_zip#13, 200)
+                                          +- Exchange hashpartitioning(ca_zip#13, 5)
                                              +- *(4) HashAggregate(keys=[ca_zip#13], functions=[partial_count(1)])
                                                 +- *(4) Project [ca_zip#13]
                                                    +- *(4) BroadcastHashJoin [ca_address_sk#15], [c_current_addr_sk#16], Inner, BuildRight

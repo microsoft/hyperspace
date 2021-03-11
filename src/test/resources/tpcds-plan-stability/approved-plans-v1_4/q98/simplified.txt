@@ -1,10 +1,10 @@
 WholeStageCodegen
-  Project [revenueratio,i_item_desc,itemrevenue,i_category,i_current_price,i_class]
-    Sort [revenueratio,i_item_id,i_item_desc,i_category,i_class]
+  Project [i_category,i_class,i_current_price,i_item_desc,itemrevenue,revenueratio]
+    Sort [i_category,i_class,i_item_desc,i_item_id,revenueratio]
       InputAdapter
-        Exchange [revenueratio,i_item_id,i_item_desc,i_category,i_class] #1
+        Exchange [i_category,i_class,i_item_desc,i_item_id,revenueratio] #1
           WholeStageCodegen
-            Project [i_item_id,i_item_desc,_w0,itemrevenue,i_category,_we0,i_current_price,i_class]
+            Project [_w0,_we0,i_category,i_class,i_current_price,i_item_desc,i_item_id,itemrevenue]
               InputAdapter
                 Window [_w1,i_class]
                   WholeStageCodegen
@@ -12,27 +12,27 @@ WholeStageCodegen
                       InputAdapter
                         Exchange [i_class] #2
                           WholeStageCodegen
-                            HashAggregate [i_item_id,i_item_desc,sum,sum(UnscaledValue(ss_ext_sales_price)),i_category,i_current_price,i_class] [sum,sum(UnscaledValue(ss_ext_sales_price)),_w0,itemrevenue,_w1]
+                            HashAggregate [i_category,i_class,i_current_price,i_item_desc,i_item_id,sum,sum(UnscaledValue(ss_ext_sales_price))] [_w0,_w1,itemrevenue,sum,sum(UnscaledValue(ss_ext_sales_price))]
                               InputAdapter
-                                Exchange [i_item_id,i_item_desc,i_category,i_current_price,i_class] #3
+                                Exchange [i_category,i_class,i_current_price,i_item_desc,i_item_id] #3
                                   WholeStageCodegen
-                                    HashAggregate [i_item_id,i_item_desc,sum,i_category,ss_ext_sales_price,sum,i_current_price,i_class] [sum,sum]
-                                      Project [i_class,i_current_price,ss_ext_sales_price,i_category,i_item_desc,i_item_id]
-                                        BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                          Project [i_class,i_current_price,ss_ext_sales_price,i_category,ss_sold_date_sk,i_item_desc,i_item_id]
-                                            BroadcastHashJoin [ss_item_sk,i_item_sk]
-                                              Project [ss_sold_date_sk,ss_item_sk,ss_ext_sales_price]
+                                    HashAggregate [i_category,i_class,i_current_price,i_item_desc,i_item_id,ss_ext_sales_price,sum,sum] [sum,sum]
+                                      Project [i_category,i_class,i_current_price,i_item_desc,i_item_id,ss_ext_sales_price]
+                                        BroadcastHashJoin [d_date_sk,ss_sold_date_sk]
+                                          Project [i_category,i_class,i_current_price,i_item_desc,i_item_id,ss_ext_sales_price,ss_sold_date_sk]
+                                            BroadcastHashJoin [i_item_sk,ss_item_sk]
+                                              Project [ss_ext_sales_price,ss_item_sk,ss_sold_date_sk]
                                                 Filter [ss_item_sk,ss_sold_date_sk]
-                                                  Scan parquet default.store_sales [ss_sold_date_sk,ss_item_sk,ss_ext_sales_price] [ss_sold_date_sk,ss_item_sk,ss_ext_sales_price]
+                                                  Scan parquet default.store_sales [ss_ext_sales_price,ss_item_sk,ss_sold_date_sk] [ss_ext_sales_price,ss_item_sk,ss_sold_date_sk]
                                               InputAdapter
                                                 BroadcastExchange #4
                                                   WholeStageCodegen
-                                                    Project [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id]
+                                                    Project [i_category,i_class,i_current_price,i_item_desc,i_item_id,i_item_sk]
                                                       Filter [i_category,i_item_sk]
-                                                        Scan parquet default.item [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id] [i_class,i_current_price,i_item_sk,i_category,i_item_desc,i_item_id]
+                                                        Scan parquet default.item [i_category,i_class,i_current_price,i_item_desc,i_item_id,i_item_sk] [i_category,i_class,i_current_price,i_item_desc,i_item_id,i_item_sk]
                                           InputAdapter
                                             BroadcastExchange #5
                                               WholeStageCodegen
                                                 Project [d_date_sk]
                                                   Filter [d_date,d_date_sk]
-                                                    Scan parquet default.date_dim [d_date_sk,d_date] [d_date_sk,d_date]
+                                                    Scan parquet default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]

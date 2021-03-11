@@ -1,6 +1,6 @@
-TakeOrderedAndProject [avg_quarterly_sales,sum_sales,i_manufact_id]
+TakeOrderedAndProject [avg_quarterly_sales,i_manufact_id,sum_sales]
   WholeStageCodegen
-    Project [i_manufact_id,sum_sales,avg_quarterly_sales]
+    Project [avg_quarterly_sales,i_manufact_id,sum_sales]
       Filter [avg_quarterly_sales,sum_sales]
         InputAdapter
           Window [_w0,i_manufact_id]
@@ -9,31 +9,31 @@ TakeOrderedAndProject [avg_quarterly_sales,sum_sales,i_manufact_id]
                 InputAdapter
                   Exchange [i_manufact_id] #1
                     WholeStageCodegen
-                      HashAggregate [i_manufact_id,d_qoy,sum,sum(UnscaledValue(ss_sales_price))] [sum(UnscaledValue(ss_sales_price)),sum_sales,_w0,sum]
+                      HashAggregate [d_qoy,i_manufact_id,sum,sum(UnscaledValue(ss_sales_price))] [_w0,sum,sum(UnscaledValue(ss_sales_price)),sum_sales]
                         InputAdapter
-                          Exchange [i_manufact_id,d_qoy] #2
+                          Exchange [d_qoy,i_manufact_id] #2
                             WholeStageCodegen
-                              HashAggregate [d_qoy,sum,ss_sales_price,sum,i_manufact_id] [sum,sum]
-                                Project [i_manufact_id,ss_sales_price,d_qoy]
-                                  BroadcastHashJoin [ss_store_sk,s_store_sk]
-                                    Project [i_manufact_id,ss_store_sk,ss_sales_price,d_qoy]
-                                      BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
-                                        Project [i_manufact_id,ss_sold_date_sk,ss_store_sk,ss_sales_price]
+                              HashAggregate [d_qoy,i_manufact_id,ss_sales_price,sum,sum] [sum,sum]
+                                Project [d_qoy,i_manufact_id,ss_sales_price]
+                                  BroadcastHashJoin [s_store_sk,ss_store_sk]
+                                    Project [d_qoy,i_manufact_id,ss_sales_price,ss_store_sk]
+                                      BroadcastHashJoin [d_date_sk,ss_sold_date_sk]
+                                        Project [i_manufact_id,ss_sales_price,ss_sold_date_sk,ss_store_sk]
                                           BroadcastHashJoin [i_item_sk,ss_item_sk]
                                             Project [i_item_sk,i_manufact_id]
-                                              Filter [i_category,i_class,i_brand,i_item_sk]
-                                                Scan parquet default.item [i_class,i_manufact_id,i_item_sk,i_category,i_brand] [i_class,i_manufact_id,i_item_sk,i_category,i_brand]
+                                              Filter [i_brand,i_category,i_class,i_item_sk]
+                                                Scan parquet default.item [i_brand,i_category,i_class,i_item_sk,i_manufact_id] [i_brand,i_category,i_class,i_item_sk,i_manufact_id]
                                             InputAdapter
                                               BroadcastExchange #3
                                                 WholeStageCodegen
-                                                  Project [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price]
+                                                  Project [ss_item_sk,ss_sales_price,ss_sold_date_sk,ss_store_sk]
                                                     Filter [ss_item_sk,ss_sold_date_sk,ss_store_sk]
-                                                      Scan parquet default.store_sales [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price] [ss_sold_date_sk,ss_item_sk,ss_store_sk,ss_sales_price]
+                                                      Scan parquet default.store_sales [ss_item_sk,ss_sales_price,ss_sold_date_sk,ss_store_sk] [ss_item_sk,ss_sales_price,ss_sold_date_sk,ss_store_sk]
                                         InputAdapter
                                           BroadcastExchange #4
                                             WholeStageCodegen
                                               Project [d_date_sk,d_qoy]
-                                                Filter [d_month_seq,d_date_sk]
+                                                Filter [d_date_sk,d_month_seq]
                                                   Scan parquet default.date_dim [d_date_sk,d_month_seq,d_qoy] [d_date_sk,d_month_seq,d_qoy]
                                     InputAdapter
                                       BroadcastExchange #5

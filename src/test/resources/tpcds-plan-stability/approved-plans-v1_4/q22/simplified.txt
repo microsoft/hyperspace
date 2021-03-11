@@ -1,32 +1,32 @@
-TakeOrderedAndProject [i_category,i_class,i_product_name,i_brand,qoh]
+TakeOrderedAndProject [i_brand,i_category,i_class,i_product_name,qoh]
   WholeStageCodegen
-    HashAggregate [avg(cast(inv_quantity_on_hand as bigint)),i_category,count,spark_grouping_id,sum,i_class,i_product_name,i_brand] [avg(cast(inv_quantity_on_hand as bigint)),qoh,sum,count]
+    HashAggregate [avg(cast(inv_quantity_on_hand as bigint)),count,i_brand,i_category,i_class,i_product_name,spark_grouping_id,sum] [avg(cast(inv_quantity_on_hand as bigint)),count,qoh,sum]
       InputAdapter
-        Exchange [i_category,spark_grouping_id,i_class,i_product_name,i_brand] #1
+        Exchange [i_brand,i_category,i_class,i_product_name,spark_grouping_id] #1
           WholeStageCodegen
-            HashAggregate [sum,i_category,count,count,spark_grouping_id,sum,i_class,i_product_name,inv_quantity_on_hand,i_brand] [sum,count,sum,count]
-              Expand [i_product_name,i_class,i_brand,i_category,inv_quantity_on_hand]
-                Project [i_brand,i_category,inv_quantity_on_hand,i_class,i_product_name]
+            HashAggregate [count,count,i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand,spark_grouping_id,sum,sum] [count,count,sum,sum]
+              Expand [i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand]
+                Project [i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand]
                   BroadcastHashJoin [inv_warehouse_sk,w_warehouse_sk]
-                    Project [i_class,inv_quantity_on_hand,inv_warehouse_sk,i_product_name,i_category,i_brand]
-                      BroadcastHashJoin [inv_item_sk,i_item_sk]
-                        Project [inv_item_sk,inv_warehouse_sk,inv_quantity_on_hand]
-                          BroadcastHashJoin [inv_date_sk,d_date_sk]
-                            Project [inv_date_sk,inv_item_sk,inv_warehouse_sk,inv_quantity_on_hand]
+                    Project [i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand,inv_warehouse_sk]
+                      BroadcastHashJoin [i_item_sk,inv_item_sk]
+                        Project [inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                          BroadcastHashJoin [d_date_sk,inv_date_sk]
+                            Project [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
                               Filter [inv_date_sk,inv_item_sk,inv_warehouse_sk]
-                                Scan parquet default.inventory [inv_date_sk,inv_item_sk,inv_warehouse_sk,inv_quantity_on_hand] [inv_date_sk,inv_item_sk,inv_warehouse_sk,inv_quantity_on_hand]
+                                Scan parquet default.inventory [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk] [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
                             InputAdapter
                               BroadcastExchange #2
                                 WholeStageCodegen
                                   Project [d_date_sk]
-                                    Filter [d_month_seq,d_date_sk]
+                                    Filter [d_date_sk,d_month_seq]
                                       Scan parquet default.date_dim [d_date_sk,d_month_seq] [d_date_sk,d_month_seq]
                         InputAdapter
                           BroadcastExchange #3
                             WholeStageCodegen
-                              Project [i_class,i_item_sk,i_product_name,i_category,i_brand]
+                              Project [i_brand,i_category,i_class,i_item_sk,i_product_name]
                                 Filter [i_item_sk]
-                                  Scan parquet default.item [i_class,i_item_sk,i_product_name,i_category,i_brand] [i_class,i_item_sk,i_product_name,i_category,i_brand]
+                                  Scan parquet default.item [i_brand,i_category,i_class,i_item_sk,i_product_name] [i_brand,i_category,i_class,i_item_sk,i_product_name]
                     InputAdapter
                       BroadcastExchange #4
                         WholeStageCodegen

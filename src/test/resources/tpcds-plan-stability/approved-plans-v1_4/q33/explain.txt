@@ -1,11 +1,11 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[total_sales#1 ASC NULLS FIRST], output=[i_manufact_id#2,total_sales#1])
 +- *(20) HashAggregate(keys=[i_manufact_id#2], functions=[sum(total_sales#3)])
-   +- Exchange hashpartitioning(i_manufact_id#2, 200)
+   +- Exchange hashpartitioning(i_manufact_id#2, 5)
       +- *(19) HashAggregate(keys=[i_manufact_id#2], functions=[partial_sum(total_sales#3)])
          +- Union
             :- *(6) HashAggregate(keys=[i_manufact_id#2], functions=[sum(UnscaledValue(ss_ext_sales_price#4))])
-            :  +- Exchange hashpartitioning(i_manufact_id#2, 200)
+            :  +- Exchange hashpartitioning(i_manufact_id#2, 5)
             :     +- *(5) HashAggregate(keys=[i_manufact_id#2], functions=[partial_sum(UnscaledValue(ss_ext_sales_price#4))])
             :        +- *(5) Project [ss_ext_sales_price#4, i_manufact_id#2]
             :           +- *(5) BroadcastHashJoin [ss_item_sk#5], [i_item_sk#6], Inner, BuildRight
@@ -34,7 +34,7 @@ TakeOrderedAndProject(limit=100, orderBy=[total_sales#1 ASC NULLS FIRST], output
             :                          +- *(3) Filter (isnotnull(i_category#15) && (i_category#15 = Electronics))
             :                             +- *(3) FileScan parquet default.item[i_category#15,i_manufact_id#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_category), EqualTo(i_category,Electronics)], ReadSchema: struct<i_category:string,i_manufact_id:int>
             :- *(12) HashAggregate(keys=[i_manufact_id#2], functions=[sum(UnscaledValue(cs_ext_sales_price#16))])
-            :  +- Exchange hashpartitioning(i_manufact_id#2, 200)
+            :  +- Exchange hashpartitioning(i_manufact_id#2, 5)
             :     +- *(11) HashAggregate(keys=[i_manufact_id#2], functions=[partial_sum(UnscaledValue(cs_ext_sales_price#16))])
             :        +- *(11) Project [cs_ext_sales_price#16, i_manufact_id#2]
             :           +- *(11) BroadcastHashJoin [cs_item_sk#17], [i_item_sk#6], Inner, BuildRight
@@ -49,7 +49,7 @@ TakeOrderedAndProject(limit=100, orderBy=[total_sales#1 ASC NULLS FIRST], output
             :              :     +- ReusedExchange [ca_address_sk#8], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
             :              +- ReusedExchange [i_item_sk#6, i_manufact_id#2], BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
             +- *(18) HashAggregate(keys=[i_manufact_id#2], functions=[sum(UnscaledValue(ws_ext_sales_price#20))])
-               +- Exchange hashpartitioning(i_manufact_id#2, 200)
+               +- Exchange hashpartitioning(i_manufact_id#2, 5)
                   +- *(17) HashAggregate(keys=[i_manufact_id#2], functions=[partial_sum(UnscaledValue(ws_ext_sales_price#20))])
                      +- *(17) Project [ws_ext_sales_price#20, i_manufact_id#2]
                         +- *(17) BroadcastHashJoin [ws_item_sk#21], [i_item_sk#6], Inner, BuildRight

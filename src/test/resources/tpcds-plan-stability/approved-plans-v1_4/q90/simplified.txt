@@ -4,54 +4,54 @@ TakeOrderedAndProject [am_pm_ratio]
       InputAdapter
         BroadcastNestedLoopJoin
           WholeStageCodegen
-            HashAggregate [count,count(1)] [count(1),amc,count]
+            HashAggregate [count,count(1)] [amc,count,count(1)]
               InputAdapter
                 Exchange #1
                   WholeStageCodegen
                     HashAggregate [count,count] [count,count]
                       Project
-                        BroadcastHashJoin [ws_web_page_sk,wp_web_page_sk]
+                        BroadcastHashJoin [wp_web_page_sk,ws_web_page_sk]
                           Project [ws_web_page_sk]
-                            BroadcastHashJoin [ws_sold_time_sk,t_time_sk]
+                            BroadcastHashJoin [t_time_sk,ws_sold_time_sk]
                               Project [ws_sold_time_sk,ws_web_page_sk]
-                                BroadcastHashJoin [ws_ship_hdemo_sk,hd_demo_sk]
-                                  Project [ws_sold_time_sk,ws_ship_hdemo_sk,ws_web_page_sk]
+                                BroadcastHashJoin [hd_demo_sk,ws_ship_hdemo_sk]
+                                  Project [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk]
                                     Filter [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk]
-                                      Scan parquet default.web_sales [ws_sold_time_sk,ws_ship_hdemo_sk,ws_web_page_sk] [ws_sold_time_sk,ws_ship_hdemo_sk,ws_web_page_sk]
+                                      Scan parquet default.web_sales [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk] [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk]
                                   InputAdapter
                                     BroadcastExchange #2
                                       WholeStageCodegen
                                         Project [hd_demo_sk]
-                                          Filter [hd_dep_count,hd_demo_sk]
+                                          Filter [hd_demo_sk,hd_dep_count]
                                             Scan parquet default.household_demographics [hd_demo_sk,hd_dep_count] [hd_demo_sk,hd_dep_count]
                               InputAdapter
                                 BroadcastExchange #3
                                   WholeStageCodegen
                                     Project [t_time_sk]
                                       Filter [t_hour,t_time_sk]
-                                        Scan parquet default.time_dim [t_time_sk,t_hour] [t_time_sk,t_hour]
+                                        Scan parquet default.time_dim [t_hour,t_time_sk] [t_hour,t_time_sk]
                           InputAdapter
                             BroadcastExchange #4
                               WholeStageCodegen
                                 Project [wp_web_page_sk]
                                   Filter [wp_char_count,wp_web_page_sk]
-                                    Scan parquet default.web_page [wp_web_page_sk,wp_char_count] [wp_web_page_sk,wp_char_count]
+                                    Scan parquet default.web_page [wp_char_count,wp_web_page_sk] [wp_char_count,wp_web_page_sk]
           BroadcastExchange #5
             WholeStageCodegen
-              HashAggregate [count,count(1)] [count(1),pmc,count]
+              HashAggregate [count,count(1)] [count,count(1),pmc]
                 InputAdapter
                   Exchange #6
                     WholeStageCodegen
                       HashAggregate [count,count] [count,count]
                         Project
-                          BroadcastHashJoin [ws_web_page_sk,wp_web_page_sk]
+                          BroadcastHashJoin [wp_web_page_sk,ws_web_page_sk]
                             Project [ws_web_page_sk]
-                              BroadcastHashJoin [ws_sold_time_sk,t_time_sk]
+                              BroadcastHashJoin [t_time_sk,ws_sold_time_sk]
                                 Project [ws_sold_time_sk,ws_web_page_sk]
-                                  BroadcastHashJoin [ws_ship_hdemo_sk,hd_demo_sk]
-                                    Project [ws_sold_time_sk,ws_ship_hdemo_sk,ws_web_page_sk]
+                                  BroadcastHashJoin [hd_demo_sk,ws_ship_hdemo_sk]
+                                    Project [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk]
                                       Filter [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk]
-                                        Scan parquet default.web_sales [ws_sold_time_sk,ws_ship_hdemo_sk,ws_web_page_sk] [ws_sold_time_sk,ws_ship_hdemo_sk,ws_web_page_sk]
+                                        Scan parquet default.web_sales [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk] [ws_ship_hdemo_sk,ws_sold_time_sk,ws_web_page_sk]
                                     InputAdapter
                                       ReusedExchange [hd_demo_sk] [hd_demo_sk] #2
                                 InputAdapter
@@ -59,6 +59,6 @@ TakeOrderedAndProject [am_pm_ratio]
                                     WholeStageCodegen
                                       Project [t_time_sk]
                                         Filter [t_hour,t_time_sk]
-                                          Scan parquet default.time_dim [t_time_sk,t_hour] [t_time_sk,t_hour]
+                                          Scan parquet default.time_dim [t_hour,t_time_sk] [t_hour,t_time_sk]
                             InputAdapter
                               ReusedExchange [wp_web_page_sk] [wp_web_page_sk] #4

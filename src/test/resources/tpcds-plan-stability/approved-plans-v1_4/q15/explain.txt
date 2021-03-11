@@ -1,7 +1,7 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[ca_zip#1 ASC NULLS FIRST], output=[ca_zip#1,sum(cs_sales_price)#2])
 +- *(5) HashAggregate(keys=[ca_zip#1], functions=[sum(UnscaledValue(cs_sales_price#3))])
-   +- Exchange hashpartitioning(ca_zip#1, 200)
+   +- Exchange hashpartitioning(ca_zip#1, 5)
       +- *(4) HashAggregate(keys=[ca_zip#1], functions=[partial_sum(UnscaledValue(cs_sales_price#3))])
          +- *(4) Project [cs_sales_price#3, ca_zip#1]
             +- *(4) BroadcastHashJoin [cs_sold_date_sk#4], [d_date_sk#5], Inner, BuildRight
