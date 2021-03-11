@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, ExprId, GetStructField, In, Literal, NamedExpression, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
@@ -32,8 +32,9 @@ import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
+import com.microsoft.hyperspace.index.rules.PlanUtils._
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 object RuleUtils {
 
@@ -256,12 +257,15 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
-    // Note that we transform *only* the base relation and not other portions of the plan
-    // (e.g., filters). For instance, given the following input plan:
+    // Note that depending on the case we transform only the base relation
+    // and sometimes other portions of the plan (e.g., filters). For instance,
+    // given the following input plan:
     //        Project(A,B) -> Filter(C = 10) -> Scan (A,B,C,D,E)
-    // in the presence of a suitable index, the getIndexPlan() method will emit:
+    // in the presence of a suitable index, we will transform to:
     //        Project(A,B) -> Filter(C = 10) -> Index Scan (A,B,C)
-    plan transformDown {
+    // In the case of nested fields we will transform the project and
+    // filter nodes too.
+    plan transformUp {
       case l: LeafNode if provider.isSupportedRelation(l) =>
         val relation = provider.getRelation(l)
         val location = index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
@@ -276,10 +280,29 @@ object RuleUtils {
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput = relation.plan.output
-          .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
-          .map(_.asInstanceOf[AttributeReference])
+        val resolvedFields =
+          ResolverUtils.resolve(spark, index.indexedColumns ++ index.includedColumns, relation.plan)
+        val updatedOutput =
+          if (resolvedFields.isDefined && resolvedFields.get.exists(_.isNested)) {
+            indexFsRelation.schema.flatMap { s =>
+              relation.plan.output.find(a => s.name.contains(a.name)).map { a =>
+                AttributeReference(s.name, s.dataType, a.nullable, a.metadata)(
+                  NamedExpression.newExprId,
+                  a.qualifier)
+              }
+            }
+          } else {
+            relation.plan.output
+                .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+                .map(_.asInstanceOf[AttributeReference])
+          }
         relation.createLogicalRelation(indexFsRelation, updatedOutput)
+
+      case p: Project if provider.isSupportedProject(p, index) =>
+        transformProject(p)
+
+      case f: Filter if provider.isSupportedFilter(f, index) =>
+        transformFilter(f)
     }
   }
 
@@ -565,5 +588,55 @@ object RuleUtils {
     }
     assert(shuffleInjected)
     shuffled
+  }
+
+  private def transformProject(project: Project): Project = {
+    val projectedFields = project.projectList.map { exp =>
+      val fieldName = extractNamesFromExpression(exp).head
+      val escapedFieldName = PlanUtils.prefixNestedField(fieldName)
+      val attr = extractAttributeRef(exp, fieldName)
+      val fieldType = extractTypeFromExpression(exp, fieldName)
+      getExprId(project, escapedFieldName) match {
+        case Some(exprId) =>
+          attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
+            exprId,
+            attr.qualifier)
+        case _ =>
+          attr
+      }
+    }
+    project.copy(projectList = projectedFields)
+  }
+
+  private def transformFilter(filter: Filter): Filter = {
+    val fieldNames = extractNamesFromExpression(filter.condition)
+    var mutableFilter = filter
+    fieldNames.foreach { fieldName =>
+      val escapedFieldName = PlanUtils.prefixNestedField(fieldName)
+      getExprId(filter, escapedFieldName) match {
+        case Some(exprId) =>
+          val (parentExpresion, exp) =
+            extractSearchQuery(filter.condition, fieldName)
+          val fieldType = extractTypeFromExpression(exp, fieldName)
+          val attr = extractAttributeRef(exp, fieldName)
+          val newAttr = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
+            exprId,
+            attr.qualifier)
+          val newExp = exp match {
+            case _: GetStructField => newAttr
+            case other: Expression => other
+          }
+          val newParentExpression =
+            replaceInSearchQuery(parentExpresion, exp, newExp)
+          mutableFilter = filter.copy(condition = newParentExpression)
+        case _ =>
+          mutableFilter = filter
+      }
+    }
+    mutableFilter
+  }
+
+  private def getExprId(plan: LogicalPlan, fieldName: String): Option[ExprId] = {
+    plan.output.find(a => a.name.equalsIgnoreCase(fieldName)).map(_.exprId)
   }
 }

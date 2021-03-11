@@ -32,6 +32,167 @@ import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn.NESTED_FIELD_P
 object ResolverUtils {
 
   /**
+   * Return available string if required string can be resolved with it, based on spark resolver.
+   *
+   * @param resolver Resolver.
+   * @param requiredString The string that requires resolution.
+   * @param availableString Available string to resolve from.
+   * @return Optional available string if resolution is successful, else None
+   */
+  def resolve(
+      resolver: Resolver,
+      requiredString: String,
+      availableString: String): Option[String] = {
+    if (resolver(requiredString, availableString)) Some(availableString) else None
+  }
+
+  /**
+   * Finds the first matching resolved string from the list of availableStrings, when resolving
+   * for requiredString. If no matching string found, return None.
+   *
+   * @param spark Spark session.
+   * @param requiredString The string that requires resolution.
+   * @param availableStrings All available strings to resolve from.
+   * @return First matching (i.e. resolved) string from availableStrings. If no match is found,
+   *         return None.
+   */
+  def resolve(
+      spark: SparkSession,
+      requiredString: String,
+      availableStrings: Seq[String]): Option[String] = {
+    availableStrings.find(resolve(spark.sessionState.conf.resolver, requiredString, _).isDefined)
+  }
+
+  /**
+   * Finds all resolved strings for requiredStrings, from the list of availableStrings. Returns
+   * optional seq of resolved strings if all required strings are resolved, otherwise None.
+   *
+   * @param spark Spark session.
+   * @param requiredStrings List of strings to resolve.
+   * @param availableStrings All available strings to resolve from.
+   * @return Optional Seq of resolved strings if all required strings are resolved. Else, None.
+   */
+  def resolve(
+      spark: SparkSession,
+      requiredStrings: Seq[String],
+      availableStrings: Seq[String]): Option[Seq[String]] = {
+    Some(requiredStrings.map(resolve(spark, _, availableStrings).getOrElse { return None }))
+  }
+
+  /**
+   * Finds all resolved strings for requiredStrings, from the given logical plan. Returns
+   * optional seq of resolved strings if all required strings are resolved, otherwise None.
+   *
+   * @param spark Spark session.
+   * @param requiredStrings List of strings to resolve.
+   * @param plan Logical plan to resolve against.
+   * @return Optional sequence of ResolvedColumn objects if all required strings are resolved.
+   *         Else, None.
+   */
+  def resolve(
+      spark: SparkSession,
+      requiredStrings: Seq[String],
+      plan: LogicalPlan,
+      resolverMethod: (String, LogicalPlan, Resolver) => Option[Expression] =
+        defaultResolverMethod,
+      throwIfNotInSchema: Boolean = true): Option[Seq[ResolvedColumn]] = {
+    val schema = plan.schema
+    val resolver = spark.sessionState.conf.resolver
+    val resolved = requiredStrings.map { requiredField =>
+      resolverMethod(requiredField, plan, resolver)
+        .map { expr =>
+          val resolvedColNameParts = extractColumnName(expr)
+          validateResolvedColumnName(requiredField, resolvedColNameParts)
+          val origColNameParts =
+            getColumnNameFromSchema(schema, resolvedColNameParts, resolver, throwIfNotInSchema)
+          ResolvedColumn(origColNameParts.mkString("."), origColNameParts.length > 1)
+        }
+        .getOrElse { return None }
+    }
+    Some(resolved)
+  }
+
+  /**
+   * The default way of resolving field names.
+   *
+   * @param fieldName The field name to resolve.
+   * @param plan The Logical Plan that contains information about the field.
+   * @param resolver The resolver to use to resolve the field.
+   * @return A optional [[Expression]] that is the resolved field name.
+   * @return
+   */
+  protected[hyperspace] def defaultResolverMethod(
+      fieldName: String,
+      plan: LogicalPlan,
+      resolver: Resolver): Option[Expression] = {
+    plan.resolveQuoted(fieldName, resolver)
+  }
+
+  // Extracts the parts of a nested field access path from an expression.
+  private def extractColumnName(expr: Expression): Seq[String] = {
+    expr match {
+      case a: Attribute =>
+        Seq(a.name)
+      case GetStructField(child, _, Some(name)) =>
+        extractColumnName(child) :+ name
+      case _: GetArrayStructFields =>
+        // TODO: Nested arrays will be supported later
+        throw HyperspaceException("Array types are not supported.")
+      case _: GetMapValue =>
+        // TODO: Nested maps will be supported later
+        throw HyperspaceException("Map types are not supported.")
+      case Alias(nested: ExtractValue, _) =>
+        extractColumnName(nested)
+    }
+  }
+
+  // Validate the resolved column name by checking if nested columns have dots in its field names.
+  private def validateResolvedColumnName(
+      origCol: String,
+      resolvedColNameParts: Seq[String]): Unit = {
+    if (resolvedColNameParts.length > 1 && resolvedColNameParts.exists(_.contains("."))) {
+      throw HyperspaceException(
+        s"Hyperspace does not support the nested column whose name contains dots: $origCol")
+    }
+  }
+
+  // Given resolved column name parts, return new column name parts using the name in the given
+  // schema to use the original name in order to preserve the casing.
+  private def getColumnNameFromSchema(
+      schema: StructType,
+      resolvedColNameParts: Seq[String],
+      resolver: Resolver,
+      throwIfNotInSchema: Boolean = true): Seq[String] = resolvedColNameParts match {
+    case h :: tail =>
+      val fieldOpt = schema.find(f => resolver(f.name, h))
+      fieldOpt match {
+        case Some(field) =>
+          field match {
+            case StructField(name, s: StructType, _, _) =>
+              name +: getColumnNameFromSchema(s, tail, resolver)
+            case StructField(_, _: ArrayType, _, _) =>
+              // TODO: Nested arrays will be supported later
+              throw HyperspaceException("Array types are not supported.")
+            case StructField(_, _: MapType, _, _) =>
+              // TODO: Nested maps will be supported later
+              throw HyperspaceException("Map types are not supported")
+            case f => Seq(f.name)
+          }
+        case _ =>
+          if (throwIfNotInSchema) {
+            throw HyperspaceException(s"Hyperspace cannot not find $h in schema")
+          } else {
+            if (tail.nonEmpty) {
+              h +: getColumnNameFromSchema(schema, tail, resolver, throwIfNotInSchema)
+            } else {
+              Seq(h)
+            }
+          }
+      }
+
+  }
+
+  /**
    * [[ResolvedColumn]] stores information when a column name is resolved against the
    * analyzed plan and its schema.
    *
@@ -94,137 +255,12 @@ object ResolverUtils {
      */
     def apply(normalizedColumnName: String): ResolvedColumn = {
       if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
-        ResolvedColumn(normalizedColumnName.substring(NESTED_FIELD_PREFIX.length), isNested = true)
+        ResolvedColumn(
+          normalizedColumnName.substring(NESTED_FIELD_PREFIX.length),
+          isNested = true)
       } else {
         ResolvedColumn(normalizedColumnName, isNested = false)
       }
     }
-  }
-
-  /**
-   * Return available string if required string can be resolved with it, based on spark resolver.
-   *
-   * @param resolver Resolver.
-   * @param requiredString The string that requires resolution.
-   * @param availableString Available string to resolve from.
-   * @return Optional available string if resolution is successful, else None
-   */
-  def resolve(
-      resolver: Resolver,
-      requiredString: String,
-      availableString: String): Option[String] = {
-    if (resolver(requiredString, availableString)) Some(availableString) else None
-  }
-
-  /**
-   * Finds the first matching resolved string from the list of availableStrings, when resolving
-   * for requiredString. If no matching string found, return None.
-   *
-   * @param spark Spark session.
-   * @param requiredString The string that requires resolution.
-   * @param availableStrings All available strings to resolve from.
-   * @return First matching (i.e. resolved) string from availableStrings. If no match is found,
-   *         return None.
-   */
-  def resolve(
-      spark: SparkSession,
-      requiredString: String,
-      availableStrings: Seq[String]): Option[String] = {
-    availableStrings.find(resolve(spark.sessionState.conf.resolver, requiredString, _).isDefined)
-  }
-
-  /**
-   * Finds all resolved strings for requiredStrings, from the list of availableStrings. Returns
-   * optional seq of resolved strings if all required strings are resolved, otherwise None.
-   *
-   * @param spark Spark session.
-   * @param requiredStrings List of strings to resolve.
-   * @param availableStrings All available strings to resolve from.
-   * @return Optional Seq of resolved strings if all required strings are resolved. Else, None.
-   */
-  def resolve(
-      spark: SparkSession,
-      requiredStrings: Seq[String],
-      availableStrings: Seq[String]): Option[Seq[String]] = {
-    Some(requiredStrings.map(resolve(spark, _, availableStrings).getOrElse { return None }))
-  }
-
-  /**
-   * Finds all resolved strings for requiredStrings, from the given logical plan. Returns
-   * optional seq of resolved strings if all required strings are resolved, otherwise None.
-   *
-   * @param spark Spark session.
-   * @param requiredStrings List of strings to resolve.
-   * @param plan Logical plan to resolve against.
-   * @return Optional sequence of ResolvedColumn objects if all required strings are resolved.
-   *         Else, None.
-   */
-  def resolve(
-      spark: SparkSession,
-      requiredStrings: Seq[String],
-      plan: LogicalPlan): Option[Seq[ResolvedColumn]] = {
-    val schema = plan.schema
-    val resolver = spark.sessionState.conf.resolver
-    val resolved = requiredStrings.map { requiredField =>
-      plan
-        .resolveQuoted(requiredField, resolver)
-        .map { expr =>
-          val resolvedColNameParts = extractColumnName(expr)
-          validateResolvedColumnName(requiredField, resolvedColNameParts)
-          val origColNameParts = getColumnNameFromSchema(schema, resolvedColNameParts, resolver)
-          ResolvedColumn(origColNameParts.mkString("."), origColNameParts.length > 1)
-        }
-        .getOrElse { return None }
-    }
-    Some(resolved)
-  }
-
-  // Extracts the parts of a nested field access path from an expression.
-  private def extractColumnName(expr: Expression): Seq[String] = {
-    expr match {
-      case a: Attribute =>
-        Seq(a.name)
-      case GetStructField(child, _, Some(name)) =>
-        extractColumnName(child) :+ name
-      case _: GetArrayStructFields =>
-        // TODO: Nested arrays will be supported later
-        throw HyperspaceException("Array types are not supported.")
-      case _: GetMapValue =>
-        // TODO: Nested maps will be supported later
-        throw HyperspaceException("Map types are not supported.")
-      case Alias(nested: ExtractValue, _) =>
-        extractColumnName(nested)
-    }
-  }
-
-  // Validate the resolved column name by checking if nested columns have dots in its field names.
-  private def validateResolvedColumnName(
-      origCol: String,
-      resolvedColNameParts: Seq[String]): Unit = {
-    if (resolvedColNameParts.length > 1 && resolvedColNameParts.exists(_.contains("."))) {
-      throw HyperspaceException(
-        s"Hyperspace does not support the nested column whose name contains dots: $origCol")
-    }
-  }
-
-  // Given resolved column name parts, return new column name parts using the name in the given
-  // schema to use the original name in order to preserve the casing.
-  private def getColumnNameFromSchema(
-      schema: StructType,
-      resolvedColNameParts: Seq[String],
-      resolver: Resolver): Seq[String] = resolvedColNameParts match {
-    case h :: tail =>
-      val field = schema.find(f => resolver(f.name, h)).get
-      field match {
-        case StructField(name, s: StructType, _, _) =>
-          name +: getColumnNameFromSchema(s, tail, resolver)
-        case StructField(_, _: ArrayType, _, _) =>
-          // TODO: Nested arrays will be supported later
-          throw HyperspaceException("Array types are not supported.")
-        case StructField(_, _: MapType, _, _) =>
-          // TODO: Nested maps will be supported later
-          throw HyperspaceException("Map types are not supported")
-        case f => Seq(f.name)
-      }
   }
 }

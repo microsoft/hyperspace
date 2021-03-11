@@ -19,12 +19,13 @@ package com.microsoft.hyperspace.index.sources
 import scala.util.{Success, Try}
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.Relation
-import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
+import com.microsoft.hyperspace.index.{IndexLogEntry, Relation}
+import com.microsoft.hyperspace.index.rules.PlanUtils._
+import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf, ResolverUtils}
 
 /**
  * [[FileBasedSourceProviderManager]] is responsible for loading source providers which implements
@@ -107,6 +108,45 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     runWithDefault(f) {
       throw HyperspaceException("No source provider returned valid results.")
     }
+  }
+
+  /**
+   * Returns true if the given project is a supported project. If all of the registered
+   * providers return None, this returns false.
+   *
+   * @param project Project to check if it's supported.
+   * @return True if the given project is a supported relation.
+   */
+  def isSupportedProject(project: Project, index: IndexLogEntry): Boolean = {
+    val indexCols = index.indexedColumns ++ index.includedColumns
+    val resolvedIndexCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i))
+    val hasNestedCols = resolvedIndexCols.exists(_.isNested)
+    val projectListFields = project.projectList.flatMap(extractNamesFromExpression)
+    val containsNestedFields = projectListFields.exists(i => indexCols.contains(i))
+    var containsNestedChildren = false
+    project.child.foreach {
+      case f: Filter =>
+        val filterSupported = isSupportedFilter(f, index)
+        containsNestedChildren = containsNestedChildren || filterSupported
+      case _ =>
+    }
+    hasNestedCols && (containsNestedFields || containsNestedChildren)
+  }
+
+  /**
+   * Returns true if the given filter is a supported filter. If all of the registered
+   * providers return None, this returns false.
+   *
+   * @param filter Filter to check if it's supported.
+   * @return True if the given project is a supported relation.
+   */
+  def isSupportedFilter(filter: Filter, index: IndexLogEntry): Boolean = {
+    val indexCols = index.indexedColumns ++ index.includedColumns
+    val resolvedIndexCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i))
+    val hasNestedCols = resolvedIndexCols.exists(_.isNested)
+    val filterFields = extractNamesFromExpression(filter.condition).toSeq
+    val supported = filterFields.exists(i => indexCols.contains(i))
+    hasNestedCols && supported
   }
 
   /**
