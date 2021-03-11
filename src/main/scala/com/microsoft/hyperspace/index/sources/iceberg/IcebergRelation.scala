@@ -61,26 +61,6 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
   }
 
   /**
-   * FileInfo list for all source files that the current relation references to.
-   */
-  override lazy val allFileInfos: Seq[FileInfo] = {
-    allFiles.map { f =>
-      FileInfo(
-        f.getPath.toString,
-        f.getLen,
-        f.getModificationTime,
-        IndexConstants.UNKNOWN_FILE_ID)
-    }
-  }
-
-  /**
-   * Summation of all source file size.
-   */
-  override lazy val allFileSizeInBytes: Long = {
-    allFileInfos.map(_.size).sum
-  }
-
-  /**
    * The optional partition base path of the current relation.
    */
   override def partitionBasePath: Option[String] = plan.source match {

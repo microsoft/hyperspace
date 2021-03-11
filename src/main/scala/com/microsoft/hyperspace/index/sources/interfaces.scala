@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{FileIdTracker, FileInfo, IndexLogEntry, Relation}
+import com.microsoft.hyperspace.index.{FileIdTracker, FileInfo, IndexConstants, IndexLogEntry, Relation}
 
 /**
  * ::Experimental::
@@ -68,12 +68,22 @@ trait FileBasedRelation extends SourceRelation {
   /**
    * FileInfo list for all source files that the current relation references to.
    */
-  val allFileInfos: Seq[FileInfo]
+  final lazy val allFileInfos: Seq[FileInfo] = {
+    allFiles.map { f =>
+      FileInfo(
+        f.getPath.toString,
+        f.getLen,
+        f.getModificationTime,
+        IndexConstants.UNKNOWN_FILE_ID)
+    }
+  }
 
   /**
    * Summation of all source file size.
    */
-  val allFileSizeInBytes: Long
+  final lazy val allFileSizeInBytes: Long = {
+    allFileInfos.map(_.size).sum
+  }
 
   /**
    * The partition schema of the current relation.

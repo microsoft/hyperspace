@@ -60,26 +60,6 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   }
 
   /**
-   * FileInfo list for all source files that the current relation references to.
-   */
-  override lazy val allFileInfos: Seq[FileInfo] = {
-    allFiles.map { f =>
-      FileInfo(
-        f.getPath.toString,
-        f.getLen,
-        f.getModificationTime,
-        IndexConstants.UNKNOWN_FILE_ID)
-    }
-  }
-
-  /**
-   * Summation of all source file size.
-   */
-  override lazy val allFileSizeInBytes: Long = {
-    allFileInfos.map(_.size).sum
-  }
-
-  /**
    * The partition schema of the current relation.
    */
   override def partitionSchema: StructType = plan.relation match {
