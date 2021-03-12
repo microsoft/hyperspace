@@ -92,7 +92,7 @@ trait PlanStabilitySuite extends TPCDSBase with Logging {
 
   protected val baseResourcePath = {
     // use the same way as `SQLQueryTestSuite` to get the resource path
-    java.nio.file.Paths.get("src", "test", "resources", "tpcds-plan-stability").toFile
+    java.nio.file.Paths.get("src", "test", "resources", "tpcds").toFile
   }
 
   private val referenceRegex = "#\\d+".r
@@ -274,13 +274,16 @@ trait PlanStabilitySuite extends TPCDSBase with Logging {
   }
 }
 
-class TPCDSV1_4_PlanStabilitySuite extends PlanStabilitySuite {
+/**
+ * Spark Only Suite.
+ */
+class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
   override val goldenFilePath: String =
-    new File(baseResourcePath, s"approved-plans-v1_4").getAbsolutePath
+    new File(baseResourcePath, "spark-2.4/approved-plans-v1_4").getAbsolutePath
 
   tpcdsQueries.foreach { q =>
     test(s"check simplified (tpcds-v1.4/$q)") {
-      testQuery("tpcds", q)
+      testQuery("tpcds/queries", q)
     }
   }
 }
