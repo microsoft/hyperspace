@@ -1,142 +1,25 @@
 == Physical Plan ==
-TakeOrderedAndProject (25)
-+- * Project (24)
-   +- Window (23)
-      +- * Sort (22)
-         +- Exchange (21)
-            +- * HashAggregate (20)
-               +- Exchange (19)
-                  +- * HashAggregate (18)
-                     +- * Expand (17)
-                        +- * Project (16)
-                           +- * BroadcastHashJoin Inner BuildRight (15)
-                              :- * Project (10)
-                              :  +- * BroadcastHashJoin Inner BuildRight (9)
-                              :     :- * Filter (3)
-                              :     :  +- * ColumnarToRow (2)
-                              :     :     +- Scan parquet default.web_sales (1)
-                              :     +- BroadcastExchange (8)
-                              :        +- * Project (7)
-                              :           +- * Filter (6)
-                              :              +- * ColumnarToRow (5)
-                              :                 +- Scan parquet default.date_dim (4)
-                              +- BroadcastExchange (14)
-                                 +- * Filter (13)
-                                    +- * ColumnarToRow (12)
-                                       +- Scan parquet default.item (11)
-
-
-(1) Scan parquet default.web_sales
-Output [3]: [ws_sold_date_sk#1, ws_item_sk#2, ws_net_paid#3]
-Batched: true
-Location [not included in comparison]/{warehouse_dir}/web_sales]
-PushedFilters: [IsNotNull(ws_sold_date_sk), IsNotNull(ws_item_sk)]
-ReadSchema: struct<ws_sold_date_sk:int,ws_item_sk:int,ws_net_paid:decimal(7,2)>
-
-(2) ColumnarToRow [codegen id : 3]
-Input [3]: [ws_sold_date_sk#1, ws_item_sk#2, ws_net_paid#3]
-
-(3) Filter [codegen id : 3]
-Input [3]: [ws_sold_date_sk#1, ws_item_sk#2, ws_net_paid#3]
-Condition : (isnotnull(ws_sold_date_sk#1) AND isnotnull(ws_item_sk#2))
-
-(4) Scan parquet default.date_dim
-Output [2]: [d_date_sk#4, d_month_seq#5]
-Batched: true
-Location [not included in comparison]/{warehouse_dir}/date_dim]
-PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211), IsNotNull(d_date_sk)]
-ReadSchema: struct<d_date_sk:int,d_month_seq:int>
-
-(5) ColumnarToRow [codegen id : 1]
-Input [2]: [d_date_sk#4, d_month_seq#5]
-
-(6) Filter [codegen id : 1]
-Input [2]: [d_date_sk#4, d_month_seq#5]
-Condition : (((isnotnull(d_month_seq#5) AND (d_month_seq#5 >= 1200)) AND (d_month_seq#5 <= 1211)) AND isnotnull(d_date_sk#4))
-
-(7) Project [codegen id : 1]
-Output [1]: [d_date_sk#4]
-Input [2]: [d_date_sk#4, d_month_seq#5]
-
-(8) BroadcastExchange
-Input [1]: [d_date_sk#4]
-Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [id=#6]
-
-(9) BroadcastHashJoin [codegen id : 3]
-Left keys [1]: [ws_sold_date_sk#1]
-Right keys [1]: [d_date_sk#4]
-Join condition: None
-
-(10) Project [codegen id : 3]
-Output [2]: [ws_item_sk#2, ws_net_paid#3]
-Input [4]: [ws_sold_date_sk#1, ws_item_sk#2, ws_net_paid#3, d_date_sk#4]
-
-(11) Scan parquet default.item
-Output [3]: [i_item_sk#7, i_class#8, i_category#9]
-Batched: true
-Location [not included in comparison]/{warehouse_dir}/item]
-PushedFilters: [IsNotNull(i_item_sk)]
-ReadSchema: struct<i_item_sk:int,i_class:string,i_category:string>
-
-(12) ColumnarToRow [codegen id : 2]
-Input [3]: [i_item_sk#7, i_class#8, i_category#9]
-
-(13) Filter [codegen id : 2]
-Input [3]: [i_item_sk#7, i_class#8, i_category#9]
-Condition : isnotnull(i_item_sk#7)
-
-(14) BroadcastExchange
-Input [3]: [i_item_sk#7, i_class#8, i_category#9]
-Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [id=#10]
-
-(15) BroadcastHashJoin [codegen id : 3]
-Left keys [1]: [ws_item_sk#2]
-Right keys [1]: [i_item_sk#7]
-Join condition: None
-
-(16) Project [codegen id : 3]
-Output [3]: [ws_net_paid#3, i_category#9, i_class#8]
-Input [5]: [ws_item_sk#2, ws_net_paid#3, i_item_sk#7, i_class#8, i_category#9]
-
-(17) Expand [codegen id : 3]
-Input [3]: [ws_net_paid#3, i_category#9, i_class#8]
-Arguments: [List(ws_net_paid#3, i_category#9, i_class#8, 0), List(ws_net_paid#3, i_category#9, null, 1), List(ws_net_paid#3, null, null, 3)], [ws_net_paid#3, i_category#11, i_class#12, spark_grouping_id#13]
-
-(18) HashAggregate [codegen id : 3]
-Input [4]: [ws_net_paid#3, i_category#11, i_class#12, spark_grouping_id#13]
-Keys [3]: [i_category#11, i_class#12, spark_grouping_id#13]
-Functions [1]: [partial_sum(UnscaledValue(ws_net_paid#3))]
-Aggregate Attributes [1]: [sum#14]
-Results [4]: [i_category#11, i_class#12, spark_grouping_id#13, sum#15]
-
-(19) Exchange
-Input [4]: [i_category#11, i_class#12, spark_grouping_id#13, sum#15]
-Arguments: hashpartitioning(i_category#11, i_class#12, spark_grouping_id#13, 5), true, [id=#16]
-
-(20) HashAggregate [codegen id : 4]
-Input [4]: [i_category#11, i_class#12, spark_grouping_id#13, sum#15]
-Keys [3]: [i_category#11, i_class#12, spark_grouping_id#13]
-Functions [1]: [sum(UnscaledValue(ws_net_paid#3))]
-Aggregate Attributes [1]: [sum(UnscaledValue(ws_net_paid#3))#17]
-Results [7]: [MakeDecimal(sum(UnscaledValue(ws_net_paid#3))#17,17,2) AS total_sum#18, i_category#11, i_class#12, (cast((shiftright(spark_grouping_id#13, 1) & 1) as tinyint) + cast((shiftright(spark_grouping_id#13, 0) & 1) as tinyint)) AS lochierarchy#19, (cast((shiftright(spark_grouping_id#13, 1) & 1) as tinyint) + cast((shiftright(spark_grouping_id#13, 0) & 1) as tinyint)) AS _w1#20, CASE WHEN (cast(cast((shiftright(spark_grouping_id#13, 0) & 1) as tinyint) as int) = 0) THEN i_category#11 END AS _w2#21, MakeDecimal(sum(UnscaledValue(ws_net_paid#3))#17,17,2) AS _w3#22]
-
-(21) Exchange
-Input [7]: [total_sum#18, i_category#11, i_class#12, lochierarchy#19, _w1#20, _w2#21, _w3#22]
-Arguments: hashpartitioning(_w1#20, _w2#21, 5), true, [id=#23]
-
-(22) Sort [codegen id : 5]
-Input [7]: [total_sum#18, i_category#11, i_class#12, lochierarchy#19, _w1#20, _w2#21, _w3#22]
-Arguments: [_w1#20 ASC NULLS FIRST, _w2#21 ASC NULLS FIRST, _w3#22 DESC NULLS LAST], false, 0
-
-(23) Window
-Input [7]: [total_sum#18, i_category#11, i_class#12, lochierarchy#19, _w1#20, _w2#21, _w3#22]
-Arguments: [rank(_w3#22) windowspecdefinition(_w1#20, _w2#21, _w3#22 DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_within_parent#24], [_w1#20, _w2#21], [_w3#22 DESC NULLS LAST]
-
-(24) Project [codegen id : 6]
-Output [5]: [total_sum#18, i_category#11, i_class#12, lochierarchy#19, rank_within_parent#24]
-Input [8]: [total_sum#18, i_category#11, i_class#12, lochierarchy#19, _w1#20, _w2#21, _w3#22, rank_within_parent#24]
-
-(25) TakeOrderedAndProject
-Input [5]: [total_sum#18, i_category#11, i_class#12, lochierarchy#19, rank_within_parent#24]
-Arguments: 100, [lochierarchy#19 DESC NULLS LAST, CASE WHEN (cast(lochierarchy#19 as int) = 0) THEN i_category#11 END ASC NULLS FIRST, rank_within_parent#24 ASC NULLS FIRST], [total_sum#18, i_category#11, i_class#12, lochierarchy#19, rank_within_parent#24]
-
+TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WHEN (cast(lochierarchy#1 as int) = 0) THEN i_category#2 END ASC NULLS FIRST,rank_within_parent#3 ASC NULLS FIRST], output=[total_sum#4,i_category#2,i_class#5,lochierarchy#1,rank_within_parent#3])
++- *(6) Project [total_sum#4, i_category#2, i_class#5, lochierarchy#1, rank_within_parent#3]
+   +- Window [rank(_w3#6) windowspecdefinition(_w1#7, _w2#8, _w3#6 DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_within_parent#3], [_w1#7, _w2#8], [_w3#6 DESC NULLS LAST]
+      +- *(5) Sort [_w1#7 ASC NULLS FIRST, _w2#8 ASC NULLS FIRST, _w3#6 DESC NULLS LAST], false, 0
+         +- Exchange hashpartitioning(_w1#7, _w2#8, 5)
+            +- *(4) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[sum(UnscaledValue(ws_net_paid#10))])
+               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 5)
+                  +- *(3) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[partial_sum(UnscaledValue(ws_net_paid#10))])
+                     +- *(3) Expand [List(ws_net_paid#10, i_category#11, i_class#12, 0), List(ws_net_paid#10, i_category#11, null, 1), List(ws_net_paid#10, null, null, 3)], [ws_net_paid#10, i_category#2, i_class#5, spark_grouping_id#9]
+                        +- *(3) Project [ws_net_paid#10, i_category#13 AS i_category#11, i_class#14 AS i_class#12]
+                           +- *(3) BroadcastHashJoin [ws_item_sk#15], [i_item_sk#16], Inner, BuildRight
+                              :- *(3) Project [ws_item_sk#15, ws_net_paid#10]
+                              :  +- *(3) BroadcastHashJoin [ws_sold_date_sk#17], [d_date_sk#18], Inner, BuildRight
+                              :     :- *(3) Project [ws_sold_date_sk#17, ws_item_sk#15, ws_net_paid#10]
+                              :     :  +- *(3) Filter (isnotnull(ws_sold_date_sk#17) && isnotnull(ws_item_sk#15))
+                              :     :     +- *(3) FileScan parquet default.web_sales[ws_sold_date_sk#17,ws_item_sk#15,ws_net_paid#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/web_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ws_sold_date_sk), IsNotNull(ws_item_sk)], ReadSchema: struct<ws_sold_date_sk:int,ws_item_sk:int,ws_net_paid:decimal(7,2)>
+                              :     +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                              :        +- *(1) Project [d_date_sk#18]
+                              :           +- *(1) Filter (((isnotnull(d_month_seq#19) && (d_month_seq#19 >= 1200)) && (d_month_seq#19 <= 1211)) && isnotnull(d_date_sk#18))
+                              :              +- *(1) FileScan parquet default.date_dim[d_date_sk#18,d_month_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_month_seq:int>
+                              +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
+                                 +- *(2) Project [i_item_sk#16, i_class#14, i_category#13]
+                                    +- *(2) Filter isnotnull(i_item_sk#16)
+                                       +- *(2) FileScan parquet default.item[i_item_sk#16,i_class#14,i_category#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[file:/C:/Users/apdave/github/hyperspace-1/spark-warehouse/item], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_class:string,i_category:string>
