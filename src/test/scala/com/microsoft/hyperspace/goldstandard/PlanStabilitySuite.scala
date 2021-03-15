@@ -240,7 +240,7 @@ trait PlanStabilitySuite extends TPCDSBase with Logging {
 
   private def normalizeLocation(plan: String): String = {
     plan.replaceAll(
-      s"Location.*$clsName/",
+      s"Location.*spark-warehouse/",
       "Location [not included in comparison]/{warehouse_dir}/")
   }
 
