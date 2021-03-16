@@ -554,9 +554,6 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
        """.stripMargin)
   }
 
-  private val originalCBCEnabled = conf.cboEnabled
-  private val originalJoinReorderEnabled = conf.joinReorderEnabled
-
   override def beforeAll(): Unit = {
     super.beforeAll()
     tableNames.foreach { tableName =>
@@ -565,8 +562,6 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   override def afterAll(): Unit = {
-    conf.setConf(SQLConf.CBO_ENABLED, originalCBCEnabled)
-    conf.setConf(SQLConf.JOIN_REORDER_ENABLED, originalJoinReorderEnabled)
     tableNames.foreach { tableName =>
       spark.sessionState.catalog.dropTable(TableIdentifier(tableName), true, true)
     }
