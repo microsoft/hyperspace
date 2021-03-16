@@ -5,7 +5,6 @@
  *
  * The below license was copied from: https://github.com/FasterXML/jackson-module-scala/blob/2.10/src/main/resources/META-INF/LICENSE
  */
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -272,10 +271,10 @@ class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
   override val goldenFilePath: String =
     new File(baseResourcePath, "spark-2.4/approved-plans-v1_4").getAbsolutePath
 
-  // Enable cross join because some queries fail during query optimization phase.
-  withSQLConf("spark.sql.crossJoin.enabled" -> "true") {
-    tpcdsQueries.foreach { q =>
-      test(s"check simplified (tpcds-v1.4/$q)") {
+  tpcdsQueries.foreach { q =>
+    test(s"check simplified (tpcds-v1.4/$q)") {
+      // Enable cross join because some queries fail during query optimization phase.
+      withSQLConf("spark.sql.crossJoin.enabled" -> "true") {
         testQuery("tpcds/queries", q)
       }
     }

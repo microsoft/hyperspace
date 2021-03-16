@@ -12,8 +12,8 @@ TakeOrderedAndProject(limit=100, orderBy=[rnk#1 ASC NULLS FIRST], output=[rnk#1,
       :     :     :        +- *(3) Sort [rank_col#11 ASC NULLS FIRST], false, 0
       :     :     :           +- Exchange SinglePartition
       :     :     :              +- *(2) Project [item_sk#8, rank_col#11]
-      :     :     :                 +- *(2) Filter (isnotnull(avg(ss_net_profit#12)#13) && (cast(avg(ss_net_profit#12)#13 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery7089)), DecimalType(13,7))))
-      :     :     :                    :  +- Subquery subquery7089
+      :     :     :                 +- *(2) Filter (isnotnull(avg(ss_net_profit#12)#13) && (cast(avg(ss_net_profit#12)#13 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery6830)), DecimalType(13,7))))
+      :     :     :                    :  +- Subquery subquery6830
       :     :     :                    :     +- *(2) HashAggregate(keys=[ss_store_sk#14], functions=[avg(UnscaledValue(ss_net_profit#12))])
       :     :     :                    :        +- Exchange hashpartitioning(ss_store_sk#14, 5)
       :     :     :                    :           +- *(1) HashAggregate(keys=[ss_store_sk#14], functions=[partial_avg(UnscaledValue(ss_net_profit#12))])
@@ -33,8 +33,8 @@ TakeOrderedAndProject(limit=100, orderBy=[rnk#1 ASC NULLS FIRST], output=[rnk#1,
       :     :                 +- *(6) Sort [rank_col#17 DESC NULLS LAST], false, 0
       :     :                    +- Exchange SinglePartition
       :     :                       +- *(5) Project [item_sk#6, rank_col#17]
-      :     :                          +- *(5) Filter (isnotnull(avg(ss_net_profit#12)#18) && (cast(avg(ss_net_profit#12)#18 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery7094)), DecimalType(13,7))))
-      :     :                             :  +- Subquery subquery7094
+      :     :                          +- *(5) Filter (isnotnull(avg(ss_net_profit#12)#18) && (cast(avg(ss_net_profit#12)#18 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery6835)), DecimalType(13,7))))
+      :     :                             :  +- Subquery subquery6835
       :     :                             :     +- *(2) HashAggregate(keys=[ss_store_sk#14], functions=[avg(UnscaledValue(ss_net_profit#12))])
       :     :                             :        +- Exchange hashpartitioning(ss_store_sk#14, 5)
       :     :                             :           +- *(1) HashAggregate(keys=[ss_store_sk#14], functions=[partial_avg(UnscaledValue(ss_net_profit#12))])
