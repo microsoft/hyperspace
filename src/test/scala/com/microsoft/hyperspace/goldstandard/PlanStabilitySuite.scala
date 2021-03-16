@@ -33,6 +33,7 @@ import scala.collection.mutable
 import org.apache.commons.io.FileUtils
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.AttributeSet
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.ExplainCommand
@@ -77,20 +78,7 @@ import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
  */
 // scalastyle:on filelinelengthchecker
 
-trait PlanStabilitySuite extends TPCDSBase with Logging {
-
-  private val originalCrossJoinEnabled = spark.conf.get("spark.sql.crossJoin.enabled")
-
-  override def beforeAll(): Unit = {
-    spark.conf.set("spark.sql.crossJoin.enabled", "true")
-    super.beforeAll()
-  }
-
-  override def afterAll(): Unit = {
-    spark.conf.set("spark.sql.crossJoin.enabled", originalCrossJoinEnabled)
-    super.afterAll()
-  }
-
+trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
   private val regenerateGoldenFiles: Boolean = System.getenv("SPARK_GENERATE_GOLDEN_FILES") == "1"
 
   protected val baseResourcePath = {
@@ -284,9 +272,12 @@ class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
   override val goldenFilePath: String =
     new File(baseResourcePath, "spark-2.4/approved-plans-v1_4").getAbsolutePath
 
-  tpcdsQueries.foreach { q =>
-    test(s"check simplified (tpcds-v1.4/$q)") {
-      testQuery("tpcds/queries", q)
+  // Enable cross join because some queries fail during query optimization phase.
+  withSQLConf("spark.sql.crossJoin.enabled" -> "true") {
+    tpcdsQueries.foreach { q =>
+      test(s"check simplified (tpcds-v1.4/$q)") {
+        testQuery("tpcds/queries", q)
+      }
     }
   }
 }
