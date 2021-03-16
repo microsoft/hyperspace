@@ -79,12 +79,15 @@ import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
 
 trait PlanStabilitySuite extends TPCDSBase with Logging {
 
+  private val originalCrossJoinEnabled = spark.conf.get("spark.sql.crossJoin.enabled")
+
   override def beforeAll(): Unit = {
     spark.conf.set("spark.sql.crossJoin.enabled", "true")
     super.beforeAll()
   }
 
   override def afterAll(): Unit = {
+    spark.conf.set("spark.sql.crossJoin.enabled", originalCrossJoinEnabled)
     super.afterAll()
   }
 
