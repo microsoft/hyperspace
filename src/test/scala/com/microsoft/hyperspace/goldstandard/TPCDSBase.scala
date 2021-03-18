@@ -38,8 +38,8 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
 
   // The TPCDS queries below are based on v1.4.
   // TODO: Fix bulid pipeline for q49 and reenable q49.
-  val tpcdsQueries = Seq(
-    "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10", "q11",
+  val tpcdsQueries = Seq("q0")
+  /* ("q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10", "q11",
     "q12", "q13", "q14a", "q14b", "q15", "q16", "q17", "q18", "q19", "q20",
     "q21", "q22", "q23a", "q23b", "q24a", "q24b", "q25", "q26", "q27", "q28", "q29", "q30",
     "q31", "q32", "q33", "q34", "q35", "q36", "q37", "q38", "q39a", "q39b", "q40",
@@ -48,7 +48,7 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
     "q61", "q62", "q63", "q64", "q65", "q66", "q67", "q68", "q69", "q70",
     "q71", "q72", "q73", "q74", "q75", "q76", "q77", "q78", "q79", "q80",
     "q81", "q82", "q83", "q84", "q85", "q86", "q87", "q88", "q89", "q90",
-    "q91", "q92", "q93", "q94", "q95", "q96", "q97", "q98", "q99")
+    "q91", "q92", "q93", "q94", "q95", "q96", "q97", "q98", "q99") */
 
   private val tableColumns = Map(
     "store_sales" ->
@@ -572,9 +572,9 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   override def afterAll(): Unit = {
-    tableNames.foreach { tableName =>
-      spark.sessionState.catalog.dropTable(TableIdentifier(tableName), true, true)
-    }
+    //tableNames.foreach { tableName =>
+    //  spark.sessionState.catalog.dropTable(TableIdentifier(tableName), true, true)
+    //}
     super.afterAll()
   }
 }
