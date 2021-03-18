@@ -1,0 +1,78 @@
+TakeOrderedAndProject [30 days ,31 - 60 days ,61 - 90 days ,91 - 120 days ,>120 days ,sm_type,substring(w_warehouse_name, 1, 20),web_name]
+  WholeStageCodegen
+    HashAggregate [sm_type,substring(w_warehouse_name, 1, 20),sum,sum,sum,sum,sum,sum(cast(CASE WHEN (((ws_ship_date_sk - ws_sold_date_sk) > 30) && ((ws_ship_date_sk - ws_sold_date_sk) <= 60)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((ws_ship_date_sk - ws_sold_date_sk) > 60) && ((ws_ship_date_sk - ws_sold_date_sk) <= 90)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((ws_ship_date_sk - ws_sold_date_sk) > 90) && ((ws_ship_date_sk - ws_sold_date_sk) <= 120)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((ws_ship_date_sk - ws_sold_date_sk) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((ws_ship_date_sk - ws_sold_date_sk) > 120) THEN 1 ELSE 0 END as bigint)),web_name] [30 days ,31 - 60 days ,61 - 90 days ,91 - 120 days ,>120 days ,substring(w_warehouse_name, 1, 20),sum,sum,sum,sum,sum,sum(cast(CASE WHEN (((ws_ship_date_sk - ws_sold_date_sk) > 30) && ((ws_ship_date_sk - ws_sold_date_sk) <= 60)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((ws_ship_date_sk - ws_sold_date_sk) > 60) && ((ws_ship_date_sk - ws_sold_date_sk) <= 90)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((ws_ship_date_sk - ws_sold_date_sk) > 90) && ((ws_ship_date_sk - ws_sold_date_sk) <= 120)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((ws_ship_date_sk - ws_sold_date_sk) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((ws_ship_date_sk - ws_sold_date_sk) > 120) THEN 1 ELSE 0 END as bigint))]
+      InputAdapter
+        Exchange [sm_type,substring(w_warehouse_name, 1, 20),web_name] #1
+          WholeStageCodegen
+            HashAggregate [sm_type,substring(w_warehouse_name, 1, 20),sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,w_warehouse_name,web_name,ws_ship_date_sk,ws_sold_date_sk] [substring(w_warehouse_name, 1, 20),sum,sum,sum,sum,sum,sum,sum,sum,sum,sum]
+              Project [sm_type,w_warehouse_name,web_name,ws_ship_date_sk,ws_sold_date_sk]
+                SortMergeJoin [d_date_sk,ws_ship_date_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [ws_ship_date_sk]
+                        InputAdapter
+                          Exchange [ws_ship_date_sk] #2
+                            WholeStageCodegen
+                              Project [sm_type,w_warehouse_name,web_name,ws_ship_date_sk,ws_sold_date_sk]
+                                SortMergeJoin [web_site_sk,ws_web_site_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ws_web_site_sk]
+                                        InputAdapter
+                                          Exchange [ws_web_site_sk] #3
+                                            WholeStageCodegen
+                                              Project [sm_type,w_warehouse_name,ws_ship_date_sk,ws_sold_date_sk,ws_web_site_sk]
+                                                SortMergeJoin [sm_ship_mode_sk,ws_ship_mode_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [ws_ship_mode_sk]
+                                                        InputAdapter
+                                                          Exchange [ws_ship_mode_sk] #4
+                                                            WholeStageCodegen
+                                                              Project [w_warehouse_name,ws_ship_date_sk,ws_ship_mode_sk,ws_sold_date_sk,ws_web_site_sk]
+                                                                SortMergeJoin [w_warehouse_sk,ws_warehouse_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [ws_warehouse_sk]
+                                                                        InputAdapter
+                                                                          Exchange [ws_warehouse_sk] #5
+                                                                            WholeStageCodegen
+                                                                              Project [ws_ship_date_sk,ws_ship_mode_sk,ws_sold_date_sk,ws_warehouse_sk,ws_web_site_sk]
+                                                                                Filter [ws_ship_date_sk,ws_ship_mode_sk,ws_warehouse_sk,ws_web_site_sk]
+                                                                                  Scan parquet default.web_sales [ws_ship_date_sk,ws_ship_mode_sk,ws_sold_date_sk,ws_warehouse_sk,ws_web_site_sk] [ws_ship_date_sk,ws_ship_mode_sk,ws_sold_date_sk,ws_warehouse_sk,ws_web_site_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [w_warehouse_sk]
+                                                                        InputAdapter
+                                                                          Exchange [w_warehouse_sk] #6
+                                                                            WholeStageCodegen
+                                                                              Project [w_warehouse_name,w_warehouse_sk]
+                                                                                Filter [w_warehouse_sk]
+                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse [w_warehouse_name,w_warehouse_sk] [w_warehouse_name,w_warehouse_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [sm_ship_mode_sk]
+                                                        InputAdapter
+                                                          Exchange [sm_ship_mode_sk] #7
+                                                            WholeStageCodegen
+                                                              Project [sm_ship_mode_sk,sm_type]
+                                                                Filter [sm_ship_mode_sk]
+                                                                  Scan parquet default.ship_mode [sm_ship_mode_sk,sm_type] [sm_ship_mode_sk,sm_type]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [web_site_sk]
+                                        InputAdapter
+                                          Exchange [web_site_sk] #8
+                                            WholeStageCodegen
+                                              Project [web_name,web_site_sk]
+                                                Filter [web_site_sk]
+                                                  Scan Hyperspace(Type: CI, Name: JoinIndex36-index-46-web_site_sk-3, LogVersion: 0) default.web_site [web_name,web_site_sk] [web_name,web_site_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [d_date_sk]
+                        InputAdapter
+                          Exchange [d_date_sk] #9
+                            WholeStageCodegen
+                              Project [d_date_sk]
+                                Filter [d_date_sk,d_month_seq]
+                                  Scan Hyperspace(Type: CI, Name: FilterIndex07-index-17-d_month_seq-7, LogVersion: 0) default.date_dim [d_date_sk,d_month_seq] [d_date_sk,d_month_seq]

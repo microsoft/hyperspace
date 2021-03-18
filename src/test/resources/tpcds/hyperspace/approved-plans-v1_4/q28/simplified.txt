@@ -1,0 +1,90 @@
+CollectLimit
+  CartesianProduct
+    CartesianProduct
+      CartesianProduct
+        CartesianProduct
+          CartesianProduct
+            WholeStageCodegen
+              HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum] [B1_CNT,B1_CNTD,B1_LP,avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum]
+                InputAdapter
+                  Exchange #1
+                    WholeStageCodegen
+                      HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count(ss_list_price),count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count,count(ss_list_price),count(ss_list_price),sum,sum]
+                        HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                          InputAdapter
+                            Exchange [ss_list_price] #2
+                              WholeStageCodegen
+                                HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count(ss_list_price),ss_list_price,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                                  Project [ss_list_price]
+                                    Filter [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+                                      Scan parquet default.store_sales [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost] [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+            WholeStageCodegen
+              HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum] [B2_CNT,B2_CNTD,B2_LP,avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum]
+                InputAdapter
+                  Exchange #3
+                    WholeStageCodegen
+                      HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count(ss_list_price),count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count,count(ss_list_price),count(ss_list_price),sum,sum]
+                        HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                          InputAdapter
+                            Exchange [ss_list_price] #4
+                              WholeStageCodegen
+                                HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count(ss_list_price),ss_list_price,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                                  Project [ss_list_price]
+                                    Filter [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+                                      Scan parquet default.store_sales [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost] [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+          WholeStageCodegen
+            HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum] [B3_CNT,B3_CNTD,B3_LP,avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum]
+              InputAdapter
+                Exchange #5
+                  WholeStageCodegen
+                    HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count(ss_list_price),count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count,count(ss_list_price),count(ss_list_price),sum,sum]
+                      HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                        InputAdapter
+                          Exchange [ss_list_price] #6
+                            WholeStageCodegen
+                              HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count(ss_list_price),ss_list_price,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                                Project [ss_list_price]
+                                  Filter [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+                                    Scan parquet default.store_sales [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost] [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+        WholeStageCodegen
+          HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum] [B4_CNT,B4_CNTD,B4_LP,avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum]
+            InputAdapter
+              Exchange #7
+                WholeStageCodegen
+                  HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count(ss_list_price),count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count,count(ss_list_price),count(ss_list_price),sum,sum]
+                    HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                      InputAdapter
+                        Exchange [ss_list_price] #8
+                          WholeStageCodegen
+                            HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count(ss_list_price),ss_list_price,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                              Project [ss_list_price]
+                                Filter [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+                                  Scan parquet default.store_sales [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost] [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+      WholeStageCodegen
+        HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum] [B5_CNT,B5_CNTD,B5_LP,avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum]
+          InputAdapter
+            Exchange #9
+              WholeStageCodegen
+                HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count(ss_list_price),count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count,count(ss_list_price),count(ss_list_price),sum,sum]
+                  HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                    InputAdapter
+                      Exchange [ss_list_price] #10
+                        WholeStageCodegen
+                          HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count(ss_list_price),ss_list_price,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                            Project [ss_list_price]
+                              Filter [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+                                Scan parquet default.store_sales [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost] [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+    WholeStageCodegen
+      HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum] [B6_CNT,B6_CNTD,B6_LP,avg(UnscaledValue(ss_list_price)),count,count,count,count(ss_list_price),count(ss_list_price),sum]
+        InputAdapter
+          Exchange #11
+            WholeStageCodegen
+              HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count(ss_list_price),count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count,count,count(ss_list_price),count(ss_list_price),sum,sum]
+                HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),ss_list_price,sum,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                  InputAdapter
+                    Exchange [ss_list_price] #12
+                      WholeStageCodegen
+                        HashAggregate [avg(UnscaledValue(ss_list_price)),count,count,count(ss_list_price),ss_list_price,sum] [avg(UnscaledValue(ss_list_price)),count,count,count,count,count(ss_list_price),sum,sum]
+                          Project [ss_list_price]
+                            Filter [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]
+                              Scan parquet default.store_sales [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost] [ss_coupon_amt,ss_list_price,ss_quantity,ss_wholesale_cost]

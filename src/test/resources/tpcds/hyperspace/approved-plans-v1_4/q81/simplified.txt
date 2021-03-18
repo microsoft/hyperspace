@@ -1,0 +1,133 @@
+TakeOrderedAndProject [c_customer_id,c_first_name,c_last_name,c_salutation,ca_city,ca_country,ca_county,ca_gmt_offset,ca_location_type,ca_state,ca_street_name,ca_street_number,ca_street_type,ca_suite_number,ca_zip,ctr_total_return]
+  WholeStageCodegen
+    Project [c_customer_id,c_first_name,c_last_name,c_salutation,ca_city,ca_country,ca_county,ca_gmt_offset,ca_location_type,ca_state,ca_street_name,ca_street_number,ca_street_type,ca_suite_number,ca_zip,ctr_total_return]
+      SortMergeJoin [c_current_addr_sk,ca_address_sk]
+        InputAdapter
+          WholeStageCodegen
+            Sort [c_current_addr_sk]
+              InputAdapter
+                Exchange [c_current_addr_sk] #1
+                  WholeStageCodegen
+                    Project [c_current_addr_sk,c_customer_id,c_first_name,c_last_name,c_salutation,ctr_total_return]
+                      SortMergeJoin [c_customer_sk,ctr_customer_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [ctr_customer_sk]
+                              InputAdapter
+                                Exchange [ctr_customer_sk] #2
+                                  WholeStageCodegen
+                                    Project [ctr_customer_sk,ctr_total_return]
+                                      SortMergeJoin [(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6))),ctr_state,ctr_state,ctr_total_return]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ctr_state]
+                                              InputAdapter
+                                                Exchange [ctr_state] #3
+                                                  WholeStageCodegen
+                                                    Filter [ctr_total_return]
+                                                      HashAggregate [ca_state,cr_returning_customer_sk,sum,sum(UnscaledValue(cr_return_amt_inc_tax))] [ctr_customer_sk,ctr_state,ctr_total_return,sum,sum(UnscaledValue(cr_return_amt_inc_tax))]
+                                                        InputAdapter
+                                                          Exchange [ca_state,cr_returning_customer_sk] #4
+                                                            WholeStageCodegen
+                                                              HashAggregate [ca_state,cr_return_amt_inc_tax,cr_returning_customer_sk,sum,sum] [sum,sum]
+                                                                Project [ca_state,cr_return_amt_inc_tax,cr_returning_customer_sk]
+                                                                  SortMergeJoin [ca_address_sk,cr_returning_addr_sk]
+                                                                    InputAdapter
+                                                                      WholeStageCodegen
+                                                                        Sort [cr_returning_addr_sk]
+                                                                          InputAdapter
+                                                                            Exchange [cr_returning_addr_sk] #5
+                                                                              WholeStageCodegen
+                                                                                Project [cr_return_amt_inc_tax,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                  SortMergeJoin [cr_returned_date_sk,d_date_sk]
+                                                                                    InputAdapter
+                                                                                      WholeStageCodegen
+                                                                                        Sort [cr_returned_date_sk]
+                                                                                          InputAdapter
+                                                                                            Exchange [cr_returned_date_sk] #6
+                                                                                              WholeStageCodegen
+                                                                                                Project [cr_return_amt_inc_tax,cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                                  Filter [cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                                    Scan parquet default.catalog_returns [cr_return_amt_inc_tax,cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk] [cr_return_amt_inc_tax,cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                    InputAdapter
+                                                                                      WholeStageCodegen
+                                                                                        Sort [d_date_sk]
+                                                                                          InputAdapter
+                                                                                            Exchange [d_date_sk] #7
+                                                                                              WholeStageCodegen
+                                                                                                Project [d_date_sk]
+                                                                                                  Filter [d_date_sk,d_year]
+                                                                                                    Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                    InputAdapter
+                                                                      WholeStageCodegen
+                                                                        Sort [ca_address_sk]
+                                                                          InputAdapter
+                                                                            Exchange [ca_address_sk] #8
+                                                                              WholeStageCodegen
+                                                                                Project [ca_address_sk,ca_state]
+                                                                                  Filter [ca_address_sk,ca_state]
+                                                                                    Scan Hyperspace(Type: CI, Name: FilterIndex32-index-35-ca_state-11, LogVersion: 0) default.customer_address [ca_address_sk,ca_state] [ca_address_sk,ca_state]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ctr_state]
+                                              InputAdapter
+                                                Exchange [ctr_state] #9
+                                                  WholeStageCodegen
+                                                    Filter [(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))]
+                                                      HashAggregate [avg(ctr_total_return),count,ctr_state,sum] [(CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6))),avg(ctr_total_return),count,ctr_state,sum]
+                                                        InputAdapter
+                                                          Exchange [ctr_state] #10
+                                                            WholeStageCodegen
+                                                              HashAggregate [count,count,ctr_state,ctr_total_return,sum,sum] [count,count,sum,sum]
+                                                                HashAggregate [ca_state,cr_returning_customer_sk,sum,sum(UnscaledValue(cr_return_amt_inc_tax))] [ctr_state,ctr_total_return,sum,sum(UnscaledValue(cr_return_amt_inc_tax))]
+                                                                  InputAdapter
+                                                                    Exchange [ca_state,cr_returning_customer_sk] #11
+                                                                      WholeStageCodegen
+                                                                        HashAggregate [ca_state,cr_return_amt_inc_tax,cr_returning_customer_sk,sum,sum] [sum,sum]
+                                                                          Project [ca_state,cr_return_amt_inc_tax,cr_returning_customer_sk]
+                                                                            SortMergeJoin [ca_address_sk,cr_returning_addr_sk]
+                                                                              InputAdapter
+                                                                                WholeStageCodegen
+                                                                                  Sort [cr_returning_addr_sk]
+                                                                                    InputAdapter
+                                                                                      Exchange [cr_returning_addr_sk] #12
+                                                                                        WholeStageCodegen
+                                                                                          Project [cr_return_amt_inc_tax,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                            SortMergeJoin [cr_returned_date_sk,d_date_sk]
+                                                                                              InputAdapter
+                                                                                                WholeStageCodegen
+                                                                                                  Sort [cr_returned_date_sk]
+                                                                                                    InputAdapter
+                                                                                                      Exchange [cr_returned_date_sk] #13
+                                                                                                        WholeStageCodegen
+                                                                                                          Project [cr_return_amt_inc_tax,cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                                            Filter [cr_returned_date_sk,cr_returning_addr_sk]
+                                                                                                              Scan parquet default.catalog_returns [cr_return_amt_inc_tax,cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk] [cr_return_amt_inc_tax,cr_returned_date_sk,cr_returning_addr_sk,cr_returning_customer_sk]
+                                                                                              InputAdapter
+                                                                                                WholeStageCodegen
+                                                                                                  Sort [d_date_sk]
+                                                                                                    InputAdapter
+                                                                                                      ReusedExchange [d_date_sk] [d_date_sk] #7
+                                                                              InputAdapter
+                                                                                WholeStageCodegen
+                                                                                  Sort [ca_address_sk]
+                                                                                    InputAdapter
+                                                                                      ReusedExchange [ca_address_sk,ca_state] [ca_address_sk,ca_state] #8
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [c_customer_sk]
+                              InputAdapter
+                                Exchange [c_customer_sk] #14
+                                  WholeStageCodegen
+                                    Project [c_current_addr_sk,c_customer_id,c_customer_sk,c_first_name,c_last_name,c_salutation]
+                                      Filter [c_current_addr_sk,c_customer_sk]
+                                        Scan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer [c_current_addr_sk,c_customer_id,c_customer_sk,c_first_name,c_last_name,c_salutation] [c_current_addr_sk,c_customer_id,c_customer_sk,c_first_name,c_last_name,c_salutation]
+        InputAdapter
+          WholeStageCodegen
+            Sort [ca_address_sk]
+              InputAdapter
+                Exchange [ca_address_sk] #15
+                  WholeStageCodegen
+                    Project [ca_address_sk,ca_city,ca_country,ca_county,ca_gmt_offset,ca_location_type,ca_state,ca_street_name,ca_street_number,ca_street_type,ca_suite_number,ca_zip]
+                      Filter [ca_address_sk,ca_state]
+                        Scan Hyperspace(Type: CI, Name: FilterIndex32-index-35-ca_state-11, LogVersion: 0) default.customer_address [ca_address_sk,ca_city,ca_country,ca_county,ca_gmt_offset,ca_location_type,ca_state,ca_street_name,ca_street_number,ca_street_type,ca_suite_number,ca_zip] [ca_address_sk,ca_city,ca_country,ca_county,ca_gmt_offset,ca_location_type,ca_state,ca_street_name,ca_street_number,ca_street_type,ca_suite_number,ca_zip]

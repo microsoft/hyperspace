@@ -11,4 +11,4 @@ CollectLimit
           WholeStageCodegen
             Project [ss_customer_sk,ss_sold_date_sk]
               Filter [ss_sold_date_sk]
-                Scan Hyperspace(Type: CI, Name: ssIndex, LogVersion: 0) default.store_sales [ss_customer_sk,ss_sold_date_sk] [ss_customer_sk,ss_sold_date_sk]
+                Scan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales [ss_customer_sk,ss_sold_date_sk] [ss_customer_sk,ss_sold_date_sk]

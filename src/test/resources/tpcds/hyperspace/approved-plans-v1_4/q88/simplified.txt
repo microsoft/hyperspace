@@ -1,0 +1,304 @@
+CartesianProduct
+  CartesianProduct
+    CartesianProduct
+      CartesianProduct
+        CartesianProduct
+          CartesianProduct
+            CartesianProduct
+              WholeStageCodegen
+                HashAggregate [count,count(1)] [count,count(1),h8_30_to_9]
+                  InputAdapter
+                    Exchange #1
+                      WholeStageCodegen
+                        HashAggregate [count,count] [count,count]
+                          Project
+                            SortMergeJoin [s_store_sk,ss_store_sk]
+                              InputAdapter
+                                WholeStageCodegen
+                                  Sort [ss_store_sk]
+                                    InputAdapter
+                                      Exchange [ss_store_sk] #2
+                                        WholeStageCodegen
+                                          Project [ss_store_sk]
+                                            SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [ss_sold_time_sk]
+                                                    InputAdapter
+                                                      Exchange [ss_sold_time_sk] #3
+                                                        WholeStageCodegen
+                                                          Project [ss_sold_time_sk,ss_store_sk]
+                                                            SortMergeJoin [hd_demo_sk,ss_hdemo_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Project [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk]
+                                                                    Filter [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk]
+                                                                      Scan Hyperspace(Type: CI, Name: JoinIndex17-index-27-ss_hdemo_sk-19, LogVersion: 0) default.store_sales [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk] [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Project [hd_demo_sk]
+                                                                    Filter [hd_demo_sk,hd_dep_count,hd_vehicle_count]
+                                                                      Scan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics [hd_demo_sk,hd_dep_count,hd_vehicle_count] [hd_demo_sk,hd_dep_count,hd_vehicle_count]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [t_time_sk]
+                                                    InputAdapter
+                                                      Exchange [t_time_sk] #4
+                                                        WholeStageCodegen
+                                                          Project [t_time_sk]
+                                                            Filter [t_hour,t_minute,t_time_sk]
+                                                              Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                              InputAdapter
+                                WholeStageCodegen
+                                  Sort [s_store_sk]
+                                    InputAdapter
+                                      Exchange [s_store_sk] #5
+                                        WholeStageCodegen
+                                          Project [s_store_sk]
+                                            Filter [s_store_name,s_store_sk]
+                                              Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_name,s_store_sk] [s_store_name,s_store_sk]
+              WholeStageCodegen
+                HashAggregate [count,count(1)] [count,count(1),h9_to_9_30]
+                  InputAdapter
+                    Exchange #6
+                      WholeStageCodegen
+                        HashAggregate [count,count] [count,count]
+                          Project
+                            SortMergeJoin [s_store_sk,ss_store_sk]
+                              InputAdapter
+                                WholeStageCodegen
+                                  Sort [ss_store_sk]
+                                    InputAdapter
+                                      Exchange [ss_store_sk] #7
+                                        WholeStageCodegen
+                                          Project [ss_store_sk]
+                                            SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [ss_sold_time_sk]
+                                                    InputAdapter
+                                                      ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [t_time_sk]
+                                                    InputAdapter
+                                                      Exchange [t_time_sk] #8
+                                                        WholeStageCodegen
+                                                          Project [t_time_sk]
+                                                            Filter [t_hour,t_minute,t_time_sk]
+                                                              Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                              InputAdapter
+                                WholeStageCodegen
+                                  Sort [s_store_sk]
+                                    InputAdapter
+                                      ReusedExchange [s_store_sk] [s_store_sk] #5
+            WholeStageCodegen
+              HashAggregate [count,count(1)] [count,count(1),h9_30_to_10]
+                InputAdapter
+                  Exchange #9
+                    WholeStageCodegen
+                      HashAggregate [count,count] [count,count]
+                        Project
+                          SortMergeJoin [s_store_sk,ss_store_sk]
+                            InputAdapter
+                              WholeStageCodegen
+                                Sort [ss_store_sk]
+                                  InputAdapter
+                                    Exchange [ss_store_sk] #10
+                                      WholeStageCodegen
+                                        Project [ss_store_sk]
+                                          SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Sort [ss_sold_time_sk]
+                                                  InputAdapter
+                                                    ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Sort [t_time_sk]
+                                                  InputAdapter
+                                                    Exchange [t_time_sk] #11
+                                                      WholeStageCodegen
+                                                        Project [t_time_sk]
+                                                          Filter [t_hour,t_minute,t_time_sk]
+                                                            Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                            InputAdapter
+                              WholeStageCodegen
+                                Sort [s_store_sk]
+                                  InputAdapter
+                                    ReusedExchange [s_store_sk] [s_store_sk] #5
+          WholeStageCodegen
+            HashAggregate [count,count(1)] [count,count(1),h10_to_10_30]
+              InputAdapter
+                Exchange #12
+                  WholeStageCodegen
+                    HashAggregate [count,count] [count,count]
+                      Project
+                        SortMergeJoin [s_store_sk,ss_store_sk]
+                          InputAdapter
+                            WholeStageCodegen
+                              Sort [ss_store_sk]
+                                InputAdapter
+                                  Exchange [ss_store_sk] #13
+                                    WholeStageCodegen
+                                      Project [ss_store_sk]
+                                        SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [ss_sold_time_sk]
+                                                InputAdapter
+                                                  ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [t_time_sk]
+                                                InputAdapter
+                                                  Exchange [t_time_sk] #14
+                                                    WholeStageCodegen
+                                                      Project [t_time_sk]
+                                                        Filter [t_hour,t_minute,t_time_sk]
+                                                          Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                          InputAdapter
+                            WholeStageCodegen
+                              Sort [s_store_sk]
+                                InputAdapter
+                                  ReusedExchange [s_store_sk] [s_store_sk] #5
+        WholeStageCodegen
+          HashAggregate [count,count(1)] [count,count(1),h10_30_to_11]
+            InputAdapter
+              Exchange #15
+                WholeStageCodegen
+                  HashAggregate [count,count] [count,count]
+                    Project
+                      SortMergeJoin [s_store_sk,ss_store_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [ss_store_sk]
+                              InputAdapter
+                                Exchange [ss_store_sk] #16
+                                  WholeStageCodegen
+                                    Project [ss_store_sk]
+                                      SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ss_sold_time_sk]
+                                              InputAdapter
+                                                ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [t_time_sk]
+                                              InputAdapter
+                                                Exchange [t_time_sk] #17
+                                                  WholeStageCodegen
+                                                    Project [t_time_sk]
+                                                      Filter [t_hour,t_minute,t_time_sk]
+                                                        Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [s_store_sk]
+                              InputAdapter
+                                ReusedExchange [s_store_sk] [s_store_sk] #5
+      WholeStageCodegen
+        HashAggregate [count,count(1)] [count,count(1),h11_to_11_30]
+          InputAdapter
+            Exchange #18
+              WholeStageCodegen
+                HashAggregate [count,count] [count,count]
+                  Project
+                    SortMergeJoin [s_store_sk,ss_store_sk]
+                      InputAdapter
+                        WholeStageCodegen
+                          Sort [ss_store_sk]
+                            InputAdapter
+                              Exchange [ss_store_sk] #19
+                                WholeStageCodegen
+                                  Project [ss_store_sk]
+                                    SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                      InputAdapter
+                                        WholeStageCodegen
+                                          Sort [ss_sold_time_sk]
+                                            InputAdapter
+                                              ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                      InputAdapter
+                                        WholeStageCodegen
+                                          Sort [t_time_sk]
+                                            InputAdapter
+                                              Exchange [t_time_sk] #20
+                                                WholeStageCodegen
+                                                  Project [t_time_sk]
+                                                    Filter [t_hour,t_minute,t_time_sk]
+                                                      Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                      InputAdapter
+                        WholeStageCodegen
+                          Sort [s_store_sk]
+                            InputAdapter
+                              ReusedExchange [s_store_sk] [s_store_sk] #5
+    WholeStageCodegen
+      HashAggregate [count,count(1)] [count,count(1),h11_30_to_12]
+        InputAdapter
+          Exchange #21
+            WholeStageCodegen
+              HashAggregate [count,count] [count,count]
+                Project
+                  SortMergeJoin [s_store_sk,ss_store_sk]
+                    InputAdapter
+                      WholeStageCodegen
+                        Sort [ss_store_sk]
+                          InputAdapter
+                            Exchange [ss_store_sk] #22
+                              WholeStageCodegen
+                                Project [ss_store_sk]
+                                  SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                    InputAdapter
+                                      WholeStageCodegen
+                                        Sort [ss_sold_time_sk]
+                                          InputAdapter
+                                            ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                    InputAdapter
+                                      WholeStageCodegen
+                                        Sort [t_time_sk]
+                                          InputAdapter
+                                            Exchange [t_time_sk] #23
+                                              WholeStageCodegen
+                                                Project [t_time_sk]
+                                                  Filter [t_hour,t_minute,t_time_sk]
+                                                    Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                    InputAdapter
+                      WholeStageCodegen
+                        Sort [s_store_sk]
+                          InputAdapter
+                            ReusedExchange [s_store_sk] [s_store_sk] #5
+  WholeStageCodegen
+    HashAggregate [count,count(1)] [count,count(1),h12_to_12_30]
+      InputAdapter
+        Exchange #24
+          WholeStageCodegen
+            HashAggregate [count,count] [count,count]
+              Project
+                SortMergeJoin [s_store_sk,ss_store_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [ss_store_sk]
+                        InputAdapter
+                          Exchange [ss_store_sk] #25
+                            WholeStageCodegen
+                              Project [ss_store_sk]
+                                SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ss_sold_time_sk]
+                                        InputAdapter
+                                          ReusedExchange [ss_sold_time_sk,ss_store_sk] [ss_sold_time_sk,ss_store_sk] #3
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [t_time_sk]
+                                        InputAdapter
+                                          Exchange [t_time_sk] #26
+                                            WholeStageCodegen
+                                              Project [t_time_sk]
+                                                Filter [t_hour,t_minute,t_time_sk]
+                                                  Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [s_store_sk]
+                        InputAdapter
+                          ReusedExchange [s_store_sk] [s_store_sk] #5

@@ -1,0 +1,78 @@
+TakeOrderedAndProject [30 days ,31 - 60 days ,61 - 90 days ,91 - 120 days ,>120 days ,s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip]
+  WholeStageCodegen
+    HashAggregate [s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip,sum,sum,sum,sum,sum,sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 30) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 60)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 60) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 90)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 90) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 120)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 120) THEN 1 ELSE 0 END as bigint))] [30 days ,31 - 60 days ,61 - 90 days ,91 - 120 days ,>120 days ,sum,sum,sum,sum,sum,sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 30) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 60)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 60) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 90)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN (((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 90) && ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 120)) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) <= 30) THEN 1 ELSE 0 END as bigint)),sum(cast(CASE WHEN ((sr_returned_date_skL - cast(ss_sold_date_sk as bigint)) > 120) THEN 1 ELSE 0 END as bigint))]
+      InputAdapter
+        Exchange [s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip] #1
+          WholeStageCodegen
+            HashAggregate [s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip,sr_returned_date_sk,ss_sold_date_sk,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum] [sum,sum,sum,sum,sum,sum,sum,sum,sum,sum]
+              Project [s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip,sr_returned_date_sk,ss_sold_date_sk]
+                SortMergeJoin [d_date_sk,sr_returned_date_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [sr_returned_date_sk]
+                        InputAdapter
+                          Exchange [sr_returned_date_sk] #2
+                            WholeStageCodegen
+                              Project [s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip,sr_returned_date_sk,ss_sold_date_sk]
+                                SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ss_sold_date_sk]
+                                        InputAdapter
+                                          Exchange [ss_sold_date_sk] #3
+                                            WholeStageCodegen
+                                              Project [s_city,s_company_id,s_county,s_state,s_store_name,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip,sr_returned_date_sk,ss_sold_date_sk]
+                                                SortMergeJoin [s_store_sk,ss_store_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [ss_store_sk]
+                                                        InputAdapter
+                                                          Exchange [ss_store_sk] #4
+                                                            WholeStageCodegen
+                                                              Project [sr_returned_date_sk,ss_sold_date_sk,ss_store_sk]
+                                                                SortMergeJoin [sr_customer_sk,sr_item_sk,sr_ticket_number,ss_customer_sk,ss_item_sk,ss_ticket_number]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [ss_customer_sk,ss_item_sk,ss_ticket_number]
+                                                                        InputAdapter
+                                                                          Exchange [ss_customer_sk,ss_item_sk,ss_ticket_number] #5
+                                                                            WholeStageCodegen
+                                                                              Project [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ticket_number]
+                                                                                Filter [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ticket_number]
+                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ticket_number] [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_ticket_number]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [sr_customer_sk,sr_item_sk,sr_ticket_number]
+                                                                        InputAdapter
+                                                                          Exchange [sr_customer_sk,sr_item_sk,sr_ticket_number] #6
+                                                                            WholeStageCodegen
+                                                                              Project [sr_customer_sk,sr_item_sk,sr_returned_date_sk,sr_ticket_number]
+                                                                                Filter [sr_customer_sk,sr_item_sk,sr_returned_date_sk,sr_ticket_number]
+                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex21-index-20-sr_item_sk-7, LogVersion: 0) default.store_returns [sr_customer_sk,sr_item_sk,sr_returned_date_sk,sr_ticket_number] [sr_customer_sk,sr_item_sk,sr_returned_date_sk,sr_ticket_number]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [s_store_sk]
+                                                        InputAdapter
+                                                          Exchange [s_store_sk] #7
+                                                            WholeStageCodegen
+                                                              Project [s_city,s_company_id,s_county,s_state,s_store_name,s_store_sk,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip]
+                                                                Filter [s_store_sk]
+                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_city,s_company_id,s_county,s_state,s_store_name,s_store_sk,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip] [s_city,s_company_id,s_county,s_state,s_store_name,s_store_sk,s_street_name,s_street_number,s_street_type,s_suite_number,s_zip]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [d_date_sk]
+                                        InputAdapter
+                                          Exchange [d_date_sk] #8
+                                            WholeStageCodegen
+                                              Project [d_date_sk]
+                                                Filter [d_date_sk]
+                                                  Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk] [d_date_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [d_date_sk]
+                        InputAdapter
+                          Exchange [d_date_sk] #9
+                            WholeStageCodegen
+                              Project [d_date_sk]
+                                Filter [d_date_sk,d_moy,d_year]
+                                  Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_moy,d_year] [d_date_sk,d_moy,d_year]

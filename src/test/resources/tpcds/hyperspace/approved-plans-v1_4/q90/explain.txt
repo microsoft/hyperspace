@@ -1,0 +1,55 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[am_pm_ratio#1 ASC NULLS FIRST], output=[am_pm_ratio#1])
++- *(29) Project [CheckOverflow((promote_precision(cast(amc#2 as decimal(15,4))) / promote_precision(cast(pmc#3 as decimal(15,4)))), DecimalType(35,20)) AS am_pm_ratio#1]
+   +- CartesianProduct
+      :- *(14) HashAggregate(keys=[], functions=[count(1)])
+      :  +- Exchange SinglePartition
+      :     +- *(13) HashAggregate(keys=[], functions=[partial_count(1)])
+      :        +- *(13) Project
+      :           +- *(13) SortMergeJoin [ws_web_page_sk#4], [wp_web_page_sk#5], Inner
+      :              :- *(10) Sort [ws_web_page_sk#4 ASC NULLS FIRST], false, 0
+      :              :  +- Exchange hashpartitioning(ws_web_page_sk#4, 200)
+      :              :     +- *(9) Project [ws_web_page_sk#4]
+      :              :        +- *(9) SortMergeJoin [ws_sold_time_sk#6], [t_time_sk#7], Inner
+      :              :           :- *(6) Sort [ws_sold_time_sk#6 ASC NULLS FIRST], false, 0
+      :              :           :  +- Exchange hashpartitioning(ws_sold_time_sk#6, 200)
+      :              :           :     +- *(5) Project [ws_sold_time_sk#6, ws_web_page_sk#4]
+      :              :           :        +- *(5) SortMergeJoin [ws_ship_hdemo_sk#8], [hd_demo_sk#9], Inner
+      :              :           :           :- *(2) Sort [ws_ship_hdemo_sk#8 ASC NULLS FIRST], false, 0
+      :              :           :           :  +- Exchange hashpartitioning(ws_ship_hdemo_sk#8, 200)
+      :              :           :           :     +- *(1) Project [ws_sold_time_sk#6, ws_ship_hdemo_sk#8, ws_web_page_sk#4]
+      :              :           :           :        +- *(1) Filter ((isnotnull(ws_ship_hdemo_sk#8) && isnotnull(ws_sold_time_sk#6)) && isnotnull(ws_web_page_sk#4))
+      :              :           :           :           +- *(1) FileScan parquet default.web_sales[ws_sold_time_sk#6,ws_ship_hdemo_sk#8,ws_web_page_sk#4] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/web_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ws_ship_hdemo_sk), IsNotNull(ws_sold_time_sk), IsNotNull(ws_web_page_sk)], ReadSchema: struct<ws_sold_time_sk:int,ws_ship_hdemo_sk:int,ws_web_page_sk:int>
+      :              :           :           +- *(4) Sort [hd_demo_sk#9 ASC NULLS FIRST], false, 0
+      :              :           :              +- Exchange hashpartitioning(hd_demo_sk#9, 200)
+      :              :           :                 +- *(3) Project [hd_demo_sk#9]
+      :              :           :                    +- *(3) Filter ((isnotnull(hd_dep_count#10) && (hd_dep_count#10 = 6)) && isnotnull(hd_demo_sk#9))
+      :              :           :                       +- *(3) FileScan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics[hd_demo_sk#9,hd_dep_count#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(hd_dep_count), EqualTo(hd_dep_count,6), IsNotNull(hd_demo_sk)], ReadSchema: struct<hd_demo_sk:int,hd_dep_count:int>
+      :              :           +- *(8) Sort [t_time_sk#7 ASC NULLS FIRST], false, 0
+      :              :              +- Exchange hashpartitioning(t_time_sk#7, 200)
+      :              :                 +- *(7) Project [t_time_sk#7]
+      :              :                    +- *(7) Filter (((isnotnull(t_hour#11) && (t_hour#11 >= 8)) && (t_hour#11 <= 9)) && isnotnull(t_time_sk#7))
+      :              :                       +- *(7) FileScan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim[t_time_sk#7,t_hour#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(t_hour), GreaterThanOrEqual(t_hour,8), LessThanOrEqual(t_hour,9), IsNotNull(t_time_sk)], ReadSchema: struct<t_time_sk:int,t_hour:int>
+      :              +- *(12) Sort [wp_web_page_sk#5 ASC NULLS FIRST], false, 0
+      :                 +- Exchange hashpartitioning(wp_web_page_sk#5, 200)
+      :                    +- *(11) Project [wp_web_page_sk#5]
+      :                       +- *(11) Filter (((isnotnull(wp_char_count#12) && (wp_char_count#12 >= 5000)) && (wp_char_count#12 <= 5200)) && isnotnull(wp_web_page_sk#5))
+      :                          +- *(11) FileScan parquet default.web_page[wp_web_page_sk#5,wp_char_count#12] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/web_page], PartitionFilters: [], PushedFilters: [IsNotNull(wp_char_count), GreaterThanOrEqual(wp_char_count,5000), LessThanOrEqual(wp_char_count,..., ReadSchema: struct<wp_web_page_sk:int,wp_char_count:int>
+      +- *(28) HashAggregate(keys=[], functions=[count(1)])
+         +- Exchange SinglePartition
+            +- *(27) HashAggregate(keys=[], functions=[partial_count(1)])
+               +- *(27) Project
+                  +- *(27) SortMergeJoin [ws_web_page_sk#4], [wp_web_page_sk#5], Inner
+                     :- *(24) Sort [ws_web_page_sk#4 ASC NULLS FIRST], false, 0
+                     :  +- Exchange hashpartitioning(ws_web_page_sk#4, 200)
+                     :     +- *(23) Project [ws_web_page_sk#4]
+                     :        +- *(23) SortMergeJoin [ws_sold_time_sk#6], [t_time_sk#7], Inner
+                     :           :- *(20) Sort [ws_sold_time_sk#6 ASC NULLS FIRST], false, 0
+                     :           :  +- ReusedExchange [ws_sold_time_sk#6, ws_web_page_sk#4], Exchange hashpartitioning(ws_sold_time_sk#6, 200)
+                     :           +- *(22) Sort [t_time_sk#7 ASC NULLS FIRST], false, 0
+                     :              +- Exchange hashpartitioning(t_time_sk#7, 200)
+                     :                 +- *(21) Project [t_time_sk#7]
+                     :                    +- *(21) Filter (((isnotnull(t_hour#11) && (t_hour#11 >= 19)) && (t_hour#11 <= 20)) && isnotnull(t_time_sk#7))
+                     :                       +- *(21) FileScan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim[t_time_sk#7,t_hour#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(t_hour), GreaterThanOrEqual(t_hour,19), LessThanOrEqual(t_hour,20), IsNotNull(t_time_sk)], ReadSchema: struct<t_time_sk:int,t_hour:int>
+                     +- *(26) Sort [wp_web_page_sk#5 ASC NULLS FIRST], false, 0
+                        +- ReusedExchange [wp_web_page_sk#5], Exchange hashpartitioning(wp_web_page_sk#5, 200)

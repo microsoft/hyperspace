@@ -1,0 +1,82 @@
+TakeOrderedAndProject [c_customer_id,customer_id,customername]
+  WholeStageCodegen
+    Project [c_customer_id,c_first_name,c_last_name]
+      SortMergeJoin [cd_demo_sk,sr_cdemo_sk]
+        InputAdapter
+          WholeStageCodegen
+            Sort [cd_demo_sk]
+              InputAdapter
+                Exchange [cd_demo_sk] #1
+                  WholeStageCodegen
+                    Project [c_customer_id,c_first_name,c_last_name,cd_demo_sk]
+                      SortMergeJoin [hd_income_band_sk,ib_income_band_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [hd_income_band_sk]
+                              InputAdapter
+                                Exchange [hd_income_band_sk] #2
+                                  WholeStageCodegen
+                                    Project [c_customer_id,c_first_name,c_last_name,cd_demo_sk,hd_income_band_sk]
+                                      SortMergeJoin [c_current_hdemo_sk,hd_demo_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [c_current_hdemo_sk]
+                                              InputAdapter
+                                                Exchange [c_current_hdemo_sk] #3
+                                                  WholeStageCodegen
+                                                    Project [c_current_hdemo_sk,c_customer_id,c_first_name,c_last_name,cd_demo_sk]
+                                                      SortMergeJoin [c_current_cdemo_sk,cd_demo_sk]
+                                                        InputAdapter
+                                                          WholeStageCodegen
+                                                            Sort [c_current_cdemo_sk]
+                                                              InputAdapter
+                                                                Exchange [c_current_cdemo_sk] #4
+                                                                  WholeStageCodegen
+                                                                    Project [c_current_cdemo_sk,c_current_hdemo_sk,c_customer_id,c_first_name,c_last_name]
+                                                                      SortMergeJoin [c_current_addr_sk,ca_address_sk]
+                                                                        InputAdapter
+                                                                          WholeStageCodegen
+                                                                            Project [c_current_addr_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_id,c_first_name,c_last_name]
+                                                                              Filter [c_current_addr_sk,c_current_cdemo_sk,c_current_hdemo_sk]
+                                                                                Scan Hyperspace(Type: CI, Name: JoinIndex44-index-16-c_current_addr_sk-17, LogVersion: 0) default.customer [c_current_addr_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_id,c_first_name,c_last_name] [c_current_addr_sk,c_current_cdemo_sk,c_current_hdemo_sk,c_customer_id,c_first_name,c_last_name]
+                                                                        InputAdapter
+                                                                          WholeStageCodegen
+                                                                            Project [ca_address_sk]
+                                                                              Filter [ca_address_sk,ca_city]
+                                                                                Scan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address [ca_address_sk,ca_city] [ca_address_sk,ca_city]
+                                                        InputAdapter
+                                                          WholeStageCodegen
+                                                            Sort [cd_demo_sk]
+                                                              InputAdapter
+                                                                Exchange [cd_demo_sk] #5
+                                                                  WholeStageCodegen
+                                                                    Project [cd_demo_sk]
+                                                                      Filter [cd_demo_sk]
+                                                                        Scan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics [cd_demo_sk] [cd_demo_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [hd_demo_sk]
+                                              InputAdapter
+                                                Exchange [hd_demo_sk] #6
+                                                  WholeStageCodegen
+                                                    Project [hd_demo_sk,hd_income_band_sk]
+                                                      Filter [hd_demo_sk,hd_income_band_sk]
+                                                        Scan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics [hd_demo_sk,hd_income_band_sk] [hd_demo_sk,hd_income_band_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [ib_income_band_sk]
+                              InputAdapter
+                                Exchange [ib_income_band_sk] #7
+                                  WholeStageCodegen
+                                    Project [ib_income_band_sk]
+                                      Filter [ib_income_band_sk,ib_lower_bound,ib_upper_bound]
+                                        Scan parquet default.income_band [ib_income_band_sk,ib_lower_bound,ib_upper_bound] [ib_income_band_sk,ib_lower_bound,ib_upper_bound]
+        InputAdapter
+          WholeStageCodegen
+            Sort [sr_cdemo_sk]
+              InputAdapter
+                Exchange [sr_cdemo_sk] #8
+                  WholeStageCodegen
+                    Project [sr_cdemo_sk]
+                      Filter [sr_cdemo_sk]
+                        Scan parquet default.store_returns [sr_cdemo_sk] [sr_cdemo_sk]

@@ -1,0 +1,49 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[ext_price#1 DESC NULLS LAST,brand#2 ASC NULLS FIRST,brand_id#3 ASC NULLS FIRST,i_manufact_id#4 ASC NULLS FIRST,i_manufact#5 ASC NULLS FIRST], output=[brand_id#3,brand#2,i_manufact_id#4,i_manufact#5,ext_price#1])
++- *(20) HashAggregate(keys=[i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5], functions=[sum(UnscaledValue(ss_ext_sales_price#8))])
+   +- Exchange hashpartitioning(i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5, 200)
+      +- *(19) HashAggregate(keys=[i_brand#6, i_brand_id#7, i_manufact_id#4, i_manufact#5], functions=[partial_sum(UnscaledValue(ss_ext_sales_price#8))])
+         +- *(19) Project [ss_ext_sales_price#8, i_brand_id#7, i_brand#6, i_manufact_id#4, i_manufact#5]
+            +- *(19) SortMergeJoin [ss_store_sk#9], [s_store_sk#10], Inner, NOT (substring(ca_zip#11, 1, 5) = substring(s_zip#12, 1, 5))
+               :- *(16) Sort [ss_store_sk#9 ASC NULLS FIRST], false, 0
+               :  +- Exchange hashpartitioning(ss_store_sk#9, 200)
+               :     +- *(15) Project [ss_store_sk#9, ss_ext_sales_price#8, i_brand_id#7, i_brand#6, i_manufact_id#4, i_manufact#5, ca_zip#11]
+               :        +- *(15) SortMergeJoin [c_current_addr_sk#13], [ca_address_sk#14], Inner
+               :           :- *(12) Sort [c_current_addr_sk#13 ASC NULLS FIRST], false, 0
+               :           :  +- Exchange hashpartitioning(c_current_addr_sk#13, 200)
+               :           :     +- *(11) Project [ss_store_sk#9, ss_ext_sales_price#8, i_brand_id#7, i_brand#6, i_manufact_id#4, i_manufact#5, c_current_addr_sk#13]
+               :           :        +- *(11) SortMergeJoin [ss_customer_sk#15], [c_customer_sk#16], Inner
+               :           :           :- *(8) Sort [ss_customer_sk#15 ASC NULLS FIRST], false, 0
+               :           :           :  +- Exchange hashpartitioning(ss_customer_sk#15, 200)
+               :           :           :     +- *(7) Project [ss_customer_sk#15, ss_store_sk#9, ss_ext_sales_price#8, i_brand_id#7, i_brand#6, i_manufact_id#4, i_manufact#5]
+               :           :           :        +- *(7) SortMergeJoin [ss_item_sk#17], [i_item_sk#18], Inner
+               :           :           :           :- *(4) Sort [ss_item_sk#17 ASC NULLS FIRST], false, 0
+               :           :           :           :  +- Exchange hashpartitioning(ss_item_sk#17, 200)
+               :           :           :           :     +- *(3) Project [ss_item_sk#17, ss_customer_sk#15, ss_store_sk#9, ss_ext_sales_price#8]
+               :           :           :           :        +- *(3) SortMergeJoin [d_date_sk#19], [ss_sold_date_sk#20], Inner
+               :           :           :           :           :- *(1) Project [d_date_sk#19]
+               :           :           :           :           :  +- *(1) Filter ((((isnotnull(d_moy#21) && isnotnull(d_year#22)) && (d_moy#21 = 11)) && (d_year#22 = 1998)) && isnotnull(d_date_sk#19))
+               :           :           :           :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#19,d_year#22,d_moy#21] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_moy), IsNotNull(d_year), EqualTo(d_moy,11), EqualTo(d_year,1998), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>, SelectedBucketsCount: 200 out of 200
+               :           :           :           :           +- *(2) Project [ss_sold_date_sk#20, ss_item_sk#17, ss_customer_sk#15, ss_store_sk#9, ss_ext_sales_price#8]
+               :           :           :           :              +- *(2) Filter (((isnotnull(ss_sold_date_sk#20) && isnotnull(ss_item_sk#17)) && isnotnull(ss_customer_sk#15)) && isnotnull(ss_store_sk#9))
+               :           :           :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales[ss_sold_date_sk#20,ss_item_sk#17,ss_customer_sk#15,ss_store_sk#9,ss_ext_sales_price#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_sold_date_sk), IsNotNull(ss_item_sk), IsNotNull(ss_customer_sk), IsNotNull(ss_store..., ReadSchema: struct<ss_sold_date_sk:int,ss_item_sk:int,ss_customer_sk:int,ss_store_sk:int,ss_ext_sales_price:d..., SelectedBucketsCount: 200 out of 200
+               :           :           :           +- *(6) Sort [i_item_sk#18 ASC NULLS FIRST], false, 0
+               :           :           :              +- Exchange hashpartitioning(i_item_sk#18, 200)
+               :           :           :                 +- *(5) Project [i_item_sk#18, i_brand_id#7, i_brand#6, i_manufact_id#4, i_manufact#5]
+               :           :           :                    +- *(5) Filter ((isnotnull(i_manager_id#23) && (i_manager_id#23 = 8)) && isnotnull(i_item_sk#18))
+               :           :           :                       +- *(5) FileScan Hyperspace(Type: CI, Name: FilterIndex11-index-48-i_manager_id-7, LogVersion: 0) default.item[i_item_sk#18,i_brand_id#7,i_brand#6,i_manufact_id#4,i_manufact#5,i_manager_id#23] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_manager_id), EqualTo(i_manager_id,8), IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_brand_id:int,i_brand:string,i_manufact_id:int,i_manufact:string,i_manager_...
+               :           :           +- *(10) Sort [c_customer_sk#16 ASC NULLS FIRST], false, 0
+               :           :              +- Exchange hashpartitioning(c_customer_sk#16, 200)
+               :           :                 +- *(9) Project [c_customer_sk#16, c_current_addr_sk#13]
+               :           :                    +- *(9) Filter (isnotnull(c_customer_sk#16) && isnotnull(c_current_addr_sk#13))
+               :           :                       +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#16,c_current_addr_sk#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk), IsNotNull(c_current_addr_sk)], ReadSchema: struct<c_customer_sk:int,c_current_addr_sk:int>
+               :           +- *(14) Sort [ca_address_sk#14 ASC NULLS FIRST], false, 0
+               :              +- Exchange hashpartitioning(ca_address_sk#14, 200)
+               :                 +- *(13) Project [ca_address_sk#14, ca_zip#11]
+               :                    +- *(13) Filter (isnotnull(ca_address_sk#14) && isnotnull(ca_zip#11))
+               :                       +- *(13) FileScan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address[ca_address_sk#14,ca_zip#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ca_address_sk), IsNotNull(ca_zip)], ReadSchema: struct<ca_address_sk:int,ca_zip:string>
+               +- *(18) Sort [s_store_sk#10 ASC NULLS FIRST], false, 0
+                  +- Exchange hashpartitioning(s_store_sk#10, 200)
+                     +- *(17) Project [s_store_sk#10, s_zip#12]
+                        +- *(17) Filter (isnotnull(s_zip#12) && isnotnull(s_store_sk#10))
+                           +- *(17) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#10,s_zip#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_zip), IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int,s_zip:string>

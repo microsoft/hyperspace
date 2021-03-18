@@ -1,0 +1,48 @@
+WholeStageCodegen
+  Project [i_category,i_class,i_current_price,i_item_desc,itemrevenue,revenueratio]
+    Sort [i_category,i_class,i_item_desc,i_item_id,revenueratio]
+      InputAdapter
+        Exchange [i_category,i_class,i_item_desc,i_item_id,revenueratio] #1
+          WholeStageCodegen
+            Project [_w0,_we0,i_category,i_class,i_current_price,i_item_desc,i_item_id,itemrevenue]
+              InputAdapter
+                Window [_w1,i_class]
+                  WholeStageCodegen
+                    Sort [i_class]
+                      InputAdapter
+                        Exchange [i_class] #2
+                          WholeStageCodegen
+                            HashAggregate [i_category,i_class,i_current_price,i_item_desc,i_item_id,sum,sum(UnscaledValue(ss_ext_sales_price))] [_w0,_w1,itemrevenue,sum,sum(UnscaledValue(ss_ext_sales_price))]
+                              InputAdapter
+                                Exchange [i_category,i_class,i_current_price,i_item_desc,i_item_id] #3
+                                  WholeStageCodegen
+                                    HashAggregate [i_category,i_class,i_current_price,i_item_desc,i_item_id,ss_ext_sales_price,sum,sum] [sum,sum]
+                                      Project [i_category,i_class,i_current_price,i_item_desc,i_item_id,ss_ext_sales_price]
+                                        SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [ss_sold_date_sk]
+                                                InputAdapter
+                                                  Exchange [ss_sold_date_sk] #4
+                                                    WholeStageCodegen
+                                                      Project [i_category,i_class,i_current_price,i_item_desc,i_item_id,ss_ext_sales_price,ss_sold_date_sk]
+                                                        SortMergeJoin [i_item_sk,ss_item_sk]
+                                                          InputAdapter
+                                                            WholeStageCodegen
+                                                              Project [ss_ext_sales_price,ss_item_sk,ss_sold_date_sk]
+                                                                Filter [ss_item_sk,ss_sold_date_sk]
+                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex13-index-3-ss_item_sk-16, LogVersion: 0) default.store_sales [ss_ext_sales_price,ss_item_sk,ss_sold_date_sk] [ss_ext_sales_price,ss_item_sk,ss_sold_date_sk]
+                                                          InputAdapter
+                                                            WholeStageCodegen
+                                                              Project [i_category,i_class,i_current_price,i_item_desc,i_item_id,i_item_sk]
+                                                                Filter [i_category,i_item_sk]
+                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item [i_category,i_class,i_current_price,i_item_desc,i_item_id,i_item_sk] [i_category,i_class,i_current_price,i_item_desc,i_item_id,i_item_sk]
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [d_date_sk]
+                                                InputAdapter
+                                                  Exchange [d_date_sk] #5
+                                                    WholeStageCodegen
+                                                      Project [d_date_sk]
+                                                        Filter [d_date,d_date_sk]
+                                                          Scan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]

@@ -1,0 +1,93 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[item_id#1 ASC NULLS FIRST,sr_item_qty#2 ASC NULLS FIRST], output=[item_id#1,sr_item_qty#2,sr_dev#3,cr_item_qty#4,cr_dev#5,wr_item_qty#6,wr_dev#7,average#8])
++- *(57) Project [item_id#1, sr_item_qty#2, (((cast(sr_item_qty#2 as double) / cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as double)) / 3.0) * 100.0) AS sr_dev#3, cr_item_qty#4, (((cast(cr_item_qty#4 as double) / cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as double)) / 3.0) * 100.0) AS cr_dev#5, wr_item_qty#6, (((cast(wr_item_qty#6 as double) / cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as double)) / 3.0) * 100.0) AS wr_dev#7, CheckOverflow((promote_precision(cast(cast(((sr_item_qty#2 + cr_item_qty#4) + wr_item_qty#6) as decimal(20,0)) as decimal(21,1))) / 3.0), DecimalType(27,6)) AS average#8]
+   +- *(57) SortMergeJoin [item_id#1], [item_id#9], Inner
+      :- *(37) Project [item_id#1, sr_item_qty#2, cr_item_qty#4]
+      :  +- *(37) SortMergeJoin [item_id#1], [item_id#10], Inner
+      :     :- *(19) Sort [item_id#1 ASC NULLS FIRST], false, 0
+      :     :  +- Exchange hashpartitioning(item_id#1, 200)
+      :     :     +- *(18) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(sr_return_quantity#12 as bigint))])
+      :     :        +- Exchange hashpartitioning(i_item_id#11, 200)
+      :     :           +- *(17) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(sr_return_quantity#12 as bigint))])
+      :     :              +- *(17) Project [sr_return_quantity#12, i_item_id#11]
+      :     :                 +- *(17) SortMergeJoin [sr_returned_date_sk#13], [cast(d_date_sk#14 as bigint)], Inner
+      :     :                    :- *(6) Sort [sr_returned_date_sk#13 ASC NULLS FIRST], false, 0
+      :     :                    :  +- Exchange hashpartitioning(sr_returned_date_sk#13, 200)
+      :     :                    :     +- *(5) Project [sr_returned_date_sk#13, sr_return_quantity#12, i_item_id#11]
+      :     :                    :        +- *(5) SortMergeJoin [sr_item_sk#15], [cast(i_item_sk#16 as bigint)], Inner
+      :     :                    :           :- *(2) Sort [sr_item_sk#15 ASC NULLS FIRST], false, 0
+      :     :                    :           :  +- Exchange hashpartitioning(sr_item_sk#15, 200)
+      :     :                    :           :     +- *(1) Project [sr_returned_date_sk#13, sr_item_sk#15, sr_return_quantity#12]
+      :     :                    :           :        +- *(1) Filter (isnotnull(sr_item_sk#15) && isnotnull(sr_returned_date_sk#13))
+      :     :                    :           :           +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex21-index-20-sr_item_sk-7, LogVersion: 0) default.store_returns[sr_returned_date_sk#13,sr_item_sk#15,sr_return_quantity#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(sr_item_sk), IsNotNull(sr_returned_date_sk)], ReadSchema: struct<sr_returned_date_sk:bigint,sr_item_sk:bigint,sr_return_quantity:int>
+      :     :                    :           +- *(4) Sort [cast(i_item_sk#16 as bigint) ASC NULLS FIRST], false, 0
+      :     :                    :              +- Exchange hashpartitioning(cast(i_item_sk#16 as bigint), 200)
+      :     :                    :                 +- *(3) Project [i_item_sk#16, i_item_id#11]
+      :     :                    :                    +- *(3) Filter (isnotnull(i_item_sk#16) && isnotnull(i_item_id#11))
+      :     :                    :                       +- *(3) FileScan Hyperspace(Type: CI, Name: FilterIndex09-index-32-i_item_sk-1, LogVersion: 0) default.item[i_item_sk#16,i_item_id#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_item_id)], ReadSchema: struct<i_item_sk:int,i_item_id:string>
+      :     :                    +- *(16) Sort [cast(d_date_sk#14 as bigint) ASC NULLS FIRST], false, 0
+      :     :                       +- Exchange hashpartitioning(cast(d_date_sk#14 as bigint), 200)
+      :     :                          +- *(15) Project [d_date_sk#14]
+      :     :                             +- SortMergeJoin [d_date#17], [d_date#17#18], LeftSemi
+      :     :                                :- *(8) Sort [d_date#17 ASC NULLS FIRST], false, 0
+      :     :                                :  +- Exchange hashpartitioning(d_date#17, 200)
+      :     :                                :     +- *(7) Project [d_date_sk#14, d_date#17]
+      :     :                                :        +- *(7) Filter isnotnull(d_date_sk#14)
+      :     :                                :           +- *(7) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#14,d_date#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_date:date>
+      :     :                                +- *(14) Sort [d_date#17#18 ASC NULLS FIRST], false, 0
+      :     :                                   +- Exchange hashpartitioning(d_date#17#18, 200)
+      :     :                                      +- *(13) Project [d_date#17 AS d_date#17#18]
+      :     :                                         +- SortMergeJoin [d_week_seq#19], [d_week_seq#19#20], LeftSemi
+      :     :                                            :- *(10) Sort [d_week_seq#19 ASC NULLS FIRST], false, 0
+      :     :                                            :  +- Exchange hashpartitioning(d_week_seq#19, 200)
+      :     :                                            :     +- *(9) FileScan parquet default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<d_date:date,d_week_seq:int>
+      :     :                                            +- *(12) Sort [d_week_seq#19#20 ASC NULLS FIRST], false, 0
+      :     :                                               +- Exchange hashpartitioning(d_week_seq#19#20, 200)
+      :     :                                                  +- *(11) Project [d_week_seq#19 AS d_week_seq#19#20]
+      :     :                                                     +- *(11) Filter cast(d_date#17 as string) IN (2000-06-30,2000-09-27,2000-11-17)
+      :     :                                                        +- *(11) FileScan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim[d_date#17,d_week_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<d_date:date,d_week_seq:int>
+      :     +- *(36) Sort [item_id#10 ASC NULLS FIRST], false, 0
+      :        +- Exchange hashpartitioning(item_id#10, 200)
+      :           +- *(35) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(cr_return_quantity#21 as bigint))])
+      :              +- Exchange hashpartitioning(i_item_id#11, 200)
+      :                 +- *(34) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(cr_return_quantity#21 as bigint))])
+      :                    +- *(34) Project [cr_return_quantity#21, i_item_id#11]
+      :                       +- *(34) SortMergeJoin [cr_returned_date_sk#22], [d_date_sk#14], Inner
+      :                          :- *(23) Sort [cr_returned_date_sk#22 ASC NULLS FIRST], false, 0
+      :                          :  +- Exchange hashpartitioning(cr_returned_date_sk#22, 200)
+      :                          :     +- *(22) Project [cr_returned_date_sk#22, cr_return_quantity#21, i_item_id#11]
+      :                          :        +- *(22) SortMergeJoin [cr_item_sk#23], [i_item_sk#16], Inner
+      :                          :           :- *(20) Project [cr_returned_date_sk#22, cr_item_sk#23, cr_return_quantity#21]
+      :                          :           :  +- *(20) Filter (isnotnull(cr_item_sk#23) && isnotnull(cr_returned_date_sk#22))
+      :                          :           :     +- *(20) FileScan Hyperspace(Type: CI, Name: JoinIndex47-index-26-cr_item_sk-8, LogVersion: 0) default.catalog_returns[cr_returned_date_sk#22,cr_item_sk#23,cr_return_quantity#21] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cr_item_sk), IsNotNull(cr_returned_date_sk)], ReadSchema: struct<cr_returned_date_sk:int,cr_item_sk:int,cr_return_quantity:int>, SelectedBucketsCount: 200 out of 200
+      :                          :           +- *(21) Project [i_item_sk#16, i_item_id#11]
+      :                          :              +- *(21) Filter (isnotnull(i_item_sk#16) && isnotnull(i_item_id#11))
+      :                          :                 +- *(21) FileScan Hyperspace(Type: CI, Name: FilterIndex09-index-32-i_item_sk-1, LogVersion: 0) default.item[i_item_sk#16,i_item_id#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_item_id)], ReadSchema: struct<i_item_sk:int,i_item_id:string>, SelectedBucketsCount: 200 out of 200
+      :                          +- *(33) Sort [d_date_sk#14 ASC NULLS FIRST], false, 0
+      :                             +- Exchange hashpartitioning(d_date_sk#14, 200)
+      :                                +- *(32) Project [d_date_sk#14]
+      :                                   +- SortMergeJoin [d_date#17], [d_date#17#24], LeftSemi
+      :                                      :- *(25) Sort [d_date#17 ASC NULLS FIRST], false, 0
+      :                                      :  +- ReusedExchange [d_date_sk#14, d_date#17], Exchange hashpartitioning(d_date#17, 200)
+      :                                      +- *(31) Sort [d_date#17#24 ASC NULLS FIRST], false, 0
+      :                                         +- ReusedExchange [d_date#17#24], Exchange hashpartitioning(d_date#17#18, 200)
+      +- *(56) Sort [item_id#9 ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(item_id#9, 200)
+            +- *(55) HashAggregate(keys=[i_item_id#11], functions=[sum(cast(wr_return_quantity#25 as bigint))])
+               +- Exchange hashpartitioning(i_item_id#11, 200)
+                  +- *(54) HashAggregate(keys=[i_item_id#11], functions=[partial_sum(cast(wr_return_quantity#25 as bigint))])
+                     +- *(54) Project [wr_return_quantity#25, i_item_id#11]
+                        +- *(54) SortMergeJoin [wr_returned_date_sk#26], [cast(d_date_sk#14 as bigint)], Inner
+                           :- *(43) Sort [wr_returned_date_sk#26 ASC NULLS FIRST], false, 0
+                           :  +- Exchange hashpartitioning(wr_returned_date_sk#26, 200)
+                           :     +- *(42) Project [wr_returned_date_sk#26, wr_return_quantity#25, i_item_id#11]
+                           :        +- *(42) SortMergeJoin [wr_item_sk#27], [cast(i_item_sk#16 as bigint)], Inner
+                           :           :- *(39) Sort [wr_item_sk#27 ASC NULLS FIRST], false, 0
+                           :           :  +- Exchange hashpartitioning(wr_item_sk#27, 200)
+                           :           :     +- *(38) Project [wr_returned_date_sk#26, wr_item_sk#27, wr_return_quantity#25]
+                           :           :        +- *(38) Filter (isnotnull(wr_item_sk#27) && isnotnull(wr_returned_date_sk#26))
+                           :           :           +- *(38) FileScan Hyperspace(Type: CI, Name: JoinIndex41-index-36-wr_item_sk-11, LogVersion: 0) default.web_returns[wr_returned_date_sk#26,wr_item_sk#27,wr_return_quantity#25] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(wr_item_sk), IsNotNull(wr_returned_date_sk)], ReadSchema: struct<wr_returned_date_sk:bigint,wr_item_sk:bigint,wr_return_quantity:int>
+                           :           +- *(41) Sort [cast(i_item_sk#16 as bigint) ASC NULLS FIRST], false, 0
+                           :              +- ReusedExchange [i_item_sk#16, i_item_id#11], Exchange hashpartitioning(cast(i_item_sk#16 as bigint), 200)
+                           +- *(53) Sort [cast(d_date_sk#14 as bigint) ASC NULLS FIRST], false, 0
+                              +- ReusedExchange [d_date_sk#14], Exchange hashpartitioning(cast(d_date_sk#14 as bigint), 200)

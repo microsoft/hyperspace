@@ -1,0 +1,32 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[qoh#1 ASC NULLS FIRST,i_product_name#2 ASC NULLS FIRST,i_brand#3 ASC NULLS FIRST,i_class#4 ASC NULLS FIRST,i_category#5 ASC NULLS FIRST], output=[i_product_name#2,i_brand#3,i_class#4,i_category#5,qoh#1])
++- *(12) HashAggregate(keys=[i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6], functions=[avg(cast(inv_quantity_on_hand#7 as bigint))])
+   +- Exchange hashpartitioning(i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6, 200)
+      +- *(11) HashAggregate(keys=[i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6], functions=[partial_avg(cast(inv_quantity_on_hand#7 as bigint))])
+         +- *(11) Expand [List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, i_class#10, i_category#11, 0), List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, i_class#10, null, 1), List(inv_quantity_on_hand#7, i_product_name#8, i_brand#9, null, null, 3), List(inv_quantity_on_hand#7, i_product_name#8, null, null, null, 7), List(inv_quantity_on_hand#7, null, null, null, null, 15)], [inv_quantity_on_hand#7, i_product_name#2, i_brand#3, i_class#4, i_category#5, spark_grouping_id#6]
+            +- *(11) Project [inv_quantity_on_hand#7, i_product_name#12 AS i_product_name#8, i_brand#13 AS i_brand#9, i_class#14 AS i_class#10, i_category#15 AS i_category#11]
+               +- *(11) SortMergeJoin [inv_warehouse_sk#16], [w_warehouse_sk#17], Inner
+                  :- *(8) Sort [inv_warehouse_sk#16 ASC NULLS FIRST], false, 0
+                  :  +- Exchange hashpartitioning(inv_warehouse_sk#16, 200)
+                  :     +- *(7) Project [inv_warehouse_sk#16, inv_quantity_on_hand#7, i_brand#13, i_class#14, i_category#15, i_product_name#12]
+                  :        +- *(7) SortMergeJoin [inv_item_sk#18], [i_item_sk#19], Inner
+                  :           :- *(4) Sort [inv_item_sk#18 ASC NULLS FIRST], false, 0
+                  :           :  +- Exchange hashpartitioning(inv_item_sk#18, 200)
+                  :           :     +- *(3) Project [inv_item_sk#18, inv_warehouse_sk#16, inv_quantity_on_hand#7]
+                  :           :        +- *(3) SortMergeJoin [inv_date_sk#20], [d_date_sk#21], Inner
+                  :           :           :- *(1) Project [inv_date_sk#20, inv_item_sk#18, inv_warehouse_sk#16, inv_quantity_on_hand#7]
+                  :           :           :  +- *(1) Filter ((isnotnull(inv_date_sk#20) && isnotnull(inv_item_sk#18)) && isnotnull(inv_warehouse_sk#16))
+                  :           :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex01-index-34-inv_date_sk-3, LogVersion: 0) default.inventory[inv_date_sk#20,inv_item_sk#18,inv_warehouse_sk#16,inv_quantity_on_hand#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(inv_date_sk), IsNotNull(inv_item_sk), IsNotNull(inv_warehouse_sk)], ReadSchema: struct<inv_date_sk:int,inv_item_sk:int,inv_warehouse_sk:int,inv_quantity_on_hand:int>, SelectedBucketsCount: 200 out of 200
+                  :           :           +- *(2) Project [d_date_sk#21]
+                  :           :              +- *(2) Filter (((isnotnull(d_month_seq#22) && (d_month_seq#22 >= 1200)) && (d_month_seq#22 <= 1211)) && isnotnull(d_date_sk#21))
+                  :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#21,d_month_seq#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_month_seq:int>, SelectedBucketsCount: 200 out of 200
+                  :           +- *(6) Sort [i_item_sk#19 ASC NULLS FIRST], false, 0
+                  :              +- Exchange hashpartitioning(i_item_sk#19, 200)
+                  :                 +- *(5) Project [i_item_sk#19, i_brand#13, i_class#14, i_category#15, i_product_name#12]
+                  :                    +- *(5) Filter isnotnull(i_item_sk#19)
+                  :                       +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#19,i_brand#13,i_class#14,i_category#15,i_product_name#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_brand:string,i_class:string,i_category:string,i_product_name:string>
+                  +- *(10) Sort [w_warehouse_sk#17 ASC NULLS FIRST], false, 0
+                     +- Exchange hashpartitioning(w_warehouse_sk#17, 200)
+                        +- *(9) Project [w_warehouse_sk#17]
+                           +- *(9) Filter isnotnull(w_warehouse_sk#17)
+                              +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse[w_warehouse_sk#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int>

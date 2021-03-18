@@ -1,0 +1,216 @@
+TakeOrderedAndProject [channel,id,profit,returns,sales]
+  WholeStageCodegen
+    HashAggregate [channel,id,spark_grouping_id,sum,sum,sum,sum(profit),sum(returns),sum(sales)] [profit,returns,sales,sum,sum,sum,sum(profit),sum(returns),sum(sales)]
+      InputAdapter
+        Exchange [channel,id,spark_grouping_id] #1
+          WholeStageCodegen
+            HashAggregate [channel,id,profit,returns,sales,spark_grouping_id,sum,sum,sum,sum,sum,sum] [sum,sum,sum,sum,sum,sum]
+              Expand [channel,id,profit,returns,sales]
+                InputAdapter
+                  Union
+                    WholeStageCodegen
+                      Project [profit,profit_loss,returns,s_store_sk,sales]
+                        InputAdapter
+                          SortMergeJoin [s_store_sk,s_store_sk]
+                            WholeStageCodegen
+                              Sort [s_store_sk]
+                                HashAggregate [s_store_sk,sum,sum,sum(UnscaledValue(ss_ext_sales_price)),sum(UnscaledValue(ss_net_profit))] [profit,sales,sum,sum,sum(UnscaledValue(ss_ext_sales_price)),sum(UnscaledValue(ss_net_profit))]
+                                  HashAggregate [s_store_sk,ss_ext_sales_price,ss_net_profit,sum,sum,sum,sum] [sum,sum,sum,sum]
+                                    Project [s_store_sk,ss_ext_sales_price,ss_net_profit]
+                                      SortMergeJoin [s_store_sk,ss_store_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ss_store_sk]
+                                              InputAdapter
+                                                Exchange [ss_store_sk] #2
+                                                  WholeStageCodegen
+                                                    Project [ss_ext_sales_price,ss_net_profit,ss_store_sk]
+                                                      SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                                        InputAdapter
+                                                          WholeStageCodegen
+                                                            Project [ss_ext_sales_price,ss_net_profit,ss_sold_date_sk,ss_store_sk]
+                                                              Filter [ss_sold_date_sk,ss_store_sk]
+                                                                Scan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales [ss_ext_sales_price,ss_net_profit,ss_sold_date_sk,ss_store_sk] [ss_ext_sales_price,ss_net_profit,ss_sold_date_sk,ss_store_sk]
+                                                        InputAdapter
+                                                          WholeStageCodegen
+                                                            Project [d_date_sk]
+                                                              Filter [d_date,d_date_sk]
+                                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [s_store_sk]
+                                              InputAdapter
+                                                Exchange [s_store_sk] #3
+                                                  WholeStageCodegen
+                                                    Project [s_store_sk]
+                                                      Filter [s_store_sk]
+                                                        Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_sk] [s_store_sk]
+                            WholeStageCodegen
+                              Sort [s_store_sk]
+                                HashAggregate [s_store_sk,sum,sum,sum(UnscaledValue(sr_net_loss)),sum(UnscaledValue(sr_return_amt))] [profit_loss,returns,sum,sum,sum(UnscaledValue(sr_net_loss)),sum(UnscaledValue(sr_return_amt))]
+                                  InputAdapter
+                                    Exchange [s_store_sk] #4
+                                      WholeStageCodegen
+                                        HashAggregate [s_store_sk,sr_net_loss,sr_return_amt,sum,sum,sum,sum] [sum,sum,sum,sum]
+                                          Project [s_store_sk,sr_net_loss,sr_return_amt]
+                                            SortMergeJoin [s_store_sk,sr_store_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [sr_store_sk]
+                                                    InputAdapter
+                                                      Exchange [sr_store_sk] #5
+                                                        WholeStageCodegen
+                                                          Project [sr_net_loss,sr_return_amt,sr_store_sk]
+                                                            SortMergeJoin [d_date_sk,sr_returned_date_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Sort [sr_returned_date_sk]
+                                                                    InputAdapter
+                                                                      Exchange [sr_returned_date_sk] #6
+                                                                        WholeStageCodegen
+                                                                          Project [sr_net_loss,sr_return_amt,sr_returned_date_sk,sr_store_sk]
+                                                                            Filter [sr_returned_date_sk,sr_store_sk]
+                                                                              Scan Hyperspace(Type: CI, Name: JoinIndex23-index-37-sr_returned_date_sk-7, LogVersion: 0) default.store_returns [sr_net_loss,sr_return_amt,sr_returned_date_sk,sr_store_sk] [sr_net_loss,sr_return_amt,sr_returned_date_sk,sr_store_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Sort [d_date_sk]
+                                                                    InputAdapter
+                                                                      Exchange [d_date_sk] #7
+                                                                        WholeStageCodegen
+                                                                          Project [d_date_sk]
+                                                                            Filter [d_date,d_date_sk]
+                                                                              Scan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [s_store_sk]
+                                                    InputAdapter
+                                                      Exchange [s_store_sk] #8
+                                                        WholeStageCodegen
+                                                          Project [s_store_sk]
+                                                            Filter [s_store_sk]
+                                                              Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_sk] [s_store_sk]
+                    WholeStageCodegen
+                      Project [cs_call_center_sk,profit,profit_loss,returns,sales]
+                        InputAdapter
+                          CartesianProduct
+                            WholeStageCodegen
+                              HashAggregate [cs_call_center_sk,sum,sum,sum(UnscaledValue(cs_ext_sales_price)),sum(UnscaledValue(cs_net_profit))] [profit,sales,sum,sum,sum(UnscaledValue(cs_ext_sales_price)),sum(UnscaledValue(cs_net_profit))]
+                                InputAdapter
+                                  Exchange [cs_call_center_sk] #9
+                                    WholeStageCodegen
+                                      HashAggregate [cs_call_center_sk,cs_ext_sales_price,cs_net_profit,sum,sum,sum,sum] [sum,sum,sum,sum]
+                                        Project [cs_call_center_sk,cs_ext_sales_price,cs_net_profit]
+                                          SortMergeJoin [cs_sold_date_sk,d_date_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Project [cs_call_center_sk,cs_ext_sales_price,cs_net_profit,cs_sold_date_sk]
+                                                  Filter [cs_sold_date_sk]
+                                                    Scan Hyperspace(Type: CI, Name: JoinIndex26-index-6-cs_sold_date_sk-26, LogVersion: 0) default.catalog_sales [cs_call_center_sk,cs_ext_sales_price,cs_net_profit,cs_sold_date_sk] [cs_call_center_sk,cs_ext_sales_price,cs_net_profit,cs_sold_date_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Project [d_date_sk]
+                                                  Filter [d_date,d_date_sk]
+                                                    Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                            WholeStageCodegen
+                              HashAggregate [sum,sum,sum(UnscaledValue(cr_net_loss)),sum(UnscaledValue(cr_return_amount))] [profit_loss,returns,sum,sum,sum(UnscaledValue(cr_net_loss)),sum(UnscaledValue(cr_return_amount))]
+                                InputAdapter
+                                  Exchange #10
+                                    WholeStageCodegen
+                                      HashAggregate [cr_net_loss,cr_return_amount,sum,sum,sum,sum] [sum,sum,sum,sum]
+                                        Project [cr_net_loss,cr_return_amount]
+                                          SortMergeJoin [cr_returned_date_sk,d_date_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Sort [cr_returned_date_sk]
+                                                  InputAdapter
+                                                    Exchange [cr_returned_date_sk] #11
+                                                      WholeStageCodegen
+                                                        Project [cr_net_loss,cr_return_amount,cr_returned_date_sk]
+                                                          Filter [cr_returned_date_sk]
+                                                            Scan parquet default.catalog_returns [cr_net_loss,cr_return_amount,cr_returned_date_sk] [cr_net_loss,cr_return_amount,cr_returned_date_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Sort [d_date_sk]
+                                                  InputAdapter
+                                                    Exchange [d_date_sk] #12
+                                                      WholeStageCodegen
+                                                        Project [d_date_sk]
+                                                          Filter [d_date,d_date_sk]
+                                                            Scan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                    WholeStageCodegen
+                      Project [profit,profit_loss,returns,sales,wp_web_page_sk]
+                        InputAdapter
+                          SortMergeJoin [wp_web_page_sk,wp_web_page_sk]
+                            WholeStageCodegen
+                              Sort [wp_web_page_sk]
+                                HashAggregate [sum,sum,sum(UnscaledValue(ws_ext_sales_price)),sum(UnscaledValue(ws_net_profit)),wp_web_page_sk] [profit,sales,sum,sum,sum(UnscaledValue(ws_ext_sales_price)),sum(UnscaledValue(ws_net_profit))]
+                                  HashAggregate [sum,sum,sum,sum,wp_web_page_sk,ws_ext_sales_price,ws_net_profit] [sum,sum,sum,sum]
+                                    Project [wp_web_page_sk,ws_ext_sales_price,ws_net_profit]
+                                      SortMergeJoin [wp_web_page_sk,ws_web_page_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ws_web_page_sk]
+                                              InputAdapter
+                                                Exchange [ws_web_page_sk] #13
+                                                  WholeStageCodegen
+                                                    Project [ws_ext_sales_price,ws_net_profit,ws_web_page_sk]
+                                                      SortMergeJoin [d_date_sk,ws_sold_date_sk]
+                                                        InputAdapter
+                                                          WholeStageCodegen
+                                                            Project [ws_ext_sales_price,ws_net_profit,ws_sold_date_sk,ws_web_page_sk]
+                                                              Filter [ws_sold_date_sk,ws_web_page_sk]
+                                                                Scan Hyperspace(Type: CI, Name: JoinIndex37-index-9-ws_sold_date_sk-21, LogVersion: 0) default.web_sales [ws_ext_sales_price,ws_net_profit,ws_sold_date_sk,ws_web_page_sk] [ws_ext_sales_price,ws_net_profit,ws_sold_date_sk,ws_web_page_sk]
+                                                        InputAdapter
+                                                          WholeStageCodegen
+                                                            Project [d_date_sk]
+                                                              Filter [d_date,d_date_sk]
+                                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [wp_web_page_sk]
+                                              InputAdapter
+                                                Exchange [wp_web_page_sk] #14
+                                                  WholeStageCodegen
+                                                    Project [wp_web_page_sk]
+                                                      Filter [wp_web_page_sk]
+                                                        Scan parquet default.web_page [wp_web_page_sk] [wp_web_page_sk]
+                            WholeStageCodegen
+                              Sort [wp_web_page_sk]
+                                HashAggregate [sum,sum,sum(UnscaledValue(wr_net_loss)),sum(UnscaledValue(wr_return_amt)),wp_web_page_sk] [profit_loss,returns,sum,sum,sum(UnscaledValue(wr_net_loss)),sum(UnscaledValue(wr_return_amt))]
+                                  InputAdapter
+                                    Exchange [wp_web_page_sk] #15
+                                      WholeStageCodegen
+                                        HashAggregate [sum,sum,sum,sum,wp_web_page_sk,wr_net_loss,wr_return_amt] [sum,sum,sum,sum]
+                                          Project [wp_web_page_sk,wr_net_loss,wr_return_amt]
+                                            SortMergeJoin [wp_web_page_sk,wr_web_page_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [wr_web_page_sk]
+                                                    InputAdapter
+                                                      Exchange [wr_web_page_sk] #16
+                                                        WholeStageCodegen
+                                                          Project [wr_net_loss,wr_return_amt,wr_web_page_sk]
+                                                            SortMergeJoin [d_date_sk,wr_returned_date_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Sort [wr_returned_date_sk]
+                                                                    InputAdapter
+                                                                      Exchange [wr_returned_date_sk] #17
+                                                                        WholeStageCodegen
+                                                                          Project [wr_net_loss,wr_return_amt,wr_returned_date_sk,wr_web_page_sk]
+                                                                            Filter [wr_returned_date_sk,wr_web_page_sk]
+                                                                              Scan parquet default.web_returns [wr_net_loss,wr_return_amt,wr_returned_date_sk,wr_web_page_sk] [wr_net_loss,wr_return_amt,wr_returned_date_sk,wr_web_page_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Sort [d_date_sk]
+                                                                    InputAdapter
+                                                                      ReusedExchange [d_date_sk] [d_date_sk] #7
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [wp_web_page_sk]
+                                                    InputAdapter
+                                                      Exchange [wp_web_page_sk] #18
+                                                        WholeStageCodegen
+                                                          Project [wp_web_page_sk]
+                                                            Filter [wp_web_page_sk]
+                                                              Scan parquet default.web_page [wp_web_page_sk] [wp_web_page_sk]

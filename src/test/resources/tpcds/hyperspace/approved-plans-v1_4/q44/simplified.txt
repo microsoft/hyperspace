@@ -1,0 +1,93 @@
+TakeOrderedAndProject [best_performing,rnk,worst_performing]
+  WholeStageCodegen
+    Project [i_product_name,i_product_name,rnk]
+      SortMergeJoin [i_item_sk,item_sk]
+        InputAdapter
+          WholeStageCodegen
+            Sort [item_sk]
+              InputAdapter
+                Exchange [item_sk] #1
+                  WholeStageCodegen
+                    Project [i_product_name,item_sk,rnk]
+                      SortMergeJoin [i_item_sk,item_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [item_sk]
+                              InputAdapter
+                                Exchange [item_sk] #2
+                                  WholeStageCodegen
+                                    Project [item_sk,item_sk,rnk]
+                                      SortMergeJoin [rnk,rnk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [rnk]
+                                              Project [item_sk,rnk]
+                                                Filter [item_sk,rnk]
+                                                  InputAdapter
+                                                    Window [rank_col]
+                                                      WholeStageCodegen
+                                                        Sort [rank_col]
+                                                          InputAdapter
+                                                            Exchange #3
+                                                              WholeStageCodegen
+                                                                Project [item_sk,rank_col]
+                                                                  Filter [avg(ss_net_profit)]
+                                                                    Subquery #1
+                                                                      WholeStageCodegen
+                                                                        HashAggregate [avg(UnscaledValue(ss_net_profit)),count,ss_store_sk,sum] [avg(UnscaledValue(ss_net_profit)),count,rank_col,sum]
+                                                                          InputAdapter
+                                                                            Exchange [ss_store_sk] #5
+                                                                              WholeStageCodegen
+                                                                                HashAggregate [count,count,ss_net_profit,ss_store_sk,sum,sum] [count,count,sum,sum]
+                                                                                  Project [ss_net_profit,ss_store_sk]
+                                                                                    Filter [ss_addr_sk,ss_store_sk]
+                                                                                      Scan Hyperspace(Type: CI, Name: JoinIndex14-index-5-ss_store_sk-20, LogVersion: 0) default.store_sales [ss_addr_sk,ss_net_profit,ss_store_sk] [ss_addr_sk,ss_net_profit,ss_store_sk]
+                                                                    HashAggregate [avg(UnscaledValue(ss_net_profit)),count,ss_item_sk,sum] [avg(UnscaledValue(ss_net_profit)),avg(ss_net_profit),count,item_sk,rank_col,sum]
+                                                                      InputAdapter
+                                                                        Exchange [ss_item_sk] #4
+                                                                          WholeStageCodegen
+                                                                            HashAggregate [count,count,ss_item_sk,ss_net_profit,sum,sum] [count,count,sum,sum]
+                                                                              Project [ss_item_sk,ss_net_profit]
+                                                                                Filter [ss_store_sk]
+                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex14-index-5-ss_store_sk-20, LogVersion: 0) default.store_sales [ss_item_sk,ss_net_profit,ss_store_sk] [ss_item_sk,ss_net_profit,ss_store_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [rnk]
+                                              Project [item_sk,rnk]
+                                                Filter [item_sk,rnk]
+                                                  InputAdapter
+                                                    Window [rank_col]
+                                                      WholeStageCodegen
+                                                        Sort [rank_col]
+                                                          InputAdapter
+                                                            Exchange #6
+                                                              WholeStageCodegen
+                                                                Project [item_sk,rank_col]
+                                                                  Filter [avg(ss_net_profit)]
+                                                                    Subquery #2
+                                                                      WholeStageCodegen
+                                                                        HashAggregate [avg(UnscaledValue(ss_net_profit)),count,ss_store_sk,sum] [avg(UnscaledValue(ss_net_profit)),count,rank_col,sum]
+                                                                          InputAdapter
+                                                                            Exchange [ss_store_sk] #7
+                                                                              WholeStageCodegen
+                                                                                HashAggregate [count,count,ss_net_profit,ss_store_sk,sum,sum] [count,count,sum,sum]
+                                                                                  Project [ss_net_profit,ss_store_sk]
+                                                                                    Filter [ss_addr_sk,ss_store_sk]
+                                                                                      Scan Hyperspace(Type: CI, Name: JoinIndex14-index-5-ss_store_sk-20, LogVersion: 0) default.store_sales [ss_addr_sk,ss_net_profit,ss_store_sk] [ss_addr_sk,ss_net_profit,ss_store_sk]
+                                                                    HashAggregate [avg(UnscaledValue(ss_net_profit)),count,ss_item_sk,sum] [avg(UnscaledValue(ss_net_profit)),avg(ss_net_profit),count,item_sk,rank_col,sum]
+                                                                      InputAdapter
+                                                                        ReusedExchange [count,ss_item_sk,sum] [count,ss_item_sk,sum] #4
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [i_item_sk]
+                              InputAdapter
+                                Exchange [i_item_sk] #8
+                                  WholeStageCodegen
+                                    Project [i_item_sk,i_product_name]
+                                      Filter [i_item_sk]
+                                        Scan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item [i_item_sk,i_product_name] [i_item_sk,i_product_name]
+        InputAdapter
+          WholeStageCodegen
+            Sort [i_item_sk]
+              InputAdapter
+                ReusedExchange [i_item_sk,i_product_name] [i_item_sk,i_product_name] #8

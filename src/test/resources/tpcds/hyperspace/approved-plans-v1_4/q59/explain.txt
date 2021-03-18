@@ -1,0 +1,55 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[s_store_name1#1 ASC NULLS FIRST,s_store_id1#2 ASC NULLS FIRST,d_week_seq1#3 ASC NULLS FIRST], output=[s_store_name1#1,s_store_id1#2,d_week_seq1#3,(sun_sales1 / sun_sales2)#4,(mon_sales1 / mon_sales2)#5,(tue_sales1 / tue_sales2)#6,(wed_sales1 / wed_sales2)#7,(thu_sales1 / thu_sales2)#8,(fri_sales1 / fri_sales2)#9,(sat_sales1 / sat_sales2)#10])
++- *(27) Project [s_store_name1#1, s_store_id1#2, d_week_seq1#3, CheckOverflow((promote_precision(sun_sales1#11) / promote_precision(sun_sales2#12)), DecimalType(37,20)) AS (sun_sales1 / sun_sales2)#4, CheckOverflow((promote_precision(mon_sales1#13) / promote_precision(mon_sales2#14)), DecimalType(37,20)) AS (mon_sales1 / mon_sales2)#5, CheckOverflow((promote_precision(tue_sales1#15) / promote_precision(tue_sales2#16)), DecimalType(37,20)) AS (tue_sales1 / tue_sales2)#6, CheckOverflow((promote_precision(wed_sales1#17) / promote_precision(wed_sales2#18)), DecimalType(37,20)) AS (wed_sales1 / wed_sales2)#7, CheckOverflow((promote_precision(thu_sales1#19) / promote_precision(thu_sales2#20)), DecimalType(37,20)) AS (thu_sales1 / thu_sales2)#8, CheckOverflow((promote_precision(fri_sales1#21) / promote_precision(fri_sales2#22)), DecimalType(37,20)) AS (fri_sales1 / fri_sales2)#9, CheckOverflow((promote_precision(sat_sales1#23) / promote_precision(sat_sales2#24)), DecimalType(37,20)) AS (sat_sales1 / sat_sales2)#10]
+   +- *(27) SortMergeJoin [s_store_id1#2, d_week_seq1#3], [s_store_id2#25, (d_week_seq2#26 - 52)], Inner
+      :- *(13) Sort [s_store_id1#2 ASC NULLS FIRST, d_week_seq1#3 ASC NULLS FIRST], false, 0
+      :  +- Exchange hashpartitioning(s_store_id1#2, d_week_seq1#3, 200)
+      :     +- *(12) Project [s_store_name#27 AS s_store_name1#1, d_week_seq#28 AS d_week_seq1#3, s_store_id#29 AS s_store_id1#2, sun_sales#30 AS sun_sales1#11, mon_sales#31 AS mon_sales1#13, tue_sales#32 AS tue_sales1#15, wed_sales#33 AS wed_sales1#17, thu_sales#34 AS thu_sales1#19, fri_sales#35 AS fri_sales1#21, sat_sales#36 AS sat_sales1#23]
+      :        +- *(12) SortMergeJoin [d_week_seq#28], [d_week_seq#37], Inner
+      :           :- *(9) Sort [d_week_seq#28 ASC NULLS FIRST], false, 0
+      :           :  +- Exchange hashpartitioning(d_week_seq#28, 200)
+      :           :     +- *(8) Project [d_week_seq#28, sun_sales#30, mon_sales#31, tue_sales#32, wed_sales#33, thu_sales#34, fri_sales#35, sat_sales#36, s_store_id#29, s_store_name#27]
+      :           :        +- *(8) SortMergeJoin [ss_store_sk#38], [s_store_sk#39], Inner
+      :           :           :- *(5) Sort [ss_store_sk#38 ASC NULLS FIRST], false, 0
+      :           :           :  +- Exchange hashpartitioning(ss_store_sk#38, 200)
+      :           :           :     +- *(4) HashAggregate(keys=[d_week_seq#28, ss_store_sk#38], functions=[sum(UnscaledValue(CASE WHEN (d_day_name#40 = Sunday) THEN ss_sales_price#41 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#40 = Monday) THEN ss_sales_price#41 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#40 = Tuesday) THEN ss_sales_price#41 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#40 = Wednesday) THEN ss_sales_price#41 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#40 = Thursday) THEN ss_sales_price#41 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#40 = Friday) THEN ss_sales_price#41 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#40 = Saturday) THEN ss_sales_price#41 ELSE null END))])
+      :           :           :        +- Exchange hashpartitioning(d_week_seq#28, ss_store_sk#38, 200)
+      :           :           :           +- *(3) HashAggregate(keys=[d_week_seq#28, ss_store_sk#38], functions=[partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Sunday) THEN ss_sales_price#41 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Monday) THEN ss_sales_price#41 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Tuesday) THEN ss_sales_price#41 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Wednesday) THEN ss_sales_price#41 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Thursday) THEN ss_sales_price#41 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Friday) THEN ss_sales_price#41 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#40 = Saturday) THEN ss_sales_price#41 ELSE null END))])
+      :           :           :              +- *(3) Project [ss_store_sk#38, ss_sales_price#41, d_week_seq#28, d_day_name#40]
+      :           :           :                 +- *(3) SortMergeJoin [ss_sold_date_sk#42], [d_date_sk#43], Inner
+      :           :           :                    :- *(1) Project [ss_sold_date_sk#42, ss_store_sk#38, ss_sales_price#41]
+      :           :           :                    :  +- *(1) Filter (isnotnull(ss_sold_date_sk#42) && isnotnull(ss_store_sk#38))
+      :           :           :                    :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales[ss_sold_date_sk#42,ss_store_sk#38,ss_sales_price#41] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_sold_date_sk), IsNotNull(ss_store_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_store_sk:int,ss_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+      :           :           :                    +- *(2) Project [d_date_sk#43, d_week_seq#28, d_day_name#40]
+      :           :           :                       +- *(2) Filter (isnotnull(d_date_sk#43) && isnotnull(d_week_seq#28))
+      :           :           :                          +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#43,d_week_seq#28,d_day_name#40] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk), IsNotNull(d_week_seq)], ReadSchema: struct<d_date_sk:int,d_week_seq:int,d_day_name:string>, SelectedBucketsCount: 200 out of 200
+      :           :           +- *(7) Sort [s_store_sk#39 ASC NULLS FIRST], false, 0
+      :           :              +- Exchange hashpartitioning(s_store_sk#39, 200)
+      :           :                 +- *(6) Project [s_store_sk#39, s_store_id#29, s_store_name#27]
+      :           :                    +- *(6) Filter (isnotnull(s_store_sk#39) && isnotnull(s_store_id#29))
+      :           :                       +- *(6) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#39,s_store_id#29,s_store_name#27] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk), IsNotNull(s_store_id)], ReadSchema: struct<s_store_sk:int,s_store_id:string,s_store_name:string>
+      :           +- *(11) Sort [d_week_seq#37 ASC NULLS FIRST], false, 0
+      :              +- Exchange hashpartitioning(d_week_seq#37, 200)
+      :                 +- *(10) Project [d_week_seq#37]
+      :                    +- *(10) Filter (((isnotnull(d_month_seq#44) && (d_month_seq#44 >= 1212)) && (d_month_seq#44 <= 1223)) && isnotnull(d_week_seq#37))
+      :                       +- *(10) FileScan Hyperspace(Type: CI, Name: FilterIndex07-index-17-d_month_seq-7, LogVersion: 0) default.date_dim[d_month_seq#44,d_week_seq#37] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1212), LessThanOrEqual(d_month_seq,1223),..., ReadSchema: struct<d_month_seq:int,d_week_seq:int>
+      +- *(26) Sort [s_store_id2#25 ASC NULLS FIRST, (d_week_seq2#26 - 52) ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(s_store_id2#25, (d_week_seq2#26 - 52), 200)
+            +- *(25) Project [d_week_seq#28 AS d_week_seq2#26, s_store_id#29 AS s_store_id2#25, sun_sales#30 AS sun_sales2#12, mon_sales#31 AS mon_sales2#14, tue_sales#32 AS tue_sales2#16, wed_sales#33 AS wed_sales2#18, thu_sales#34 AS thu_sales2#20, fri_sales#35 AS fri_sales2#22, sat_sales#36 AS sat_sales2#24]
+               +- *(25) SortMergeJoin [d_week_seq#28], [d_week_seq#45], Inner
+                  :- *(22) Sort [d_week_seq#28 ASC NULLS FIRST], false, 0
+                  :  +- Exchange hashpartitioning(d_week_seq#28, 200)
+                  :     +- *(21) Project [d_week_seq#28, sun_sales#30, mon_sales#31, tue_sales#32, wed_sales#33, thu_sales#34, fri_sales#35, sat_sales#36, s_store_id#29]
+                  :        +- *(21) SortMergeJoin [ss_store_sk#38], [s_store_sk#39], Inner
+                  :           :- *(18) Sort [ss_store_sk#38 ASC NULLS FIRST], false, 0
+                  :           :  +- ReusedExchange [d_week_seq#28, ss_store_sk#38, sun_sales#30, mon_sales#31, tue_sales#32, wed_sales#33, thu_sales#34, fri_sales#35, sat_sales#36], Exchange hashpartitioning(ss_store_sk#38, 200)
+                  :           +- *(20) Sort [s_store_sk#39 ASC NULLS FIRST], false, 0
+                  :              +- Exchange hashpartitioning(s_store_sk#39, 200)
+                  :                 +- *(19) Project [s_store_sk#39, s_store_id#29]
+                  :                    +- *(19) Filter (isnotnull(s_store_sk#39) && isnotnull(s_store_id#29))
+                  :                       +- *(19) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#39,s_store_id#29] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk), IsNotNull(s_store_id)], ReadSchema: struct<s_store_sk:int,s_store_id:string>
+                  +- *(24) Sort [d_week_seq#45 ASC NULLS FIRST], false, 0
+                     +- Exchange hashpartitioning(d_week_seq#45, 200)
+                        +- *(23) Project [d_week_seq#45]
+                           +- *(23) Filter (((isnotnull(d_month_seq#46) && (d_month_seq#46 >= 1224)) && (d_month_seq#46 <= 1235)) && isnotnull(d_week_seq#45))
+                              +- *(23) FileScan Hyperspace(Type: CI, Name: FilterIndex07-index-17-d_month_seq-7, LogVersion: 0) default.date_dim[d_month_seq#46,d_week_seq#45] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1224), LessThanOrEqual(d_month_seq,1235),..., ReadSchema: struct<d_month_seq:int,d_week_seq:int>

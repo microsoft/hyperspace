@@ -1,0 +1,100 @@
+TakeOrderedAndProject [(fri_sales1 / fri_sales2),(mon_sales1 / mon_sales2),(sat_sales1 / sat_sales2),(sun_sales1 / sun_sales2),(thu_sales1 / thu_sales2),(tue_sales1 / tue_sales2),(wed_sales1 / wed_sales2),d_week_seq1,s_store_id1,s_store_name1]
+  WholeStageCodegen
+    Project [d_week_seq1,fri_sales1,fri_sales2,mon_sales1,mon_sales2,s_store_id1,s_store_name1,sat_sales1,sat_sales2,sun_sales1,sun_sales2,thu_sales1,thu_sales2,tue_sales1,tue_sales2,wed_sales1,wed_sales2]
+      SortMergeJoin [d_week_seq1,d_week_seq2,s_store_id1,s_store_id2]
+        InputAdapter
+          WholeStageCodegen
+            Sort [d_week_seq1,s_store_id1]
+              InputAdapter
+                Exchange [d_week_seq1,s_store_id1] #1
+                  WholeStageCodegen
+                    Project [d_week_seq,fri_sales,mon_sales,s_store_id,s_store_name,sat_sales,sun_sales,thu_sales,tue_sales,wed_sales]
+                      SortMergeJoin [d_week_seq,d_week_seq]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [d_week_seq]
+                              InputAdapter
+                                Exchange [d_week_seq] #2
+                                  WholeStageCodegen
+                                    Project [d_week_seq,fri_sales,mon_sales,s_store_id,s_store_name,sat_sales,sun_sales,thu_sales,tue_sales,wed_sales]
+                                      SortMergeJoin [s_store_sk,ss_store_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ss_store_sk]
+                                              InputAdapter
+                                                Exchange [ss_store_sk] #3
+                                                  WholeStageCodegen
+                                                    HashAggregate [d_week_seq,ss_store_sk,sum,sum,sum,sum,sum,sum,sum,sum(UnscaledValue(CASE WHEN (d_day_name = Friday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Monday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Saturday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Sunday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Thursday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Tuesday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Wednesday) THEN ss_sales_price ELSE null END))] [fri_sales,mon_sales,sat_sales,sum,sum,sum,sum,sum,sum,sum,sum(UnscaledValue(CASE WHEN (d_day_name = Friday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Monday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Saturday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Sunday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Thursday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Tuesday) THEN ss_sales_price ELSE null END)),sum(UnscaledValue(CASE WHEN (d_day_name = Wednesday) THEN ss_sales_price ELSE null END)),sun_sales,thu_sales,tue_sales,wed_sales]
+                                                      InputAdapter
+                                                        Exchange [d_week_seq,ss_store_sk] #4
+                                                          WholeStageCodegen
+                                                            HashAggregate [d_day_name,d_week_seq,ss_sales_price,ss_store_sk,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum] [sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum,sum]
+                                                              Project [d_day_name,d_week_seq,ss_sales_price,ss_store_sk]
+                                                                SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Project [ss_sales_price,ss_sold_date_sk,ss_store_sk]
+                                                                        Filter [ss_sold_date_sk,ss_store_sk]
+                                                                          Scan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales [ss_sales_price,ss_sold_date_sk,ss_store_sk] [ss_sales_price,ss_sold_date_sk,ss_store_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Project [d_date_sk,d_day_name,d_week_seq]
+                                                                        Filter [d_date_sk,d_week_seq]
+                                                                          Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_day_name,d_week_seq] [d_date_sk,d_day_name,d_week_seq]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [s_store_sk]
+                                              InputAdapter
+                                                Exchange [s_store_sk] #5
+                                                  WholeStageCodegen
+                                                    Project [s_store_id,s_store_name,s_store_sk]
+                                                      Filter [s_store_id,s_store_sk]
+                                                        Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_id,s_store_name,s_store_sk] [s_store_id,s_store_name,s_store_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [d_week_seq]
+                              InputAdapter
+                                Exchange [d_week_seq] #6
+                                  WholeStageCodegen
+                                    Project [d_week_seq]
+                                      Filter [d_month_seq,d_week_seq]
+                                        Scan Hyperspace(Type: CI, Name: FilterIndex07-index-17-d_month_seq-7, LogVersion: 0) default.date_dim [d_month_seq,d_week_seq] [d_month_seq,d_week_seq]
+        InputAdapter
+          WholeStageCodegen
+            Sort [d_week_seq2,s_store_id2]
+              InputAdapter
+                Exchange [d_week_seq2,s_store_id2] #7
+                  WholeStageCodegen
+                    Project [d_week_seq,fri_sales,mon_sales,s_store_id,sat_sales,sun_sales,thu_sales,tue_sales,wed_sales]
+                      SortMergeJoin [d_week_seq,d_week_seq]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [d_week_seq]
+                              InputAdapter
+                                Exchange [d_week_seq] #8
+                                  WholeStageCodegen
+                                    Project [d_week_seq,fri_sales,mon_sales,s_store_id,sat_sales,sun_sales,thu_sales,tue_sales,wed_sales]
+                                      SortMergeJoin [s_store_sk,ss_store_sk]
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [ss_store_sk]
+                                              InputAdapter
+                                                ReusedExchange [d_week_seq,fri_sales,mon_sales,sat_sales,ss_store_sk,sun_sales,thu_sales,tue_sales,wed_sales] [d_week_seq,fri_sales,mon_sales,sat_sales,ss_store_sk,sun_sales,thu_sales,tue_sales,wed_sales] #3
+                                        InputAdapter
+                                          WholeStageCodegen
+                                            Sort [s_store_sk]
+                                              InputAdapter
+                                                Exchange [s_store_sk] #9
+                                                  WholeStageCodegen
+                                                    Project [s_store_id,s_store_sk]
+                                                      Filter [s_store_id,s_store_sk]
+                                                        Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_id,s_store_sk] [s_store_id,s_store_sk]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [d_week_seq]
+                              InputAdapter
+                                Exchange [d_week_seq] #10
+                                  WholeStageCodegen
+                                    Project [d_week_seq]
+                                      Filter [d_month_seq,d_week_seq]
+                                        Scan Hyperspace(Type: CI, Name: FilterIndex07-index-17-d_month_seq-7, LogVersion: 0) default.date_dim [d_month_seq,d_week_seq] [d_month_seq,d_week_seq]

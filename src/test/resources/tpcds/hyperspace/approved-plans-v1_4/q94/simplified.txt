@@ -1,0 +1,92 @@
+TakeOrderedAndProject [order count ,total net profit ,total shipping cost ]
+  WholeStageCodegen
+    HashAggregate [count,count(ws_order_number),sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit))] [count,count(ws_order_number),order count ,sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit)),total net profit ,total shipping cost ]
+      InputAdapter
+        Exchange #1
+          WholeStageCodegen
+            HashAggregate [count,count(ws_order_number),sum,sum,sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit)),ws_order_number] [count,count,count(ws_order_number),sum,sum,sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit))]
+              HashAggregate [sum,sum,sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit)),ws_order_number] [sum,sum,sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit))]
+                InputAdapter
+                  Exchange [ws_order_number] #2
+                    WholeStageCodegen
+                      HashAggregate [sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit)),ws_ext_ship_cost,ws_net_profit,ws_order_number] [sum,sum,sum,sum,sum(UnscaledValue(ws_ext_ship_cost)),sum(UnscaledValue(ws_net_profit))]
+                        Project [ws_ext_ship_cost,ws_net_profit,ws_order_number]
+                          SortMergeJoin [web_site_sk,ws_web_site_sk]
+                            InputAdapter
+                              WholeStageCodegen
+                                Sort [ws_web_site_sk]
+                                  InputAdapter
+                                    Exchange [ws_web_site_sk] #3
+                                      WholeStageCodegen
+                                        Project [ws_ext_ship_cost,ws_net_profit,ws_order_number,ws_web_site_sk]
+                                          SortMergeJoin [ca_address_sk,ws_ship_addr_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Sort [ws_ship_addr_sk]
+                                                  InputAdapter
+                                                    Exchange [ws_ship_addr_sk] #4
+                                                      WholeStageCodegen
+                                                        Project [ws_ext_ship_cost,ws_net_profit,ws_order_number,ws_ship_addr_sk,ws_web_site_sk]
+                                                          SortMergeJoin [d_date_sk,ws_ship_date_sk]
+                                                            InputAdapter
+                                                              WholeStageCodegen
+                                                                Sort [ws_ship_date_sk]
+                                                                  InputAdapter
+                                                                    Exchange [ws_ship_date_sk] #5
+                                                                      SortMergeJoin [wr_order_number,ws_order_number]
+                                                                        WholeStageCodegen
+                                                                          Sort [ws_order_number]
+                                                                            InputAdapter
+                                                                              Exchange [ws_order_number] #6
+                                                                                WholeStageCodegen
+                                                                                  Project [ws_ext_ship_cost,ws_net_profit,ws_order_number,ws_ship_addr_sk,ws_ship_date_sk,ws_web_site_sk]
+                                                                                    InputAdapter
+                                                                                      SortMergeJoin [ws_order_number,ws_order_number,ws_warehouse_sk,ws_warehouse_sk]
+                                                                                        WholeStageCodegen
+                                                                                          Sort [ws_order_number]
+                                                                                            InputAdapter
+                                                                                              Exchange [ws_order_number] #7
+                                                                                                WholeStageCodegen
+                                                                                                  Project [ws_ext_ship_cost,ws_net_profit,ws_order_number,ws_ship_addr_sk,ws_ship_date_sk,ws_warehouse_sk,ws_web_site_sk]
+                                                                                                    Filter [ws_ship_addr_sk,ws_ship_date_sk,ws_web_site_sk]
+                                                                                                      Scan parquet default.web_sales [ws_ext_ship_cost,ws_net_profit,ws_order_number,ws_ship_addr_sk,ws_ship_date_sk,ws_warehouse_sk,ws_web_site_sk] [ws_ext_ship_cost,ws_net_profit,ws_order_number,ws_ship_addr_sk,ws_ship_date_sk,ws_warehouse_sk,ws_web_site_sk]
+                                                                                        WholeStageCodegen
+                                                                                          Sort [ws_order_number]
+                                                                                            InputAdapter
+                                                                                              Exchange [ws_order_number] #8
+                                                                                                WholeStageCodegen
+                                                                                                  Project [ws_order_number,ws_warehouse_sk]
+                                                                                                    Scan parquet default.web_sales [ws_order_number,ws_warehouse_sk] [ws_order_number,ws_warehouse_sk]
+                                                                        WholeStageCodegen
+                                                                          Sort [wr_order_number]
+                                                                            InputAdapter
+                                                                              Exchange [wr_order_number] #9
+                                                                                WholeStageCodegen
+                                                                                  Scan parquet default.web_returns [wr_order_number] [wr_order_number]
+                                                            InputAdapter
+                                                              WholeStageCodegen
+                                                                Sort [d_date_sk]
+                                                                  InputAdapter
+                                                                    Exchange [d_date_sk] #10
+                                                                      WholeStageCodegen
+                                                                        Project [d_date_sk]
+                                                                          Filter [d_date,d_date_sk]
+                                                                            Scan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                                            InputAdapter
+                                              WholeStageCodegen
+                                                Sort [ca_address_sk]
+                                                  InputAdapter
+                                                    Exchange [ca_address_sk] #11
+                                                      WholeStageCodegen
+                                                        Project [ca_address_sk]
+                                                          Filter [ca_address_sk,ca_state]
+                                                            Scan Hyperspace(Type: CI, Name: FilterIndex32-index-35-ca_state-11, LogVersion: 0) default.customer_address [ca_address_sk,ca_state] [ca_address_sk,ca_state]
+                            InputAdapter
+                              WholeStageCodegen
+                                Sort [web_site_sk]
+                                  InputAdapter
+                                    Exchange [web_site_sk] #12
+                                      WholeStageCodegen
+                                        Project [web_site_sk]
+                                          Filter [web_company_name,web_site_sk]
+                                            Scan Hyperspace(Type: CI, Name: JoinIndex36-index-46-web_site_sk-3, LogVersion: 0) default.web_site [web_company_name,web_site_sk] [web_company_name,web_site_sk]

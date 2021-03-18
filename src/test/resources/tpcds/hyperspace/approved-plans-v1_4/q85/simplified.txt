@@ -1,0 +1,129 @@
+TakeOrderedAndProject [aggOrder,avg(wr_fee),avg(wr_refunded_cash),avg(ws_quantity),substring(r_reason_desc, 1, 20)]
+  WholeStageCodegen
+    HashAggregate [avg(UnscaledValue(wr_fee)),avg(UnscaledValue(wr_refunded_cash)),avg(cast(ws_quantity as bigint)),count,count,count,r_reason_desc,sum,sum,sum] [aggOrder,avg(UnscaledValue(wr_fee)),avg(UnscaledValue(wr_refunded_cash)),avg(cast(ws_quantity as bigint)),avg(wr_fee),avg(wr_refunded_cash),avg(ws_quantity),count,count,count,substring(r_reason_desc, 1, 20),sum,sum,sum]
+      InputAdapter
+        Exchange [r_reason_desc] #1
+          WholeStageCodegen
+            HashAggregate [count,count,count,count,count,count,r_reason_desc,sum,sum,sum,sum,sum,sum,wr_fee,wr_refunded_cash,ws_quantity] [count,count,count,count,count,count,sum,sum,sum,sum,sum,sum]
+              Project [r_reason_desc,wr_fee,wr_refunded_cash,ws_quantity]
+                SortMergeJoin [r_reason_sk,wr_reason_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [wr_reason_sk]
+                        InputAdapter
+                          Exchange [wr_reason_sk] #2
+                            WholeStageCodegen
+                              Project [wr_fee,wr_reason_sk,wr_refunded_cash,ws_quantity]
+                                SortMergeJoin [d_date_sk,ws_sold_date_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ws_sold_date_sk]
+                                        InputAdapter
+                                          Exchange [ws_sold_date_sk] #3
+                                            WholeStageCodegen
+                                              Project [wr_fee,wr_reason_sk,wr_refunded_cash,ws_quantity,ws_sold_date_sk]
+                                                SortMergeJoin [ca_address_sk,ca_state,wr_refunded_addr_sk,ws_net_profit]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [wr_refunded_addr_sk]
+                                                        InputAdapter
+                                                          Exchange [wr_refunded_addr_sk] #4
+                                                            WholeStageCodegen
+                                                              Project [wr_fee,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,ws_net_profit,ws_quantity,ws_sold_date_sk]
+                                                                SortMergeJoin [cd_demo_sk,cd_education_status,cd_education_status,cd_marital_status,cd_marital_status,wr_returning_cdemo_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [cd_education_status,cd_marital_status,wr_returning_cdemo_sk]
+                                                                        InputAdapter
+                                                                          Exchange [cd_education_status,cd_marital_status,wr_returning_cdemo_sk] #5
+                                                                            WholeStageCodegen
+                                                                              Project [cd_education_status,cd_marital_status,wr_fee,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,wr_returning_cdemo_sk,ws_net_profit,ws_quantity,ws_sold_date_sk]
+                                                                                SortMergeJoin [cd_demo_sk,cd_education_status,cd_marital_status,wr_refunded_cdemo_sk,ws_sales_price]
+                                                                                  InputAdapter
+                                                                                    WholeStageCodegen
+                                                                                      Sort [wr_refunded_cdemo_sk]
+                                                                                        InputAdapter
+                                                                                          Exchange [wr_refunded_cdemo_sk] #6
+                                                                                            WholeStageCodegen
+                                                                                              Project [wr_fee,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,wr_refunded_cdemo_sk,wr_returning_cdemo_sk,ws_net_profit,ws_quantity,ws_sales_price,ws_sold_date_sk]
+                                                                                                SortMergeJoin [wp_web_page_sk,ws_web_page_sk]
+                                                                                                  InputAdapter
+                                                                                                    WholeStageCodegen
+                                                                                                      Sort [ws_web_page_sk]
+                                                                                                        InputAdapter
+                                                                                                          Exchange [ws_web_page_sk] #7
+                                                                                                            WholeStageCodegen
+                                                                                                              Project [wr_fee,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,wr_refunded_cdemo_sk,wr_returning_cdemo_sk,ws_net_profit,ws_quantity,ws_sales_price,ws_sold_date_sk,ws_web_page_sk]
+                                                                                                                SortMergeJoin [wr_item_sk,wr_order_number,ws_item_sk,ws_order_number]
+                                                                                                                  InputAdapter
+                                                                                                                    WholeStageCodegen
+                                                                                                                      Sort [ws_item_sk,ws_order_number]
+                                                                                                                        InputAdapter
+                                                                                                                          Exchange [ws_item_sk,ws_order_number] #8
+                                                                                                                            WholeStageCodegen
+                                                                                                                              Project [ws_item_sk,ws_net_profit,ws_order_number,ws_quantity,ws_sales_price,ws_sold_date_sk,ws_web_page_sk]
+                                                                                                                                Filter [ws_item_sk,ws_order_number,ws_sold_date_sk,ws_web_page_sk]
+                                                                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex37-index-9-ws_sold_date_sk-21, LogVersion: 0) default.web_sales [ws_item_sk,ws_net_profit,ws_order_number,ws_quantity,ws_sales_price,ws_sold_date_sk,ws_web_page_sk] [ws_item_sk,ws_net_profit,ws_order_number,ws_quantity,ws_sales_price,ws_sold_date_sk,ws_web_page_sk]
+                                                                                                                  InputAdapter
+                                                                                                                    WholeStageCodegen
+                                                                                                                      Sort [wr_item_sk,wr_order_number]
+                                                                                                                        InputAdapter
+                                                                                                                          Exchange [wr_item_sk,wr_order_number] #9
+                                                                                                                            WholeStageCodegen
+                                                                                                                              Project [wr_fee,wr_item_sk,wr_order_number,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,wr_refunded_cdemo_sk,wr_returning_cdemo_sk]
+                                                                                                                                Filter [wr_item_sk,wr_order_number,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cdemo_sk,wr_returning_cdemo_sk]
+                                                                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex41-index-36-wr_item_sk-11, LogVersion: 0) default.web_returns [wr_fee,wr_item_sk,wr_order_number,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,wr_refunded_cdemo_sk,wr_returning_cdemo_sk] [wr_fee,wr_item_sk,wr_order_number,wr_reason_sk,wr_refunded_addr_sk,wr_refunded_cash,wr_refunded_cdemo_sk,wr_returning_cdemo_sk]
+                                                                                                  InputAdapter
+                                                                                                    WholeStageCodegen
+                                                                                                      Sort [wp_web_page_sk]
+                                                                                                        InputAdapter
+                                                                                                          Exchange [wp_web_page_sk] #10
+                                                                                                            WholeStageCodegen
+                                                                                                              Project [wp_web_page_sk]
+                                                                                                                Filter [wp_web_page_sk]
+                                                                                                                  Scan parquet default.web_page [wp_web_page_sk] [wp_web_page_sk]
+                                                                                  InputAdapter
+                                                                                    WholeStageCodegen
+                                                                                      Sort [cd_demo_sk]
+                                                                                        InputAdapter
+                                                                                          Exchange [cd_demo_sk] #11
+                                                                                            WholeStageCodegen
+                                                                                              Project [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                                                                Filter [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics [cd_demo_sk,cd_education_status,cd_marital_status] [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                                        InputAdapter
+                                                                          Exchange [cd_demo_sk,cd_education_status,cd_marital_status] #12
+                                                                            WholeStageCodegen
+                                                                              Project [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                                                Filter [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics [cd_demo_sk,cd_education_status,cd_marital_status] [cd_demo_sk,cd_education_status,cd_marital_status]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [ca_address_sk]
+                                                        InputAdapter
+                                                          Exchange [ca_address_sk] #13
+                                                            WholeStageCodegen
+                                                              Project [ca_address_sk,ca_state]
+                                                                Filter [ca_address_sk,ca_country]
+                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address [ca_address_sk,ca_country,ca_state] [ca_address_sk,ca_country,ca_state]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [d_date_sk]
+                                        InputAdapter
+                                          Exchange [d_date_sk] #14
+                                            WholeStageCodegen
+                                              Project [d_date_sk]
+                                                Filter [d_date_sk,d_year]
+                                                  Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [r_reason_sk]
+                        InputAdapter
+                          Exchange [r_reason_sk] #15
+                            WholeStageCodegen
+                              Project [r_reason_desc,r_reason_sk]
+                                Filter [r_reason_sk]
+                                  Scan parquet default.reason [r_reason_desc,r_reason_sk] [r_reason_desc,r_reason_sk]
