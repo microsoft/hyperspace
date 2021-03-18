@@ -19,13 +19,15 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
-import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.functions.{col, input_file_name}
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils, SchemaUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -73,7 +75,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
         val coveringIndexProperties =
-          (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
+          (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation) ++
+            usesNestedFieldsProperty(indexConfig)).toMap
 
         IndexLogEntry(
           indexConfig.indexName,
@@ -109,6 +112,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
+  private def usesNestedFieldsProperty(indexConfig: IndexConfig): Option[(String, String)] = {
+    if (SchemaUtils.hasNestedFields(indexConfig.indexedColumns ++ indexConfig.includedColumns)) {
+      Some(IndexConstants.USES_NESTED_FIELDS_PROPERTY -> "true")
+    } else {
+      None
+    }
+  }
+
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
@@ -117,7 +128,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // run job
     val repartitionedIndexDataFrame =
-      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(df(_)): _*)
+      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(c => col(s"$c")): _*)
 
     // Save the index with the number of buckets specified.
     repartitionedIndexDataFrame.write
@@ -144,9 +155,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df: DataFrame,
       indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
     val spark = df.sparkSession
-    val dfColumnNames = df.schema.fieldNames
-    val indexedColumns = indexConfig.indexedColumns
-    val includedColumns = indexConfig.includedColumns
+    val dfColumnNames = SchemaUtils.flatten(df.schema)
+    val indexedColumns = SchemaUtils.unescapeFieldNames(indexConfig.indexedColumns)
+    val includedColumns = SchemaUtils.unescapeFieldNames(indexConfig.includedColumns)
     val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
     val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
 
@@ -177,8 +188,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
       val partitionColumns = relation.partitionSchema.map(_.name)
-      val missingPartitionColumns = partitionColumns.filter(
-        ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
+      val missingPartitionColumns =
+        partitionColumns.filter(ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
       val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
 
       // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a
@@ -202,10 +213,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .select(
           allIndexColumns.head,
           allIndexColumns.tail :+ IndexConstants.DATA_FILE_NAME_ID: _*)
+        .toDF(
+          SchemaUtils.escapeFieldNames(allIndexColumns) :+ IndexConstants.DATA_FILE_NAME_ID: _*)
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
+        .toDF(SchemaUtils.escapeFieldNames(columnsFromIndexConfig): _*)
     }
 
-    (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
+    val escapedIndexedColumns = SchemaUtils.escapeFieldNames(resolvedIndexedColumns)
+    val escapedIncludedColumns = SchemaUtils.escapeFieldNames(resolvedIncludedColumns)
+
+    (indexDF, escapedIndexedColumns, escapedIncludedColumns)
   }
 }

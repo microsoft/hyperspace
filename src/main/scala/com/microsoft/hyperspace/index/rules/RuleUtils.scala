@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, In, Literal, Not}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, GetStructField, In, IsNotNull, Literal, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
@@ -33,7 +33,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.util.{HyperspaceConf, SchemaUtils}
 
 object RuleUtils {
 
@@ -286,10 +286,31 @@ object RuleUtils {
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput = relation.plan.output
-          .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
-          .map(_.asInstanceOf[AttributeReference])
+        val flatSchema = SchemaUtils.escapeFieldNames(SchemaUtils.flatten(relation.plan.schema))
+        val updatedOutput =
+          if (index.usesNestedFields &&
+              SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(flatSchema))) {
+            indexFsRelation.schema.flatMap { s =>
+              val exprId = getFieldPosition(index, s.name)
+              relation.plan.output.find(a => s.name.contains(a.name)).map { a =>
+                AttributeReference(s.name, s.dataType, a.nullable, a.metadata)(
+                  ExprId(exprId),
+                  a.qualifier)
+              }
+            }
+          } else {
+            relation.plan.output
+              .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+              .map(_.asInstanceOf[AttributeReference])
+          }
+
         relation.createLogicalRelation(indexFsRelation, updatedOutput)
+
+      case p: Project if PlanUtils.isSupportedProject(p) =>
+        transformProject(p, index)
+
+      case f: Filter if PlanUtils.isSupportedFilter(f) =>
+        transformFilter(f, index)
     }
   }
 
@@ -353,7 +374,7 @@ object RuleUtils {
 
         val filesToRead = {
           if (useBucketSpec || !index.hasParquetAsSourceFormat || filesDeleted.nonEmpty ||
-              relation.partitionSchema.nonEmpty) {
+              relation.partitionSchema.nonEmpty || index.usesNestedFields) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -377,9 +398,10 @@ object RuleUtils {
         // In order to handle deleted files, read index data with the lineage column so that
         // we could inject Filter-Not-In conditions on the lineage column to exclude the indexed
         // rows from the deleted files.
+        val flatSchema = SchemaUtils.escapeFieldNames(SchemaUtils.flatten(relation.plan.schema))
         val newSchema = StructType(
           index.schema.filter(s =>
-            relation.plan.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
+            flatSchema.contains(s.name) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
         def fileIndex: InMemoryFileIndex = {
@@ -400,9 +422,22 @@ object RuleUtils {
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput = relation.plan.output
-          .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
-          .map(_.asInstanceOf[AttributeReference])
+        val updatedOutput =
+          if (index.usesNestedFields &&
+              SchemaUtils.hasNestedFields(SchemaUtils.unescapeFieldNames(flatSchema))) {
+            indexFsRelation.schema.flatMap { s =>
+              val exprId = getFieldPosition(index, s.name)
+              relation.plan.output.find(a => s.name.contains(a.name)).map { a =>
+                AttributeReference(s.name, s.dataType, a.nullable, a.metadata)(
+                  ExprId(exprId),
+                  a.qualifier)
+              }
+            }
+          } else {
+            relation.plan.output
+              .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+              .map(_.asInstanceOf[AttributeReference])
+          }
 
         if (filesDeleted.isEmpty) {
           relation.createLogicalRelation(indexFsRelation, updatedOutput)
@@ -414,6 +449,13 @@ object RuleUtils {
           val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }
+
+      case p: Project if PlanUtils.isSupportedProject(p) =>
+        transformProject(p, index)
+
+      case f: Filter if PlanUtils.isSupportedFilter(f) =>
+        transformFilter(f, index)
+
     }
 
     if (unhandledAppendedFiles.nonEmpty) {
@@ -434,7 +476,21 @@ object RuleUtils {
         // Although only numBuckets of BucketSpec is used in BucketUnion*, bucketColumnNames
         // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
         // misunderstanding.
-        val bucketSpec = index.bucketSpec.copy(sortColumnNames = Nil)
+
+        val aliases = PlanUtils
+          .collectAliases(plan)
+          .collect {
+            case (shortName, _, ref: GetStructField) =>
+              val escapedFieldName =
+                SchemaUtils.escapeFieldName(PlanUtils.getChildNameFromStruct(ref))
+              escapedFieldName -> shortName
+          }
+          .toMap
+        val aliasBucketNames = index.bucketSpec.bucketColumnNames.map { col =>
+          aliases.getOrElse(col, col)
+        }
+        val bucketSpec =
+          index.bucketSpec.copy(bucketColumnNames = aliasBucketNames, sortColumnNames = Nil)
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(
@@ -487,11 +543,14 @@ object RuleUtils {
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
         val partitionColumns = relation.partitionSchema.map(_.name)
-        val updatedSchema = StructType(relation.plan.schema.filter(col =>
-          index.schema.contains(col) || relation.partitionSchema.contains(col)))
+        val updatedSchema = StructType(
+          relation.plan.schema.filter(col =>
+            index.schema.fieldNames.exists(n => n.contains(col.name)) ||
+              relation.partitionSchema.contains(col)))
         val updatedOutput = relation.plan.output
           .filter(attr =>
-            index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+            index.schema.fieldNames.exists(n => n.contains(attr.name)) ||
+              partitionColumns.contains(attr.name))
           .map(_.asInstanceOf[AttributeReference])
         val newRelation = relation.createHadoopFsRelation(
           newLocation,
@@ -537,7 +596,14 @@ object RuleUtils {
           plan: LogicalPlan,
           indexedColumns: Seq[String]): Seq[Option[Attribute]] = {
         val attrMap = plan.output.attrs.map(attr => (attr.name, attr)).toMap
-        indexedColumns.map(colName => attrMap.get(colName))
+        indexedColumns.map { colName =>
+          attrMap
+            .find {
+              case (k, _) =>
+                colName.contains(k)
+            }
+            .map(_._2)
+        }
       }
     }
 
@@ -575,5 +641,130 @@ object RuleUtils {
     }
     assert(shuffleInjected)
     shuffled
+  }
+
+  /**
+   * Transforms the projection to use the field in the index. The nested field in the
+   * projection is different from the top level field stored in the index. For example
+   * {{{Project [
+   *   nested#536.leaf.cnt AS cnt#556,
+   *   query#533,
+   *   nested#536.leaf.id AS id#557]}}}
+   *
+   * must be transformed into something similar to this:
+   * {{{Project [
+   *   nested__leaf__cnt#0 AS cnt#653,
+   *   query#1 AS query#533,
+   *   nested__leaf__id#2 AS id#654]}}}
+   *
+   * @param project The projection we want to transform
+   * @param index The suitable index
+   * @return
+   */
+  private def transformProject(project: Project, index: IndexLogEntry): Project = {
+    val projectedFields = project.projectList.map { exp =>
+      val fieldName = PlanUtils.extractNamesFromExpression(exp).head
+      val shortFieldName = fieldName.split(SchemaUtils.NESTED_FIELD_NEEDLE_REGEX).last
+      val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
+      val attr = PlanUtils.extractAttributeRef(exp, fieldName)
+      val fieldType = PlanUtils.extractTypeFromExpression(exp, fieldName)
+      val exprId = getFieldPosition(index, escapedFieldName)
+      val attrCopy = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
+        ExprId(exprId),
+        attr.qualifier)
+      if (fieldName != shortFieldName) {
+        Alias(attrCopy, shortFieldName)(exprId = exp.toAttribute.exprId)
+      } else {
+        Alias(attrCopy, attrCopy.name)(exprId = exp.toAttribute.exprId)
+      }
+    }
+    project.copy(projectList = projectedFields)
+  }
+
+  /**
+   * Transforms the filter to use the field in the index. The nested field in the
+   * filter is different from the top level field stored in the index. For example
+   * {{{Filter (
+   *   (isnotnull(nested#536) &&
+   *   (nested#536.leaf.cnt >= 20)) &&
+   *   (nested#536.leaf.cnt <= 40))}}}
+   *
+   * must be transformed into something similar to this:
+   * {{{Filter (
+   *   (isnotnull(nested__leaf__cnt#0) &&
+   *   (nested__leaf__cnt#0 >= 20)) &&
+   *   (nested__leaf__cnt#0 <= 40))}}}
+   *
+   * Pre-requisite
+   * - The index must have at least one nested field
+   *
+   * @param filter The filter we want to transform
+   * @param index The suitable index
+   * @return
+   */
+  private def transformFilter(filter: Filter, index: IndexLogEntry): Filter = {
+    val nestedFields = getNestedFields(index)
+    if (nestedFields.nonEmpty) {
+      val newCondition = filter.condition.transformDown {
+        case gsf: GetStructField =>
+          val fieldName = PlanUtils.getChildNameFromStruct(gsf)
+          val escapedFieldName = SchemaUtils.escapeFieldName(fieldName)
+          if (nestedFields.contains(escapedFieldName)) {
+            val fieldType = PlanUtils.extractTypeFromExpression(gsf, fieldName)
+            val attr = PlanUtils.extractAttributeRef(gsf, fieldName)
+            val exprId = getFieldPosition(index, escapedFieldName)
+            val newAttr = attr.copy(name = escapedFieldName, dataType = fieldType)(
+              ExprId(exprId),
+              attr.qualifier)
+            newAttr
+          } else {
+            gsf
+          }
+        case cond @ IsNotNull(child) =>
+          val fieldName =
+            SchemaUtils.escapeFieldName(PlanUtils.extractNamesFromExpression(child).head)
+          val elemFound = nestedFields.find(i => i.contains(fieldName))
+          elemFound match {
+            case Some(name) =>
+              val newChild = child match {
+                case attr: AttributeReference =>
+                  val fieldType =
+                    PlanUtils.extractTypeFromExpression(cond, SchemaUtils.unescapeFieldName(name))
+                  val exprId = getFieldPosition(index, name)
+                  attr.copy(name = name, dataType = fieldType)(ExprId(exprId), attr.qualifier)
+                case other =>
+                  other
+              }
+              cond.copy(child = newChild)
+            case _ =>
+              cond
+          }
+      }
+      filter.copy(condition = newCondition)
+    } else {
+      filter
+    }
+  }
+
+  /**
+   * The method collects a list of nested field names from the index schema.
+   *
+   * @param index The chosen index
+   * @return A collection of nested field names
+   */
+  private def getNestedFields(index: IndexLogEntry): Seq[String] = {
+    index.schema.fieldNames.filter(_.contains(SchemaUtils.NESTED_FIELD_REPLACEMENT))
+  }
+
+  /**
+   * Given and index and a field name it returns the position in the index schema.
+   * This method is used to properly create attributes over the index dataset.
+   *
+   * @param index The chosen index
+   * @param fieldName The field name for which we need to find its position in the index schema
+   * @return
+   */
+  private def getFieldPosition(index: IndexLogEntry, fieldName: String): Int = {
+    index.schema.fieldNames.indexWhere(_.equalsIgnoreCase(fieldName))
   }
 }

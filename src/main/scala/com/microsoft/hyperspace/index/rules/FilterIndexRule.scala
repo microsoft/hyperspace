@@ -16,11 +16,14 @@
 
 package com.microsoft.hyperspace.index.rules
 
+import scala.util.Try
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, Expression, GetStructField}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
@@ -28,7 +31,7 @@ import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils, SchemaUtils}
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -113,8 +116,8 @@ object FilterIndexRule
 
         val candidateIndexes = allIndexes.filter { index =>
           indexCoversPlan(
-            outputColumns,
-            filterColumns,
+            SchemaUtils.escapeFieldNames(outputColumns),
+            SchemaUtils.escapeFieldNames(filterColumns),
             index.indexedColumns,
             index.includedColumns)
         }
@@ -168,9 +171,19 @@ object ExtractFilterNode {
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
-        .map(_.references.map(_.asInstanceOf[AttributeReference].name))
+        .map(PlanUtils.extractNamesFromExpression)
         .flatMap(_.toSeq)
-      val filterColumnNames = condition.references.map(_.name).toSeq
+      val filterColumnNames = PlanUtils
+        .extractNamesFromExpression(condition)
+        .toSeq
+        .sortBy(-_.length)
+        .foldLeft(Seq.empty[String]) { (acc, e) =>
+          if (!acc.exists(i => i.startsWith(e))) {
+            acc :+ e
+          } else {
+            acc
+          }
+        }
 
       Some(project, filter, projectColumnNames, filterColumnNames)
 

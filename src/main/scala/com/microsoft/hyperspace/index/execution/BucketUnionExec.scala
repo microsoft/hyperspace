@@ -110,12 +110,23 @@ private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketS
   override def output: Seq[Attribute] = children.head.output
 
   override def outputPartitioning: Partitioning = {
-    assert(children.map(_.outputPartitioning).toSet.size == 1)
-    assert(children.head.outputPartitioning.isInstanceOf[HashPartitioning])
-    assert(
-      children.head.outputPartitioning
-        .asInstanceOf[HashPartitioning]
-        .numPartitions == bucketSpec.numBuckets)
-    children.head.outputPartitioning
+    val parts = children.map(_.outputPartitioning).distinct
+    assert(parts.forall(_.isInstanceOf[HashPartitioning]))
+    assert(parts.forall(_.numPartitions == bucketSpec.numBuckets))
+
+    val reduced = parts.reduceLeft { (a, b) =>
+      val h1 = a.asInstanceOf[HashPartitioning]
+      val h2 = b.asInstanceOf[HashPartitioning]
+      val h1Name = h1.references.head.name
+      val h2Name = h2.references.head.name
+      val same = h1Name.contains(h2Name) || h2Name.contains(h1Name)
+      assert(same)
+      if (h1Name.length > h2Name.length) {
+        h1
+      } else {
+        h2
+      }
+    }
+    reduced
   }
 }
