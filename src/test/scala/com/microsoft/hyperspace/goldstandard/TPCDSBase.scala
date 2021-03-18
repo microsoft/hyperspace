@@ -38,6 +38,7 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
 
   // The TPCDS queries below are based on v1.4.
   // TODO: Fix bulid pipeline for q49 and reenable q49.
+
   val tpcdsQueries = Seq(
     "q0", "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10", "q11",
     "q12", "q13", "q14a", "q14b", "q15", "q16", "q17", "q18", "q19", "q20",
@@ -572,9 +573,9 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   override def afterAll(): Unit = {
-    //tableNames.foreach { tableName =>
-    //  spark.sessionState.catalog.dropTable(TableIdentifier(tableName), true, true)
-    //}
+    tableNames.foreach { tableName =>
+      spark.sessionState.catalog.dropTable(TableIdentifier(tableName), true, true)
+    }
     super.afterAll()
   }
 }
