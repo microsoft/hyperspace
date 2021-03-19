@@ -52,19 +52,19 @@ TakeOrderedAndProject(limit=100, orderBy=[segment#1 ASC NULLS FIRST,num_customer
                         :     :              +- *(8) FileScan parquet default.customer_address[ca_address_sk#13,ca_county#8,ca_state#9] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/customer_address], PartitionFilters: [], PushedFilters: [IsNotNull(ca_address_sk), IsNotNull(ca_state), IsNotNull(ca_county)], ReadSchema: struct<ca_address_sk:int,ca_county:string,ca_state:string>
                         :     +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, true], input[1, string, true]))
                         :        +- *(9) Project [s_county#10, s_state#11]
-                        :           +- *(9) Filter (isnotnull(s_state#11) && isnotnull(s_county#10))
-                        :              +- *(9) FileScan parquet default.store[s_county#10,s_state#11] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_state), IsNotNull(s_county)], ReadSchema: struct<s_county:string,s_state:string>
+                        :           +- *(9) Filter (isnotnull(s_county#10) && isnotnull(s_state#11))
+                        :              +- *(9) FileScan parquet default.store[s_county#10,s_state#11] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_county), IsNotNull(s_state)], ReadSchema: struct<s_county:string,s_state:string>
                         +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)))
                            +- *(10) Project [d_date_sk#7]
-                              +- *(10) Filter (((isnotnull(d_month_seq#32) && (d_month_seq#32 >= Subquery subquery9542)) && (d_month_seq#32 <= Subquery subquery9543)) && isnotnull(d_date_sk#7))
-                                 :  :- Subquery subquery9542
+                              +- *(10) Filter (((isnotnull(d_month_seq#32) && (d_month_seq#32 >= Subquery subquery9804)) && (d_month_seq#32 <= Subquery subquery9805)) && isnotnull(d_date_sk#7))
+                                 :  :- Subquery subquery9804
                                  :  :  +- *(2) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
                                  :  :     +- Exchange hashpartitioning((d_month_seq + 1)#33, 5)
                                  :  :        +- *(1) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
                                  :  :           +- *(1) Project [(d_month_seq#32 + 1) AS (d_month_seq + 1)#33]
                                  :  :              +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
                                  :  :                 +- *(1) FileScan parquet default.date_dim[d_month_seq#32,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,1998), EqualTo(d_moy,12)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
-                                 :  +- Subquery subquery9543
+                                 :  +- Subquery subquery9805
                                  :     +- *(2) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
                                  :        +- Exchange hashpartitioning((d_month_seq + 3)#34, 5)
                                  :           +- *(1) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
@@ -72,14 +72,14 @@ TakeOrderedAndProject(limit=100, orderBy=[segment#1 ASC NULLS FIRST,num_customer
                                  :                 +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
                                  :                    +- *(1) FileScan parquet default.date_dim[d_month_seq#32,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,1998), EqualTo(d_moy,12)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
                                  +- *(10) FileScan parquet default.date_dim[d_date_sk#7,d_month_seq#32] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_month_seq:int>
-                                       :- Subquery subquery9542
+                                       :- Subquery subquery9804
                                        :  +- *(2) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
                                        :     +- Exchange hashpartitioning((d_month_seq + 1)#33, 5)
                                        :        +- *(1) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
                                        :           +- *(1) Project [(d_month_seq#32 + 1) AS (d_month_seq + 1)#33]
                                        :              +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
                                        :                 +- *(1) FileScan parquet default.date_dim[d_month_seq#32,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,1998), EqualTo(d_moy,12)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
-                                       +- Subquery subquery9543
+                                       +- Subquery subquery9805
                                           +- *(2) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
                                              +- Exchange hashpartitioning((d_month_seq + 3)#34, 5)
                                                 +- *(1) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])

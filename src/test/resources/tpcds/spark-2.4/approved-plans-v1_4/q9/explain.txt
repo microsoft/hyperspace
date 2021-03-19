@@ -1,104 +1,104 @@
 == Physical Plan ==
-*(1) Project [CASE WHEN (Subquery subquery1150 > 62316685) THEN Subquery subquery1151 ELSE Subquery subquery1152 END AS bucket1#1, CASE WHEN (Subquery subquery1154 > 19045798) THEN Subquery subquery1155 ELSE Subquery subquery1156 END AS bucket2#2, CASE WHEN (Subquery subquery1158 > 365541424) THEN Subquery subquery1159 ELSE Subquery subquery1160 END AS bucket3#3, CASE WHEN (Subquery subquery1162 > 216357808) THEN Subquery subquery1163 ELSE Subquery subquery1164 END AS bucket4#4, CASE WHEN (Subquery subquery1166 > 184483884) THEN Subquery subquery1167 ELSE Subquery subquery1168 END AS bucket5#5]
-:  :- Subquery subquery1150
+*(1) Project [CASE WHEN (Subquery subquery1153 > 62316685) THEN Subquery subquery1154 ELSE Subquery subquery1155 END AS bucket1#1, CASE WHEN (Subquery subquery1157 > 19045798) THEN Subquery subquery1158 ELSE Subquery subquery1159 END AS bucket2#2, CASE WHEN (Subquery subquery1161 > 365541424) THEN Subquery subquery1162 ELSE Subquery subquery1163 END AS bucket3#3, CASE WHEN (Subquery subquery1165 > 216357808) THEN Subquery subquery1166 ELSE Subquery subquery1167 END AS bucket4#4, CASE WHEN (Subquery subquery1169 > 184483884) THEN Subquery subquery1170 ELSE Subquery subquery1171 END AS bucket5#5]
+:  :- Subquery subquery1153
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 1)) && (ss_quantity#6 <= 20))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,1), LessThanOrEqual(ss_quantity,20)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery1151
+:  :- Subquery subquery1154
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 1)) && (ss_quantity#6 <= 20))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,1), LessThanOrEqual(ss_quantity,20)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery1152
+:  :- Subquery subquery1155
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 1)) && (ss_quantity#6 <= 20))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,1), LessThanOrEqual(ss_quantity,20)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery1154
+:  :- Subquery subquery1157
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 21)) && (ss_quantity#6 <= 40))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,21), LessThanOrEqual(ss_quantity,40)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery1155
+:  :- Subquery subquery1158
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 21)) && (ss_quantity#6 <= 40))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,21), LessThanOrEqual(ss_quantity,40)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery1156
+:  :- Subquery subquery1159
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 21)) && (ss_quantity#6 <= 40))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,21), LessThanOrEqual(ss_quantity,40)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery1158
+:  :- Subquery subquery1161
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 41)) && (ss_quantity#6 <= 60))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,41), LessThanOrEqual(ss_quantity,60)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery1159
+:  :- Subquery subquery1162
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 41)) && (ss_quantity#6 <= 60))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,41), LessThanOrEqual(ss_quantity,60)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery1160
+:  :- Subquery subquery1163
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 41)) && (ss_quantity#6 <= 60))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,41), LessThanOrEqual(ss_quantity,60)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery1162
+:  :- Subquery subquery1165
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 61)) && (ss_quantity#6 <= 80))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,61), LessThanOrEqual(ss_quantity,80)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery1163
+:  :- Subquery subquery1166
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 61)) && (ss_quantity#6 <= 80))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,61), LessThanOrEqual(ss_quantity,80)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  :- Subquery subquery1164
+:  :- Subquery subquery1167
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])
 :  :           +- *(1) Project [ss_net_paid#8]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 61)) && (ss_quantity#6 <= 80))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_net_paid#8] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,61), LessThanOrEqual(ss_quantity,80)], ReadSchema: struct<ss_quantity:int,ss_net_paid:decimal(7,2)>
-:  :- Subquery subquery1166
+:  :- Subquery subquery1169
 :  :  +- *(2) HashAggregate(keys=[], functions=[count(1)])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_count(1)])
 :  :           +- *(1) Project
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 81)) && (ss_quantity#6 <= 100))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,81), LessThanOrEqual(ss_quantity,100)], ReadSchema: struct<ss_quantity:int>
-:  :- Subquery subquery1167
+:  :- Subquery subquery1170
 :  :  +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :     +- Exchange SinglePartition
 :  :        +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_ext_discount_amt#7))])
 :  :           +- *(1) Project [ss_ext_discount_amt#7]
 :  :              +- *(1) Filter ((isnotnull(ss_quantity#6) && (ss_quantity#6 >= 81)) && (ss_quantity#6 <= 100))
 :  :                 +- *(1) FileScan parquet default.store_sales[ss_quantity#6,ss_ext_discount_amt#7] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_quantity), GreaterThanOrEqual(ss_quantity,81), LessThanOrEqual(ss_quantity,100)], ReadSchema: struct<ss_quantity:int,ss_ext_discount_amt:decimal(7,2)>
-:  +- Subquery subquery1168
+:  +- Subquery subquery1171
 :     +- *(2) HashAggregate(keys=[], functions=[avg(UnscaledValue(ss_net_paid#8))])
 :        +- Exchange SinglePartition
 :           +- *(1) HashAggregate(keys=[], functions=[partial_avg(UnscaledValue(ss_net_paid#8))])

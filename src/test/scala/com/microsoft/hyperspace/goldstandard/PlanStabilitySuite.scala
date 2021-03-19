@@ -260,7 +260,7 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
       .executedPlan
       .executeCollect()
       .map(_.getString(0))
-      .mkString("\n")
+      .mkString("\r\n")
   }
 }
 
