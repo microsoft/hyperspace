@@ -21,6 +21,10 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 
 import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
+/**
+ * MockSignatureProvider is used in TPCDS_Hyperspace plan stability suite. It returns the
+ * table name of the source TPCDS table on which the index is created.
+ */
 class MockSignatureProvider extends LogicalPlanSignatureProvider {
   override def signature(logicalPlan: LogicalPlan): Option[String] = {
     val leafPlans = logicalPlan.collectLeaves()

@@ -16,41 +16,34 @@
 
 package com.microsoft.hyperspace.goldstandard
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.example.SparkApp
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
-object IndexLogEntryCreator extends SparkApp {
-  def createIndex(str: String): Unit = {
-    val splits = str.split(";")
-    val name = splits(0)
+object IndexLogEntryCreator {
+  def createIndex(indexDefinition: String, spark: SparkSession): Unit = {
+    val splits = indexDefinition.split(";")
+    val indexName = splits(0)
+    val tableName = splits(1)
     val indexCols = splits(2).split(",").toSeq
     val includedCols = splits(3).split(",").toSeq
-    val config = IndexConfig(name, indexCols, includedCols)
-    val table = splits(1)
+    val indexConfig = IndexConfig(indexName, indexCols, includedCols)
     val indexPath = {
-      val baseResourcePath = {
-        // use the same way as `SQLQueryTestSuite` to get the resource path
-        java.nio.file.Paths.get("src", "test", "resources", "tpcds").toFile
-      }
-      PathUtils
-        .makeAbsolute(
-          new Path(baseResourcePath.toString, s"hyperspace/indexes/$name"),
-          new Configuration)
+      PathUtils.makeAbsolute(s"${spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH)}/$indexName")
     }
-    new IndexLogManagerImpl(indexPath)
-      .writeLog(0, toIndex(config, s"${indexPath.toString}/v__=0", table, spark))
+    val entry = getIndexLogEntry(indexConfig, indexPath, tableName, spark)
+    assert(new IndexLogManagerImpl(indexPath).writeLog(0, entry))
   }
 
-  def toRelation(sourceDf: DataFrame): Option[Relation] = {
+  private def toRelation(sourceDf: DataFrame): Relation = {
     val leafPlans = sourceDf.queryExecution.optimizedPlan.collectLeaves()
+    assert(leafPlans.size == 1)
     leafPlans.head match {
       case LogicalRelation(
           HadoopFsRelation(location: PartitioningAwareFileIndex, _, dataSchema, _, _, _),
@@ -59,30 +52,29 @@ object IndexLogEntryCreator extends SparkApp {
           _) =>
         val sourceDataProperties =
           Hdfs.Properties(Content.fromDirectory(location.rootPaths.head, new FileIdTracker))
-        val fileFormatName = "parquet"
 
-        Some(
-          Relation(
-            location.rootPaths.map(_.toString),
-            Hdfs(sourceDataProperties),
-            dataSchema.json,
-            fileFormatName,
-            Map.empty))
-      case _ => None
+        Relation(
+          location.rootPaths.map(_.toString),
+          Hdfs(sourceDataProperties),
+          dataSchema.json,
+          "parquet",
+          Map.empty)
+      case _ => throw HyperspaceException("Unexpected relation found.")
     }
   }
 
-  def toIndex(
+  private def getIndexLogEntry(
       config: IndexConfig,
-      path: String,
+      indexPath: Path,
       tableName: String,
       spark: SparkSession): IndexLogEntry = {
+    val indexRootPath = new Path(indexPath, "v__=0")
     val sourceDf = spark.table(tableName)
     val indexSchema = {
       val allCols = config.indexedColumns ++ config.includedColumns
       StructType(sourceDf.schema.filter(f => allCols.contains(f.name)))
     }
-    val relation: Relation = toRelation(sourceDf).get
+    val relation = toRelation(sourceDf)
 
     val sourcePlanProperties = SparkPlan.Properties(
       Seq(relation),
@@ -101,7 +93,7 @@ object IndexLogEntryCreator extends SparkApp {
           IndexLogEntry.schemaString(indexSchema),
           200,
           Map("hasParquetAsSourceFormat" -> "true"))),
-      Content(Directory.fromDirectory(new Path(path), new FileIdTracker)),
+      Content(Directory.fromDirectory(indexRootPath, new FileIdTracker)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
     entry.state = Constants.States.ACTIVE

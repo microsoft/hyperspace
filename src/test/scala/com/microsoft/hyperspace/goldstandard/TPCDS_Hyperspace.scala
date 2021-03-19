@@ -103,7 +103,7 @@ class TPCDS_Hyperspace extends PlanStabilitySuite {
         "JoinIndex49-index-40-p_promo_sk-4;promotion;p_promo_sk;p_channel_event,p_channel_email,p_channel_dmail,p_channel_tv"
       )
       // scalastyle:on filelinelengthchecker
-      indexes.foreach(createIndex)
+      indexes.foreach(createIndex(_, spark))
 
       // Enable cross join because some queries fail during query optimization phase.
       withSQLConf(
