@@ -49,7 +49,7 @@ class TPCDS_Hyperspace extends PlanStabilitySuite {
       val indexes = Seq(
         "dtindex;date_dim;d_date_sk;d_year",
         "ssIndex;store_sales;ss_sold_date_sk;ss_customer_sk")
-      indexes.foreach(createIndex)
+      indexes.foreach(createIndex(_, spark))
 
       // Enable cross join because some queries fail during query optimization phase.
       withSQLConf(
