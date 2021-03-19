@@ -1,12 +1,12 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[s_store_name#1 ASC NULLS FIRST,s_store_id#2 ASC NULLS FIRST,sun_sales#3 ASC NULLS FIRST,mon_sales#4 ASC NULLS FIRST,tue_sales#5 ASC NULLS FIRST,wed_sales#6 ASC NULLS FIRST,thu_sales#7 ASC NULLS FIRST,fri_sales#8 ASC NULLS FIRST,sat_sales#9 ASC NULLS FIRST], output=[s_store_name#1,s_store_id#2,sun_sales#3,mon_sales#4,tue_sales#5,wed_sales#6,thu_sales#7,fri_sales#8,sat_sales#9])
 +- *(8) HashAggregate(keys=[s_store_name#1, s_store_id#2], functions=[sum(UnscaledValue(CASE WHEN (d_day_name#10 = Sunday) THEN ss_sales_price#11 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#10 = Monday) THEN ss_sales_price#11 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#10 = Tuesday) THEN ss_sales_price#11 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#10 = Wednesday) THEN ss_sales_price#11 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#10 = Thursday) THEN ss_sales_price#11 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#10 = Friday) THEN ss_sales_price#11 ELSE null END)), sum(UnscaledValue(CASE WHEN (d_day_name#10 = Saturday) THEN ss_sales_price#11 ELSE null END))])
-   +- Exchange hashpartitioning(s_store_name#1, s_store_id#2, 200)
+   +- Exchange hashpartitioning(s_store_name#1, s_store_id#2, 5)
       +- *(7) HashAggregate(keys=[s_store_name#1, s_store_id#2], functions=[partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Sunday) THEN ss_sales_price#11 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Monday) THEN ss_sales_price#11 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Tuesday) THEN ss_sales_price#11 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Wednesday) THEN ss_sales_price#11 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Thursday) THEN ss_sales_price#11 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Friday) THEN ss_sales_price#11 ELSE null END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#10 = Saturday) THEN ss_sales_price#11 ELSE null END))])
          +- *(7) Project [d_day_name#10, ss_sales_price#11, s_store_id#2, s_store_name#1]
             +- *(7) SortMergeJoin [ss_store_sk#12], [s_store_sk#13], Inner
                :- *(4) Sort [ss_store_sk#12 ASC NULLS FIRST], false, 0
-               :  +- Exchange hashpartitioning(ss_store_sk#12, 200)
+               :  +- Exchange hashpartitioning(ss_store_sk#12, 5)
                :     +- *(3) Project [d_day_name#10, ss_store_sk#12, ss_sales_price#11]
                :        +- *(3) SortMergeJoin [d_date_sk#14], [ss_sold_date_sk#15], Inner
                :           :- *(1) Project [d_date_sk#14, d_day_name#10]
@@ -16,7 +16,7 @@ TakeOrderedAndProject(limit=100, orderBy=[s_store_name#1 ASC NULLS FIRST,s_store
                :              +- *(2) Filter (isnotnull(ss_sold_date_sk#15) && isnotnull(ss_store_sk#12))
                :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales[ss_sold_date_sk#15,ss_store_sk#12,ss_sales_price#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_sold_date_sk), IsNotNull(ss_store_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_store_sk:int,ss_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
                +- *(6) Sort [s_store_sk#13 ASC NULLS FIRST], false, 0
-                  +- Exchange hashpartitioning(s_store_sk#13, 200)
+                  +- Exchange hashpartitioning(s_store_sk#13, 5)
                      +- *(5) Project [s_store_sk#13, s_store_id#2, s_store_name#1]
                         +- *(5) Filter ((isnotnull(s_gmt_offset#17) && (s_gmt_offset#17 = -5.00)) && isnotnull(s_store_sk#13))
                            +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#13,s_store_id#2,s_store_name#1,s_gmt_offset#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_gmt_offset), EqualTo(s_gmt_offset,-5.00), IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int,s_store_id:string,s_store_name:string,s_gmt_offset:decimal(5,2)>

@@ -1,44 +1,44 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[w_state#1 ASC NULLS FIRST,i_item_id#2 ASC NULLS FIRST], output=[w_state#1,i_item_id#2,sales_before#3,sales_after#4])
 +- *(18) HashAggregate(keys=[w_state#1, i_item_id#2], functions=[sum(CASE WHEN (d_date#5 < 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END), sum(CASE WHEN (d_date#5 >= 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END)])
-   +- Exchange hashpartitioning(w_state#1, i_item_id#2, 200)
+   +- Exchange hashpartitioning(w_state#1, i_item_id#2, 5)
       +- *(17) HashAggregate(keys=[w_state#1, i_item_id#2], functions=[partial_sum(CASE WHEN (d_date#5 < 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END), partial_sum(CASE WHEN (d_date#5 >= 11027) THEN CheckOverflow((promote_precision(cast(cs_sales_price#6 as decimal(13,2))) - promote_precision(cast(coalesce(cast(cr_refunded_cash#7 as decimal(12,2)), 0.00) as decimal(13,2)))), DecimalType(13,2)) ELSE 0.00 END)])
          +- *(17) Project [cs_sales_price#6, cr_refunded_cash#7, w_state#1, i_item_id#2, d_date#5]
             +- *(17) SortMergeJoin [cs_sold_date_sk#8], [d_date_sk#9], Inner
                :- *(14) Sort [cs_sold_date_sk#8 ASC NULLS FIRST], false, 0
-               :  +- Exchange hashpartitioning(cs_sold_date_sk#8, 200)
+               :  +- Exchange hashpartitioning(cs_sold_date_sk#8, 5)
                :     +- *(13) Project [cs_sold_date_sk#8, cs_sales_price#6, cr_refunded_cash#7, w_state#1, i_item_id#2]
                :        +- *(13) SortMergeJoin [cs_item_sk#10], [i_item_sk#11], Inner
                :           :- *(10) Sort [cs_item_sk#10 ASC NULLS FIRST], false, 0
-               :           :  +- Exchange hashpartitioning(cs_item_sk#10, 200)
+               :           :  +- Exchange hashpartitioning(cs_item_sk#10, 5)
                :           :     +- *(9) Project [cs_sold_date_sk#8, cs_item_sk#10, cs_sales_price#6, cr_refunded_cash#7, w_state#1]
                :           :        +- *(9) SortMergeJoin [cs_warehouse_sk#12], [w_warehouse_sk#13], Inner
                :           :           :- *(6) Sort [cs_warehouse_sk#12 ASC NULLS FIRST], false, 0
-               :           :           :  +- Exchange hashpartitioning(cs_warehouse_sk#12, 200)
+               :           :           :  +- Exchange hashpartitioning(cs_warehouse_sk#12, 5)
                :           :           :     +- *(5) Project [cs_sold_date_sk#8, cs_warehouse_sk#12, cs_item_sk#10, cs_sales_price#6, cr_refunded_cash#7]
                :           :           :        +- SortMergeJoin [cs_order_number#14, cs_item_sk#10], [cr_order_number#15, cr_item_sk#16], LeftOuter
                :           :           :           :- *(2) Sort [cs_order_number#14 ASC NULLS FIRST, cs_item_sk#10 ASC NULLS FIRST], false, 0
-               :           :           :           :  +- Exchange hashpartitioning(cs_order_number#14, cs_item_sk#10, 200)
+               :           :           :           :  +- Exchange hashpartitioning(cs_order_number#14, cs_item_sk#10, 5)
                :           :           :           :     +- *(1) Project [cs_sold_date_sk#8, cs_warehouse_sk#12, cs_item_sk#10, cs_order_number#14, cs_sales_price#6]
                :           :           :           :        +- *(1) Filter ((isnotnull(cs_warehouse_sk#12) && isnotnull(cs_item_sk#10)) && isnotnull(cs_sold_date_sk#8))
                :           :           :           :           +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex26-index-6-cs_sold_date_sk-26, LogVersion: 0) default.catalog_sales[cs_sold_date_sk#8,cs_warehouse_sk#12,cs_item_sk#10,cs_order_number#14,cs_sales_price#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cs_warehouse_sk), IsNotNull(cs_item_sk), IsNotNull(cs_sold_date_sk)], ReadSchema: struct<cs_sold_date_sk:int,cs_warehouse_sk:int,cs_item_sk:int,cs_order_number:int,cs_sales_price:...
                :           :           :           +- *(4) Sort [cr_order_number#15 ASC NULLS FIRST, cr_item_sk#16 ASC NULLS FIRST], false, 0
-               :           :           :              +- Exchange hashpartitioning(cr_order_number#15, cr_item_sk#16, 200)
+               :           :           :              +- Exchange hashpartitioning(cr_order_number#15, cr_item_sk#16, 5)
                :           :           :                 +- *(3) Project [cr_item_sk#16, cr_order_number#15, cr_refunded_cash#7]
                :           :           :                    +- *(3) Filter (isnotnull(cr_order_number#15) && isnotnull(cr_item_sk#16))
                :           :           :                       +- *(3) FileScan Hyperspace(Type: CI, Name: JoinIndex47-index-26-cr_item_sk-8, LogVersion: 0) default.catalog_returns[cr_item_sk#16,cr_order_number#15,cr_refunded_cash#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cr_order_number), IsNotNull(cr_item_sk)], ReadSchema: struct<cr_item_sk:int,cr_order_number:int,cr_refunded_cash:decimal(7,2)>
                :           :           +- *(8) Sort [w_warehouse_sk#13 ASC NULLS FIRST], false, 0
-               :           :              +- Exchange hashpartitioning(w_warehouse_sk#13, 200)
+               :           :              +- Exchange hashpartitioning(w_warehouse_sk#13, 5)
                :           :                 +- *(7) Project [w_warehouse_sk#13, w_state#1]
                :           :                    +- *(7) Filter isnotnull(w_warehouse_sk#13)
                :           :                       +- *(7) FileScan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse[w_warehouse_sk#13,w_state#1] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int,w_state:string>
                :           +- *(12) Sort [i_item_sk#11 ASC NULLS FIRST], false, 0
-               :              +- Exchange hashpartitioning(i_item_sk#11, 200)
+               :              +- Exchange hashpartitioning(i_item_sk#11, 5)
                :                 +- *(11) Project [i_item_sk#11, i_item_id#2]
                :                    +- *(11) Filter (((isnotnull(i_current_price#17) && (i_current_price#17 >= 0.99)) && (i_current_price#17 <= 1.49)) && isnotnull(i_item_sk#11))
                :                       +- *(11) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#11,i_item_id#2,i_current_price#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_current_price), GreaterThanOrEqual(i_current_price,0.99), LessThanOrEqual(i_current_..., ReadSchema: struct<i_item_sk:int,i_item_id:string,i_current_price:decimal(7,2)>
                +- *(16) Sort [d_date_sk#9 ASC NULLS FIRST], false, 0
-                  +- Exchange hashpartitioning(d_date_sk#9, 200)
+                  +- Exchange hashpartitioning(d_date_sk#9, 5)
                      +- *(15) Project [d_date_sk#9, d_date#5]
                         +- *(15) Filter (((isnotnull(d_date#5) && (d_date#5 >= 10997)) && (d_date#5 <= 11057)) && isnotnull(d_date_sk#9))
                            +- *(15) FileScan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim[d_date_sk#9,d_date#5] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_date), GreaterThanOrEqual(d_date,2000-02-10), LessThanOrEqual(d_date,2000-04-10), Is..., ReadSchema: struct<d_date_sk:int,d_date:date>

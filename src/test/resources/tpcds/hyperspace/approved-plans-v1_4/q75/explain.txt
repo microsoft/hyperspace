@@ -3,26 +3,26 @@ TakeOrderedAndProject(limit=100, orderBy=[sales_cnt_diff#1 ASC NULLS FIRST], out
 +- *(79) Project [d_year#11 AS prev_year#2, d_year#12 AS year#3, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#13 AS prev_yr_cnt#8, sales_cnt#14 AS curr_yr_cnt#9, (sales_cnt#14 - sales_cnt#13) AS sales_cnt_diff#1, CheckOverflow((promote_precision(cast(sales_amt#15 as decimal(19,2))) - promote_precision(cast(sales_amt#16 as decimal(19,2)))), DecimalType(19,2)) AS sales_amt_diff#10]
    +- *(79) SortMergeJoin [i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7], [i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Inner, (CheckOverflow((promote_precision(cast(sales_cnt#14 as decimal(17,2))) / promote_precision(cast(sales_cnt#13 as decimal(17,2)))), DecimalType(37,20)) < 0.90000000000000000000)
       :- *(39) Sort [i_brand_id#4 ASC NULLS FIRST, i_class_id#5 ASC NULLS FIRST, i_category_id#6 ASC NULLS FIRST, i_manufact_id#7 ASC NULLS FIRST], false, 0
-      :  +- Exchange hashpartitioning(i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, 200)
+      :  +- Exchange hashpartitioning(i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, 5)
       :     +- *(38) HashAggregate(keys=[d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7], functions=[sum(cast(sales_cnt#21 as bigint)), sum(UnscaledValue(sales_amt#22))])
-      :        +- Exchange hashpartitioning(d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, 200)
+      :        +- Exchange hashpartitioning(d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, 5)
       :           +- *(37) HashAggregate(keys=[d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7], functions=[partial_sum(cast(sales_cnt#21 as bigint)), partial_sum(UnscaledValue(sales_amt#22))])
       :              +- *(37) HashAggregate(keys=[d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22], functions=[])
-      :                 +- Exchange hashpartitioning(d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22, 200)
+      :                 +- Exchange hashpartitioning(d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22, 5)
       :                    +- *(36) HashAggregate(keys=[d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22], functions=[])
       :                       +- Union
       :                          :- *(24) HashAggregate(keys=[d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22], functions=[])
-      :                          :  +- Exchange hashpartitioning(d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22, 200)
+      :                          :  +- Exchange hashpartitioning(d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22, 5)
       :                          :     +- *(23) HashAggregate(keys=[d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, sales_cnt#21, sales_amt#22], functions=[])
       :                          :        +- Union
       :                          :           :- *(11) Project [d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, (cs_quantity#23 - coalesce(cr_return_quantity#24, 0)) AS sales_cnt#21, CheckOverflow((promote_precision(cast(cs_ext_sales_price#25 as decimal(8,2))) - promote_precision(cast(coalesce(cr_return_amount#26, 0.00) as decimal(8,2)))), DecimalType(8,2)) AS sales_amt#22]
       :                          :           :  +- SortMergeJoin [cs_order_number#27, cs_item_sk#28], [cr_order_number#29, cr_item_sk#30], LeftOuter
       :                          :           :     :- *(8) Sort [cs_order_number#27 ASC NULLS FIRST, cs_item_sk#28 ASC NULLS FIRST], false, 0
-      :                          :           :     :  +- Exchange hashpartitioning(cs_order_number#27, cs_item_sk#28, 200)
+      :                          :           :     :  +- Exchange hashpartitioning(cs_order_number#27, cs_item_sk#28, 5)
       :                          :           :     :     +- *(7) Project [cs_item_sk#28, cs_order_number#27, cs_quantity#23, cs_ext_sales_price#25, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, d_year#12]
       :                          :           :     :        +- *(7) SortMergeJoin [cs_sold_date_sk#31], [d_date_sk#32], Inner
       :                          :           :     :           :- *(4) Sort [cs_sold_date_sk#31 ASC NULLS FIRST], false, 0
-      :                          :           :     :           :  +- Exchange hashpartitioning(cs_sold_date_sk#31, 200)
+      :                          :           :     :           :  +- Exchange hashpartitioning(cs_sold_date_sk#31, 5)
       :                          :           :     :           :     +- *(3) Project [cs_sold_date_sk#31, cs_item_sk#28, cs_order_number#27, cs_quantity#23, cs_ext_sales_price#25, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7]
       :                          :           :     :           :        +- *(3) SortMergeJoin [cs_item_sk#28], [i_item_sk#33], Inner
       :                          :           :     :           :           :- *(1) Project [cs_sold_date_sk#31, cs_item_sk#28, cs_order_number#27, cs_quantity#23, cs_ext_sales_price#25]
@@ -32,23 +32,23 @@ TakeOrderedAndProject(limit=100, orderBy=[sales_cnt_diff#1 ASC NULLS FIRST], out
       :                          :           :     :           :              +- *(2) Filter ((((((isnotnull(i_category#34) && (i_category#34 = Books)) && isnotnull(i_item_sk#33)) && isnotnull(i_class_id#5)) && isnotnull(i_brand_id#4)) && isnotnull(i_category_id#6)) && isnotnull(i_manufact_id#7))
       :                          :           :     :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#33,i_brand_id#4,i_class_id#5,i_category_id#6,i_category#34,i_manufact_id#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_category), EqualTo(i_category,Books), IsNotNull(i_item_sk), IsNotNull(i_class_id), I..., ReadSchema: struct<i_item_sk:int,i_brand_id:int,i_class_id:int,i_category_id:int,i_category:string,i_manufact..., SelectedBucketsCount: 200 out of 200
       :                          :           :     :           +- *(6) Sort [d_date_sk#32 ASC NULLS FIRST], false, 0
-      :                          :           :     :              +- Exchange hashpartitioning(d_date_sk#32, 200)
+      :                          :           :     :              +- Exchange hashpartitioning(d_date_sk#32, 5)
       :                          :           :     :                 +- *(5) Project [d_date_sk#32, d_year#12]
       :                          :           :     :                    +- *(5) Filter ((isnotnull(d_year#12) && (d_year#12 = 2002)) && isnotnull(d_date_sk#32))
       :                          :           :     :                       +- *(5) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#32,d_year#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2002), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
       :                          :           :     +- *(10) Sort [cr_order_number#29 ASC NULLS FIRST, cr_item_sk#30 ASC NULLS FIRST], false, 0
-      :                          :           :        +- Exchange hashpartitioning(cr_order_number#29, cr_item_sk#30, 200)
+      :                          :           :        +- Exchange hashpartitioning(cr_order_number#29, cr_item_sk#30, 5)
       :                          :           :           +- *(9) Project [cr_item_sk#30, cr_order_number#29, cr_return_quantity#24, cr_return_amount#26]
       :                          :           :              +- *(9) Filter (isnotnull(cr_item_sk#30) && isnotnull(cr_order_number#29))
       :                          :           :                 +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex47-index-26-cr_item_sk-8, LogVersion: 0) default.catalog_returns[cr_item_sk#30,cr_order_number#29,cr_return_quantity#24,cr_return_amount#26] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cr_item_sk), IsNotNull(cr_order_number)], ReadSchema: struct<cr_item_sk:int,cr_order_number:int,cr_return_quantity:int,cr_return_amount:decimal(7,2)>
       :                          :           +- *(22) Project [d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, (ss_quantity#35 - coalesce(sr_return_quantity#36, 0)) AS sales_cnt#37, CheckOverflow((promote_precision(cast(ss_ext_sales_price#38 as decimal(8,2))) - promote_precision(cast(coalesce(sr_return_amt#39, 0.00) as decimal(8,2)))), DecimalType(8,2)) AS sales_amt#40]
       :                          :              +- SortMergeJoin [cast(ss_ticket_number#41 as bigint), cast(ss_item_sk#42 as bigint)], [sr_ticket_number#43, sr_item_sk#44], LeftOuter
       :                          :                 :- *(19) Sort [cast(ss_ticket_number#41 as bigint) ASC NULLS FIRST, cast(ss_item_sk#42 as bigint) ASC NULLS FIRST], false, 0
-      :                          :                 :  +- Exchange hashpartitioning(cast(ss_ticket_number#41 as bigint), cast(ss_item_sk#42 as bigint), 200)
+      :                          :                 :  +- Exchange hashpartitioning(cast(ss_ticket_number#41 as bigint), cast(ss_item_sk#42 as bigint), 5)
       :                          :                 :     +- *(18) Project [ss_item_sk#42, ss_ticket_number#41, ss_quantity#35, ss_ext_sales_price#38, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, d_year#12]
       :                          :                 :        +- *(18) SortMergeJoin [ss_sold_date_sk#45], [d_date_sk#32], Inner
       :                          :                 :           :- *(15) Sort [ss_sold_date_sk#45 ASC NULLS FIRST], false, 0
-      :                          :                 :           :  +- Exchange hashpartitioning(ss_sold_date_sk#45, 200)
+      :                          :                 :           :  +- Exchange hashpartitioning(ss_sold_date_sk#45, 5)
       :                          :                 :           :     +- *(14) Project [ss_sold_date_sk#45, ss_item_sk#42, ss_ticket_number#41, ss_quantity#35, ss_ext_sales_price#38, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7]
       :                          :                 :           :        +- *(14) SortMergeJoin [ss_item_sk#42], [i_item_sk#33], Inner
       :                          :                 :           :           :- *(12) Project [ss_sold_date_sk#45, ss_item_sk#42, ss_ticket_number#41, ss_quantity#35, ss_ext_sales_price#38]
@@ -58,20 +58,20 @@ TakeOrderedAndProject(limit=100, orderBy=[sales_cnt_diff#1 ASC NULLS FIRST], out
       :                          :                 :           :              +- *(13) Filter ((((((isnotnull(i_category#34) && (i_category#34 = Books)) && isnotnull(i_item_sk#33)) && isnotnull(i_class_id#5)) && isnotnull(i_brand_id#4)) && isnotnull(i_category_id#6)) && isnotnull(i_manufact_id#7))
       :                          :                 :           :                 +- *(13) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#33,i_brand_id#4,i_class_id#5,i_category_id#6,i_category#34,i_manufact_id#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_category), EqualTo(i_category,Books), IsNotNull(i_item_sk), IsNotNull(i_class_id), I..., ReadSchema: struct<i_item_sk:int,i_brand_id:int,i_class_id:int,i_category_id:int,i_category:string,i_manufact..., SelectedBucketsCount: 200 out of 200
       :                          :                 :           +- *(17) Sort [d_date_sk#32 ASC NULLS FIRST], false, 0
-      :                          :                 :              +- ReusedExchange [d_date_sk#32, d_year#12], Exchange hashpartitioning(d_date_sk#32, 200)
+      :                          :                 :              +- ReusedExchange [d_date_sk#32, d_year#12], Exchange hashpartitioning(d_date_sk#32, 5)
       :                          :                 +- *(21) Sort [sr_ticket_number#43 ASC NULLS FIRST, sr_item_sk#44 ASC NULLS FIRST], false, 0
-      :                          :                    +- Exchange hashpartitioning(sr_ticket_number#43, sr_item_sk#44, 200)
+      :                          :                    +- Exchange hashpartitioning(sr_ticket_number#43, sr_item_sk#44, 5)
       :                          :                       +- *(20) Project [sr_item_sk#44, sr_ticket_number#43, sr_return_quantity#36, sr_return_amt#39]
       :                          :                          +- *(20) Filter (isnotnull(sr_ticket_number#43) && isnotnull(sr_item_sk#44))
       :                          :                             +- *(20) FileScan Hyperspace(Type: CI, Name: JoinIndex21-index-20-sr_item_sk-7, LogVersion: 0) default.store_returns[sr_item_sk#44,sr_ticket_number#43,sr_return_quantity#36,sr_return_amt#39] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(sr_ticket_number), IsNotNull(sr_item_sk)], ReadSchema: struct<sr_item_sk:bigint,sr_ticket_number:bigint,sr_return_quantity:int,sr_return_amt:decimal(7,2)>
       :                          +- *(35) Project [d_year#12, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, (ws_quantity#46 - coalesce(wr_return_quantity#47, 0)) AS sales_cnt#48, CheckOverflow((promote_precision(cast(ws_ext_sales_price#49 as decimal(8,2))) - promote_precision(cast(coalesce(wr_return_amt#50, 0.00) as decimal(8,2)))), DecimalType(8,2)) AS sales_amt#51]
       :                             +- SortMergeJoin [cast(ws_order_number#52 as bigint), cast(ws_item_sk#53 as bigint)], [wr_order_number#54, wr_item_sk#55], LeftOuter
       :                                :- *(32) Sort [cast(ws_order_number#52 as bigint) ASC NULLS FIRST, cast(ws_item_sk#53 as bigint) ASC NULLS FIRST], false, 0
-      :                                :  +- Exchange hashpartitioning(cast(ws_order_number#52 as bigint), cast(ws_item_sk#53 as bigint), 200)
+      :                                :  +- Exchange hashpartitioning(cast(ws_order_number#52 as bigint), cast(ws_item_sk#53 as bigint), 5)
       :                                :     +- *(31) Project [ws_item_sk#53, ws_order_number#52, ws_quantity#46, ws_ext_sales_price#49, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7, d_year#12]
       :                                :        +- *(31) SortMergeJoin [ws_sold_date_sk#56], [d_date_sk#32], Inner
       :                                :           :- *(28) Sort [ws_sold_date_sk#56 ASC NULLS FIRST], false, 0
-      :                                :           :  +- Exchange hashpartitioning(ws_sold_date_sk#56, 200)
+      :                                :           :  +- Exchange hashpartitioning(ws_sold_date_sk#56, 5)
       :                                :           :     +- *(27) Project [ws_sold_date_sk#56, ws_item_sk#53, ws_order_number#52, ws_quantity#46, ws_ext_sales_price#49, i_brand_id#4, i_class_id#5, i_category_id#6, i_manufact_id#7]
       :                                :           :        +- *(27) SortMergeJoin [ws_item_sk#53], [i_item_sk#33], Inner
       :                                :           :           :- *(25) Project [ws_sold_date_sk#56, ws_item_sk#53, ws_order_number#52, ws_quantity#46, ws_ext_sales_price#49]
@@ -81,61 +81,61 @@ TakeOrderedAndProject(limit=100, orderBy=[sales_cnt_diff#1 ASC NULLS FIRST], out
       :                                :           :              +- *(26) Filter ((((((isnotnull(i_category#34) && (i_category#34 = Books)) && isnotnull(i_item_sk#33)) && isnotnull(i_class_id#5)) && isnotnull(i_brand_id#4)) && isnotnull(i_category_id#6)) && isnotnull(i_manufact_id#7))
       :                                :           :                 +- *(26) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#33,i_brand_id#4,i_class_id#5,i_category_id#6,i_category#34,i_manufact_id#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_category), EqualTo(i_category,Books), IsNotNull(i_item_sk), IsNotNull(i_class_id), I..., ReadSchema: struct<i_item_sk:int,i_brand_id:int,i_class_id:int,i_category_id:int,i_category:string,i_manufact..., SelectedBucketsCount: 200 out of 200
       :                                :           +- *(30) Sort [d_date_sk#32 ASC NULLS FIRST], false, 0
-      :                                :              +- ReusedExchange [d_date_sk#32, d_year#12], Exchange hashpartitioning(d_date_sk#32, 200)
+      :                                :              +- ReusedExchange [d_date_sk#32, d_year#12], Exchange hashpartitioning(d_date_sk#32, 5)
       :                                +- *(34) Sort [wr_order_number#54 ASC NULLS FIRST, wr_item_sk#55 ASC NULLS FIRST], false, 0
-      :                                   +- Exchange hashpartitioning(wr_order_number#54, wr_item_sk#55, 200)
+      :                                   +- Exchange hashpartitioning(wr_order_number#54, wr_item_sk#55, 5)
       :                                      +- *(33) Project [wr_item_sk#55, wr_order_number#54, wr_return_quantity#47, wr_return_amt#50]
       :                                         +- *(33) Filter (isnotnull(wr_order_number#54) && isnotnull(wr_item_sk#55))
       :                                            +- *(33) FileScan Hyperspace(Type: CI, Name: JoinIndex41-index-36-wr_item_sk-11, LogVersion: 0) default.web_returns[wr_item_sk#55,wr_order_number#54,wr_return_quantity#47,wr_return_amt#50] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(wr_order_number), IsNotNull(wr_item_sk)], ReadSchema: struct<wr_item_sk:bigint,wr_order_number:bigint,wr_return_quantity:int,wr_return_amt:decimal(7,2)>
       +- *(78) Sort [i_brand_id#17 ASC NULLS FIRST, i_class_id#18 ASC NULLS FIRST, i_category_id#19 ASC NULLS FIRST, i_manufact_id#20 ASC NULLS FIRST], false, 0
-         +- Exchange hashpartitioning(i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, 200)
+         +- Exchange hashpartitioning(i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, 5)
             +- *(77) HashAggregate(keys=[d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], functions=[sum(cast(sales_cnt#21 as bigint)), sum(UnscaledValue(sales_amt#22))])
-               +- Exchange hashpartitioning(d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, 200)
+               +- Exchange hashpartitioning(d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, 5)
                   +- *(76) HashAggregate(keys=[d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], functions=[partial_sum(cast(sales_cnt#21 as bigint)), partial_sum(UnscaledValue(sales_amt#22))])
                      +- *(76) HashAggregate(keys=[d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22], functions=[])
-                        +- Exchange hashpartitioning(d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22, 200)
+                        +- Exchange hashpartitioning(d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22, 5)
                            +- *(75) HashAggregate(keys=[d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22], functions=[])
                               +- Union
                                  :- *(63) HashAggregate(keys=[d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22], functions=[])
-                                 :  +- Exchange hashpartitioning(d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22, 200)
+                                 :  +- Exchange hashpartitioning(d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22, 5)
                                  :     +- *(62) HashAggregate(keys=[d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, sales_cnt#21, sales_amt#22], functions=[])
                                  :        +- Union
                                  :           :- *(50) Project [d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, (cs_quantity#23 - coalesce(cr_return_quantity#24, 0)) AS sales_cnt#21, CheckOverflow((promote_precision(cast(cs_ext_sales_price#25 as decimal(8,2))) - promote_precision(cast(coalesce(cr_return_amount#26, 0.00) as decimal(8,2)))), DecimalType(8,2)) AS sales_amt#22]
                                  :           :  +- SortMergeJoin [cs_order_number#27, cs_item_sk#28], [cr_order_number#29, cr_item_sk#30], LeftOuter
                                  :           :     :- *(47) Sort [cs_order_number#27 ASC NULLS FIRST, cs_item_sk#28 ASC NULLS FIRST], false, 0
-                                 :           :     :  +- Exchange hashpartitioning(cs_order_number#27, cs_item_sk#28, 200)
+                                 :           :     :  +- Exchange hashpartitioning(cs_order_number#27, cs_item_sk#28, 5)
                                  :           :     :     +- *(46) Project [cs_item_sk#28, cs_order_number#27, cs_quantity#23, cs_ext_sales_price#25, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, d_year#11]
                                  :           :     :        +- *(46) SortMergeJoin [cs_sold_date_sk#31], [d_date_sk#57], Inner
                                  :           :     :           :- *(43) Sort [cs_sold_date_sk#31 ASC NULLS FIRST], false, 0
-                                 :           :     :           :  +- ReusedExchange [cs_sold_date_sk#31, cs_item_sk#28, cs_order_number#27, cs_quantity#23, cs_ext_sales_price#25, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Exchange hashpartitioning(cs_sold_date_sk#31, 200)
+                                 :           :     :           :  +- ReusedExchange [cs_sold_date_sk#31, cs_item_sk#28, cs_order_number#27, cs_quantity#23, cs_ext_sales_price#25, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Exchange hashpartitioning(cs_sold_date_sk#31, 5)
                                  :           :     :           +- *(45) Sort [d_date_sk#57 ASC NULLS FIRST], false, 0
-                                 :           :     :              +- Exchange hashpartitioning(d_date_sk#57, 200)
+                                 :           :     :              +- Exchange hashpartitioning(d_date_sk#57, 5)
                                  :           :     :                 +- *(44) Project [d_date_sk#57, d_year#11]
                                  :           :     :                    +- *(44) Filter ((isnotnull(d_year#11) && (d_year#11 = 2001)) && isnotnull(d_date_sk#57))
                                  :           :     :                       +- *(44) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#57,d_year#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
                                  :           :     +- *(49) Sort [cr_order_number#29 ASC NULLS FIRST, cr_item_sk#30 ASC NULLS FIRST], false, 0
-                                 :           :        +- ReusedExchange [cr_item_sk#30, cr_order_number#29, cr_return_quantity#24, cr_return_amount#26], Exchange hashpartitioning(cr_order_number#29, cr_item_sk#30, 200)
+                                 :           :        +- ReusedExchange [cr_item_sk#30, cr_order_number#29, cr_return_quantity#24, cr_return_amount#26], Exchange hashpartitioning(cr_order_number#29, cr_item_sk#30, 5)
                                  :           +- *(61) Project [d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, (ss_quantity#35 - coalesce(sr_return_quantity#36, 0)) AS sales_cnt#37, CheckOverflow((promote_precision(cast(ss_ext_sales_price#38 as decimal(8,2))) - promote_precision(cast(coalesce(sr_return_amt#39, 0.00) as decimal(8,2)))), DecimalType(8,2)) AS sales_amt#40]
                                  :              +- SortMergeJoin [cast(ss_ticket_number#41 as bigint), cast(ss_item_sk#42 as bigint)], [sr_ticket_number#43, sr_item_sk#44], LeftOuter
                                  :                 :- *(58) Sort [cast(ss_ticket_number#41 as bigint) ASC NULLS FIRST, cast(ss_item_sk#42 as bigint) ASC NULLS FIRST], false, 0
-                                 :                 :  +- Exchange hashpartitioning(cast(ss_ticket_number#41 as bigint), cast(ss_item_sk#42 as bigint), 200)
+                                 :                 :  +- Exchange hashpartitioning(cast(ss_ticket_number#41 as bigint), cast(ss_item_sk#42 as bigint), 5)
                                  :                 :     +- *(57) Project [ss_item_sk#42, ss_ticket_number#41, ss_quantity#35, ss_ext_sales_price#38, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, d_year#11]
                                  :                 :        +- *(57) SortMergeJoin [ss_sold_date_sk#45], [d_date_sk#57], Inner
                                  :                 :           :- *(54) Sort [ss_sold_date_sk#45 ASC NULLS FIRST], false, 0
-                                 :                 :           :  +- ReusedExchange [ss_sold_date_sk#45, ss_item_sk#42, ss_ticket_number#41, ss_quantity#35, ss_ext_sales_price#38, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Exchange hashpartitioning(ss_sold_date_sk#45, 200)
+                                 :                 :           :  +- ReusedExchange [ss_sold_date_sk#45, ss_item_sk#42, ss_ticket_number#41, ss_quantity#35, ss_ext_sales_price#38, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Exchange hashpartitioning(ss_sold_date_sk#45, 5)
                                  :                 :           +- *(56) Sort [d_date_sk#57 ASC NULLS FIRST], false, 0
-                                 :                 :              +- ReusedExchange [d_date_sk#57, d_year#11], Exchange hashpartitioning(d_date_sk#57, 200)
+                                 :                 :              +- ReusedExchange [d_date_sk#57, d_year#11], Exchange hashpartitioning(d_date_sk#57, 5)
                                  :                 +- *(60) Sort [sr_ticket_number#43 ASC NULLS FIRST, sr_item_sk#44 ASC NULLS FIRST], false, 0
-                                 :                    +- ReusedExchange [sr_item_sk#44, sr_ticket_number#43, sr_return_quantity#36, sr_return_amt#39], Exchange hashpartitioning(sr_ticket_number#43, sr_item_sk#44, 200)
+                                 :                    +- ReusedExchange [sr_item_sk#44, sr_ticket_number#43, sr_return_quantity#36, sr_return_amt#39], Exchange hashpartitioning(sr_ticket_number#43, sr_item_sk#44, 5)
                                  +- *(74) Project [d_year#11, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, (ws_quantity#46 - coalesce(wr_return_quantity#47, 0)) AS sales_cnt#48, CheckOverflow((promote_precision(cast(ws_ext_sales_price#49 as decimal(8,2))) - promote_precision(cast(coalesce(wr_return_amt#50, 0.00) as decimal(8,2)))), DecimalType(8,2)) AS sales_amt#51]
                                     +- SortMergeJoin [cast(ws_order_number#52 as bigint), cast(ws_item_sk#53 as bigint)], [wr_order_number#54, wr_item_sk#55], LeftOuter
                                        :- *(71) Sort [cast(ws_order_number#52 as bigint) ASC NULLS FIRST, cast(ws_item_sk#53 as bigint) ASC NULLS FIRST], false, 0
-                                       :  +- Exchange hashpartitioning(cast(ws_order_number#52 as bigint), cast(ws_item_sk#53 as bigint), 200)
+                                       :  +- Exchange hashpartitioning(cast(ws_order_number#52 as bigint), cast(ws_item_sk#53 as bigint), 5)
                                        :     +- *(70) Project [ws_item_sk#53, ws_order_number#52, ws_quantity#46, ws_ext_sales_price#49, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20, d_year#11]
                                        :        +- *(70) SortMergeJoin [ws_sold_date_sk#56], [d_date_sk#57], Inner
                                        :           :- *(67) Sort [ws_sold_date_sk#56 ASC NULLS FIRST], false, 0
-                                       :           :  +- ReusedExchange [ws_sold_date_sk#56, ws_item_sk#53, ws_order_number#52, ws_quantity#46, ws_ext_sales_price#49, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Exchange hashpartitioning(ws_sold_date_sk#56, 200)
+                                       :           :  +- ReusedExchange [ws_sold_date_sk#56, ws_item_sk#53, ws_order_number#52, ws_quantity#46, ws_ext_sales_price#49, i_brand_id#17, i_class_id#18, i_category_id#19, i_manufact_id#20], Exchange hashpartitioning(ws_sold_date_sk#56, 5)
                                        :           +- *(69) Sort [d_date_sk#57 ASC NULLS FIRST], false, 0
-                                       :              +- ReusedExchange [d_date_sk#57, d_year#11], Exchange hashpartitioning(d_date_sk#57, 200)
+                                       :              +- ReusedExchange [d_date_sk#57, d_year#11], Exchange hashpartitioning(d_date_sk#57, 5)
                                        +- *(73) Sort [wr_order_number#54 ASC NULLS FIRST, wr_item_sk#55 ASC NULLS FIRST], false, 0
-                                          +- ReusedExchange [wr_item_sk#55, wr_order_number#54, wr_return_quantity#47, wr_return_amt#50], Exchange hashpartitioning(wr_order_number#54, wr_item_sk#55, 200)
+                                          +- ReusedExchange [wr_item_sk#55, wr_order_number#54, wr_return_quantity#47, wr_return_amt#50], Exchange hashpartitioning(wr_order_number#54, wr_item_sk#55, 5)

@@ -3,24 +3,24 @@
 +- Exchange SinglePartition
    +- *(32) HashAggregate(keys=[], functions=[partial_count(1)])
       +- *(32) HashAggregate(keys=[c_last_name#1, c_first_name#2, d_date#3], functions=[])
-         +- Exchange hashpartitioning(c_last_name#1, c_first_name#2, d_date#3, 200)
+         +- Exchange hashpartitioning(c_last_name#1, c_first_name#2, d_date#3, 5)
             +- *(31) HashAggregate(keys=[c_last_name#1, c_first_name#2, d_date#3], functions=[])
                +- SortMergeJoin [coalesce(c_last_name#1, ), coalesce(c_first_name#2, ), coalesce(d_date#3, 0)], [coalesce(c_last_name#4, ), coalesce(c_first_name#5, ), coalesce(d_date#6, 0)], LeftAnti, (((c_last_name#1 <=> c_last_name#4) && (c_first_name#2 <=> c_first_name#5)) && (d_date#3 <=> d_date#6))
                   :- *(21) Sort [coalesce(c_last_name#1, ) ASC NULLS FIRST, coalesce(c_first_name#2, ) ASC NULLS FIRST, coalesce(d_date#3, 0) ASC NULLS FIRST], false, 0
-                  :  +- Exchange hashpartitioning(coalesce(c_last_name#1, ), coalesce(c_first_name#2, ), coalesce(d_date#3, 0), 200)
+                  :  +- Exchange hashpartitioning(coalesce(c_last_name#1, ), coalesce(c_first_name#2, ), coalesce(d_date#3, 0), 5)
                   :     +- *(20) HashAggregate(keys=[c_last_name#1, c_first_name#2, d_date#3], functions=[])
-                  :        +- Exchange hashpartitioning(c_last_name#1, c_first_name#2, d_date#3, 200)
+                  :        +- Exchange hashpartitioning(c_last_name#1, c_first_name#2, d_date#3, 5)
                   :           +- *(19) HashAggregate(keys=[c_last_name#1, c_first_name#2, d_date#3], functions=[])
                   :              +- SortMergeJoin [coalesce(c_last_name#1, ), coalesce(c_first_name#2, ), coalesce(d_date#3, 0)], [coalesce(c_last_name#7, ), coalesce(c_first_name#8, ), coalesce(d_date#9, 0)], LeftAnti, (((c_last_name#1 <=> c_last_name#7) && (c_first_name#2 <=> c_first_name#8)) && (d_date#3 <=> d_date#9))
                   :                 :- *(9) Sort [coalesce(c_last_name#1, ) ASC NULLS FIRST, coalesce(c_first_name#2, ) ASC NULLS FIRST, coalesce(d_date#3, 0) ASC NULLS FIRST], false, 0
-                  :                 :  +- Exchange hashpartitioning(coalesce(c_last_name#1, ), coalesce(c_first_name#2, ), coalesce(d_date#3, 0), 200)
+                  :                 :  +- Exchange hashpartitioning(coalesce(c_last_name#1, ), coalesce(c_first_name#2, ), coalesce(d_date#3, 0), 5)
                   :                 :     +- *(8) HashAggregate(keys=[c_last_name#1, c_first_name#2, d_date#3], functions=[])
-                  :                 :        +- Exchange hashpartitioning(c_last_name#1, c_first_name#2, d_date#3, 200)
+                  :                 :        +- Exchange hashpartitioning(c_last_name#1, c_first_name#2, d_date#3, 5)
                   :                 :           +- *(7) HashAggregate(keys=[c_last_name#1, c_first_name#2, d_date#3], functions=[])
                   :                 :              +- *(7) Project [c_last_name#1, c_first_name#2, d_date#3]
                   :                 :                 +- *(7) SortMergeJoin [ss_customer_sk#10], [c_customer_sk#11], Inner
                   :                 :                    :- *(4) Sort [ss_customer_sk#10 ASC NULLS FIRST], false, 0
-                  :                 :                    :  +- Exchange hashpartitioning(ss_customer_sk#10, 200)
+                  :                 :                    :  +- Exchange hashpartitioning(ss_customer_sk#10, 5)
                   :                 :                    :     +- *(3) Project [ss_customer_sk#10, d_date#3]
                   :                 :                    :        +- *(3) SortMergeJoin [ss_sold_date_sk#12], [d_date_sk#13], Inner
                   :                 :                    :           :- *(1) Project [ss_sold_date_sk#12, ss_customer_sk#10]
@@ -30,19 +30,19 @@
                   :                 :                    :              +- *(2) Filter (((isnotnull(d_month_seq#14) && (d_month_seq#14 >= 1200)) && (d_month_seq#14 <= 1211)) && isnotnull(d_date_sk#13))
                   :                 :                    :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#13,d_date#3,d_month_seq#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_date:date,d_month_seq:int>, SelectedBucketsCount: 200 out of 200
                   :                 :                    +- *(6) Sort [c_customer_sk#11 ASC NULLS FIRST], false, 0
-                  :                 :                       +- Exchange hashpartitioning(c_customer_sk#11, 200)
+                  :                 :                       +- Exchange hashpartitioning(c_customer_sk#11, 5)
                   :                 :                          +- *(5) Project [c_customer_sk#11, c_first_name#2, c_last_name#1]
                   :                 :                             +- *(5) Filter isnotnull(c_customer_sk#11)
                   :                 :                                +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#11,c_first_name#2,c_last_name#1] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk)], ReadSchema: struct<c_customer_sk:int,c_first_name:string,c_last_name:string>
                   :                 +- *(18) Sort [coalesce(c_last_name#7, ) ASC NULLS FIRST, coalesce(c_first_name#8, ) ASC NULLS FIRST, coalesce(d_date#9, 0) ASC NULLS FIRST], false, 0
-                  :                    +- Exchange hashpartitioning(coalesce(c_last_name#7, ), coalesce(c_first_name#8, ), coalesce(d_date#9, 0), 200)
+                  :                    +- Exchange hashpartitioning(coalesce(c_last_name#7, ), coalesce(c_first_name#8, ), coalesce(d_date#9, 0), 5)
                   :                       +- *(17) HashAggregate(keys=[c_last_name#7, c_first_name#8, d_date#9], functions=[])
-                  :                          +- Exchange hashpartitioning(c_last_name#7, c_first_name#8, d_date#9, 200)
+                  :                          +- Exchange hashpartitioning(c_last_name#7, c_first_name#8, d_date#9, 5)
                   :                             +- *(16) HashAggregate(keys=[c_last_name#7, c_first_name#8, d_date#9], functions=[])
                   :                                +- *(16) Project [c_last_name#7, c_first_name#8, d_date#9]
                   :                                   +- *(16) SortMergeJoin [cs_bill_customer_sk#15], [c_customer_sk#16], Inner
                   :                                      :- *(13) Sort [cs_bill_customer_sk#15 ASC NULLS FIRST], false, 0
-                  :                                      :  +- Exchange hashpartitioning(cs_bill_customer_sk#15, 200)
+                  :                                      :  +- Exchange hashpartitioning(cs_bill_customer_sk#15, 5)
                   :                                      :     +- *(12) Project [cs_bill_customer_sk#15, d_date#9]
                   :                                      :        +- *(12) SortMergeJoin [cs_sold_date_sk#17], [d_date_sk#18], Inner
                   :                                      :           :- *(10) Project [cs_sold_date_sk#17, cs_bill_customer_sk#15]
@@ -52,16 +52,16 @@
                   :                                      :              +- *(11) Filter (((isnotnull(d_month_seq#19) && (d_month_seq#19 >= 1200)) && (d_month_seq#19 <= 1211)) && isnotnull(d_date_sk#18))
                   :                                      :                 +- *(11) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#18,d_date#9,d_month_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_date:date,d_month_seq:int>, SelectedBucketsCount: 200 out of 200
                   :                                      +- *(15) Sort [c_customer_sk#16 ASC NULLS FIRST], false, 0
-                  :                                         +- ReusedExchange [c_customer_sk#16, c_first_name#8, c_last_name#7], Exchange hashpartitioning(c_customer_sk#11, 200)
+                  :                                         +- ReusedExchange [c_customer_sk#16, c_first_name#8, c_last_name#7], Exchange hashpartitioning(c_customer_sk#11, 5)
                   +- *(30) Sort [coalesce(c_last_name#4, ) ASC NULLS FIRST, coalesce(c_first_name#5, ) ASC NULLS FIRST, coalesce(d_date#6, 0) ASC NULLS FIRST], false, 0
-                     +- Exchange hashpartitioning(coalesce(c_last_name#4, ), coalesce(c_first_name#5, ), coalesce(d_date#6, 0), 200)
+                     +- Exchange hashpartitioning(coalesce(c_last_name#4, ), coalesce(c_first_name#5, ), coalesce(d_date#6, 0), 5)
                         +- *(29) HashAggregate(keys=[c_last_name#4, c_first_name#5, d_date#6], functions=[])
-                           +- Exchange hashpartitioning(c_last_name#4, c_first_name#5, d_date#6, 200)
+                           +- Exchange hashpartitioning(c_last_name#4, c_first_name#5, d_date#6, 5)
                               +- *(28) HashAggregate(keys=[c_last_name#4, c_first_name#5, d_date#6], functions=[])
                                  +- *(28) Project [c_last_name#4, c_first_name#5, d_date#6]
                                     +- *(28) SortMergeJoin [ws_bill_customer_sk#20], [c_customer_sk#21], Inner
                                        :- *(25) Sort [ws_bill_customer_sk#20 ASC NULLS FIRST], false, 0
-                                       :  +- Exchange hashpartitioning(ws_bill_customer_sk#20, 200)
+                                       :  +- Exchange hashpartitioning(ws_bill_customer_sk#20, 5)
                                        :     +- *(24) Project [ws_bill_customer_sk#20, d_date#6]
                                        :        +- *(24) SortMergeJoin [ws_sold_date_sk#22], [d_date_sk#23], Inner
                                        :           :- *(22) Project [ws_sold_date_sk#22, ws_bill_customer_sk#20]
@@ -71,4 +71,4 @@
                                        :              +- *(23) Filter (((isnotnull(d_month_seq#24) && (d_month_seq#24 >= 1200)) && (d_month_seq#24 <= 1211)) && isnotnull(d_date_sk#23))
                                        :                 +- *(23) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#23,d_date#6,d_month_seq#24] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_date:date,d_month_seq:int>, SelectedBucketsCount: 200 out of 200
                                        +- *(27) Sort [c_customer_sk#21 ASC NULLS FIRST], false, 0
-                                          +- ReusedExchange [c_customer_sk#21, c_first_name#5, c_last_name#4], Exchange hashpartitioning(c_customer_sk#11, 200)
+                                          +- ReusedExchange [c_customer_sk#21, c_first_name#5, c_last_name#4], Exchange hashpartitioning(c_customer_sk#11, 5)

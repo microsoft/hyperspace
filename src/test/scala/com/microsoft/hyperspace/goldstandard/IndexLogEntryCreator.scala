@@ -38,7 +38,7 @@ object IndexLogEntryCreator {
       PathUtils.makeAbsolute(s"${spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH)}/$indexName")
     }
     val entry = getIndexLogEntry(indexConfig, indexPath, tableName, spark)
-    assert(new IndexLogManagerImpl(indexPath).writeLog(0, entry))
+    new IndexLogManagerImpl(indexPath).writeLog(0, entry)
   }
 
   private def toRelation(sourceDf: DataFrame): Relation = {

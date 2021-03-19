@@ -3,11 +3,11 @@ TakeOrderedAndProject(limit=100, orderBy=[rnk#1 ASC NULLS FIRST], output=[rnk#1,
 +- *(17) Project [rnk#1, i_product_name#4 AS best_performing#2, i_product_name#5 AS worst_performing#3]
    +- *(17) SortMergeJoin [item_sk#6], [i_item_sk#7], Inner
       :- *(14) Sort [item_sk#6 ASC NULLS FIRST], false, 0
-      :  +- Exchange hashpartitioning(item_sk#6, 200)
+      :  +- Exchange hashpartitioning(item_sk#6, 5)
       :     +- *(13) Project [rnk#1, item_sk#6, i_product_name#4]
       :        +- *(13) SortMergeJoin [item_sk#8], [i_item_sk#9], Inner
       :           :- *(10) Sort [item_sk#8 ASC NULLS FIRST], false, 0
-      :           :  +- Exchange hashpartitioning(item_sk#8, 200)
+      :           :  +- Exchange hashpartitioning(item_sk#8, 5)
       :           :     +- *(9) Project [item_sk#8, rnk#1, item_sk#6]
       :           :        +- *(9) SortMergeJoin [rnk#1], [rnk#10], Inner
       :           :           :- *(4) Sort [rnk#1 ASC NULLS FIRST], false, 0
@@ -17,16 +17,16 @@ TakeOrderedAndProject(limit=100, orderBy=[rnk#1 ASC NULLS FIRST], output=[rnk#1,
       :           :           :           +- *(3) Sort [rank_col#11 ASC NULLS FIRST], false, 0
       :           :           :              +- Exchange SinglePartition
       :           :           :                 +- *(2) Project [item_sk#8, rank_col#11]
-      :           :           :                    +- *(2) Filter (isnotnull(avg(ss_net_profit#12)#13) && (cast(avg(ss_net_profit#12)#13 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery62983)), DecimalType(13,7))))
-      :           :           :                       :  +- Subquery subquery62983
+      :           :           :                    +- *(2) Filter (isnotnull(avg(ss_net_profit#12)#13) && (cast(avg(ss_net_profit#12)#13 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery8419)), DecimalType(13,7))))
+      :           :           :                       :  +- Subquery subquery8419
       :           :           :                       :     +- *(2) HashAggregate(keys=[ss_store_sk#14], functions=[avg(UnscaledValue(ss_net_profit#12))])
-      :           :           :                       :        +- Exchange hashpartitioning(ss_store_sk#14, 200)
+      :           :           :                       :        +- Exchange hashpartitioning(ss_store_sk#14, 5)
       :           :           :                       :           +- *(1) HashAggregate(keys=[ss_store_sk#14], functions=[partial_avg(UnscaledValue(ss_net_profit#12))])
       :           :           :                       :              +- *(1) Project [ss_store_sk#14, ss_net_profit#12]
       :           :           :                       :                 +- *(1) Filter ((isnotnull(ss_store_sk#14) && (ss_store_sk#14 = 4)) && isnull(ss_addr_sk#15))
       :           :           :                       :                    +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex14-index-5-ss_store_sk-20, LogVersion: 0) default.store_sales[ss_addr_sk#15,ss_store_sk#14,ss_net_profit#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_store_sk), EqualTo(ss_store_sk,4), IsNull(ss_addr_sk)], ReadSchema: struct<ss_addr_sk:int,ss_store_sk:int,ss_net_profit:decimal(7,2)>
       :           :           :                       +- *(2) HashAggregate(keys=[ss_item_sk#16], functions=[avg(UnscaledValue(ss_net_profit#12))])
-      :           :           :                          +- Exchange hashpartitioning(ss_item_sk#16, 200)
+      :           :           :                          +- Exchange hashpartitioning(ss_item_sk#16, 5)
       :           :           :                             +- *(1) HashAggregate(keys=[ss_item_sk#16], functions=[partial_avg(UnscaledValue(ss_net_profit#12))])
       :           :           :                                +- *(1) Project [ss_item_sk#16, ss_net_profit#12]
       :           :           :                                   +- *(1) Filter (isnotnull(ss_store_sk#14) && (ss_store_sk#14 = 4))
@@ -38,20 +38,20 @@ TakeOrderedAndProject(limit=100, orderBy=[rnk#1 ASC NULLS FIRST], output=[rnk#1,
       :           :                       +- *(7) Sort [rank_col#17 DESC NULLS LAST], false, 0
       :           :                          +- Exchange SinglePartition
       :           :                             +- *(6) Project [item_sk#6, rank_col#17]
-      :           :                                +- *(6) Filter (isnotnull(avg(ss_net_profit#12)#18) && (cast(avg(ss_net_profit#12)#18 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery62988)), DecimalType(13,7))))
-      :           :                                   :  +- Subquery subquery62988
+      :           :                                +- *(6) Filter (isnotnull(avg(ss_net_profit#12)#18) && (cast(avg(ss_net_profit#12)#18 as decimal(13,7)) > CheckOverflow((0.900000 * promote_precision(Subquery subquery8424)), DecimalType(13,7))))
+      :           :                                   :  +- Subquery subquery8424
       :           :                                   :     +- *(2) HashAggregate(keys=[ss_store_sk#14], functions=[avg(UnscaledValue(ss_net_profit#12))])
-      :           :                                   :        +- Exchange hashpartitioning(ss_store_sk#14, 200)
+      :           :                                   :        +- Exchange hashpartitioning(ss_store_sk#14, 5)
       :           :                                   :           +- *(1) HashAggregate(keys=[ss_store_sk#14], functions=[partial_avg(UnscaledValue(ss_net_profit#12))])
       :           :                                   :              +- *(1) Project [ss_store_sk#14, ss_net_profit#12]
       :           :                                   :                 +- *(1) Filter ((isnotnull(ss_store_sk#14) && (ss_store_sk#14 = 4)) && isnull(ss_addr_sk#15))
       :           :                                   :                    +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex14-index-5-ss_store_sk-20, LogVersion: 0) default.store_sales[ss_addr_sk#15,ss_store_sk#14,ss_net_profit#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_store_sk), EqualTo(ss_store_sk,4), IsNull(ss_addr_sk)], ReadSchema: struct<ss_addr_sk:int,ss_store_sk:int,ss_net_profit:decimal(7,2)>
       :           :                                   +- *(6) HashAggregate(keys=[ss_item_sk#16], functions=[avg(UnscaledValue(ss_net_profit#12))])
-      :           :                                      +- ReusedExchange [ss_item_sk#16, sum#19, count#20], Exchange hashpartitioning(ss_item_sk#16, 200)
+      :           :                                      +- ReusedExchange [ss_item_sk#16, sum#19, count#20], Exchange hashpartitioning(ss_item_sk#16, 5)
       :           +- *(12) Sort [i_item_sk#9 ASC NULLS FIRST], false, 0
-      :              +- Exchange hashpartitioning(i_item_sk#9, 200)
+      :              +- Exchange hashpartitioning(i_item_sk#9, 5)
       :                 +- *(11) Project [i_item_sk#9, i_product_name#4]
       :                    +- *(11) Filter isnotnull(i_item_sk#9)
       :                       +- *(11) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#9,i_product_name#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_product_name:string>
       +- *(16) Sort [i_item_sk#7 ASC NULLS FIRST], false, 0
-         +- ReusedExchange [i_item_sk#7, i_product_name#5], Exchange hashpartitioning(i_item_sk#9, 200)
+         +- ReusedExchange [i_item_sk#7, i_product_name#5], Exchange hashpartitioning(i_item_sk#9, 5)

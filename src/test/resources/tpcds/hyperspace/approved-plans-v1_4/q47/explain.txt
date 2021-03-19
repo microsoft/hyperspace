@@ -5,26 +5,26 @@ TakeOrderedAndProject(limit=100, orderBy=[CheckOverflow((promote_precision(cast(
       :- *(33) Project [i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8, sum_sales#1, avg_monthly_sales#2, rn#13, sum_sales#11]
       :  +- *(33) SortMergeJoin [i_category#4, i_brand#5, s_store_name#3, s_company_name#6, rn#13], [i_category#19, i_brand#20, s_store_name#21, s_company_name#22, (rn#23 + 1)], Inner
       :     :- *(17) Sort [i_category#4 ASC NULLS FIRST, i_brand#5 ASC NULLS FIRST, s_store_name#3 ASC NULLS FIRST, s_company_name#6 ASC NULLS FIRST, rn#13 ASC NULLS FIRST], false, 0
-      :     :  +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, rn#13, 200)
-      :     :     +- *(16) Filter (((((isnotnull(avg_monthly_sales#2) && isnotnull(d_year#7)) && (d_year#7 = 1999)) && (avg_monthly_sales#2 > 0.000000)) && (CASE WHEN (avg_monthly_sales#2 > 0.000000) THEN CheckOverflow((promote_precision(abs(CheckOverflow((promote_precision(cast(sum_sales#1 as decimal(22,6))) - promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(22,6)))) / promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(38,16)) ELSE null END > 0.1000000000000000)) && isnotnull(rn#13))
+      :     :  +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, rn#13, 5)
+      :     :     +- *(16) Filter (((((isnotnull(d_year#7) && isnotnull(avg_monthly_sales#2)) && (d_year#7 = 1999)) && (avg_monthly_sales#2 > 0.000000)) && (CASE WHEN (avg_monthly_sales#2 > 0.000000) THEN CheckOverflow((promote_precision(abs(CheckOverflow((promote_precision(cast(sum_sales#1 as decimal(22,6))) - promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(22,6)))) / promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(38,16)) ELSE null END > 0.1000000000000000)) && isnotnull(rn#13))
       :     :        +- Window [rank(d_year#7, d_moy#8) windowspecdefinition(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7 ASC NULLS FIRST, d_moy#8 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rn#13], [i_category#4, i_brand#5, s_store_name#3, s_company_name#6], [d_year#7 ASC NULLS FIRST, d_moy#8 ASC NULLS FIRST]
       :     :           +- *(15) Sort [i_category#4 ASC NULLS FIRST, i_brand#5 ASC NULLS FIRST, s_store_name#3 ASC NULLS FIRST, s_company_name#6 ASC NULLS FIRST, d_year#7 ASC NULLS FIRST, d_moy#8 ASC NULLS FIRST], false, 0
-      :     :              +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, 200)
+      :     :              +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, 5)
       :     :                 +- *(14) Project [i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8, sum_sales#1, avg_monthly_sales#2]
       :     :                    +- Window [avg(_w0#24) windowspecdefinition(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS avg_monthly_sales#2], [i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7]
       :     :                       +- *(13) Sort [i_category#4 ASC NULLS FIRST, i_brand#5 ASC NULLS FIRST, s_store_name#3 ASC NULLS FIRST, s_company_name#6 ASC NULLS FIRST, d_year#7 ASC NULLS FIRST], false, 0
-      :     :                          +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, 200)
+      :     :                          +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, 5)
       :     :                             +- *(12) HashAggregate(keys=[i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8], functions=[sum(UnscaledValue(ss_sales_price#25))])
-      :     :                                +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8, 200)
+      :     :                                +- Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8, 5)
       :     :                                   +- *(11) HashAggregate(keys=[i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8], functions=[partial_sum(UnscaledValue(ss_sales_price#25))])
       :     :                                      +- *(11) Project [i_brand#5, i_category#4, ss_sales_price#25, d_year#7, d_moy#8, s_store_name#3, s_company_name#6]
       :     :                                         +- *(11) SortMergeJoin [ss_store_sk#26], [s_store_sk#27], Inner
       :     :                                            :- *(8) Sort [ss_store_sk#26 ASC NULLS FIRST], false, 0
-      :     :                                            :  +- Exchange hashpartitioning(ss_store_sk#26, 200)
+      :     :                                            :  +- Exchange hashpartitioning(ss_store_sk#26, 5)
       :     :                                            :     +- *(7) Project [i_brand#5, i_category#4, ss_store_sk#26, ss_sales_price#25, d_year#7, d_moy#8]
       :     :                                            :        +- *(7) SortMergeJoin [ss_sold_date_sk#28], [d_date_sk#29], Inner
       :     :                                            :           :- *(4) Sort [ss_sold_date_sk#28 ASC NULLS FIRST], false, 0
-      :     :                                            :           :  +- Exchange hashpartitioning(ss_sold_date_sk#28, 200)
+      :     :                                            :           :  +- Exchange hashpartitioning(ss_sold_date_sk#28, 5)
       :     :                                            :           :     +- *(3) Project [i_brand#5, i_category#4, ss_sold_date_sk#28, ss_store_sk#26, ss_sales_price#25]
       :     :                                            :           :        +- *(3) SortMergeJoin [i_item_sk#30], [ss_item_sk#31], Inner
       :     :                                            :           :           :- *(1) Project [i_item_sk#30, i_brand#5, i_category#4]
@@ -34,28 +34,28 @@ TakeOrderedAndProject(limit=100, orderBy=[CheckOverflow((promote_precision(cast(
       :     :                                            :           :              +- *(2) Filter ((isnotnull(ss_item_sk#31) && isnotnull(ss_sold_date_sk#28)) && isnotnull(ss_store_sk#26))
       :     :                                            :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex13-index-3-ss_item_sk-16, LogVersion: 0) default.store_sales[ss_sold_date_sk#28,ss_item_sk#31,ss_store_sk#26,ss_sales_price#25] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_item_sk), IsNotNull(ss_sold_date_sk), IsNotNull(ss_store_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_item_sk:int,ss_store_sk:int,ss_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
       :     :                                            :           +- *(6) Sort [d_date_sk#29 ASC NULLS FIRST], false, 0
-      :     :                                            :              +- Exchange hashpartitioning(d_date_sk#29, 200)
+      :     :                                            :              +- Exchange hashpartitioning(d_date_sk#29, 5)
       :     :                                            :                 +- *(5) Project [d_date_sk#29, d_year#7, d_moy#8]
       :     :                                            :                    +- *(5) Filter ((((d_year#7 = 1999) || ((d_year#7 = 1998) && (d_moy#8 = 12))) || ((d_year#7 = 2000) && (d_moy#8 = 1))) && isnotnull(d_date_sk#29))
       :     :                                            :                       +- *(5) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#29,d_year#7,d_moy#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [Or(Or(EqualTo(d_year,1999),And(EqualTo(d_year,1998),EqualTo(d_moy,12))),And(EqualTo(d_year,2000)..., ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
       :     :                                            +- *(10) Sort [s_store_sk#27 ASC NULLS FIRST], false, 0
-      :     :                                               +- Exchange hashpartitioning(s_store_sk#27, 200)
+      :     :                                               +- Exchange hashpartitioning(s_store_sk#27, 5)
       :     :                                                  +- *(9) Project [s_store_sk#27, s_store_name#3, s_company_name#6]
       :     :                                                     +- *(9) Filter ((isnotnull(s_store_sk#27) && isnotnull(s_company_name#6)) && isnotnull(s_store_name#3))
       :     :                                                        +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#27,s_store_name#3,s_company_name#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk), IsNotNull(s_company_name), IsNotNull(s_store_name)], ReadSchema: struct<s_store_sk:int,s_store_name:string,s_company_name:string>
       :     +- *(32) Sort [i_category#19 ASC NULLS FIRST, i_brand#20 ASC NULLS FIRST, s_store_name#21 ASC NULLS FIRST, s_company_name#22 ASC NULLS FIRST, (rn#23 + 1) ASC NULLS FIRST], false, 0
-      :        +- Exchange hashpartitioning(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, (rn#23 + 1), 200)
+      :        +- Exchange hashpartitioning(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, (rn#23 + 1), 5)
       :           +- *(31) Project [i_category#19, i_brand#20, s_store_name#21, s_company_name#22, sum_sales#11, rn#23]
       :              +- *(31) Filter isnotnull(rn#23)
       :                 +- Window [rank(d_year#32, d_moy#33) windowspecdefinition(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, d_year#32 ASC NULLS FIRST, d_moy#33 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rn#23], [i_category#19, i_brand#20, s_store_name#21, s_company_name#22], [d_year#32 ASC NULLS FIRST, d_moy#33 ASC NULLS FIRST]
       :                    +- *(30) Sort [i_category#19 ASC NULLS FIRST, i_brand#20 ASC NULLS FIRST, s_store_name#21 ASC NULLS FIRST, s_company_name#22 ASC NULLS FIRST, d_year#32 ASC NULLS FIRST, d_moy#33 ASC NULLS FIRST], false, 0
-      :                       +- Exchange hashpartitioning(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, 200)
+      :                       +- Exchange hashpartitioning(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, 5)
       :                          +- *(29) HashAggregate(keys=[i_category#19, i_brand#20, s_store_name#21, s_company_name#22, d_year#32, d_moy#33], functions=[sum(UnscaledValue(ss_sales_price#25))])
-      :                             +- ReusedExchange [i_category#19, i_brand#20, s_store_name#21, s_company_name#22, d_year#32, d_moy#33, sum#34], Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8, 200)
+      :                             +- ReusedExchange [i_category#19, i_brand#20, s_store_name#21, s_company_name#22, d_year#32, d_moy#33, sum#34], Exchange hashpartitioning(i_category#4, i_brand#5, s_store_name#3, s_company_name#6, d_year#7, d_moy#8, 5)
       +- *(48) Sort [i_category#14 ASC NULLS FIRST, i_brand#15 ASC NULLS FIRST, s_store_name#16 ASC NULLS FIRST, s_company_name#17 ASC NULLS FIRST, (rn#18 - 1) ASC NULLS FIRST], false, 0
-         +- Exchange hashpartitioning(i_category#14, i_brand#15, s_store_name#16, s_company_name#17, (rn#18 - 1), 200)
+         +- Exchange hashpartitioning(i_category#14, i_brand#15, s_store_name#16, s_company_name#17, (rn#18 - 1), 5)
             +- *(47) Project [i_category#14, i_brand#15, s_store_name#16, s_company_name#17, sum_sales#12, rn#18]
                +- *(47) Filter isnotnull(rn#18)
                   +- Window [rank(d_year#35, d_moy#36) windowspecdefinition(i_category#14, i_brand#15, s_store_name#16, s_company_name#17, d_year#35 ASC NULLS FIRST, d_moy#36 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rn#18], [i_category#14, i_brand#15, s_store_name#16, s_company_name#17], [d_year#35 ASC NULLS FIRST, d_moy#36 ASC NULLS FIRST]
                      +- *(46) Sort [i_category#14 ASC NULLS FIRST, i_brand#15 ASC NULLS FIRST, s_store_name#16 ASC NULLS FIRST, s_company_name#17 ASC NULLS FIRST, d_year#35 ASC NULLS FIRST, d_moy#36 ASC NULLS FIRST], false, 0
-                        +- ReusedExchange [i_category#14, i_brand#15, s_store_name#16, s_company_name#17, d_year#35, d_moy#36, sum_sales#12], Exchange hashpartitioning(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, 200)
+                        +- ReusedExchange [i_category#14, i_brand#15, s_store_name#16, s_company_name#17, d_year#35, d_moy#36, sum_sales#12], Exchange hashpartitioning(i_category#19, i_brand#20, s_store_name#21, s_company_name#22, 5)

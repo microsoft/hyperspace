@@ -1,22 +1,22 @@
 == Physical Plan ==
 *(28) Sort [w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST], true, 0
-+- Exchange rangepartitioning(w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST, 200)
++- Exchange rangepartitioning(w_warehouse_sk#1 ASC NULLS FIRST, i_item_sk#2 ASC NULLS FIRST, d_moy#3 ASC NULLS FIRST, mean#4 ASC NULLS FIRST, cov#5 ASC NULLS FIRST, d_moy#6 ASC NULLS FIRST, mean#7 ASC NULLS FIRST, cov#8 ASC NULLS FIRST, 5)
    +- *(27) SortMergeJoin [i_item_sk#2, w_warehouse_sk#1], [i_item_sk#9, w_warehouse_sk#10], Inner
       :- *(13) Sort [i_item_sk#2 ASC NULLS FIRST, w_warehouse_sk#1 ASC NULLS FIRST], false, 0
-      :  +- Exchange hashpartitioning(i_item_sk#2, w_warehouse_sk#1, 200)
+      :  +- Exchange hashpartitioning(i_item_sk#2, w_warehouse_sk#1, 5)
       :     +- *(12) Project [w_warehouse_sk#1, i_item_sk#2, d_moy#3, mean#4, CASE WHEN (mean#4 = 0.0) THEN null ELSE (stdev#11 / mean#4) END AS cov#5]
       :        +- *(12) Filter (CASE WHEN (mean#4 = 0.0) THEN 0.0 ELSE (stdev#11 / mean#4) END > 1.0)
       :           +- *(12) HashAggregate(keys=[w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3], functions=[stddev_samp(cast(inv_quantity_on_hand#13 as double)), avg(cast(inv_quantity_on_hand#13 as bigint))])
-      :              +- Exchange hashpartitioning(w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3, 200)
+      :              +- Exchange hashpartitioning(w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3, 5)
       :                 +- *(11) HashAggregate(keys=[w_warehouse_name#12, w_warehouse_sk#1, i_item_sk#2, d_moy#3], functions=[partial_stddev_samp(cast(inv_quantity_on_hand#13 as double)), partial_avg(cast(inv_quantity_on_hand#13 as bigint))])
       :                    +- *(11) Project [inv_quantity_on_hand#13, i_item_sk#2, w_warehouse_sk#1, w_warehouse_name#12, d_moy#3]
       :                       +- *(11) SortMergeJoin [inv_date_sk#14], [d_date_sk#15], Inner
       :                          :- *(8) Sort [inv_date_sk#14 ASC NULLS FIRST], false, 0
-      :                          :  +- Exchange hashpartitioning(inv_date_sk#14, 200)
+      :                          :  +- Exchange hashpartitioning(inv_date_sk#14, 5)
       :                          :     +- *(7) Project [inv_date_sk#14, inv_quantity_on_hand#13, i_item_sk#2, w_warehouse_sk#1, w_warehouse_name#12]
       :                          :        +- *(7) SortMergeJoin [inv_warehouse_sk#16], [w_warehouse_sk#1], Inner
       :                          :           :- *(4) Sort [inv_warehouse_sk#16 ASC NULLS FIRST], false, 0
-      :                          :           :  +- Exchange hashpartitioning(inv_warehouse_sk#16, 200)
+      :                          :           :  +- Exchange hashpartitioning(inv_warehouse_sk#16, 5)
       :                          :           :     +- *(3) Project [inv_date_sk#14, inv_warehouse_sk#16, inv_quantity_on_hand#13, i_item_sk#2]
       :                          :           :        +- *(3) SortMergeJoin [inv_item_sk#17], [i_item_sk#2], Inner
       :                          :           :           :- *(1) Project [inv_date_sk#14, inv_item_sk#17, inv_warehouse_sk#16, inv_quantity_on_hand#13]
@@ -26,28 +26,28 @@
       :                          :           :              +- *(2) Filter isnotnull(i_item_sk#2)
       :                          :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: FilterIndex09-index-32-i_item_sk-1, LogVersion: 0) default.item[i_item_sk#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int>, SelectedBucketsCount: 200 out of 200
       :                          :           +- *(6) Sort [w_warehouse_sk#1 ASC NULLS FIRST], false, 0
-      :                          :              +- Exchange hashpartitioning(w_warehouse_sk#1, 200)
+      :                          :              +- Exchange hashpartitioning(w_warehouse_sk#1, 5)
       :                          :                 +- *(5) Project [w_warehouse_sk#1, w_warehouse_name#12]
       :                          :                    +- *(5) Filter isnotnull(w_warehouse_sk#1)
       :                          :                       +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse[w_warehouse_sk#1,w_warehouse_name#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int,w_warehouse_name:string>
       :                          +- *(10) Sort [d_date_sk#15 ASC NULLS FIRST], false, 0
-      :                             +- Exchange hashpartitioning(d_date_sk#15, 200)
+      :                             +- Exchange hashpartitioning(d_date_sk#15, 5)
       :                                +- *(9) Project [d_date_sk#15, d_moy#3]
       :                                   +- *(9) Filter ((((isnotnull(d_year#18) && isnotnull(d_moy#3)) && (d_year#18 = 2001)) && (d_moy#3 = 1)) && isnotnull(d_date_sk#15))
       :                                      +- *(9) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#15,d_year#18,d_moy#3] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,2001), EqualTo(d_moy,1), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
       +- *(26) Sort [i_item_sk#9 ASC NULLS FIRST, w_warehouse_sk#10 ASC NULLS FIRST], false, 0
-         +- Exchange hashpartitioning(i_item_sk#9, w_warehouse_sk#10, 200)
+         +- Exchange hashpartitioning(i_item_sk#9, w_warehouse_sk#10, 5)
             +- *(25) Project [w_warehouse_sk#10, i_item_sk#9, d_moy#6, mean#7, CASE WHEN (mean#7 = 0.0) THEN null ELSE (stdev#19 / mean#7) END AS cov#8]
                +- *(25) Filter (CASE WHEN (mean#7 = 0.0) THEN 0.0 ELSE (stdev#19 / mean#7) END > 1.0)
                   +- *(25) HashAggregate(keys=[w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6], functions=[stddev_samp(cast(inv_quantity_on_hand#13 as double)), avg(cast(inv_quantity_on_hand#13 as bigint))])
-                     +- Exchange hashpartitioning(w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6, 200)
+                     +- Exchange hashpartitioning(w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6, 5)
                         +- *(24) HashAggregate(keys=[w_warehouse_name#20, w_warehouse_sk#10, i_item_sk#9, d_moy#6], functions=[partial_stddev_samp(cast(inv_quantity_on_hand#13 as double)), partial_avg(cast(inv_quantity_on_hand#13 as bigint))])
                            +- *(24) Project [inv_quantity_on_hand#13, i_item_sk#9, w_warehouse_sk#10, w_warehouse_name#20, d_moy#6]
                               +- *(24) SortMergeJoin [inv_date_sk#14], [d_date_sk#21], Inner
                                  :- *(21) Sort [inv_date_sk#14 ASC NULLS FIRST], false, 0
-                                 :  +- ReusedExchange [inv_date_sk#14, inv_quantity_on_hand#13, i_item_sk#9, w_warehouse_sk#10, w_warehouse_name#20], Exchange hashpartitioning(inv_date_sk#14, 200)
+                                 :  +- ReusedExchange [inv_date_sk#14, inv_quantity_on_hand#13, i_item_sk#9, w_warehouse_sk#10, w_warehouse_name#20], Exchange hashpartitioning(inv_date_sk#14, 5)
                                  +- *(23) Sort [d_date_sk#21 ASC NULLS FIRST], false, 0
-                                    +- Exchange hashpartitioning(d_date_sk#21, 200)
+                                    +- Exchange hashpartitioning(d_date_sk#21, 5)
                                        +- *(22) Project [d_date_sk#21, d_moy#6]
                                           +- *(22) Filter ((((isnotnull(d_year#22) && isnotnull(d_moy#6)) && (d_year#22 = 2001)) && (d_moy#6 = 2)) && isnotnull(d_date_sk#21))
                                              +- *(22) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#21,d_year#22,d_moy#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,2001), EqualTo(d_moy,2), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>

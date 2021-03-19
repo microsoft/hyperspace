@@ -1,22 +1,22 @@
 == Physical Plan ==
 *(19) Sort [ext_price#1 DESC NULLS LAST, brand_id#2 ASC NULLS FIRST], true, 0
-+- Exchange rangepartitioning(ext_price#1 DESC NULLS LAST, brand_id#2 ASC NULLS FIRST, 200)
++- Exchange rangepartitioning(ext_price#1 DESC NULLS LAST, brand_id#2 ASC NULLS FIRST, 5)
    +- *(18) HashAggregate(keys=[i_brand#3, i_brand_id#4, t_hour#5, t_minute#6], functions=[sum(UnscaledValue(ext_price#7))])
-      +- Exchange hashpartitioning(i_brand#3, i_brand_id#4, t_hour#5, t_minute#6, 200)
+      +- Exchange hashpartitioning(i_brand#3, i_brand_id#4, t_hour#5, t_minute#6, 5)
          +- *(17) HashAggregate(keys=[i_brand#3, i_brand_id#4, t_hour#5, t_minute#6], functions=[partial_sum(UnscaledValue(ext_price#7))])
             +- *(17) Project [i_brand_id#4, i_brand#3, ext_price#7, t_hour#5, t_minute#6]
                +- *(17) SortMergeJoin [time_sk#8], [t_time_sk#9], Inner
                   :- *(14) Sort [time_sk#8 ASC NULLS FIRST], false, 0
-                  :  +- Exchange hashpartitioning(time_sk#8, 200)
+                  :  +- Exchange hashpartitioning(time_sk#8, 5)
                   :     +- *(13) Project [i_brand_id#4, i_brand#3, ext_price#7, time_sk#8]
                   :        +- *(13) SortMergeJoin [i_item_sk#10], [sold_item_sk#11], Inner
                   :           :- *(2) Sort [i_item_sk#10 ASC NULLS FIRST], false, 0
-                  :           :  +- Exchange hashpartitioning(i_item_sk#10, 200)
+                  :           :  +- Exchange hashpartitioning(i_item_sk#10, 5)
                   :           :     +- *(1) Project [i_item_sk#10, i_brand_id#4, i_brand#3]
                   :           :        +- *(1) Filter ((isnotnull(i_manager_id#12) && (i_manager_id#12 = 1)) && isnotnull(i_item_sk#10))
                   :           :           +- *(1) FileScan Hyperspace(Type: CI, Name: FilterIndex11-index-48-i_manager_id-7, LogVersion: 0) default.item[i_item_sk#10,i_brand_id#4,i_brand#3,i_manager_id#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_manager_id), EqualTo(i_manager_id,1), IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_brand_id:int,i_brand:string,i_manager_id:int>
                   :           +- *(12) Sort [sold_item_sk#11 ASC NULLS FIRST], false, 0
-                  :              +- Exchange hashpartitioning(sold_item_sk#11, 200)
+                  :              +- Exchange hashpartitioning(sold_item_sk#11, 5)
                   :                 +- Union
                   :                    :- *(5) Project [ws_ext_sales_price#13 AS ext_price#7, ws_item_sk#14 AS sold_item_sk#11, ws_sold_time_sk#15 AS time_sk#8]
                   :                    :  +- *(5) SortMergeJoin [ws_sold_date_sk#16], [d_date_sk#17], Inner
@@ -43,7 +43,7 @@
                   :                             +- *(10) Filter ((((isnotnull(d_moy#18) && isnotnull(d_year#19)) && (d_moy#18 = 11)) && (d_year#19 = 1999)) && isnotnull(d_date_sk#17))
                   :                                +- *(10) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#19,d_moy#18] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_moy), IsNotNull(d_year), EqualTo(d_moy,11), EqualTo(d_year,1999), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>, SelectedBucketsCount: 200 out of 200
                   +- *(16) Sort [t_time_sk#9 ASC NULLS FIRST], false, 0
-                     +- Exchange hashpartitioning(t_time_sk#9, 200)
+                     +- Exchange hashpartitioning(t_time_sk#9, 5)
                         +- *(15) Project [t_time_sk#9, t_hour#5, t_minute#6]
                            +- *(15) Filter (((t_meal_time#34 = breakfast) || (t_meal_time#34 = dinner)) && isnotnull(t_time_sk#9))
                               +- *(15) FileScan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim[t_time_sk#9,t_hour#5,t_minute#6,t_meal_time#34] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [Or(EqualTo(t_meal_time,breakfast),EqualTo(t_meal_time,dinner)), IsNotNull(t_time_sk)], ReadSchema: struct<t_time_sk:int,t_hour:int,t_minute:int,t_meal_time:string>

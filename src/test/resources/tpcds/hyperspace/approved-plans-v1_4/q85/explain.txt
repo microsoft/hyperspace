@@ -1,71 +1,71 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[substring(r_reason_desc, 1, 20)#1 ASC NULLS FIRST,aggOrder#2 ASC NULLS FIRST,avg(wr_refunded_cash)#3 ASC NULLS FIRST,avg(wr_fee)#4 ASC NULLS FIRST], output=[substring(r_reason_desc, 1, 20)#1,avg(ws_quantity)#5,avg(wr_refunded_cash)#3,avg(wr_fee)#4])
 +- *(30) HashAggregate(keys=[r_reason_desc#6], functions=[avg(cast(ws_quantity#7 as bigint)), avg(UnscaledValue(wr_refunded_cash#8)), avg(UnscaledValue(wr_fee#9))])
-   +- Exchange hashpartitioning(r_reason_desc#6, 200)
+   +- Exchange hashpartitioning(r_reason_desc#6, 5)
       +- *(29) HashAggregate(keys=[r_reason_desc#6], functions=[partial_avg(cast(ws_quantity#7 as bigint)), partial_avg(UnscaledValue(wr_refunded_cash#8)), partial_avg(UnscaledValue(wr_fee#9))])
          +- *(29) Project [ws_quantity#7, wr_fee#9, wr_refunded_cash#8, r_reason_desc#6]
             +- *(29) SortMergeJoin [wr_reason_sk#10], [cast(r_reason_sk#11 as bigint)], Inner
                :- *(26) Sort [wr_reason_sk#10 ASC NULLS FIRST], false, 0
-               :  +- Exchange hashpartitioning(wr_reason_sk#10, 200)
+               :  +- Exchange hashpartitioning(wr_reason_sk#10, 5)
                :     +- *(25) Project [ws_quantity#7, wr_reason_sk#10, wr_fee#9, wr_refunded_cash#8]
                :        +- *(25) SortMergeJoin [ws_sold_date_sk#12], [d_date_sk#13], Inner
                :           :- *(22) Sort [ws_sold_date_sk#12 ASC NULLS FIRST], false, 0
-               :           :  +- Exchange hashpartitioning(ws_sold_date_sk#12, 200)
+               :           :  +- Exchange hashpartitioning(ws_sold_date_sk#12, 5)
                :           :     +- *(21) Project [ws_sold_date_sk#12, ws_quantity#7, wr_reason_sk#10, wr_fee#9, wr_refunded_cash#8]
                :           :        +- *(21) SortMergeJoin [wr_refunded_addr_sk#14], [cast(ca_address_sk#15 as bigint)], Inner, ((((ca_state#16 IN (IN,OH,NJ) && (ws_net_profit#17 >= 100.00)) && (ws_net_profit#17 <= 200.00)) || ((ca_state#16 IN (WI,CT,KY) && (ws_net_profit#17 >= 150.00)) && (ws_net_profit#17 <= 300.00))) || ((ca_state#16 IN (LA,IA,AR) && (ws_net_profit#17 >= 50.00)) && (ws_net_profit#17 <= 250.00)))
                :           :           :- *(18) Sort [wr_refunded_addr_sk#14 ASC NULLS FIRST], false, 0
-               :           :           :  +- Exchange hashpartitioning(wr_refunded_addr_sk#14, 200)
+               :           :           :  +- Exchange hashpartitioning(wr_refunded_addr_sk#14, 5)
                :           :           :     +- *(17) Project [ws_sold_date_sk#12, ws_quantity#7, ws_net_profit#17, wr_refunded_addr_sk#14, wr_reason_sk#10, wr_fee#9, wr_refunded_cash#8]
                :           :           :        +- *(17) SortMergeJoin [wr_returning_cdemo_sk#18, cd_marital_status#19, cd_education_status#20], [cast(cd_demo_sk#21 as bigint), cd_marital_status#22, cd_education_status#23], Inner
                :           :           :           :- *(14) Sort [wr_returning_cdemo_sk#18 ASC NULLS FIRST, cd_marital_status#19 ASC NULLS FIRST, cd_education_status#20 ASC NULLS FIRST], false, 0
-               :           :           :           :  +- Exchange hashpartitioning(wr_returning_cdemo_sk#18, cd_marital_status#19, cd_education_status#20, 200)
+               :           :           :           :  +- Exchange hashpartitioning(wr_returning_cdemo_sk#18, cd_marital_status#19, cd_education_status#20, 5)
                :           :           :           :     +- *(13) Project [ws_sold_date_sk#12, ws_quantity#7, ws_net_profit#17, wr_refunded_addr_sk#14, wr_returning_cdemo_sk#18, wr_reason_sk#10, wr_fee#9, wr_refunded_cash#8, cd_marital_status#19, cd_education_status#20]
                :           :           :           :        +- *(13) SortMergeJoin [wr_refunded_cdemo_sk#24], [cast(cd_demo_sk#25 as bigint)], Inner, ((((((cd_marital_status#19 = M) && (cd_education_status#20 = Advanced Degree)) && (ws_sales_price#26 >= 100.00)) && (ws_sales_price#26 <= 150.00)) || ((((cd_marital_status#19 = S) && (cd_education_status#20 = College)) && (ws_sales_price#26 >= 50.00)) && (ws_sales_price#26 <= 100.00))) || ((((cd_marital_status#19 = W) && (cd_education_status#20 = 2 yr Degree)) && (ws_sales_price#26 >= 150.00)) && (ws_sales_price#26 <= 200.00)))
                :           :           :           :           :- *(10) Sort [wr_refunded_cdemo_sk#24 ASC NULLS FIRST], false, 0
-               :           :           :           :           :  +- Exchange hashpartitioning(wr_refunded_cdemo_sk#24, 200)
+               :           :           :           :           :  +- Exchange hashpartitioning(wr_refunded_cdemo_sk#24, 5)
                :           :           :           :           :     +- *(9) Project [ws_sold_date_sk#12, ws_quantity#7, ws_sales_price#26, ws_net_profit#17, wr_refunded_cdemo_sk#24, wr_refunded_addr_sk#14, wr_returning_cdemo_sk#18, wr_reason_sk#10, wr_fee#9, wr_refunded_cash#8]
                :           :           :           :           :        +- *(9) SortMergeJoin [ws_web_page_sk#27], [wp_web_page_sk#28], Inner
                :           :           :           :           :           :- *(6) Sort [ws_web_page_sk#27 ASC NULLS FIRST], false, 0
-               :           :           :           :           :           :  +- Exchange hashpartitioning(ws_web_page_sk#27, 200)
+               :           :           :           :           :           :  +- Exchange hashpartitioning(ws_web_page_sk#27, 5)
                :           :           :           :           :           :     +- *(5) Project [ws_sold_date_sk#12, ws_web_page_sk#27, ws_quantity#7, ws_sales_price#26, ws_net_profit#17, wr_refunded_cdemo_sk#24, wr_refunded_addr_sk#14, wr_returning_cdemo_sk#18, wr_reason_sk#10, wr_fee#9, wr_refunded_cash#8]
                :           :           :           :           :           :        +- *(5) SortMergeJoin [cast(ws_item_sk#29 as bigint), cast(ws_order_number#30 as bigint)], [wr_item_sk#31, wr_order_number#32], Inner
                :           :           :           :           :           :           :- *(2) Sort [cast(ws_item_sk#29 as bigint) ASC NULLS FIRST, cast(ws_order_number#30 as bigint) ASC NULLS FIRST], false, 0
-               :           :           :           :           :           :           :  +- Exchange hashpartitioning(cast(ws_item_sk#29 as bigint), cast(ws_order_number#30 as bigint), 200)
+               :           :           :           :           :           :           :  +- Exchange hashpartitioning(cast(ws_item_sk#29 as bigint), cast(ws_order_number#30 as bigint), 5)
                :           :           :           :           :           :           :     +- *(1) Project [ws_sold_date_sk#12, ws_item_sk#29, ws_web_page_sk#27, ws_order_number#30, ws_quantity#7, ws_sales_price#26, ws_net_profit#17]
                :           :           :           :           :           :           :        +- *(1) Filter (((isnotnull(ws_item_sk#29) && isnotnull(ws_order_number#30)) && isnotnull(ws_web_page_sk#27)) && isnotnull(ws_sold_date_sk#12))
                :           :           :           :           :           :           :           +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex37-index-9-ws_sold_date_sk-21, LogVersion: 0) default.web_sales[ws_sold_date_sk#12,ws_item_sk#29,ws_web_page_sk#27,ws_order_number#30,ws_quantity#7,ws_sales_price#26,ws_net_profit#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ws_item_sk), IsNotNull(ws_order_number), IsNotNull(ws_web_page_sk), IsNotNull(ws_sold_..., ReadSchema: struct<ws_sold_date_sk:int,ws_item_sk:int,ws_web_page_sk:int,ws_order_number:int,ws_quantity:int,...
                :           :           :           :           :           :           +- *(4) Sort [wr_item_sk#31 ASC NULLS FIRST, wr_order_number#32 ASC NULLS FIRST], false, 0
-               :           :           :           :           :           :              +- Exchange hashpartitioning(wr_item_sk#31, wr_order_number#32, 200)
+               :           :           :           :           :           :              +- Exchange hashpartitioning(wr_item_sk#31, wr_order_number#32, 5)
                :           :           :           :           :           :                 +- *(3) Project [wr_item_sk#31, wr_refunded_cdemo_sk#24, wr_refunded_addr_sk#14, wr_returning_cdemo_sk#18, wr_reason_sk#10, wr_order_number#32, wr_fee#9, wr_refunded_cash#8]
                :           :           :           :           :           :                    +- *(3) Filter (((((isnotnull(wr_item_sk#31) && isnotnull(wr_order_number#32)) && isnotnull(wr_refunded_cdemo_sk#24)) && isnotnull(wr_returning_cdemo_sk#18)) && isnotnull(wr_refunded_addr_sk#14)) && isnotnull(wr_reason_sk#10))
                :           :           :           :           :           :                       +- *(3) FileScan Hyperspace(Type: CI, Name: JoinIndex41-index-36-wr_item_sk-11, LogVersion: 0) default.web_returns[wr_item_sk#31,wr_refunded_cdemo_sk#24,wr_refunded_addr_sk#14,wr_returning_cdemo_sk#18,wr_reason_sk#10,wr_order_number#32,wr_fee#9,wr_refunded_cash#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(wr_item_sk), IsNotNull(wr_order_number), IsNotNull(wr_refunded_cdemo_sk), IsNotNull(wr..., ReadSchema: struct<wr_item_sk:bigint,wr_refunded_cdemo_sk:bigint,wr_refunded_addr_sk:bigint,wr_returning_cdem...
                :           :           :           :           :           +- *(8) Sort [wp_web_page_sk#28 ASC NULLS FIRST], false, 0
-               :           :           :           :           :              +- Exchange hashpartitioning(wp_web_page_sk#28, 200)
+               :           :           :           :           :              +- Exchange hashpartitioning(wp_web_page_sk#28, 5)
                :           :           :           :           :                 +- *(7) Project [wp_web_page_sk#28]
                :           :           :           :           :                    +- *(7) Filter isnotnull(wp_web_page_sk#28)
                :           :           :           :           :                       +- *(7) FileScan parquet default.web_page[wp_web_page_sk#28] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/web_page], PartitionFilters: [], PushedFilters: [IsNotNull(wp_web_page_sk)], ReadSchema: struct<wp_web_page_sk:int>
                :           :           :           :           +- *(12) Sort [cast(cd_demo_sk#25 as bigint) ASC NULLS FIRST], false, 0
-               :           :           :           :              +- Exchange hashpartitioning(cast(cd_demo_sk#25 as bigint), 200)
+               :           :           :           :              +- Exchange hashpartitioning(cast(cd_demo_sk#25 as bigint), 5)
                :           :           :           :                 +- *(11) Project [cd_demo_sk#25, cd_marital_status#19, cd_education_status#20]
                :           :           :           :                    +- *(11) Filter ((isnotnull(cd_demo_sk#25) && isnotnull(cd_education_status#20)) && isnotnull(cd_marital_status#19))
                :           :           :           :                       +- *(11) FileScan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics[cd_demo_sk#25,cd_marital_status#19,cd_education_status#20] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cd_demo_sk), IsNotNull(cd_education_status), IsNotNull(cd_marital_status)], ReadSchema: struct<cd_demo_sk:int,cd_marital_status:string,cd_education_status:string>
                :           :           :           +- *(16) Sort [cast(cd_demo_sk#21 as bigint) ASC NULLS FIRST, cd_marital_status#22 ASC NULLS FIRST, cd_education_status#23 ASC NULLS FIRST], false, 0
-               :           :           :              +- Exchange hashpartitioning(cast(cd_demo_sk#21 as bigint), cd_marital_status#22, cd_education_status#23, 200)
+               :           :           :              +- Exchange hashpartitioning(cast(cd_demo_sk#21 as bigint), cd_marital_status#22, cd_education_status#23, 5)
                :           :           :                 +- *(15) Project [cd_demo_sk#21, cd_marital_status#22, cd_education_status#23]
-               :           :           :                    +- *(15) Filter ((isnotnull(cd_marital_status#22) && isnotnull(cd_education_status#23)) && isnotnull(cd_demo_sk#21))
-               :           :           :                       +- *(15) FileScan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics[cd_demo_sk#21,cd_marital_status#22,cd_education_status#23] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cd_marital_status), IsNotNull(cd_education_status), IsNotNull(cd_demo_sk)], ReadSchema: struct<cd_demo_sk:int,cd_marital_status:string,cd_education_status:string>
+               :           :           :                    +- *(15) Filter ((isnotnull(cd_demo_sk#21) && isnotnull(cd_education_status#23)) && isnotnull(cd_marital_status#22))
+               :           :           :                       +- *(15) FileScan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics[cd_demo_sk#21,cd_marital_status#22,cd_education_status#23] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cd_demo_sk), IsNotNull(cd_education_status), IsNotNull(cd_marital_status)], ReadSchema: struct<cd_demo_sk:int,cd_marital_status:string,cd_education_status:string>
                :           :           +- *(20) Sort [cast(ca_address_sk#15 as bigint) ASC NULLS FIRST], false, 0
-               :           :              +- Exchange hashpartitioning(cast(ca_address_sk#15 as bigint), 200)
+               :           :              +- Exchange hashpartitioning(cast(ca_address_sk#15 as bigint), 5)
                :           :                 +- *(19) Project [ca_address_sk#15, ca_state#16]
                :           :                    +- *(19) Filter ((isnotnull(ca_country#33) && (ca_country#33 = United States)) && isnotnull(ca_address_sk#15))
                :           :                       +- *(19) FileScan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address[ca_address_sk#15,ca_state#16,ca_country#33] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ca_country), EqualTo(ca_country,United States), IsNotNull(ca_address_sk)], ReadSchema: struct<ca_address_sk:int,ca_state:string,ca_country:string>
                :           +- *(24) Sort [d_date_sk#13 ASC NULLS FIRST], false, 0
-               :              +- Exchange hashpartitioning(d_date_sk#13, 200)
+               :              +- Exchange hashpartitioning(d_date_sk#13, 5)
                :                 +- *(23) Project [d_date_sk#13]
                :                    +- *(23) Filter ((isnotnull(d_year#34) && (d_year#34 = 2000)) && isnotnull(d_date_sk#13))
                :                       +- *(23) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#13,d_year#34] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2000), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
                +- *(28) Sort [cast(r_reason_sk#11 as bigint) ASC NULLS FIRST], false, 0
-                  +- Exchange hashpartitioning(cast(r_reason_sk#11 as bigint), 200)
+                  +- Exchange hashpartitioning(cast(r_reason_sk#11 as bigint), 5)
                      +- *(27) Project [r_reason_sk#11, r_reason_desc#6]
                         +- *(27) Filter isnotnull(r_reason_sk#11)
                            +- *(27) FileScan parquet default.reason[r_reason_sk#11,r_reason_desc#6] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/reason], PartitionFilters: [], PushedFilters: [IsNotNull(r_reason_sk)], ReadSchema: struct<r_reason_sk:int,r_reason_desc:string>

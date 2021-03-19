@@ -3,15 +3,15 @@ TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WH
 +- *(10) Project [total_sum#4, i_category#2, i_class#5, lochierarchy#1, rank_within_parent#3]
    +- Window [rank(_w3#6) windowspecdefinition(_w1#7, _w2#8, _w3#6 DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_within_parent#3], [_w1#7, _w2#8], [_w3#6 DESC NULLS LAST]
       +- *(9) Sort [_w1#7 ASC NULLS FIRST, _w2#8 ASC NULLS FIRST, _w3#6 DESC NULLS LAST], false, 0
-         +- Exchange hashpartitioning(_w1#7, _w2#8, 200)
+         +- Exchange hashpartitioning(_w1#7, _w2#8, 5)
             +- *(8) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[sum(UnscaledValue(ws_net_paid#10))])
-               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 200)
+               +- Exchange hashpartitioning(i_category#2, i_class#5, spark_grouping_id#9, 5)
                   +- *(7) HashAggregate(keys=[i_category#2, i_class#5, spark_grouping_id#9], functions=[partial_sum(UnscaledValue(ws_net_paid#10))])
                      +- *(7) Expand [List(ws_net_paid#10, i_category#11, i_class#12, 0), List(ws_net_paid#10, i_category#11, null, 1), List(ws_net_paid#10, null, null, 3)], [ws_net_paid#10, i_category#2, i_class#5, spark_grouping_id#9]
                         +- *(7) Project [ws_net_paid#10, i_category#13 AS i_category#11, i_class#14 AS i_class#12]
                            +- *(7) SortMergeJoin [ws_item_sk#15], [i_item_sk#16], Inner
                               :- *(4) Sort [ws_item_sk#15 ASC NULLS FIRST], false, 0
-                              :  +- Exchange hashpartitioning(ws_item_sk#15, 200)
+                              :  +- Exchange hashpartitioning(ws_item_sk#15, 5)
                               :     +- *(3) Project [ws_item_sk#15, ws_net_paid#10]
                               :        +- *(3) SortMergeJoin [ws_sold_date_sk#17], [d_date_sk#18], Inner
                               :           :- *(1) Project [ws_sold_date_sk#17, ws_item_sk#15, ws_net_paid#10]
@@ -21,7 +21,7 @@ TakeOrderedAndProject(limit=100, orderBy=[lochierarchy#1 DESC NULLS LAST,CASE WH
                               :              +- *(2) Filter (((isnotnull(d_month_seq#19) && (d_month_seq#19 >= 1200)) && (d_month_seq#19 <= 1211)) && isnotnull(d_date_sk#18))
                               :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#18,d_month_seq#19] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), GreaterThanOrEqual(d_month_seq,1200), LessThanOrEqual(d_month_seq,1211),..., ReadSchema: struct<d_date_sk:int,d_month_seq:int>, SelectedBucketsCount: 200 out of 200
                               +- *(6) Sort [i_item_sk#16 ASC NULLS FIRST], false, 0
-                                 +- Exchange hashpartitioning(i_item_sk#16, 200)
+                                 +- Exchange hashpartitioning(i_item_sk#16, 5)
                                     +- *(5) Project [i_item_sk#16, i_class#14, i_category#13]
                                        +- *(5) Filter isnotnull(i_item_sk#16)
                                           +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#16,i_class#14,i_category#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_class:string,i_category:string>

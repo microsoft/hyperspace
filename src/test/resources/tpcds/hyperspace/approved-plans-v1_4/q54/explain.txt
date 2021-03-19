@@ -1,23 +1,23 @@
 == Physical Plan ==
 TakeOrderedAndProject(limit=100, orderBy=[segment#1 ASC NULLS FIRST,num_customers#2 ASC NULLS FIRST], output=[segment#1,num_customers#2,segment_base#3])
 +- *(31) HashAggregate(keys=[segment#1], functions=[count(1)])
-   +- Exchange hashpartitioning(segment#1, 200)
+   +- Exchange hashpartitioning(segment#1, 5)
       +- *(30) HashAggregate(keys=[segment#1], functions=[partial_count(1)])
          +- *(30) HashAggregate(keys=[c_customer_sk#4], functions=[sum(UnscaledValue(ss_ext_sales_price#5))])
-            +- Exchange hashpartitioning(c_customer_sk#4, 200)
+            +- Exchange hashpartitioning(c_customer_sk#4, 5)
                +- *(29) HashAggregate(keys=[c_customer_sk#4], functions=[partial_sum(UnscaledValue(ss_ext_sales_price#5))])
                   +- *(29) Project [c_customer_sk#4, ss_ext_sales_price#5]
                      +- *(29) SortMergeJoin [ss_sold_date_sk#6], [d_date_sk#7], Inner
                         :- *(26) Sort [ss_sold_date_sk#6 ASC NULLS FIRST], false, 0
-                        :  +- Exchange hashpartitioning(ss_sold_date_sk#6, 200)
+                        :  +- Exchange hashpartitioning(ss_sold_date_sk#6, 5)
                         :     +- *(25) Project [c_customer_sk#4, ss_sold_date_sk#6, ss_ext_sales_price#5]
                         :        +- *(25) SortMergeJoin [ca_county#8, ca_state#9], [s_county#10, s_state#11], Inner
                         :           :- *(22) Sort [ca_county#8 ASC NULLS FIRST, ca_state#9 ASC NULLS FIRST], false, 0
-                        :           :  +- Exchange hashpartitioning(ca_county#8, ca_state#9, 200)
+                        :           :  +- Exchange hashpartitioning(ca_county#8, ca_state#9, 5)
                         :           :     +- *(21) Project [c_customer_sk#4, ss_sold_date_sk#6, ss_ext_sales_price#5, ca_county#8, ca_state#9]
                         :           :        +- *(21) SortMergeJoin [c_current_addr_sk#12], [ca_address_sk#13], Inner
                         :           :           :- *(18) Sort [c_current_addr_sk#12 ASC NULLS FIRST], false, 0
-                        :           :           :  +- Exchange hashpartitioning(c_current_addr_sk#12, 200)
+                        :           :           :  +- Exchange hashpartitioning(c_current_addr_sk#12, 5)
                         :           :           :     +- *(17) Project [c_customer_sk#4, c_current_addr_sk#12, ss_sold_date_sk#6, ss_ext_sales_price#5]
                         :           :           :        +- *(17) SortMergeJoin [c_customer_sk#4], [ss_customer_sk#14], Inner
                         :           :           :           :- *(14) Sort [c_customer_sk#4 ASC NULLS FIRST], false, 0
@@ -26,15 +26,15 @@ TakeOrderedAndProject(limit=100, orderBy=[segment#1 ASC NULLS FIRST,num_customer
                         :           :           :           :        +- *(14) Project [c_customer_sk#4, c_current_addr_sk#12]
                         :           :           :           :           +- *(14) SortMergeJoin [customer_sk#15], [c_customer_sk#4], Inner
                         :           :           :           :              :- *(11) Sort [customer_sk#15 ASC NULLS FIRST], false, 0
-                        :           :           :           :              :  +- Exchange hashpartitioning(customer_sk#15, 200)
+                        :           :           :           :              :  +- Exchange hashpartitioning(customer_sk#15, 5)
                         :           :           :           :              :     +- *(10) Project [customer_sk#15]
                         :           :           :           :              :        +- *(10) SortMergeJoin [sold_date_sk#16], [d_date_sk#7], Inner
                         :           :           :           :              :           :- *(7) Sort [sold_date_sk#16 ASC NULLS FIRST], false, 0
-                        :           :           :           :              :           :  +- Exchange hashpartitioning(sold_date_sk#16, 200)
+                        :           :           :           :              :           :  +- Exchange hashpartitioning(sold_date_sk#16, 5)
                         :           :           :           :              :           :     +- *(6) Project [sold_date_sk#16, customer_sk#15]
                         :           :           :           :              :           :        +- *(6) SortMergeJoin [item_sk#17], [i_item_sk#18], Inner
                         :           :           :           :              :           :           :- *(3) Sort [item_sk#17 ASC NULLS FIRST], false, 0
-                        :           :           :           :              :           :           :  +- Exchange hashpartitioning(item_sk#17, 200)
+                        :           :           :           :              :           :           :  +- Exchange hashpartitioning(item_sk#17, 5)
                         :           :           :           :              :           :           :     +- Union
                         :           :           :           :              :           :           :        :- *(1) Project [cs_sold_date_sk#19 AS sold_date_sk#16, cs_bill_customer_sk#20 AS customer_sk#15, cs_item_sk#21 AS item_sk#17]
                         :           :           :           :              :           :           :        :  +- *(1) Filter ((isnotnull(cs_item_sk#21) && isnotnull(cs_sold_date_sk#19)) && isnotnull(cs_bill_customer_sk#20))
@@ -43,64 +43,64 @@ TakeOrderedAndProject(limit=100, orderBy=[segment#1 ASC NULLS FIRST,num_customer
                         :           :           :           :              :           :           :           +- *(2) Filter ((isnotnull(ws_item_sk#26) && isnotnull(ws_sold_date_sk#22)) && isnotnull(ws_bill_customer_sk#24))
                         :           :           :           :              :           :           :              +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex37-index-9-ws_sold_date_sk-21, LogVersion: 0) default.web_sales[ws_sold_date_sk#22,ws_item_sk#26,ws_bill_customer_sk#24] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ws_item_sk), IsNotNull(ws_sold_date_sk), IsNotNull(ws_bill_customer_sk)], ReadSchema: struct<ws_sold_date_sk:int,ws_item_sk:int,ws_bill_customer_sk:int>
                         :           :           :           :              :           :           +- *(5) Sort [i_item_sk#18 ASC NULLS FIRST], false, 0
-                        :           :           :           :              :           :              +- Exchange hashpartitioning(i_item_sk#18, 200)
+                        :           :           :           :              :           :              +- Exchange hashpartitioning(i_item_sk#18, 5)
                         :           :           :           :              :           :                 +- *(4) Project [i_item_sk#18]
                         :           :           :           :              :           :                    +- *(4) Filter ((((isnotnull(i_category#28) && isnotnull(i_class#29)) && (i_category#28 = Women)) && (i_class#29 = maternity)) && isnotnull(i_item_sk#18))
                         :           :           :           :              :           :                       +- *(4) FileScan Hyperspace(Type: CI, Name: FilterIndex10-index-39-i_category-9, LogVersion: 0) default.item[i_item_sk#18,i_class#29,i_category#28] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_category), IsNotNull(i_class), EqualTo(i_category,Women), EqualTo(i_class,maternity)..., ReadSchema: struct<i_item_sk:int,i_class:string,i_category:string>
                         :           :           :           :              :           +- *(9) Sort [d_date_sk#7 ASC NULLS FIRST], false, 0
-                        :           :           :           :              :              +- Exchange hashpartitioning(d_date_sk#7, 200)
+                        :           :           :           :              :              +- Exchange hashpartitioning(d_date_sk#7, 5)
                         :           :           :           :              :                 +- *(8) Project [d_date_sk#7]
                         :           :           :           :              :                    +- *(8) Filter ((((isnotnull(d_moy#30) && isnotnull(d_year#31)) && (d_moy#30 = 12)) && (d_year#31 = 1998)) && isnotnull(d_date_sk#7))
                         :           :           :           :              :                       +- *(8) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#7,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_moy), IsNotNull(d_year), EqualTo(d_moy,12), EqualTo(d_year,1998), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
                         :           :           :           :              +- *(13) Sort [c_customer_sk#4 ASC NULLS FIRST], false, 0
-                        :           :           :           :                 +- Exchange hashpartitioning(c_customer_sk#4, 200)
+                        :           :           :           :                 +- Exchange hashpartitioning(c_customer_sk#4, 5)
                         :           :           :           :                    +- *(12) Project [c_customer_sk#4, c_current_addr_sk#12]
                         :           :           :           :                       +- *(12) Filter (isnotnull(c_customer_sk#4) && isnotnull(c_current_addr_sk#12))
                         :           :           :           :                          +- *(12) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#4,c_current_addr_sk#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk), IsNotNull(c_current_addr_sk)], ReadSchema: struct<c_customer_sk:int,c_current_addr_sk:int>
                         :           :           :           +- *(16) Sort [ss_customer_sk#14 ASC NULLS FIRST], false, 0
-                        :           :           :              +- Exchange hashpartitioning(ss_customer_sk#14, 200)
+                        :           :           :              +- Exchange hashpartitioning(ss_customer_sk#14, 5)
                         :           :           :                 +- *(15) Project [ss_sold_date_sk#6, ss_customer_sk#14, ss_ext_sales_price#5]
                         :           :           :                    +- *(15) Filter (isnotnull(ss_customer_sk#14) && isnotnull(ss_sold_date_sk#6))
                         :           :           :                       +- *(15) FileScan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales[ss_sold_date_sk#6,ss_customer_sk#14,ss_ext_sales_price#5] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_customer_sk), IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_customer_sk:int,ss_ext_sales_price:decimal(7,2)>
                         :           :           +- *(20) Sort [ca_address_sk#13 ASC NULLS FIRST], false, 0
-                        :           :              +- Exchange hashpartitioning(ca_address_sk#13, 200)
+                        :           :              +- Exchange hashpartitioning(ca_address_sk#13, 5)
                         :           :                 +- *(19) Project [ca_address_sk#13, ca_county#8, ca_state#9]
                         :           :                    +- *(19) Filter ((isnotnull(ca_address_sk#13) && isnotnull(ca_county#8)) && isnotnull(ca_state#9))
                         :           :                       +- *(19) FileScan Hyperspace(Type: CI, Name: FilterIndex32-index-35-ca_state-11, LogVersion: 0) default.customer_address[ca_address_sk#13,ca_county#8,ca_state#9] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ca_address_sk), IsNotNull(ca_county), IsNotNull(ca_state)], ReadSchema: struct<ca_address_sk:int,ca_county:string,ca_state:string>
                         :           +- *(24) Sort [s_county#10 ASC NULLS FIRST, s_state#11 ASC NULLS FIRST], false, 0
-                        :              +- Exchange hashpartitioning(s_county#10, s_state#11, 200)
+                        :              +- Exchange hashpartitioning(s_county#10, s_state#11, 5)
                         :                 +- *(23) Project [s_county#10, s_state#11]
                         :                    +- *(23) Filter (isnotnull(s_county#10) && isnotnull(s_state#11))
                         :                       +- *(23) FileScan parquet default.store[s_county#10,s_state#11] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store], PartitionFilters: [], PushedFilters: [IsNotNull(s_county), IsNotNull(s_state)], ReadSchema: struct<s_county:string,s_state:string>
                         +- *(28) Sort [d_date_sk#7 ASC NULLS FIRST], false, 0
-                           +- Exchange hashpartitioning(d_date_sk#7, 200)
+                           +- Exchange hashpartitioning(d_date_sk#7, 5)
                               +- *(27) Project [d_date_sk#7]
-                                 +- *(27) Filter (((isnotnull(d_month_seq#32) && (d_month_seq#32 >= Subquery subquery76144)) && (d_month_seq#32 <= Subquery subquery76145)) && isnotnull(d_date_sk#7))
-                                    :  :- Subquery subquery76144
+                                 +- *(27) Filter (((isnotnull(d_month_seq#32) && (d_month_seq#32 >= Subquery subquery11131)) && (d_month_seq#32 <= Subquery subquery11132)) && isnotnull(d_date_sk#7))
+                                    :  :- Subquery subquery11131
                                     :  :  +- *(2) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
-                                    :  :     +- Exchange hashpartitioning((d_month_seq + 1)#33, 200)
+                                    :  :     +- Exchange hashpartitioning((d_month_seq + 1)#33, 5)
                                     :  :        +- *(1) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
                                     :  :           +- *(1) Project [(d_month_seq#32 + 1) AS (d_month_seq + 1)#33]
                                     :  :              +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
                                     :  :                 +- *(1) FileScan parquet default.date_dim[d_month_seq#32,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,1998), EqualTo(d_moy,12)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
-                                    :  +- Subquery subquery76145
+                                    :  +- Subquery subquery11132
                                     :     +- *(2) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
-                                    :        +- Exchange hashpartitioning((d_month_seq + 3)#34, 200)
+                                    :        +- Exchange hashpartitioning((d_month_seq + 3)#34, 5)
                                     :           +- *(1) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
                                     :              +- *(1) Project [(d_month_seq#32 + 3) AS (d_month_seq + 3)#34]
                                     :                 +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
                                     :                    +- *(1) FileScan parquet default.date_dim[d_month_seq#32,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,1998), EqualTo(d_moy,12)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
                                     +- *(27) FileScan Hyperspace(Type: CI, Name: FilterIndex07-index-17-d_month_seq-7, LogVersion: 0) default.date_dim[d_date_sk#7,d_month_seq#32] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_month_seq), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_month_seq:int>
-                                          :- Subquery subquery76144
+                                          :- Subquery subquery11131
                                           :  +- *(2) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
-                                          :     +- Exchange hashpartitioning((d_month_seq + 1)#33, 200)
+                                          :     +- Exchange hashpartitioning((d_month_seq + 1)#33, 5)
                                           :        +- *(1) HashAggregate(keys=[(d_month_seq + 1)#33], functions=[])
                                           :           +- *(1) Project [(d_month_seq#32 + 1) AS (d_month_seq + 1)#33]
                                           :              +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
                                           :                 +- *(1) FileScan parquet default.date_dim[d_month_seq#32,d_year#31,d_moy#30] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/date_dim], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,1998), EqualTo(d_moy,12)], ReadSchema: struct<d_month_seq:int,d_year:int,d_moy:int>
-                                          +- Subquery subquery76145
+                                          +- Subquery subquery11132
                                              +- *(2) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
-                                                +- Exchange hashpartitioning((d_month_seq + 3)#34, 200)
+                                                +- Exchange hashpartitioning((d_month_seq + 3)#34, 5)
                                                    +- *(1) HashAggregate(keys=[(d_month_seq + 3)#34], functions=[])
                                                       +- *(1) Project [(d_month_seq#32 + 3) AS (d_month_seq + 3)#34]
                                                          +- *(1) Filter (((isnotnull(d_year#31) && isnotnull(d_moy#30)) && (d_year#31 = 1998)) && (d_moy#30 = 12))
