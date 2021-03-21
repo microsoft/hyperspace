@@ -63,7 +63,7 @@ private[actions] abstract class RefreshActionBase(
     previousIndexLogEntry.hasLineageColumn
   }
 
-  override protected def prevIndexProperties(): Map[String, String] = {
+  override protected def prevIndexProperties: Map[String, String] = {
     previousIndexLogEntry.derivedDataset.properties.properties
   }
 

@@ -81,49 +81,51 @@ object RuleUtils {
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      val entry = relation.closestIndexVersion(index)
+      val entry = relation.closestIndex(index)
 
-      if (entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
-        // Find the number of common files between the source relation and index source files.
-        // The total size of common files are collected and tagged for candidate.
-        val (commonCnt, commonBytes) = relation.allFileInfos.foldLeft(0L, 0L) { (res, f) =>
-          if (entry.sourceFileInfoSet.contains(f)) {
-            (res._1 + 1, res._2 + f.size) // count, total bytes
-          } else {
-            res
+      val isHybridScanCandidate =
+        entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
+          // Find the number of common files between the source relation and index source files.
+          // The total size of common files are collected and tagged for candidate.
+          val (commonCnt, commonBytes) = relation.allFileInfos.foldLeft(0L, 0L) { (res, f) =>
+            if (entry.sourceFileInfoSet.contains(f)) {
+              (res._1 + 1, res._2 + f.size) // count, total bytes
+            } else {
+              res
+            }
           }
+
+          val appendedBytesRatio = 1 - commonBytes / relation.allFileSizeInBytes.toFloat
+          val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
+
+          val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
+          val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
+            commonCnt > 0 &&
+            appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
+            deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
+
+          // For append-only Hybrid Scan, deleted files are not allowed.
+          lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
+            appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
+
+          val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
+          if (isCandidate) {
+            entry.setTagValue(
+              relation.plan,
+              IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES,
+              commonBytes)
+
+            // If there is no change in source dataset, the index will be applied by
+            // transformPlanToUseIndexOnlyScan.
+            entry.setTagValue(
+              relation.plan,
+              IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+              !(commonCnt == entry.sourceFileInfoSet.size
+                && commonCnt == relation.allFileInfos.size))
+          }
+          isCandidate
         }
-
-        val appendedBytesRatio = 1 - commonBytes / relation.allFileSizeInBytes.toFloat
-        val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
-
-        val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-        val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
-          commonCnt > 0 &&
-          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
-          deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
-
-        // For append-only Hybrid Scan, deleted files are not allowed.
-        lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
-          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
-
-        val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
-        if (isCandidate) {
-          entry.setTagValue(
-            relation.plan,
-            IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES,
-            commonBytes)
-
-          // If there is no change in source dataset, the index will be applied by
-          // transformPlanToUseIndexOnlyScan.
-          entry.setTagValue(
-            relation.plan,
-            IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
-            !(commonCnt == entry.sourceFileInfoSet.size
-              && commonCnt == relation.allFileInfos.size))
-        }
-        isCandidate
-      }) {
+      if (isHybridScanCandidate) {
         Some(entry)
       } else {
         None

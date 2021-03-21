@@ -146,6 +146,12 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
       path)
   }
 
+  /**
+   * Retrieve the history of index log version and delta table version from the given index.
+   *
+   * @param index Index to retrieve the version info.
+   * @return List of (index log version, delta table version) in ascending order.
+   */
   private def deltaLakeVersionHistory(index: IndexLogEntry): Seq[(Int, Int)] = {
     val versions =
       index.derivedDataset.properties.properties
@@ -153,14 +159,14 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
 
     // The value is comma separated versions - <index log version>:<delta table version>.
     // e.g. "1:2,3:5,5:9"
-    versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (list, versionStr) =>
+    versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (acc, versionStr) =>
       val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
-      if (list.nonEmpty && list.head._2 == deltaTableVersion) {
+      if (acc.nonEmpty && acc.head._2 == deltaTableVersion) {
         // Omit if the delta lake version is the same. In this case, we only take the higher
         // index log version as it's from index optimizations.
-        list
+        acc
       } else {
-        (indexLogVersion, deltaTableVersion) +: list
+        (indexLogVersion, deltaTableVersion) +: acc
       }
     }
   }
@@ -175,14 +181,14 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * @param index Candidate index to be applied.
    * @return IndexLogEntry of the closest version among available index versions.
    */
-  override def closestIndexVersion(index: IndexLogEntry): IndexLogEntry = {
+  override def closestIndex(index: IndexLogEntry): IndexLogEntry = {
     // Seq of (index log version, delta lake table version)
     val versions = deltaLakeVersionHistory(index)
 
     lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
     def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
       indexManager
-        .getIndexLogEntry(index.name, logVersion)
+        .getIndexByVersion(index.name, logVersion)
         .get
         .asInstanceOf[IndexLogEntry]
     }
@@ -217,17 +223,14 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
           val prevLog = getIndexLogEntry(prevPair._1)
           val nextLog = getIndexLogEntry(nextPair._1)
 
-          def getAppendedAndDeletedBytes(logEntry: IndexLogEntry): (Long, Long) = {
+          def getDiffBytes(logEntry: IndexLogEntry): Long = {
             val commonBytes =
               allFileInfos.filter(logEntry.sourceFileInfoSet.contains).map(_.size).sum
-            (allFileSizeInBytes - commonBytes, logEntry.sourceFilesSizeInBytes - commonBytes)
+            allFileSizeInBytes - commonBytes + logEntry.sourceFilesSizeInBytes - commonBytes
           }
 
-          val (prevAppendedBytes, prevDeletedBytes) = getAppendedAndDeletedBytes(prevLog)
-          val (nextAppendedBytes, nextDeletedBytes) = getAppendedAndDeletedBytes(nextLog)
-
-          // Pick one with less diff bytes, so as to reduce the regression from Hybrid Scan.
-          if ((prevAppendedBytes + prevDeletedBytes) < (nextAppendedBytes + nextDeletedBytes)) {
+          // Prefer index with less diff bytes to reduce the chance of regression from Hybrid Scan.
+          if (getDiffBytes(prevLog) < getDiffBytes(nextLog)) {
             prevLog
           } else {
             nextLog

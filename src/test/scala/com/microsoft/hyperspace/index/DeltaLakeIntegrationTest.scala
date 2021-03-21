@@ -322,222 +322,201 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   }
 
   test("Verify time travel query picks the closest index version for Hybrid Scan.") {
-    withTempPathAsString { dataPath =>
+    withTempPathAsString { path =>
       import spark.implicits._
-      val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      dfFromSample.write.format("delta").save(dataPath)
+      val df = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      df.write.format("delta").save(path)
 
-      val timestampMap = mutable.Map[Long, String]()
-      timestampMap.put(0, getSparkFormattedTimestamps(System.currentTimeMillis).head)
+      val tsMap = mutable.Map[Long, String]()
+      tsMap.put(0, getSparkFormattedTimestamps(System.currentTimeMillis).head)
 
-      val deltaDf = spark.read.format("delta").load(dataPath)
+      val deltaDf = spark.read.format("delta").load(path)
+      val indexName = "deltaIndex1"
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-        hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+        hyperspace.createIndex(deltaDf, IndexConfig(indexName, Seq("clicks"), Seq("Query")))
       }
 
-      withIndex("deltaIndex") {
-        def query(version: Option[Long] = None, asTimestamp: Boolean = false): DataFrame = {
-          val deltaDf = if (version.isDefined) {
-            if (asTimestamp) {
-              spark.read
-                .format("delta")
-                .option("timestampAsOf", timestampMap(version.get))
-                .load(dataPath)
-            } else {
-              spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
-            }
-          } else {
-            spark.read.format("delta").load(dataPath)
-          }
-          deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
-        }
-
-        def checkExpectedIndexUsed(
-            timeTravelVersion: Option[Long],
-            expectedIndexPathSubStr: String*): Unit = {
-          val q = query(timeTravelVersion, asTimestamp = false)
-          assert(
-            isIndexUsed(q.queryExecution.optimizedPlan, expectedIndexPathSubStr: _*),
-            s"timeTravelVer: $timeTravelVersion, expectedPaths: $expectedIndexPathSubStr)," +
-              s"actualPaths: ${q.inputFiles.toSeq.toString}")
-          if (timeTravelVersion.isDefined) {
-            // Check time travel query with timestampAsOf instead of versionAsOf.
-            val df = spark.read.format("delta").load(dataPath)
-            val latestVer = getDeltaLakeTableVersion(df)
-            // Delta Lake throws an exception if the timestamp is larger than the latest commit.
-            if (latestVer != timeTravelVersion.get) {
-              assert(
-                isIndexUsed(
-                  query(timeTravelVersion, asTimestamp = true).queryExecution.optimizedPlan,
-                  expectedIndexPathSubStr: _*),
-                s"timeTravelVer: $timeTravelVersion, expectedPaths: $expectedIndexPathSubStr)")
-            }
-          }
-        }
-
-        checkExpectedIndexUsed(None, "deltaIndex/v__=0")
-
-        def appendData(doRefresh: Boolean): Unit = {
-          // Append data.
-          dfFromSample
-            .limit(3)
-            .write
-            .format("delta")
-            .mode("append")
-            .save(dataPath)
-
-          // Get the timestamp string for time travel query using "timestampAsOf" option.
-          val timestampStr = getSparkFormattedTimestamps(System.currentTimeMillis).head
-          // Sleep 1 second because the unit of commit timestamp is second.
-          Thread.sleep(1000)
-
-          if (doRefresh) {
-            hyperspace.refreshIndex("deltaIndex", mode = "full")
-          }
-
-          val newDf = spark.read.format("delta").load(dataPath)
-          timestampMap.put(getDeltaLakeTableVersion(newDf), timestampStr)
-        }
+      withIndex(indexName) {
+        checkExpectedIndexUsed(indexName, path, None, 1)
 
         withSQLConf(TestConfig.HybridScanEnabled: _*) {
-          appendData(doRefresh = false) // delta version 1
-          appendData(doRefresh = true) // delta version 2
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 1, index log version 1
+          appendAndRefresh(df, path, indexName, Some("full"), tsMap)
+          // delta version 2, index log version 3 (refresh)
 
-          // The index should be applied for the updated version.
-          checkExpectedIndexUsed(None, "deltaIndex/v__=1")
-          checkExpectedIndexUsed(Some(0), "deltaIndex/v__=0")
+          // Without delta table version, the latest log version should be applied.
+          checkExpectedIndexUsed(indexName, path, None, 3)
+          // For delta table version 0, candidate log version is 1.
+          checkExpectedIndexUsed(indexName, path, Some(0, tsMap(0)), 1)
 
-          appendData(doRefresh = false) // delta version 3
-          appendData(doRefresh = false) // delta version 4
-          appendData(doRefresh = false) // delta version 5
-          appendData(doRefresh = true) // delta version 6
-          appendData(doRefresh = false) // delta version 7
-          appendData(doRefresh = true) // delta version 8
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 3, index log version 3
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 4, index log version 3
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 5, index log version 3
+          appendAndRefresh(df, path, indexName, Some("full"), tsMap)
+          // delta version 6, index log version 5 (refresh)
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 7, index log version 5
+          appendAndRefresh(df, path, indexName, Some("full"), tsMap)
+          // delta version 8, index log version 7 (refresh)
 
-          val dataPathStr = new Path(dataPath).toString
-
-          checkExpectedIndexUsed(None, "deltaIndex/v__=3")
-          checkExpectedIndexUsed(Some(1), "deltaIndex/v__=1")
-          checkExpectedIndexUsed(Some(3), "deltaIndex/v__=1", dataPathStr)
-          checkExpectedIndexUsed(Some(5), "deltaIndex/v__=2")
-          checkExpectedIndexUsed(Some(6), "deltaIndex/v__=2")
-          checkExpectedIndexUsed(Some(7), "deltaIndex/v__=3")
+          // Without delta table version, the latest log version should be applied.
+          checkExpectedIndexUsed(indexName, path, None, 7)
+          // For delta table version 1, candidate log versions are 1, 3 and both are same diff,
+          // then pick the larger one (3).
+          checkExpectedIndexUsed(indexName, path, Some(1, tsMap(1)), 3)
+          // For delta table version 3, candidate log versions are 3, 5, but 3 is closer.
+          checkExpectedIndexUsed(indexName, path, Some(3, tsMap(3)), 3)
+          // For delta table version 5, candidate log versions are 3, 5, but 5 is closer.
+          checkExpectedIndexUsed(indexName, path, Some(5, tsMap(5)), 5)
+          // For delta table version 6, candidate log version is 5. (refresh)
+          checkExpectedIndexUsed(indexName, path, Some(6, tsMap(6)), 5)
+          // For delta table version 8, candidate log version is 7. (refresh)
+          checkExpectedIndexUsed(indexName, path, Some(8, tsMap(8)), 7)
         }
       }
     }
   }
 
   test("Verify time travel query works well with incremental refresh & optimizeIndex.") {
-    withTempPathAsString { dataPath =>
+    withTempPathAsString { path =>
       import spark.implicits._
-      val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-      dfFromSample.write.format("delta").save(dataPath)
+      val df = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      df.write.format("delta").save(path)
 
-      val timestampMap = mutable.Map[Long, String]()
-      timestampMap.put(0, getSparkFormattedTimestamps(System.currentTimeMillis).head)
+      val tsMap = mutable.Map[Long, String]()
+      tsMap.put(0, getSparkFormattedTimestamps(System.currentTimeMillis).head)
 
       val indexName = "deltaIndex2"
-      val deltaDf = spark.read.format("delta").load(dataPath)
+      val deltaDf = spark.read.format("delta").load(path)
 
-      def appendData(doRefresh: Boolean): Unit = {
-        // Append data.
-        dfFromSample
-          .limit(3)
-          .write
-          .format("delta")
-          .mode("append")
-          .save(dataPath)
-
-        // Get the timestamp string for time travel query using "timestampAsOf" option.
-        val timestampStr = getSparkFormattedTimestamps(System.currentTimeMillis).head
-        // Sleep 1 second because the unit of commit timestamp is second.
-        Thread.sleep(1000)
-
-        if (doRefresh) {
-          hyperspace.refreshIndex(indexName, mode = "incremental")
-        }
-
-        val newDf = spark.read.format("delta").load(dataPath)
-        timestampMap.put(getDeltaLakeTableVersion(newDf), timestampStr)
-      }
-
-      def query(version: Option[Long] = None, asTimestamp: Boolean = false): DataFrame = {
-        val deltaDf = if (version.isDefined) {
-          if (asTimestamp) {
-            spark.read
-              .format("delta")
-              .option("timestampAsOf", timestampMap(version.get))
-              .load(dataPath)
-          } else {
-            spark.read.format("delta").option("versionAsOf", version.get).load(dataPath)
-          }
-        } else {
-          spark.read.format("delta").load(dataPath)
-        }
-        deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
-      }
-
-      def checkExpectedIndexUsed(
-          timeTravelVersion: Option[Long],
-          expectedIndexVersion: Int): Unit = {
-        val q = query(timeTravelVersion, asTimestamp = false)
-        assert(
-          isIndexVersionUsed(q.queryExecution.optimizedPlan, indexName, expectedIndexVersion),
-          s"timeTravelVer: ${timeTravelVersion.getOrElse("N/A")}, " +
-            s"expectedIndexVer: $expectedIndexVersion, actualPaths: ${q.inputFiles.toSeq.toString}")
-        if (timeTravelVersion.isDefined) {
-          val df = spark.read.format("delta").load(dataPath)
-          // Check time travel query with timestampAsOf instead of versionAsOf.
-          val latestVer = getDeltaLakeTableVersion(df)
-          // Delta Lake throws an exception if the timestamp is larger than the latest commit.
-          if (latestVer != timeTravelVersion.get) {
-            assert(
-              isIndexVersionUsed(
-                query(timeTravelVersion, asTimestamp = true).queryExecution.optimizedPlan,
-                "delta",
-                expectedIndexVersion),
-              s"timeTravelVer: ${timeTravelVersion.getOrElse("N/A")}, "
-                + s"expectedIndexVer: $expectedIndexVersion")
-          }
-        }
-      }
-
-      appendData(doRefresh = false) // delta version 1
-      appendData(doRefresh = false) // delta version 2
+      appendAndRefresh(df, path, indexName, None, tsMap) // delta version 1
+      appendAndRefresh(df, path, indexName, None, tsMap) // delta version 2
 
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         hyperspace.createIndex(deltaDf, IndexConfig(indexName, Seq("clicks"), Seq("Query")))
       }
 
       withIndex(indexName) {
-        checkExpectedIndexUsed(None, 1)
+        checkExpectedIndexUsed(indexName, path, None, 1)
 
         withSQLConf(TestConfig.HybridScanEnabled: _*) {
-          appendData(doRefresh = false) // delta version 3, index log version 1
-          appendData(doRefresh = true) // delta version 4, index log version 3
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 3, index log version 1
+          appendAndRefresh(df, path, indexName, Some("incremental"), tsMap)
+          // delta version 4, index log version 3 (refresh)
 
-          // The index should be applied for the updated version.
-          checkExpectedIndexUsed(None, 3)
-          checkExpectedIndexUsed(Some(0), 1)
-          appendData(doRefresh = false) // delta version 5, index log version 3
-          appendData(doRefresh = false) // delta version 6, index log version 3
-          appendData(doRefresh = true) // delta version 7, index log version 5
-          hyperspace.optimizeIndex(indexName) // delta version 8, index log version 7
-          appendData(doRefresh = true) // delta version 9, index log version 9
-          hyperspace.optimizeIndex(indexName) // delta version 10, index log version 11
-          appendData(doRefresh = false) // delta version 11, index long version 11
+          // Without delta table version, the latest log version should be applied.
+          checkExpectedIndexUsed(indexName, path, None, 3)
+          // For delta table version 0, candidate log version is 1.
+          checkExpectedIndexUsed(indexName, path, Some(0, tsMap(1)), 1)
 
-          checkExpectedIndexUsed(None, 11)
-          checkExpectedIndexUsed(Some(1), 1)
-          checkExpectedIndexUsed(Some(2), 1)
-          checkExpectedIndexUsed(Some(5), 3)
-          checkExpectedIndexUsed(Some(6), 7)
-          checkExpectedIndexUsed(Some(7), 7)
-          checkExpectedIndexUsed(Some(8), 11)
-          checkExpectedIndexUsed(Some(9), 11)
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 5, index log version 3
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 6, index log version 3
+          appendAndRefresh(df, path, indexName, Some("incremental"), tsMap)
+          // delta version 7, index log version 5 (refresh)
+          hyperspace.optimizeIndex(indexName)
+          // delta version 7, index log version 7 (optimize)
+          appendAndRefresh(df, path, indexName, Some("incremental"), tsMap)
+          // delta version 8, index log version 9 (refresh)
+          hyperspace.optimizeIndex(indexName)
+          // delta version 8, index log version 11 (optimize)
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 9, index long version 11
+
+          // Without delta table version, the latest log version should be applied.
+          checkExpectedIndexUsed(indexName, path, None, 11)
+
+          // For delta table version 1, candidate log version is 1. (before index creation)
+          checkExpectedIndexUsed(indexName, path, Some(1, tsMap(1)), 1)
+          // For delta table version 2, candidate log version is 1. (index creation)
+          checkExpectedIndexUsed(indexName, path, Some(2, tsMap(2)), 1)
+          // For delta table version 5, candidate log versions are 3, 7. 3 is closer.
+          checkExpectedIndexUsed(indexName, path, Some(5, tsMap(5)), 3)
+          // For delta table version 6, candidate log versions are 3, 7. 7 is closer.
+          checkExpectedIndexUsed(indexName, path, Some(6, tsMap(6)), 7)
+          // For delta table version 7, candidate log version is 7. (optimize)
+          checkExpectedIndexUsed(indexName, path, Some(7, tsMap(7)), 7)
+          // For delta table version 8, candidate log version is 11. (optimize)
+          checkExpectedIndexUsed(indexName, path, Some(8, tsMap(8)), 11)
+          // For delta table version 9, candidate log version is 11.
+          checkExpectedIndexUsed(indexName, path, Some(9, tsMap(9)), 11)
         }
       }
     }
+  }
+
+  def checkExpectedIndexUsed(
+      indexName: String,
+      dataPath: String,
+      timeTravelInfo: Option[(Long, String)],
+      expectedIndexVersion: Int): Unit = {
+    def buildQuery(
+        path: String,
+        versionAsOf: Option[Long] = None,
+        timestampAsOf: Option[String] = None): DataFrame = {
+      assert(!(versionAsOf.isDefined && timestampAsOf.isDefined))
+      val deltaDf = if (versionAsOf.isDefined) {
+        spark.read.format("delta").option("versionAsOf", versionAsOf.get).load(path)
+      } else if (timestampAsOf.isDefined) {
+        spark.read
+          .format("delta")
+          .option("timestampAsOf", timestampAsOf.get)
+          .load(path)
+      } else {
+        spark.read.format("delta").load(path)
+      }
+      deltaDf.filter(deltaDf("clicks") <= 2000).select(deltaDf("query"))
+    }
+
+    val q = buildQuery(dataPath, timeTravelInfo.map(t => t._1), None)
+    assert(
+      isIndexVersionUsed(q.queryExecution.optimizedPlan, indexName, expectedIndexVersion),
+      s"timeTravelVer: ${timeTravelInfo.getOrElse("N/A")}, " +
+        s"expectedIndexVer: $expectedIndexVersion, " +
+        s"plan: ${q.queryExecution.optimizedPlan.toString}")
+    if (timeTravelInfo.isDefined) {
+      val df = spark.read.format("delta").load(dataPath)
+      // Check time travel query with timestampAsOf instead of versionAsOf.
+      val latestVer = getDeltaLakeTableVersion(df)
+      // Delta Lake throws an exception if the timestamp is larger than the latest commit.
+      if (latestVer != timeTravelInfo.get._1) {
+        val q = buildQuery(dataPath, None, timeTravelInfo.map(t => t._2))
+        assert(
+          isIndexVersionUsed(q.queryExecution.optimizedPlan, indexName, expectedIndexVersion),
+          s"timeTravelVer: ${timeTravelInfo.getOrElse("N/A")}, " +
+            s"expectedIndexVer: $expectedIndexVersion, " +
+            s"plan: ${q.queryExecution.optimizedPlan.toString}")
+      }
+    }
+  }
+
+  private def appendAndRefresh(
+      df: DataFrame,
+      dataPath: String,
+      indexName: String,
+      refreshMode: Option[String],
+      timestampMap: mutable.Map[Long, String]): Unit = {
+    df.limit(3).write.format("delta").mode("append").save(dataPath)
+
+    // Get the timestamp string for time travel query using "timestampAsOf" option.
+    val timestampStr = getSparkFormattedTimestamps(System.currentTimeMillis).head
+    // Sleep 1 second because Delta lake internally handles commit timestamp in second unit.
+    // Without this sleep, tests will fail in azure pipeline.
+    Thread.sleep(1000)
+
+    if (refreshMode.isDefined) {
+      hyperspace.refreshIndex(indexName, mode = refreshMode.get)
+    }
+
+    val newDf = spark.read.format("delta").load(dataPath)
+    getDeltaLakeTableVersion(newDf)
+    timestampMap.put(getDeltaLakeTableVersion(newDf), timestampStr)
   }
 
   private def getDeltaLakeTableVersion(df: DataFrame): Long = {

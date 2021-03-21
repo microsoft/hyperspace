@@ -135,14 +135,12 @@ trait FileBasedRelation extends SourceRelation {
   def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)]
 
   /**
-   * Returns IndexLogEntry of the closest index version for the given relation.
-   *
-   * curFiles is used to calculate the similarity with each index version data.
+   * Returns IndexLogEntry of the closest version for the given index.
    *
    * @param index Candidate index to be applied.
    * @return IndexLogEntry of the closest version among available index versions.
    */
-  def closestIndexVersion(index: IndexLogEntry): IndexLogEntry = {
+  def closestIndex(index: IndexLogEntry): IndexLogEntry = {
     index
   }
 }

@@ -132,8 +132,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   /**
    * Returns enriched index properties.
    *
-   * Currently, there is no update for this provider.
-   *
    * @param relation Relation to retrieve necessary information.
    * @param properties Index properties to enrich.
    * @return Updated index properties for index creation or refresh.

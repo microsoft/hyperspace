@@ -132,7 +132,7 @@ class OptimizeAction(
     (filesToOptimize.flatten.toSeq, singleFilesToIgnore.flatten.toSeq ++ largeFilesToIgnore)
   }
 
-  override protected def prevIndexProperties(): Map[String, String] = {
+  override protected def prevIndexProperties: Map[String, String] = {
     previousIndexLogEntry.derivedDataset.properties.properties
   }
 
@@ -152,7 +152,7 @@ class OptimizeAction(
                 .sourceProviderManager
                 .enrichIndexProperties(
                   previousIndexLogEntry.relations.head,
-                  prevIndexProperties() + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
+                  prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
 
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {
