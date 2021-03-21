@@ -48,7 +48,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     HyperspaceConf.indexLineageEnabled(spark)
   }
 
-  protected def prevIndexProperties(): Map[String, String] = {
+  protected def prevIndexProperties: Map[String, String] = {
+    // Return empty map for index creation - no previous properties.
     Map()
   }
 
@@ -83,7 +84,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
             .sourceProviderManager
             .enrichIndexProperties(
               sourcePlanProperties.relations.head,
-              prevIndexProperties() + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
+              prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
                 ++ hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation))
 
         IndexLogEntry(

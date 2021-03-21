@@ -152,11 +152,10 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     // The value is comma separated versions - <index log version>:<delta table version>.
     // e.g. "1:2,3:5,5:9"
     versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (list, versionStr) =>
-      val pair = versionStr.split(":")
       val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
       if (list.nonEmpty && list.head._2 == deltaTableVersion) {
         // Omit if the delta lake version is the same. In this case, we only take the higher
-        // index log version as this is usually from index optimizations.
+        // index log version as it's from index optimizations.
         list
       } else {
         (indexLogVersion, deltaTableVersion) +: list
@@ -187,43 +186,43 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     }
     // TODO: Currently assume all versions of index data exist.
     //  Need to check and remove candidate indexes.
+    //  See https://github.com/microsoft/hyperspace/issues/387
 
     plan.relation match {
       case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-        val equalOrLessLastIndex = versions.lastIndexWhere(location.tableVersion >= _._2)
-        if (equalOrLessLastIndex == versions.size - 1) {
+        // Find the largest index version whose delta table version is equal or less than
+        // the given relation.
+        val equalOrLessThanLastIndex = versions.lastIndexWhere(location.tableVersion >= _._2)
+        if (equalOrLessThanLastIndex == versions.size - 1) {
           // The given table version is equal or larger than the latest index's.
           // Use the latest version.
           index
-        } else if (equalOrLessLastIndex == -1) {
+        } else if (equalOrLessThanLastIndex == -1) {
           // The given table version is smaller than the version at index creation.
           // Use the initial version.
           getIndexLogEntry(versions.head._1)
-        } else if (versions(equalOrLessLastIndex)._2 == location.tableVersion) {
+        } else if (versions(equalOrLessThanLastIndex)._2 == location.tableVersion) {
           // There is the index version that built for the given table version.
           // Use the exact version.
-          getIndexLogEntry(versions(equalOrLessLastIndex)._1)
+          getIndexLogEntry(versions(equalOrLessThanLastIndex)._1)
         } else {
           // Now, there are 2 candidate versions for the given table version:
           // prevPair(indexVer1, tablePrevVersion), nextPair(indexVer2, tableNextVersion)
           // which is (tablePrevVersion < TimeTravel table version < tableNextVersion).
-          val prevPair = versions(equalOrLessLastIndex)
-          val nextPair = versions(equalOrLessLastIndex + 1)
+          val prevPair = versions(equalOrLessThanLastIndex)
+          val nextPair = versions(equalOrLessThanLastIndex + 1)
 
           val prevLog = getIndexLogEntry(prevPair._1)
           val nextLog = getIndexLogEntry(nextPair._1)
 
-          val curFilesSize = allFileInfos.map(_.size).sum
+          def getAppendedAndDeletedBytes(logEntry: IndexLogEntry): (Long, Long) = {
+            val commonBytes =
+              allFileInfos.filter(logEntry.sourceFileInfoSet.contains).map(_.size).sum
+            (allFileSizeInBytes - commonBytes, prevLog.sourceFilesSizeInBytes - commonBytes)
+          }
 
-          val prevCommonBytes =
-            allFileInfos.filter(prevLog.sourceFileInfoSet.contains).map(_.size).sum
-          val prevAppendedBytes = curFilesSize - prevCommonBytes
-          val prevDeletedBytes = prevLog.sourceFilesSizeInBytes - prevCommonBytes
-
-          val nextCommonBytes =
-            allFileInfos.filter(nextLog.sourceFileInfoSet.contains).map(_.size).sum
-          val nextAppendedBytes = curFilesSize - nextCommonBytes
-          val nextDeletedBytes = nextLog.sourceFilesSizeInBytes - nextCommonBytes
+          val (prevAppendedBytes, prevDeletedBytes) = getAppendedAndDeletedBytes(prevLog)
+          val (nextAppendedBytes, nextDeletedBytes) = getAppendedAndDeletedBytes(nextLog)
 
           // Pick one with less diff bytes, so as to reduce the regression from Hybrid Scan.
           if ((prevAppendedBytes + prevDeletedBytes) < (nextAppendedBytes + nextDeletedBytes)) {

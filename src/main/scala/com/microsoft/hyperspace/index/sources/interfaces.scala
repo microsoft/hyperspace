@@ -227,10 +227,10 @@ trait FileBasedSourceProvider extends SourceProvider {
    * Returns enriched index properties.
    *
    * @param relation Logical relation to retrieve necessary information.
-   * @param previousProperties Index properties of previous index version.
-   * @return Updated index properties for index creation or refreshment.
+   * @param properties Index properties to enrich.
+   * @return Updated index properties for index creation or refresh.
    */
   def enrichIndexProperties(
       relation: Relation,
-      previousProperties: Map[String, String]): Option[Map[String, String]]
+      properties: Map[String, String]): Option[Map[String, String]]
 }

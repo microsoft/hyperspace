@@ -235,5 +235,4 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
       (kv._1._1.replace("file:/", "file:///"), kv._2)
     }
   }
-
 }

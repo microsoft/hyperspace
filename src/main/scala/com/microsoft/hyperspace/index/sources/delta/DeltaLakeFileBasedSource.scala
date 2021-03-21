@@ -27,8 +27,8 @@ import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourc
 object DeltaLakeConstants {
   val DELTA_FORMAT_STR = "delta"
 
-  // JSON property name used in index metadata to store Delta Lake version history of refreshment.
-  val DELTA_VERSION_HISTORY_PROPERTY = "deltaVers"
+  // JSON property name used in index metadata to store Delta Lake version history of refresh.
+  val DELTA_VERSION_HISTORY_PROPERTY = "deltaVersions"
 }
 
 /**
@@ -98,26 +98,27 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    *
    * Delta Lake source provider adds:
    * 1) DELTA_VERSION_HISTORY_PROPERTY logs the history of INDEX_VERSION:DELTA_TABLE_VERSION
-   *    values for each index creation & refreshment.
+   *    values for each index creation & refresh.
    *
    * @param relation Relation to retrieve necessary information.
-   * @param previousProperties Index properties of previous index version.
-   * @return Update index properties for index creation or refreshment.
+   * @param properties Index properties to enrich.
+   * @return Update index properties for index creation or refresh.
    */
   override def enrichIndexProperties(
       relation: Relation,
-      previousProperties: Map[String, String]): Option[Map[String, String]] = {
+      properties: Map[String, String]): Option[Map[String, String]] = {
     if (!relation.fileFormat.equals(DeltaLakeConstants.DELTA_FORMAT_STR)) {
       None
     } else {
-      val indexVersion = previousProperties(IndexConstants.INDEX_LOG_VERSION)
+      val indexVersion = properties(IndexConstants.INDEX_LOG_VERSION)
       val deltaVerHistory = relation.options.get("versionAsOf").map { deltaVersion =>
+        val newVersionMapping = s"$indexVersion:$deltaVersion"
         DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY ->
-          previousProperties.get(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY).map { str =>
-            s"$str,$indexVersion:$deltaVersion"
-          }.getOrElse(s"$indexVersion:$deltaVersion")
+          properties.get(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY).map { prop =>
+            s"$prop,$newVersionMapping"
+          }.getOrElse(newVersionMapping)
       }
-      Some(previousProperties ++ deltaVerHistory)
+      Some(properties ++ deltaVerHistory)
     }
   }
 }

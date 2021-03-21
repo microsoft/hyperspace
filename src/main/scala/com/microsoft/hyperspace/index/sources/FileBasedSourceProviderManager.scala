@@ -94,13 +94,13 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * Returns enriched index properties.
    *
    * @param relation Relation to retrieve necessary information.
-   * @param previousProperties Index properties of previous index version.
-   * @return New property entries for index creation or refreshment.
+   * @param properties Index properties to enrich.
+   * @return New property entries for index creation or refresh.
    */
   def enrichIndexProperties(
       relation: Relation,
-      previousProperties: Map[String, String]): Map[String, String] = {
-    run(p => p.enrichIndexProperties(relation, previousProperties))
+      properties: Map[String, String]): Map[String, String] = {
+    run(p => p.enrichIndexProperties(relation, properties))
   }
 
   /**

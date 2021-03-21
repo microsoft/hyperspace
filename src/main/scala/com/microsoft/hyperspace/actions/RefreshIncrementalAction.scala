@@ -48,7 +48,8 @@ class RefreshIncrementalAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) with Action {
+    extends RefreshActionBase(spark, logManager, dataManager)
+    with Action {
 
   final override def op(): Unit = {
     logInfo(
