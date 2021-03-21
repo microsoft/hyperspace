@@ -122,6 +122,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
+   * input_file_name() could be different depending on the OS and source.
+   *
    * For [[DeltaLakeRelation]], each file path should be in this format:
    *   `file:/path/to/file`
    *
