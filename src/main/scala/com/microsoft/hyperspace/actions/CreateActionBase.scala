@@ -132,8 +132,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-
-
   private def write(
       spark: SparkSession,
       df: DataFrame,
@@ -149,22 +147,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       case -1 => BloomFilter.create(indexConfig.expectedNumItems).bitSize()
       case _ => indexConfig.numBits
     }
-
-    def cleanCountry = (country: String) => {
-      val allUSA = Seq("US", "USa", "USA", "United states", "United states of America")
-      if (allUSA.contains(country)) {
-        "USA"
-      }
-      else {
-        "unknown"
-      }
-    }
-
-    val expectedGlobalItems: Long =
-      df.agg(approx_count_distinct(resolvedIndexedColumn.head)).collect()(0)(0).asInstanceOf[Long]
-    val globalBF = BloomFilter.create(expectedGlobalItems, resolvedNumBits)
-    assert(
-      globalBF.isCompatible(BloomFilter.create(indexConfig.expectedNumItems, resolvedNumBits)))
 
     // TODO Begin has this op as relation is created there
     // TODO Maybe use lineage to make file smaller
@@ -187,8 +169,11 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       relations.rootPaths.map(p => Tuple1(p))
     ).toDF("FileName")
     val createBloomFilterData = spark.udf.register("createBloomFilter", bloomFilterUDF)
-    bloomFilterDF.withColumn("Data", createBloomFilterData(col("FileName")))
-    bloomFilterDF.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
+    val bloomFilterResult = bloomFilterDF.withColumn(
+      "Data",
+      createBloomFilterData(col("FileName"))
+    )
+    bloomFilterResult.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
   }
 
   private def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

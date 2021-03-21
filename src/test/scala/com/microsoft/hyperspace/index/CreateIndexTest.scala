@@ -39,7 +39,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private val indexConfig3 = IndexConfig("index3", Seq("imprs"), Seq("clicks"))
   private val indexConfig4 = IndexConfig("index4", Seq("Date", "Query"), Seq("clicks"))
-  private val bloomIndexConfig = BloomFilterIndexConfig("indexBF1", "Affiliation", 10)
+  private val bloomIndexConfig = BloomFilterIndexConfig("indexBF1", "Affiliation", 100)
   private var nonPartitionedDataDF: DataFrame = _
   private var partitionedDataDF: DataFrame = _
   private var comicDataDF: DataFrame = _
@@ -85,6 +85,8 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
 
   test("Creating one bloom filter index.") {
     hyperspace.createIndex(comicDataDF, bloomIndexConfig)
+    spark.read.parquet(
+      systemPath.toString + "\\" + bloomIndexConfig.indexName + "\\v__=0\\bf.parquet").show()
     val count = hyperspace.indexes.where(s"name = '${bloomIndexConfig.indexName}' ").count
     assert(count == 1)
   }
