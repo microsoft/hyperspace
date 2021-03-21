@@ -20,9 +20,8 @@ import org.apache.commons.io.output.ByteArrayOutputStream
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
-import org.apache.spark.sql.functions.{approx_count_distinct, input_file_name}
+import org.apache.spark.sql.functions.{approx_count_distinct, col, input_file_name, udf}
 import org.apache.spark.util.sketch.BloomFilter
-
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
@@ -133,6 +132,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
+
+
   private def write(
       spark: SparkSession,
       df: DataFrame,
@@ -149,6 +150,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       case _ => indexConfig.numBits
     }
 
+    def cleanCountry = (country: String) => {
+      val allUSA = Seq("US", "USa", "USA", "United states", "United states of America")
+      if (allUSA.contains(country)) {
+        "USA"
+      }
+      else {
+        "unknown"
+      }
+    }
+
     val expectedGlobalItems: Long =
       df.agg(approx_count_distinct(resolvedIndexedColumn.head)).collect()(0)(0).asInstanceOf[Long]
     val globalBF = BloomFilter.create(expectedGlobalItems, resolvedNumBits)
@@ -157,14 +168,10 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // TODO Begin has this op as relation is created there
     // TODO Maybe use lineage to make file smaller
-    import spark.implicits._
     val relations = getRelation(spark, df).createRelationMetadata(fileIdTracker)
-    val resultColSeq = Seq("Path", "BFData", "Active")
-    val result = Seq.empty[(String, String, String)].toDF(resultColSeq: _*)
-    relations.rootPaths.foreach(path => {
+    val bloomFilterUDF = udf((path: String) => {
       val bfByteStream = new ByteArrayOutputStream()
-      val localBF = spark.read
-        .schema(df.schema)
+      val localBF = spark.read.schema(df.schema)
         .format(relations.fileFormat)
         .options(relations.options)
         .load(path)
@@ -173,18 +180,15 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .bloomFilter(resolvedIndexedColumn.head, indexConfig.expectedNumItems, resolvedNumBits)
       localBF.writeTo(bfByteStream)
       bfByteStream.close()
-      globalBF.mergeInPlace(localBF)
-      val bfBinaryCharStream = bfByteStream.toByteArray.map(_.toChar).mkString
-      val bfRecord = Seq((path, bfBinaryCharStream, "1")).toDF(resultColSeq: _*)
-      result.union(bfRecord)
+      bfByteStream.toByteArray.map(_.toChar).mkString
     })
-    val gbfByteStream = new ByteArrayOutputStream()
-    globalBF.writeTo(gbfByteStream)
-    gbfByteStream.close()
-    val globalBFRecord = Seq(("GLOBAL", gbfByteStream.toByteArray.map(_.toChar).mkString, "1"))
-      .toDF(resultColSeq: _*)
-    result.union(globalBFRecord)
-    result.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
+
+    val bloomFilterDF = spark.createDataFrame(
+      relations.rootPaths.map(p => Tuple1(p))
+    ).toDF("FileName")
+    val createBloomFilterData = spark.udf.register("createBloomFilter", bloomFilterUDF)
+    bloomFilterDF.withColumn("Data", createBloomFilterData(col("FileName")))
+    bloomFilterDF.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
   }
 
   private def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
