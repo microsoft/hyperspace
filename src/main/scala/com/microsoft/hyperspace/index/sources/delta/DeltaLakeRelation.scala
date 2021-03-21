@@ -220,7 +220,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
           def getAppendedAndDeletedBytes(logEntry: IndexLogEntry): (Long, Long) = {
             val commonBytes =
               allFileInfos.filter(logEntry.sourceFileInfoSet.contains).map(_.size).sum
-            (allFileSizeInBytes - commonBytes, prevLog.sourceFilesSizeInBytes - commonBytes)
+            (allFileSizeInBytes - commonBytes, logEntry.sourceFilesSizeInBytes - commonBytes)
           }
 
           val (prevAppendedBytes, prevDeletedBytes) = getAppendedAndDeletedBytes(prevLog)

@@ -355,11 +355,11 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
         def checkExpectedIndexUsed(
             timeTravelVersion: Option[Long],
             expectedIndexPathSubStr: String*): Unit = {
+          val q = query(timeTravelVersion, asTimestamp = false)
           assert(
-            isIndexUsed(
-              query(timeTravelVersion, asTimestamp = false).queryExecution.optimizedPlan,
-              expectedIndexPathSubStr: _*),
-            s"timeTravelVer: $timeTravelVersion, expectedPaths: $expectedIndexPathSubStr)")
+            isIndexUsed(q.queryExecution.optimizedPlan, expectedIndexPathSubStr: _*),
+            s"timeTravelVer: $timeTravelVersion, expectedPaths: $expectedIndexPathSubStr)," +
+              s"actualPaths: ${q.inputFiles.toSeq.toString}")
           if (timeTravelVersion.isDefined) {
             // Check time travel query with timestampAsOf instead of versionAsOf.
             val df = spark.read.format("delta").load(dataPath)
@@ -480,13 +480,11 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
       def checkExpectedIndexUsed(
           timeTravelVersion: Option[Long],
           expectedIndexVersion: Int): Unit = {
+        val q = query(timeTravelVersion, asTimestamp = false)
         assert(
-          isIndexVersionUsed(
-            query(timeTravelVersion, asTimestamp = false).queryExecution.optimizedPlan,
-            indexName,
-            expectedIndexVersion),
-          s"timeTravelVer: ${timeTravelVersion.getOrElse("N/A")}, "
-            + s"expectedIndexVer: $expectedIndexVersion")
+          isIndexVersionUsed(q.queryExecution.optimizedPlan, indexName, expectedIndexVersion),
+          s"timeTravelVer: ${timeTravelVersion.getOrElse("N/A")}, " +
+            s"expectedIndexVer: $expectedIndexVersion, actualPaths: ${q.inputFiles.toSeq.toString}")
         if (timeTravelVersion.isDefined) {
           val df = spark.read.format("delta").load(dataPath)
           // Check time travel query with timestampAsOf instead of versionAsOf.
