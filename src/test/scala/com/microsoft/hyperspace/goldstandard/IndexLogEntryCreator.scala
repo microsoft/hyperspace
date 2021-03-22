@@ -27,17 +27,10 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.PathUtils
 
 object IndexLogEntryCreator {
-  def createIndex(indexDefinition: String, spark: SparkSession): Unit = {
-    val splits = indexDefinition.split(";")
-    val indexName = splits(0)
-    val tableName = splits(1)
-    val indexCols = splits(2).split(",").toSeq
-    val includedCols = splits(3).split(",").toSeq
-    val indexConfig = IndexConfig(indexName, indexCols, includedCols)
-    val indexPath = {
-      PathUtils.makeAbsolute(s"${spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH)}/$indexName")
-    }
-    val entry = getIndexLogEntry(indexConfig, indexPath, tableName, spark)
+  def createIndex(index: IndexDefinition, spark: SparkSession): Unit = {
+    val indexPath =
+      PathUtils.makeAbsolute(s"${spark.conf.get(IndexConstants.INDEX_SYSTEM_PATH)}/${index.name}")
+    val entry = getIndexLogEntry(index, indexPath, spark)
     assert(new IndexLogManagerImpl(indexPath).writeLog(0, entry))
   }
 
@@ -64,14 +57,13 @@ object IndexLogEntryCreator {
   }
 
   private def getIndexLogEntry(
-      config: IndexConfig,
+      index: IndexDefinition,
       indexPath: Path,
-      tableName: String,
       spark: SparkSession): IndexLogEntry = {
     val indexRootPath = new Path(indexPath, "v__=0")
-    val sourceDf = spark.table(tableName)
+    val sourceDf = spark.table(index.tableName)
     val indexSchema = {
-      val allCols = config.indexedColumns ++ config.includedColumns
+      val allCols = index.indexedCols ++ index.includedCols
       StructType(sourceDf.schema.filter(f => allCols.contains(f.name)))
     }
     val relation = toRelation(sourceDf)
@@ -81,15 +73,18 @@ object IndexLogEntryCreator {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(
-          Signature("com.microsoft.hyperspace.goldstandard.MockSignatureProvider", tableName)))))
+        LogicalPlanFingerprint.Properties(
+          Seq(
+            Signature(
+              "com.microsoft.hyperspace.goldstandard.MockSignatureProvider",
+              index.tableName)))))
 
     val entry = IndexLogEntry(
-      config.indexName,
+      index.name,
       CoveringIndex(
         CoveringIndex.Properties(
           CoveringIndex.Properties
-            .Columns(config.indexedColumns, config.includedColumns),
+            .Columns(index.indexedCols, index.includedCols),
           IndexLogEntry.schemaString(indexSchema),
           200,
           Map("hasParquetAsSourceFormat" -> "true"))),
