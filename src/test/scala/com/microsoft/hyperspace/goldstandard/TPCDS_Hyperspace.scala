@@ -97,7 +97,7 @@ class TPCDS_Hyperspace extends PlanStabilitySuite {
       "JoinIndex49-index-40-p_promo_sk-4;promotion;p_promo_sk;p_channel_event,p_channel_email,p_channel_dmail,p_channel_tv"
     )
     // scalastyle:on filelinelengthchecker
-    indexes.foreach(createIndex(_, spark))
+    indexes.foreach(i => createIndex(IndexDefinition.fromString(i), spark))
   }
 
   override def afterAll(): Unit = {
@@ -114,5 +114,29 @@ class TPCDS_Hyperspace extends PlanStabilitySuite {
         testQuery("tpcds/queries", q)
       }
     }
+  }
+}
+
+case class IndexDefinition(
+    name: String,
+    indexedCols: Seq[String],
+    includedCols: Seq[String],
+    tableName: String) {
+}
+
+object IndexDefinition {
+  /**
+   * Index definition from conf files should be provided in the following format:
+   * "index-name;table-name;comma-separated-indexed-cols;comma-separated-included-cols"
+   * @param definition: Index definition in string representation mentioned above.
+   * @return IndexDefinition.
+   */
+  def fromString(definition: String): IndexDefinition = {
+    val splits = definition.split(";")
+    val indexName = splits(0)
+    val tableName = splits(1)
+    val indexCols = splits(2).split(",").toSeq
+    val includedCols = splits(3).split(",").toSeq
+    IndexDefinition(indexName, indexCols, includedCols, tableName)
   }
 }
