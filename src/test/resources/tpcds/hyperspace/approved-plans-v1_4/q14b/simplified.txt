@@ -27,7 +27,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                           WholeStageCodegen
                                             Project [d_date_sk]
                                               Filter [d_date_sk,d_year]
-                                                Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                   WholeStageCodegen
                                     Project [cs_list_price,cs_quantity]
                                       SortMergeJoin [cs_sold_date_sk,d_date_sk]
@@ -40,7 +40,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                           WholeStageCodegen
                                             Project [d_date_sk]
                                               Filter [d_date_sk,d_year]
-                                                Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                   WholeStageCodegen
                                     Project [ws_list_price,ws_quantity]
                                       SortMergeJoin [d_date_sk,ws_sold_date_sk]
@@ -53,7 +53,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                           WholeStageCodegen
                                             Project [d_date_sk]
                                               Filter [d_date_sk,d_year]
-                                                Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                 HashAggregate [count,count(1),i_brand_id,i_category_id,i_class_id,sum,sum(CheckOverflow((promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_list_price as decimal(12,2)))), DecimalType(18,2)))] [channel,count,count(1),number_sales,sales,sum,sum(CheckOverflow((promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_list_price as decimal(12,2)))), DecimalType(18,2))),sum(CheckOverflow((promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_list_price as decimal(12,2)))), DecimalType(18,2)))]
                   InputAdapter
                     Exchange [i_brand_id,i_category_id,i_class_id] #1
@@ -150,7 +150,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                                                                                                                     WholeStageCodegen
                                                                                                                                       Project [d_date_sk]
                                                                                                                                         Filter [d_date_sk,d_year]
-                                                                                                                                          Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                                                                                          Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                                                                                             WholeStageCodegen
                                                                                                               Sort [i_brand_id,i_category_id,i_class_id]
                                                                                                                 InputAdapter
@@ -270,7 +270,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                           WholeStageCodegen
                                             Project [d_date_sk]
                                               Filter [d_date_sk,d_year]
-                                                Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                   WholeStageCodegen
                                     Project [cs_list_price,cs_quantity]
                                       SortMergeJoin [cs_sold_date_sk,d_date_sk]
@@ -283,7 +283,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                           WholeStageCodegen
                                             Project [d_date_sk]
                                               Filter [d_date_sk,d_year]
-                                                Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                   WholeStageCodegen
                                     Project [ws_list_price,ws_quantity]
                                       SortMergeJoin [d_date_sk,ws_sold_date_sk]
@@ -296,7 +296,7 @@ TakeOrderedAndProject [channel,channel,i_brand_id,i_brand_id,i_category_id,i_cat
                                           WholeStageCodegen
                                             Project [d_date_sk]
                                               Filter [d_date_sk,d_year]
-                                                Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                 HashAggregate [count,count(1),i_brand_id,i_category_id,i_class_id,sum,sum(CheckOverflow((promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_list_price as decimal(12,2)))), DecimalType(18,2)))] [channel,count,count(1),number_sales,sales,sum,sum(CheckOverflow((promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_list_price as decimal(12,2)))), DecimalType(18,2))),sum(CheckOverflow((promote_precision(cast(cast(ss_quantity as decimal(10,0)) as decimal(12,2))) * promote_precision(cast(ss_list_price as decimal(12,2)))), DecimalType(18,2)))]
                   InputAdapter
                     Exchange [i_brand_id,i_category_id,i_class_id] #19

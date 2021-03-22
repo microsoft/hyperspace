@@ -41,7 +41,7 @@ TakeOrderedAndProject [gross_margin,i_category,i_class,lochierarchy,rank_within_
                                                                       WholeStageCodegen
                                                                         Project [d_date_sk]
                                                                           Filter [d_date_sk,d_year]
-                                                                            Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                            Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                                     InputAdapter
                                                       WholeStageCodegen
                                                         Sort [i_item_sk]

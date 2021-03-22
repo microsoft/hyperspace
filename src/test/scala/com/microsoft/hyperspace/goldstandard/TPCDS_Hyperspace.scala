@@ -43,8 +43,6 @@ class TPCDS_Hyperspace extends PlanStabilitySuite {
     // scalastyle:off filelinelengthchecker
     // TODO: Read indexes from a file.
     val indexes = Seq(
-      "dtindex;date_dim;d_date_sk;d_year",
-      "ssIndex;store_sales;ss_sold_date_sk;ss_customer_sk",
       "JoinIndex00-index-33-inv_item_sk-3;inventory;inv_item_sk;inv_date_sk,inv_warehouse_sk,inv_quantity_on_hand",
       "JoinIndex01-index-34-inv_date_sk-3;inventory;inv_date_sk;inv_warehouse_sk,inv_quantity_on_hand,inv_item_sk",
       "JoinIndex02-index-42-inv_warehouse_sk-3;inventory;inv_warehouse_sk;inv_date_sk,inv_quantity_on_hand,inv_item_sk",

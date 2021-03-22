@@ -36,4 +36,4 @@
                +- Exchange hashpartitioning(d_date_sk#3, 5)
                   +- *(13) Project [d_date_sk#3]
                      +- *(13) Filter ((isnotnull(d_year#16) && (d_year#16 = 2001)) && isnotnull(d_date_sk#3))
-                        +- *(13) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#3,d_year#16] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+                        +- *(13) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#3,d_year#16] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>

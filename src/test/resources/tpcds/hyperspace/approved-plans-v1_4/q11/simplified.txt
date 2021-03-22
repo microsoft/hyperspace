@@ -51,7 +51,7 @@ TakeOrderedAndProject [customer_preferred_cust_flag]
                                                                 WholeStageCodegen
                                                                   Project [d_date_sk,d_year]
                                                                     Filter [d_date_sk,d_year]
-                                                                      Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                      Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                     LocalTableScan [customer_id,year_total] [customer_id,year_total]
                         InputAdapter
                           WholeStageCodegen
@@ -80,7 +80,7 @@ TakeOrderedAndProject [customer_preferred_cust_flag]
                                                               WholeStageCodegen
                                                                 Project [d_date_sk,d_year]
                                                                   Filter [d_date_sk,d_year]
-                                                                    Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                    Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                     LocalTableScan [customer_id,customer_preferred_cust_flag,year_total] [customer_id,customer_preferred_cust_flag,year_total]
                 InputAdapter
                   WholeStageCodegen

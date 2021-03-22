@@ -66,7 +66,7 @@ TakeOrderedAndProject [30 days ,31 - 60 days ,61 - 90 days ,91 - 120 days ,>120 
                                             WholeStageCodegen
                                               Project [d_date_sk]
                                                 Filter [d_date_sk]
-                                                  Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk] [d_date_sk]
+                                                  Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk] [d_date_sk]
                   InputAdapter
                     WholeStageCodegen
                       Sort [d_date_sk]

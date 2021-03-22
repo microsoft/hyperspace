@@ -65,7 +65,7 @@ TakeOrderedAndProject [curr_yr_cnt,i_brand_id,i_category_id,i_class_id,i_manufac
                                                                                             WholeStageCodegen
                                                                                               Project [d_date_sk,d_year]
                                                                                                 Filter [d_date_sk,d_year]
-                                                                                                  Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                                                  Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                                                     WholeStageCodegen
                                                                       Sort [cr_item_sk,cr_order_number]
                                                                         InputAdapter
@@ -208,7 +208,7 @@ TakeOrderedAndProject [curr_yr_cnt,i_brand_id,i_category_id,i_class_id,i_manufac
                                                                                             WholeStageCodegen
                                                                                               Project [d_date_sk,d_year]
                                                                                                 Filter [d_date_sk,d_year]
-                                                                                                  Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                                                  Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                                                     WholeStageCodegen
                                                                       Sort [cr_item_sk,cr_order_number]
                                                                         InputAdapter

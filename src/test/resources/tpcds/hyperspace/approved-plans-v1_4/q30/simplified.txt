@@ -57,7 +57,7 @@ TakeOrderedAndProject [c_birth_country,c_birth_day,c_birth_month,c_birth_year,c_
                                                                                               WholeStageCodegen
                                                                                                 Project [d_date_sk]
                                                                                                   Filter [d_date_sk,d_year]
-                                                                                                    Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                                                                    Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                                                                     InputAdapter
                                                                       WholeStageCodegen
                                                                         Sort [ca_address_sk]

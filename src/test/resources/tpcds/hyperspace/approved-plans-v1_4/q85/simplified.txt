@@ -117,7 +117,7 @@ TakeOrderedAndProject [aggOrder,avg(wr_fee),avg(wr_refunded_cash),avg(ws_quantit
                                             WholeStageCodegen
                                               Project [d_date_sk]
                                                 Filter [d_date_sk,d_year]
-                                                  Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                  Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                   InputAdapter
                     WholeStageCodegen
                       Sort [r_reason_sk]

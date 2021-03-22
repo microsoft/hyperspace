@@ -28,7 +28,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer
       :     :  :        :                    +- Exchange hashpartitioning(d_date_sk#17, 5)
       :     :  :        :                       +- *(5) Project [d_date_sk#17, d_year#14]
       :     :  :        :                          +- *(5) Filter (((isnotnull(d_year#14) && d_year#14 IN (2001,2002)) && (d_year#14 = 2001)) && isnotnull(d_date_sk#17))
-      :     :  :        :                             +- *(5) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), In(d_year, [2001,2002]), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :     :  :        :                             +- *(5) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), In(d_year, [2001,2002]), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
       :     :  :        +- LocalTableScan <empty>, [customer_id#20, year_total#21]
       :     :  +- *(18) Sort [customer_id#1 ASC NULLS FIRST], false, 0
       :     :     +- Exchange hashpartitioning(customer_id#1, 5)
@@ -44,7 +44,7 @@ TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer
       :     :           :                 +- Exchange hashpartitioning(d_date_sk#17, 5)
       :     :           :                    +- *(14) Project [d_date_sk#17, d_year#14]
       :     :           :                       +- *(14) Filter (((isnotnull(d_year#14) && d_year#14 IN (2001,2002)) && (d_year#14 = 2002)) && isnotnull(d_date_sk#17))
-      :     :           :                          +- *(14) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), In(d_year, [2001,2002]), EqualTo(d_year,2002), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :     :           :                          +- *(14) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), In(d_year, [2001,2002]), EqualTo(d_year,2002), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
       :     :           +- LocalTableScan <empty>, [customer_id#20, customer_first_name#22, customer_last_name#23, year_total#21]
       :     +- *(28) Sort [customer_id#10 ASC NULLS FIRST], false, 0
       :        +- Exchange hashpartitioning(customer_id#10, 5)

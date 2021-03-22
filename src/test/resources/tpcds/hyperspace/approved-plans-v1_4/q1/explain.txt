@@ -25,7 +25,7 @@ TakeOrderedAndProject(limit=100, orderBy=[c_customer_id#1 ASC NULLS FIRST], outp
       :           :     :                          +- Exchange hashpartitioning(cast(d_date_sk#13 as bigint), 5)
       :           :     :                             +- *(3) Project [d_date_sk#13]
       :           :     :                                +- *(3) Filter ((isnotnull(d_year#14) && (d_year#14 = 2000)) && isnotnull(d_date_sk#13))
-      :           :     :                                   +- *(3) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#13,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2000), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :           :     :                                   +- *(3) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#13,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2000), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
       :           :     +- *(15) Sort [ctr_store_sk#4#6 ASC NULLS FIRST], false, 0
       :           :        +- Exchange hashpartitioning(ctr_store_sk#4#6, 5)
       :           :           +- *(14) Filter isnotnull((CAST(avg(ctr_total_return) AS DECIMAL(21,6)) * CAST(1.2 AS DECIMAL(21,6)))#8)

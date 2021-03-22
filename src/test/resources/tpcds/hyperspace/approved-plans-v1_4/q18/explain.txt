@@ -55,7 +55,7 @@ TakeOrderedAndProject(limit=100, orderBy=[ca_country#1 ASC NULLS FIRST,ca_state#
                   :              +- Exchange hashpartitioning(d_date_sk#31, 5)
                   :                 +- *(19) Project [d_date_sk#31]
                   :                    +- *(19) Filter ((isnotnull(d_year#43) && (d_year#43 = 1998)) && isnotnull(d_date_sk#31))
-                  :                       +- *(19) FileScan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim[d_date_sk#31,d_year#43] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,1998), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+                  :                       +- *(19) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#31,d_year#43] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,1998), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
                   +- *(24) Sort [i_item_sk#29 ASC NULLS FIRST], false, 0
                      +- Exchange hashpartitioning(i_item_sk#29, 5)
                         +- *(23) Project [i_item_sk#29, i_item_id#24]

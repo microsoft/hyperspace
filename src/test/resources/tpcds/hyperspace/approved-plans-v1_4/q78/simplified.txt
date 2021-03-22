@@ -53,7 +53,7 @@ TakeOrderedAndProject [cs_qty,other_chan_qty,other_chan_sales_price,other_chan_w
                                                     WholeStageCodegen
                                                       Project [d_date_sk,d_year]
                                                         Filter [d_date_sk,d_year]
-                                                          Scan Hyperspace(Type: CI, Name: dtindex, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                                          Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
                 InputAdapter
                   WholeStageCodegen
                     Sort [ws_customer_sk,ws_item_sk,ws_sold_year]
