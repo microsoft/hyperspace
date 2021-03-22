@@ -153,12 +153,15 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * @return List of (index log version, delta table version) in ascending order.
    */
   private def deltaLakeVersionHistory(index: IndexLogEntry): Seq[(Int, Int)] = {
+    // Versions are comma separated - <index log version>:<delta table version>.
+    // e.g. "1:2,3:5,5:9"
     val versions =
       index.derivedDataset.properties.properties
         .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
 
-    // The value is comma separated versions - <index log version>:<delta table version>.
-    // e.g. "1:2,3:5,5:9"
+    // Versions are processed in a reverse order to keep the higher index log version
+    // in case different index log versions refer to the same delta lake version.
+    // For example, "1:1,2:2,3:2" will become Seq((1, 1), (3, 2)).
     versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (acc, versionStr) =>
       val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
       if (acc.nonEmpty && acc.head._2 == deltaTableVersion) {
@@ -172,9 +175,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   }
 
   /**
-   * Returns IndexLogEntry of the closest index version for the given relation.
+   * Returns IndexLogEntry of the closest version for the given index.
    *
-   * curFiles is used to calculate the similarity with each index version data.
    * Delta Lake source provider utilizes the history information of DELTA_VERSION_HISTORY_PROPERTY
    * to find the closet version of the index.
    *
@@ -188,7 +190,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
     def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
       indexManager
-        .getIndexByVersion(index.name, logVersion)
+        .getIndex(index.name, logVersion)
         .get
         .asInstanceOf[IndexLogEntry]
     }
@@ -226,7 +228,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
           def getDiffBytes(logEntry: IndexLogEntry): Long = {
             val commonBytes =
               allFileInfos.filter(logEntry.sourceFileInfoSet.contains).map(_.size).sum
-            allFileSizeInBytes - commonBytes + logEntry.sourceFilesSizeInBytes - commonBytes
+            (allFileSizeInBytes - commonBytes) + (logEntry.sourceFilesSizeInBytes - commonBytes)
           }
 
           // Prefer index with less diff bytes to reduce the chance of regression from Hybrid Scan.

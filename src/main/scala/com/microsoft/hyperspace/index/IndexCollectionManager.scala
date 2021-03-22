@@ -162,7 +162,7 @@ class IndexCollectionManager(
     }
   }
 
-  override def getIndexByVersion(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
+  override def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
     withLogManager(indexName) { logManager =>
       logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry])
     }

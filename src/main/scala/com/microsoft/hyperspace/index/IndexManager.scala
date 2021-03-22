@@ -112,5 +112,5 @@ trait IndexManager {
    * @param logVersion Index log version to retrieve.
    * @return IndexLogEntry if the index of the given log version exists, otherwise None.
    */
-  def getIndexByVersion(indexName: String, logVersion: Int): Option[IndexLogEntry]
+  def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry]
 }
