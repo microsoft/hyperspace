@@ -147,8 +147,7 @@ class IndexCollectionManager(
     } else {
       Seq()
     }
-    indexPaths.map(path =>
-      indexLogManagerFactory.create(path, hadoopConf))
+    indexPaths.map(path => indexLogManagerFactory.create(path, hadoopConf))
   }
 
   private def getLogManager(indexName: String): Option[IndexLogManager] = {
@@ -160,6 +159,12 @@ class IndexCollectionManager(
       Some(indexLogManagerFactory.create(indexPath, hadoopConf))
     } else {
       None
+    }
+  }
+
+  override def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
+    withLogManager(indexName) { logManager =>
+      logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry])
     }
   }
 

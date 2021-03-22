@@ -48,7 +48,8 @@ class RefreshIncrementalAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    extends RefreshActionBase(spark, logManager, dataManager)
+    with Action {
 
   final override def op(): Unit = {
     logInfo(
@@ -127,7 +128,7 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath, endId)
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.
