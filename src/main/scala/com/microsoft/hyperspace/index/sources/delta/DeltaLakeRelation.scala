@@ -228,6 +228,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
           def getDiffBytes(logEntry: IndexLogEntry): Long = {
             val commonBytes =
               allFileInfos.filter(logEntry.sourceFileInfoSet.contains).map(_.size).sum
+            // appended bytes + deleted bytes
             (allFileSizeInBytes - commonBytes) + (logEntry.sourceFilesSizeInBytes - commonBytes)
           }
 
