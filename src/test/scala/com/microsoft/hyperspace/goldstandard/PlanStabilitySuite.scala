@@ -99,7 +99,9 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
   private def isApproved(dir: File, actualSimplifiedPlan: String): Boolean = {
     val file = new File(dir, "simplified.txt")
     val expected = FileUtils.readFileToString(file, StandardCharsets.UTF_8)
-    expected == actualSimplifiedPlan
+    expected.replaceAll("\r", "").replaceAll("\n", "") == actualSimplifiedPlan
+      .replaceAll("\r", "")
+      .replaceAll("\n", "")
   }
 
   /**
