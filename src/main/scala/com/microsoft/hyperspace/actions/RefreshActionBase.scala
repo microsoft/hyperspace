@@ -22,6 +22,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.SchemaUtils
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -90,7 +91,10 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val indexConfig: IndexConfig = {
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+    IndexConfig(
+      previousIndexLogEntry.name,
+      SchemaUtils.removePrefixNestedFieldNames(ddColumns.indexed),
+      SchemaUtils.removePrefixNestedFieldNames(ddColumns.included))
   }
 
   final override val transientState: String = REFRESHING

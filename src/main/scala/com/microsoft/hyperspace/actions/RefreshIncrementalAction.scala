@@ -23,6 +23,7 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshIncrementalActionEvent}
+import com.microsoft.hyperspace.util.SchemaUtils
 
 /**
  * Action to refresh indexes with newly appended files and deleted files in an incremental way.
@@ -91,7 +92,7 @@ class RefreshIncrementalAction(
         refreshDF,
         indexDataPath.toString,
         previousIndexLogEntry.numBuckets,
-        indexConfig.indexedColumns,
+        SchemaUtils.prefixNestedFieldNames(indexConfig.indexedColumns),
         writeMode)
     }
   }

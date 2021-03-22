@@ -31,7 +31,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -555,6 +555,10 @@ case class IndexLogEntry(
 
   override def hashCode(): Int = {
     config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
+  }
+
+  def usesNestedFields: Boolean = {
+    SchemaUtils.containsNestedFieldNames(indexedColumns ++ includedColumns)
   }
 
   /**

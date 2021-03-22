@@ -19,13 +19,13 @@ package com.microsoft.hyperspace.actions
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
-import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.functions.{col, input_file_name}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils, SchemaUtils}
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -127,9 +127,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     val (indexDataFrame, resolvedIndexedColumns, _) =
       prepareIndexDataFrame(spark, df, indexConfig)
 
-    // run job
-    val repartitionedIndexDataFrame =
-      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(df(_)): _*)
+    // Run job
+    val repartitionedIndexDataFrame = {
+      // For nested fields, resolvedIndexedColumns will have flattened names with `.` (dots),
+      // thus they need to be enclosed in backticks to access them as top-level columns.
+      // Note that backticking the non-nested columns is a no-op.
+      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(c => col(s"`$c`")): _*)
+    }
 
     // Save the index with the number of buckets specified.
     repartitionedIndexDataFrame.write
@@ -156,21 +160,21 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df: DataFrame,
       indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
     val spark = df.sparkSession
-    val dfColumnNames = df.schema.fieldNames
+    val plan = df.queryExecution.analyzed
     val indexedColumns = indexConfig.indexedColumns
     val includedColumns = indexConfig.includedColumns
-    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, dfColumnNames)
-    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, dfColumnNames)
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, plan)
+    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, plan)
 
     (resolvedIndexedColumns, resolvedIncludedColumns) match {
       case (Some(indexed), Some(included)) => (indexed, included)
       case _ =>
         val unresolvedColumns = (indexedColumns ++ includedColumns)
-          .map(c => (c, ResolverUtils.resolve(spark, c, dfColumnNames)))
+          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan)))
           .collect { case c if c._2.isEmpty => c._1 }
         throw HyperspaceException(
           s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
-            s"from available source columns '${dfColumnNames.mkString(",")}'")
+            s"from available source columns:\n${df.schema.treeString}")
     }
   }
 
@@ -180,6 +184,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
+
+    val escapedIndexedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIndexedColumns)
+    val escapedIncludedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIncludedColumns)
 
     val indexDF = if (hasLineage(spark)) {
       val relation = getRelation(spark, df)
@@ -214,10 +221,13 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .select(
           allIndexColumns.head,
           allIndexColumns.tail :+ IndexConstants.DATA_FILE_NAME_ID: _*)
+        .toDF(escapedIndexedColumns ++ escapedIncludedColumns ++ missingPartitionColumns :+
+          IndexConstants.DATA_FILE_NAME_ID: _*)
     } else {
       df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
+        .toDF(escapedIndexedColumns ++ escapedIncludedColumns : _*)
     }
 
-    (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
+    (indexDF, escapedIndexedColumns, escapedIncludedColumns)
   }
 }
