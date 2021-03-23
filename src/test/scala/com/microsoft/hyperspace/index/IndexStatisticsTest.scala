@@ -56,14 +56,13 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
         withIndex(indexConfig.indexName) {
           hyperspace.createIndex(dataDF, indexConfig)
-          validateIndexStats(indexConfig.indexName, Seq(0))
+          validateIndexStats(indexConfig.indexName, None, Seq(0))
         }
       }
     }
   }
 
-  test(
-    "index() on an index refreshed in incremental or quick mode returns correct result.") {
+  test("index() on an index refreshed in incremental or quick mode returns correct result.") {
     Seq("incremental", "quick").foreach { mode =>
       withTempPathAsString { testPath =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
@@ -90,7 +89,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
             // In "incremental" mode, with deleted files, a new directory ("v__=1" for this test)
             // gets created which will contain all index files for latest version of index.
             val expectedVersions = if (mode.equals("quick")) Seq(0) else Seq(1)
-            validateIndexStats(indexConfig.indexName, expectedVersions)
+            validateIndexStats(indexConfig.indexName, None, expectedVersions)
           }
         }
       }
@@ -116,19 +115,35 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
 
             hyperspace.refreshIndex(indexConfig.indexName, "incremental")
           }
-          validateIndexStats(indexConfig.indexName, Seq(0, 1, 2))
+          validateIndexStats(indexConfig.indexName, None, Seq(0, 1, 2))
+
+          // Validate index statistics result with log versions.
+          validateIndexStats(indexConfig.indexName, Some(0), Seq(0))
+          validateIndexStats(indexConfig.indexName, Some(1), Seq(0))
+          validateIndexStats(indexConfig.indexName, Some(3), Seq(0, 1))
         }
       }
     }
   }
 
-  private def validateIndexStats(indexName: String, expectedIndexVersions: Seq[Int]): Unit = {
-    val indexStatsDF = hyperspace.index(indexName)
+  private def validateIndexStats(
+      indexName: String,
+      logVersion: Option[Int],
+      expectedIndexVersions: Seq[Int]): Unit = {
+    val indexStatsDF = if (logVersion.isDefined) {
+      hyperspace.index(indexName, logVersion.get)
+    } else {
+      hyperspace.index(indexName)
+    }
     assert(indexStatsDF.count() == 1)
 
     import spark.implicits._
     val indexStats = indexStatsDF.as[IndexStatistics].collect()(0)
-    val log = logManager(systemPath, indexName).getLatestStableLog()
+    val log = if (logVersion.isDefined) {
+      logManager(systemPath, indexName).getLog(logVersion.get)
+    } else {
+      logManager(systemPath, indexName).getLatestStableLog()
+    }
     assert(log.isDefined)
     val entry = log.get.asInstanceOf[IndexLogEntry]
     assert(indexStats.equals(IndexStatistics(entry, extended = true)))

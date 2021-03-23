@@ -158,6 +158,15 @@ class Hyperspace:
         """
         return DataFrame(self.hyperspace.index(indexName), self.spark._wrapped)
 
+    def index(self, indexName, logVersion):
+        """
+        Get index metadata and detailed index statistics for a given index and log version.
+        :param indexName: index name
+        :param logVersion: log version
+        :return: dataFrame object containing the index metadata and detailed index statistics.
+        """
+        return DataFrame(self.hyperspace.index(indexName, logVersion), self.spark._wrapped)
+
     @staticmethod
     def enable(spark):
         """

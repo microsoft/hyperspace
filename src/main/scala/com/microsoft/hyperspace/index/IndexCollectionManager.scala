@@ -138,6 +138,24 @@ class IndexCollectionManager(
     }
   }
 
+  override def index(indexName: String, logVersion: Int): DataFrame = {
+    withLogManager(indexName) { logManager =>
+      logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry]) match {
+        case Some(l) =>
+          import spark.implicits._
+          Seq(IndexStatistics(toIndexLogEntry(l), extended = true)).toDF()
+        case None =>
+          throw HyperspaceException(s"No log version $logVersion found for index $indexName.")
+      }
+    }
+  }
+
+  override def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
+    withLogManager(indexName) { logManager =>
+      logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry])
+    }
+  }
+
   private def indexLogManagers: Seq[IndexLogManager] = {
     val hadoopConf = spark.sessionState.newHadoopConf()
     val rootPath = PathResolver(conf, hadoopConf).systemPath
@@ -159,12 +177,6 @@ class IndexCollectionManager(
       Some(indexLogManagerFactory.create(indexPath, hadoopConf))
     } else {
       None
-    }
-  }
-
-  override def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
-    withLogManager(indexName) { logManager =>
-      logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry])
     }
   }
 
