@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.functions.{col, input_file_name}
 
@@ -104,23 +104,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  private def hasParquetAsSourceFormatProperty(
-      relation: FileBasedRelation): Option[(String, String)] = {
-    if (relation.hasParquetAsSourceFormat) {
-      Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true")
-    } else {
-      None
-    }
-  }
-
-  private def hasLineageProperty(spark: SparkSession): Option[(String, String)] = {
-    if (hasLineage(spark)) {
-      Some(IndexConstants.LINEAGE_PROPERTY -> "true")
-    } else {
-      None
-    }
-  }
-
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
     val numBuckets = numBucketsForIndex(spark)
 
@@ -156,9 +139,26 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     relations.head
   }
 
+  private def hasParquetAsSourceFormatProperty(
+      relation: FileBasedRelation): Option[(String, String)] = {
+    if (relation.hasParquetAsSourceFormat) {
+      Some(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true")
+    } else {
+      None
+    }
+  }
+
+  private def hasLineageProperty(spark: SparkSession): Option[(String, String)] = {
+    if (hasLineage(spark)) {
+      Some(IndexConstants.LINEAGE_PROPERTY -> "true")
+    } else {
+      None
+    }
+  }
+
   private def resolveConfig(
       df: DataFrame,
-      indexConfig: IndexConfig): (Seq[String], Seq[String]) = {
+      indexConfig: IndexConfig): (Seq[(String, Boolean)], Seq[(String, Boolean)]) = {
     val spark = df.sparkSession
     val plan = df.queryExecution.analyzed
     val indexedColumns = indexConfig.indexedColumns
@@ -170,8 +170,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       case (Some(indexed), Some(included)) => (indexed, included)
       case _ =>
         val unresolvedColumns = (indexedColumns ++ includedColumns)
-          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan)))
-          .collect { case c if c._2.isEmpty => c._1 }
+          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan).map(_.map(_._1))))
+          .collect { case (c, r) if r.isEmpty => c }
         throw HyperspaceException(
           s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
             s"from available source columns:\n${df.schema.treeString}")
@@ -183,10 +183,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df: DataFrame,
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val columnsFromIndexConfig = resolvedIndexedColumns ++ resolvedIncludedColumns
+    val columnsFromIndexConfig =
+      resolvedIndexedColumns.map(_._1) ++ resolvedIncludedColumns.map(_._1)
 
-    val escapedIndexedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIndexedColumns)
-    val escapedIncludedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIncludedColumns)
+    val prefixedIndexedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIndexedColumns)
+    val prefixedIncludedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIncludedColumns)
+    val prefixedColumnsFromIndexConfig = prefixedIndexedColumns ++ prefixedIncludedColumns
 
     val indexDF = if (hasLineage(spark)) {
       val relation = getRelation(spark, df)
@@ -215,19 +217,25 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val dataPathColumn = "_data_path"
       val lineagePairs = relation.lineagePairs(fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
+      val prefixedAllIndexColumns = prefixedColumnsFromIndexConfig ++ missingPartitionColumns
 
       df.withColumn(dataPathColumn, input_file_name())
         .join(lineageDF.hint("broadcast"), dataPathColumn)
-        .select(
-          allIndexColumns.head,
-          allIndexColumns.tail :+ IndexConstants.DATA_FILE_NAME_ID: _*)
-        .toDF(escapedIndexedColumns ++ escapedIncludedColumns ++ missingPartitionColumns :+
-          IndexConstants.DATA_FILE_NAME_ID: _*)
+        .select(prepareColumns(allIndexColumns, prefixedAllIndexColumns) :+
+          col(IndexConstants.DATA_FILE_NAME_ID): _*)
     } else {
-      df.select(columnsFromIndexConfig.head, columnsFromIndexConfig.tail: _*)
-        .toDF(escapedIndexedColumns ++ escapedIncludedColumns : _*)
+      df.select(prepareColumns(columnsFromIndexConfig, prefixedColumnsFromIndexConfig): _*)
     }
 
-    (indexDF, escapedIndexedColumns, escapedIncludedColumns)
+    (indexDF, prefixedIndexedColumns, prefixedIncludedColumns)
+  }
+
+  private def prepareColumns(
+      originalColumns: Seq[String],
+      prefixedColumns: Seq[String]): Seq[Column] = {
+    originalColumns.zip(prefixedColumns).map {
+      case (original, prefixed) =>
+        col(original).as(prefixed)
+    }
   }
 }

@@ -93,8 +93,10 @@ private[actions] abstract class RefreshActionBase(
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
     IndexConfig(
       previousIndexLogEntry.name,
-      SchemaUtils.removePrefixNestedFieldNames(ddColumns.indexed),
-      SchemaUtils.removePrefixNestedFieldNames(ddColumns.included))
+      // As indexed & included columns in previousLogEntry are resolved & prefixed names,
+      // need to remove the prefix to resolve with the dataframe for refresh.
+      SchemaUtils.removePrefixNestedFieldNames(ddColumns.indexed).map(_._1),
+      SchemaUtils.removePrefixNestedFieldNames(ddColumns.included).map(_._1))
   }
 
   final override val transientState: String = REFRESHING

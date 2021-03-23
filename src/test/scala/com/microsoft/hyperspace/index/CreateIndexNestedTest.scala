@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import scala.collection.immutable.ListMap
 import scala.collection.mutable.WrappedArray
 
 import org.apache.hadoop.conf.Configuration
@@ -159,8 +160,9 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       // should be added to index schema if they are not already among index config columns.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (SchemaUtils.prefixNestedFieldNames(indexConfig2.indexedColumns ++
-            indexConfig2.includedColumns) ++
+          (SchemaUtils.prefixNestedFieldNames(
+            indexConfig2.indexedColumns.zip(Seq(true)) ++
+            indexConfig2.includedColumns.zip(Seq(true))) ++
             Seq(IndexConstants.DATA_FILE_NAME_ID) ++ partitionKeys).sorted)
     }
   }
@@ -174,8 +176,9 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       // For non-partitioned data, only file name lineage column should be added to index schema.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (SchemaUtils.prefixNestedFieldNames(indexConfig1.indexedColumns ++
-            indexConfig1.includedColumns) ++
+          (SchemaUtils.prefixNestedFieldNames(
+            indexConfig1.indexedColumns.zip(Seq(true)) ++
+            indexConfig1.includedColumns.zip(Seq(false, true))) ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }

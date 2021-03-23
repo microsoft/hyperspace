@@ -22,18 +22,17 @@ import com.microsoft.hyperspace.SparkInvolvedSuite
 
 class SchemaUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
 
-  val originals = Seq(
-    "id",
-    "a.b.c",
-    "__hs_nested",
-    "__hs_nested_a",
-    "a.__hs_nested",
-    "a.__hs_nested.b",
-    "a.__hs_nested.b",
-    "a.nested..b",
-    "a.`g.c`.b",
-    "a.g-c.b",
-    "a-b")
+  val originals = Seq[(String, Boolean)](
+    ("id", false),
+    ("a.b.c", true),
+    ("__hs_nested", false),
+    ("__hs_nested_a", false),
+    ("a.__hs_nested", true),
+    ("a.__hs_nested.b", true),
+    ("a.nested..b", true),
+    ("a.`g.c`.b", true),
+    ("a.g-c.b", true),
+    ("a-b", false))
   val prefixed = Seq(
     "id",
     "__hs_nested.a.b.c",
@@ -41,17 +40,19 @@ class SchemaUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     "__hs_nested_a",
     "__hs_nested.a.__hs_nested",
     "__hs_nested.a.__hs_nested.b",
-    "__hs_nested.a.__hs_nested.b",
     "__hs_nested.a.nested..b",
     "__hs_nested.a.`g.c`.b",
     "__hs_nested.a.g-c.b",
     "a-b")
 
-  test("prefixNestedFieldName") {
+  test("prefixNestedFieldName - default behavior") {
     originals.zipWithIndex.foreach {
       case (v, i) =>
-        assert(SchemaUtils.prefixNestedFieldName(v) == prefixed(i))
+        assert(SchemaUtils.prefixNestedFieldName(v._1) == prefixed(i))
     }
+  }
+
+  test("prefixNestedFieldName - already prefixed") {
     assert(
       SchemaUtils.prefixNestedFieldName("__hs_nested.already.prefixed") ==
         "__hs_nested.already.prefixed")
@@ -64,7 +65,7 @@ class SchemaUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
   test("removePrefixNestedFieldName") {
     prefixed.zipWithIndex.foreach {
       case (v, i) =>
-        assert(SchemaUtils.removePrefixNestedFieldName(v) == originals(i))
+        assert(SchemaUtils.removePrefixNestedFieldName(v) == originals.toSeq(i)._1)
     }
   }
 
@@ -73,22 +74,22 @@ class SchemaUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("isFieldNamePrefixed") {
-    val expectedBools1 =
+    val expectedBooleans1 =
       Seq(false, false, false, false, false, false, false, false, false, false, false)
     originals.zipWithIndex.foreach {
       case (v, i) =>
-        assert(SchemaUtils.isFieldNamePrefixed(v) == expectedBools1(i))
+        assert(SchemaUtils.isFieldNamePrefixed(v._1) == expectedBooleans1(i))
     }
-    val expectedBools2 =
-      Seq(false, true, false, false, true, true, true, true, true, true, false)
+    val expectedBooleans2 =
+      Seq(false, true, false, false, true, true, true, true, true, false)
     prefixed.zipWithIndex.foreach {
       case (v, i) =>
-        assert(SchemaUtils.isFieldNamePrefixed(v) == expectedBools2(i))
+        assert(SchemaUtils.isFieldNamePrefixed(v) == expectedBooleans2(i))
     }
   }
 
   test("containsNestedFieldNames") {
-    assert(!SchemaUtils.containsNestedFieldNames(originals))
+    assert(!SchemaUtils.containsNestedFieldNames(originals.map(_._1)))
     assert(SchemaUtils.containsNestedFieldNames(prefixed))
   }
 }

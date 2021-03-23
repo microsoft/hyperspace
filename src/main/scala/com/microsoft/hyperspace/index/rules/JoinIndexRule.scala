@@ -305,8 +305,8 @@ object JoinIndexRule
     val rRequiredIndexedCols = lRMap.values.toSeq
 
     // All required columns resolved with base relation.
-    val lRequiredAllCols = resolve(spark, allRequiredCols(left), leftRelation.plan).get
-    val rRequiredAllCols = resolve(spark, allRequiredCols(right), rightRelation.plan).get
+    val lRequiredAllCols = resolve(spark, allRequiredCols(left), leftRelation.plan).get.map(_._1)
+    val rRequiredAllCols = resolve(spark, allRequiredCols(right), rightRelation.plan).get.map(_._1)
 
     // Make sure required indexed columns are subset of all required columns for a subplan
     require(resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined)

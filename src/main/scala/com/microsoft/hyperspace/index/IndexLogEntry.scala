@@ -557,10 +557,6 @@ case class IndexLogEntry(
     config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
   }
 
-  def usesNestedFields: Boolean = {
-    SchemaUtils.containsNestedFieldNames(indexedColumns ++ includedColumns)
-  }
-
   /**
    * A mutable map for holding auxiliary information of this index log entry while applying rules.
    */

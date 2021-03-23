@@ -23,7 +23,6 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshIncrementalActionEvent}
-import com.microsoft.hyperspace.util.SchemaUtils
 
 /**
  * Action to refresh indexes with newly appended files and deleted files in an incremental way.
@@ -92,7 +91,8 @@ class RefreshIncrementalAction(
         refreshDF,
         indexDataPath.toString,
         previousIndexLogEntry.numBuckets,
-        SchemaUtils.prefixNestedFieldNames(indexConfig.indexedColumns),
+        // previousIndexLogEntry should contain the resolved and prefixed field names.
+        previousIndexLogEntry.derivedDataset.properties.columns.indexed,
         writeMode)
     }
   }
@@ -114,10 +114,6 @@ class RefreshIncrementalAction(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
     }
-  }
-
-  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
   /**
@@ -143,5 +139,9 @@ class RefreshIncrementalAction(
       // New entry.
       entry
     }
+  }
+
+  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

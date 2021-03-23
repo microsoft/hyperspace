@@ -84,12 +84,13 @@ object ResolverUtils {
    * @param spark Spark session.
    * @param requiredStrings List of strings to resolve.
    * @param plan Logical plan to resolve against.
-   * @return Optional Seq of resolved strings if all required strings are resolved. Else, None.
+   * @return Optional sequence of tuples of resolved name string and nested state boolean
+   *         if all required strings are resolved. Else, None.
    */
   def resolve(
       spark: SparkSession,
       requiredStrings: Seq[String],
-      plan: LogicalPlan): Option[Seq[String]] = {
+      plan: LogicalPlan): Option[Seq[(String, Boolean)]] = {
     val schema = plan.schema
     val resolver = spark.sessionState.conf.resolver
     val resolved = requiredStrings.map { requiredField =>
@@ -98,7 +99,12 @@ object ResolverUtils {
         .map { expr =>
           val resolvedColNameParts = extractColumnName(expr)
           validateResolvedColumnName(requiredField, resolvedColNameParts)
-          getColumnNameFromSchema(schema, resolvedColNameParts, resolver).mkString(".")
+          getColumnNameFromSchema(schema, resolvedColNameParts, resolver)
+            .foldLeft(("", false)) { (acc, i) =>
+              val name = Seq(acc._1, i._1).filter(_.nonEmpty).mkString(".")
+              val isNested = acc._2 || i._2
+              (name, isNested)
+            }
         }
         .getOrElse { return None }
     }
@@ -110,8 +116,8 @@ object ResolverUtils {
     expr match {
       case a: Attribute =>
         Seq(a.name)
-      case g @ GetStructField(_, _, Some(name)) =>
-        extractColumnName(g.child) :+ name
+      case GetStructField(child, _, Some(name)) =>
+        extractColumnName(child) :+ name
       case _: GetArrayStructFields =>
         // TODO: Nested arrays will be supported later
         throw HyperspaceException("Array types are not supported.")
@@ -138,19 +144,19 @@ object ResolverUtils {
   private def getColumnNameFromSchema(
       schema: StructType,
       resolvedColNameParts: Seq[String],
-      resolver: Resolver): Seq[String] = resolvedColNameParts match {
+      resolver: Resolver): Seq[(String, Boolean)] = resolvedColNameParts match {
     case h :: tail =>
       val field = schema.find(f => resolver(f.name, h)).get
       field match {
         case StructField(name, s: StructType, _, _) =>
-          name +: getColumnNameFromSchema(s, tail, resolver)
+          (name, true) +: getColumnNameFromSchema(s, tail, resolver)
         case StructField(_, _: ArrayType, _, _) =>
           // TODO: Nested arrays will be supported later
           throw HyperspaceException("Array types are not supported.")
         case StructField(_, _: MapType, _, _) =>
           // TODO: Nested maps will be supported later
           throw HyperspaceException("Map types are not supported")
-        case f => Seq(f.name)
+        case f => Seq((f.name, false))
       }
   }
 }

@@ -22,7 +22,7 @@ import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 
 class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
 
-  test("testResolve against dataframe - simple") {
+  test("Verify testResolve against dataframe - simple.") {
     import spark.implicits._
 
     val coll = Seq((1, "a", "a2"))
@@ -31,16 +31,16 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("id", "name"), df.queryExecution.analyzed)
-        .contains(Seq("id", "name")))
+        .contains(Seq(("id", false), ("name", false))))
     assert(
       ResolverUtils.resolve(spark, Seq("unknown", "name"), df.queryExecution.analyzed).isEmpty)
     assert(
       ResolverUtils
         .resolve(spark, Seq.empty[String], df.queryExecution.analyzed)
-        .contains(Seq.empty[String]))
+        .contains(Seq.empty[(String, Boolean)]))
   }
 
-  test("testResolve against dataframe - case sensitiveness false") {
+  test("Verify testResolve against dataframe - case sensitiveness false") {
     import spark.implicits._
 
     val coll = Seq((1, "a", "a2"))
@@ -49,10 +49,10 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("iD", "nAme"), df.queryExecution.analyzed)
-        .contains(Seq("Id", "Name")))
+        .contains(Seq(("Id", false), ("Name", false))))
   }
 
-  test("testResolve against dataframe - case sensitiveness true") {
+  test("Verify testResolve against dataframe - case sensitiveness true") {
     import spark.implicits._
 
     val coll = Seq((1, "a", "a2"))
@@ -64,7 +64,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     spark.conf.set("spark.sql.caseSensitive", prevCaseSensitivity)
   }
 
-  test("testResolve against dataframe - nested") {
+  test("Verify testResolve against dataframe - nested") {
     import spark.implicits._
 
     val coll =
@@ -74,17 +74,22 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("id", "nm"), df.queryExecution.analyzed)
-        .contains(Seq("id", "nm")))
+        .contains(Seq(("id", false), ("nm", false))))
     assert(
       ResolverUtils
         .resolve(
           spark,
           Seq("nm", "nested.n.n.n.f2", "nested.n.n.nf1_b", "nested.nf1"),
           df.queryExecution.analyzed)
-        .contains(Seq("nm", "nested.n.n.n.f2", "nested.n.n.nf1_b", "nested.nf1")))
+        .contains(
+          Seq(
+            ("nm", false),
+            ("nested.n.n.n.f2", true),
+            ("nested.n.n.nf1_b", true),
+            ("nested.nf1", true))))
   }
 
-  test("testResolve against dataframe - unsupported nested field names") {
+  test("Verify testResolve against dataframe - unsupported nested field names") {
     import spark.implicits._
 
     val coll = Seq((1, "a", NType5("m1", "s1")))
@@ -93,7 +98,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("id", "nm", "nested.n__y"), df.queryExecution.analyzed)
-        .contains(Seq("id", "nm", "nested.n__y")))
+        .contains(Seq(("id", false), ("nm", false), ("nested.n__y", true))))
     val exc = intercept[HyperspaceException] {
       ResolverUtils.resolve(spark, Seq("nm", "nested.`nf9.x`"), df.queryExecution.analyzed)
     }
@@ -102,7 +107,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
         "contains dots: nested.`nf9.x`"))
   }
 
-  test("testResolve against dataframe - unsupported nested array types") {
+  test("Verify testResolve against dataframe - unsupported nested array types") {
     import spark.implicits._
 
     val coll = Seq((1, "a", NType7("f1", Seq[NType](NType("ff1", 11L)))))
@@ -113,7 +118,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(exc.getMessage.contains("Array types are not supported."))
   }
 
-  test("testResolve against dataframe - unsupported nested map types") {
+  test("Verify testResolve against dataframe - unsupported nested map types") {
     import spark.implicits._
 
     val coll =
