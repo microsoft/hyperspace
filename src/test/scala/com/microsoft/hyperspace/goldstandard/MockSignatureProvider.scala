@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.goldstandard
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
 /**
@@ -37,6 +38,7 @@ class MockSignatureProvider extends LogicalPlanSignatureProvider {
           _,
           _) =>
         Some(location.rootPaths.head.getName)
+      case _ => throw HyperspaceException("Unexpected logical plan found.")
     }
   }
 }

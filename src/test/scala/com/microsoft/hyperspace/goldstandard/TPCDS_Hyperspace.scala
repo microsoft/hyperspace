@@ -37,10 +37,10 @@ class TPCDS_Hyperspace extends PlanStabilitySuite {
     spark.conf.set(INDEX_SYSTEM_PATH, indexSystemPath)
     spark.enableHyperspace()
 
-    val indexes = Seq(
+    val indexDefinitions = Seq(
       "dtindex;date_dim;d_date_sk;d_year",
       "ssIndex;store_sales;ss_sold_date_sk;ss_customer_sk")
-    indexes.foreach(i => createIndex(IndexDefinition.fromString(i), spark))
+    indexDefinitions.foreach(i => createIndex(IndexDefinition.fromString(i), spark))
   }
 
   override def afterAll(): Unit = {
@@ -71,6 +71,7 @@ object IndexDefinition {
   /**
    * Index definition from conf files should be provided in the following format:
    * "index-name;table-name;comma-separated-indexed-cols;comma-separated-included-cols"
+   *
    * @param definition: Index definition in string representation mentioned above.
    * @return IndexDefinition.
    */

@@ -87,7 +87,7 @@ object IndexLogEntryCreator {
             .Columns(index.indexedCols, index.includedCols),
           IndexLogEntry.schemaString(indexSchema),
           200,
-          Map("hasParquetAsSourceFormat" -> "true"))),
+          Map(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY -> "true"))),
       Content(Directory.fromDirectory(indexRootPath, new FileIdTracker)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
