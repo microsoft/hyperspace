@@ -150,22 +150,17 @@ class Hyperspace:
                                                self.hyperspace.indexes(), verbose)
         redirectFunc(result_string)
 
-    def index(self, indexName):
+    def index(self, indexName, logVersion = None):
         """
         Get index metadata and detailed index statistics for a given index.
-        :param indexName: index name
-        :return: dataFrame object containing the index metadata and detailed index statistics.
-        """
-        return DataFrame(self.hyperspace.index(indexName), self.spark._wrapped)
-
-    def index(self, indexName, logVersion):
-        """
-        Get index metadata and detailed index statistics for a given index and log version.
         :param indexName: index name
         :param logVersion: log version
         :return: dataFrame object containing the index metadata and detailed index statistics.
         """
-        return DataFrame(self.hyperspace.index(indexName, logVersion), self.spark._wrapped)
+        if logVersion:
+            return DataFrame(self.hyperspace.index(indexName, logVersion), self.spark._wrapped)
+        else:
+            return DataFrame(self.hyperspace.index(indexName), self.spark._wrapped)
 
     @staticmethod
     def enable(spark):
