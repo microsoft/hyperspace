@@ -84,7 +84,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
           val expected = IndexStatistics(
             indexConfig1.indexName,
             indexConfig1.indexedColumns,
-            indexConfig1.includedColumns,
+            indexConfig1.includedColumns.include,
             200,
             expectedSchema.json,
             s"$systemPath/${indexConfig1.indexName}" +
@@ -789,7 +789,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
           CoveringIndex(
             CoveringIndex.Properties(
               CoveringIndex.Properties
-                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
+                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns.include),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
               Map())),

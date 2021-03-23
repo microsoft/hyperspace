@@ -28,10 +28,24 @@ class Hyperspace:
         >>> _getJavaIndexConfig(idx_config)
         """
         indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
-        included_columns = self._getScalaSeqFromList(index_config.includedColumns)
+        included_columns = self._getJavaIncludedColumnsConfig(index_config.includedColumns.include, index_config.includedColumns.exclude)
         _jindexConfig = self.jvm.com.microsoft.hyperspace.index.IndexConfig(
             self.jvm.java.lang.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig
+
+    def _getJavaIncludedColumnsConfig(self, include, exclude):
+        """
+        Constructs IncludedColumnsConfig Java object from Java's List objects.
+        :param include: List of column names to include as included columns.
+        :param exclude: List of column names to exclude to form list of included columns.
+        :return: IncludedColumnsConfig python object.
+
+        >>> _getJavaIncludedColumnsConfig(include, exclude)
+        """
+        include_columns = self._getScalaSeqFromList(include)
+        exclude_columns = self._getScalaSeqFromList(exclude)
+        _jincludedColumns = self.jvm.com.microsoft.hyperspace.index.IncludedColumnsConfig(include_columns, exclude_columns)
+        return _jincludedColumns
 
     def _getScalaSeqFromList(self, list):
         """
@@ -67,7 +81,7 @@ class Hyperspace:
         :param indexConfig: indexConfig
 
         >>> hyperspace = Hyperspace(spark)
-        >>> idxConfig = IndexConfig("indexName", ["c1"], ["c2","c3"])
+        >>> idxConfig = IndexConfig("indexName", ["c1"], IncludedColumnsConfig(["c2, c3"], []))
         >>> df = spark.read.parquet("./sample.parquet").toDF("c1", "c2", "c3")
         >>> hyperspace.createIndex(df, indexConfig)
         """

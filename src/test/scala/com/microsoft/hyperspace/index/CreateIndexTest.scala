@@ -165,7 +165,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
       // For non-partitioned data, only file name lineage column should be added to index schema.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig1.indexedColumns ++ indexConfig1.includedColumns ++
+          (indexConfig1.indexedColumns ++ indexConfig1.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }
@@ -180,7 +180,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
       // should be added to index schema if they are not already among index config columns.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID) ++ partitionKeys).sorted)
     }
   }
@@ -195,7 +195,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
       // there should be no duplicates due to adding lineage.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig4.indexedColumns ++ indexConfig4.includedColumns ++
+          (indexConfig4.indexedColumns ++ indexConfig4.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }
@@ -212,7 +212,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
       // file name column and second partition key column as lineage columns.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns ++
+          (indexConfig3.indexedColumns ++ indexConfig3.includedColumns.include ++
             Seq(IndexConstants.DATA_FILE_NAME_ID, partitionKeys(1))).sorted)
     }
   }
@@ -240,5 +240,21 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
 
       lineageValues.forall(lineageRange.contains(_))
     }
+  }
+
+  test("Create index using IndexConfig with excluded columns.") {
+    val indexConfig = IndexConfig("index1", Seq("RGUID"), IncludedColumnsConfig(Seq(), Seq("Date")))
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+
+    val columns = Set("Query", "imprs", "clicks")
+    val indexes = hyperspace.indexes.where(s"name = '${indexConfig.indexName}' ")
+    assert(indexes.count == 1)
+    assert(indexes.head.getAs[WrappedArray[String]]("indexedColumns").head == "RGUID")
+    assert(indexes.head.getAs[WrappedArray[String]]("includedColumns").toSet === columns)
+
+    val indexRecordsDF = spark.read.parquet(
+      s"$systemPath/${indexConfig.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+    assert(
+      indexRecordsDF.schema.fieldNames.toSet === (columns ++ indexConfig.indexedColumns.toSet))
   }
 }

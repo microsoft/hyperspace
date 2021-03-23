@@ -490,5 +490,4 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
     assert(allowEmpty || cnt > 0)
     cnt
   }
-
 }

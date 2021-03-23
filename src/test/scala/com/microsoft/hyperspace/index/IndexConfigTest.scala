@@ -106,7 +106,7 @@ class IndexConfigTest extends SparkFunSuite {
 
     assert(indexConfig.indexName.equals(indexName))
     assert(indexConfig.indexedColumns.equals(indexedColumns))
-    assert(indexConfig.includedColumns.equals(includedColumns))
+    assert(indexConfig.includedColumns.include.equals(includedColumns))
   }
 
   test("Test exception on multiple indexBy, include and index name on IndexConfig builder.") {
