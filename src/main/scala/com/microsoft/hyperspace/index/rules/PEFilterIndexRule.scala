@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, BinaryComparison, EqualTo, Expression, UnaryExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
@@ -48,14 +49,7 @@ object PEFilterIndexRule
         try {
           val candidateIndexes = findCoveringIndexes(filter, filterColumns)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
-            case Some(index) =>
-              val transformedPlan =
-                transformPlan(
-                  spark,
-                  filter,
-                  index,
-                  originalPlan)
-              transformedPlan
+            case Some(index) => transformPlan(filter, index, originalPlan)
             case None => originalPlan
           }
         } catch {
@@ -67,22 +61,11 @@ object PEFilterIndexRule
   }
 
   def transformPlan(
-      spark: SparkSession,
       filter: Filter,
       index: IndexLogEntry,
       originalPlan: LogicalPlan): LogicalPlan = {
-    val filteredDf =
-      spark.read
-        .parquet(index.content.files.map(_.toString): _*)
-        .where(filter.condition.sql)
-        .select(IndexConstants.DATA_FILE_NAME_ID)
-    val fileIds = filteredDf.rdd.map(r => r(0)).collect.toSet
-    val fileList =
-      index.fileIdTracker.getFileToIdMap
-        .filterKeys(k => fileIds.contains(index.fileIdTracker.getFileToIdMap(k)))
-        .keys
-        .map(f => new Path(f._1))
-        .toSeq
+    // Filter useable files from original data source.
+    val fileList = getFilteredFiles(filter, index)
 
     // Make InMemoryFileIndex from file list.
     val provider = Hyperspace.getContext(spark).sourceProviderManager
@@ -101,11 +84,52 @@ object PEFilterIndexRule
           .getOrElse(Map())
         val schema = StructType((l.schema ++ oldFileIndex.partitionSchema).distinct)
         val newFileIndex = new InMemoryFileIndex(spark, fileList, options, Some(schema))
+        val fsOptions = fs.options ++ Map(IndexConstants.INDEX_RELATION_IDENTIFIER)
 
-        l.copy(fs.copy(location = newFileIndex)(spark))
+        l.copy(fs.copy(location = newFileIndex, options = fsOptions)(spark))
     }
 
     returnVal
+  }
+
+  def getFilteredFiles(filter: Filter, index: IndexLogEntry): Seq[Path] = {
+    val condition = getIndexCompatibleCondition(filter.condition, index)
+
+    val filteredDf =
+      spark.read
+        .parquet(index.content.files.map(_.toString): _*)
+        .where(condition.sql)
+        .select(IndexConstants.DATA_FILE_NAME_ID)
+    val fileIds = filteredDf.rdd.map(r => r(0)).collect.toSet
+
+    index.fileIdTracker.getFileToIdMap
+      .filterKeys(k => fileIds.contains(index.fileIdTracker.getFileToIdMap(k)))
+      .keys
+      .map(f => new Path(f._1))
+      .toSeq
+  }
+
+  private def extractConditions(condition: Expression): Seq[Expression] = condition match {
+    case e: BinaryComparison => Seq(e)
+    case e: UnaryExpression => Seq(e)
+    case And(left, right) => extractConditions(left) ++ extractConditions(right)
+    case _ => throw new IllegalStateException("Unsupported condition found")
+  }
+
+  /**
+   * Choose only those conditions which work with the index. For filter queries, these conditions
+   * should reference to only the head column of indexed columns.
+   *
+   * @param condition Complete filter condition expression.
+   * @param index IndexLogEntry for which we are extracting the compatible sub-conditions.
+   * @return Subset of sub-conditions which work with this index.
+   */
+  private def getIndexCompatibleCondition(
+      condition: Expression,
+      index: IndexLogEntry): Expression = {
+    extractConditions(condition)
+      .filter(_.references.forall(_.name.equals(index.indexedColumns.head)))
+      .reduce(And)
   }
 
   private def findCoveringIndexes(
