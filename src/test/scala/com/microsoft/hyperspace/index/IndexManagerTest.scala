@@ -16,7 +16,9 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.execution.datasources.{BucketingUtils, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
@@ -797,7 +799,8 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
             PathUtils.makeAbsolute(
               s"$systemPath/${indexConfig.indexName}" +
                 s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
-            fileIdTracker),
+            fileIdTracker,
+            new Configuration),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state
