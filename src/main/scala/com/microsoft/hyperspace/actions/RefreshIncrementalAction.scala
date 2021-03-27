@@ -91,7 +91,8 @@ class RefreshIncrementalAction(
         refreshDF,
         indexDataPath.toString,
         previousIndexLogEntry.numBuckets,
-        indexConfig.indexedColumns,
+        // previousIndexLogEntry should contain the resolved and prefixed field names.
+        previousIndexLogEntry.derivedDataset.properties.columns.indexed,
         writeMode)
     }
   }
@@ -113,10 +114,6 @@ class RefreshIncrementalAction(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
     }
-  }
-
-  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
   /**
@@ -142,5 +139,9 @@ class RefreshIncrementalAction(
       // New entry.
       entry
     }
+  }
+
+  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

@@ -18,6 +18,11 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.Resolver
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Expression, ExtractValue, GetArrayStructFields, GetMapValue, GetStructField}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.types.{ArrayType, MapType, StructField, StructType}
+
+import com.microsoft.hyperspace.HyperspaceException
 
 /**
  * [[ResolverUtils]] provides utility functions to resolve strings based on spark's resolver.
@@ -70,5 +75,88 @@ object ResolverUtils {
       requiredStrings: Seq[String],
       availableStrings: Seq[String]): Option[Seq[String]] = {
     Some(requiredStrings.map(resolve(spark, _, availableStrings).getOrElse { return None }))
+  }
+
+  /**
+   * Finds all resolved strings for requiredStrings, from the given logical plan. Returns
+   * optional seq of resolved strings if all required strings are resolved, otherwise None.
+   *
+   * @param spark Spark session.
+   * @param requiredStrings List of strings to resolve.
+   * @param plan Logical plan to resolve against.
+   * @return Optional sequence of tuples of resolved name string and nested state boolean
+   *         if all required strings are resolved. Else, None.
+   */
+  def resolve(
+      spark: SparkSession,
+      requiredStrings: Seq[String],
+      plan: LogicalPlan): Option[Seq[(String, Boolean)]] = {
+    val schema = plan.schema
+    val resolver = spark.sessionState.conf.resolver
+    val resolved = requiredStrings.map { requiredField =>
+      plan
+        .resolveQuoted(requiredField, resolver)
+        .map { expr =>
+          val resolvedColNameParts = extractColumnName(expr)
+          validateResolvedColumnName(requiredField, resolvedColNameParts)
+          getColumnNameFromSchema(schema, resolvedColNameParts, resolver)
+            .foldLeft(("", false)) { (acc, i) =>
+              val name = Seq(acc._1, i._1).filter(_.nonEmpty).mkString(".")
+              val isNested = acc._2 || i._2
+              (name, isNested)
+            }
+        }
+        .getOrElse { return None }
+    }
+    Some(resolved)
+  }
+
+  // Extracts the parts of a nested field access path from an expression.
+  private def extractColumnName(expr: Expression): Seq[String] = {
+    expr match {
+      case a: Attribute =>
+        Seq(a.name)
+      case GetStructField(child, _, Some(name)) =>
+        extractColumnName(child) :+ name
+      case _: GetArrayStructFields =>
+        // TODO: Nested arrays will be supported later
+        throw HyperspaceException("Array types are not supported.")
+      case _: GetMapValue =>
+        // TODO: Nested maps will be supported later
+        throw HyperspaceException("Map types are not supported.")
+      case Alias(nested: ExtractValue, _) =>
+        extractColumnName(nested)
+    }
+  }
+
+  // Validate the resolved column name by checking if nested columns have dots in its field names.
+  private def validateResolvedColumnName(
+      origCol: String,
+      resolvedColNameParts: Seq[String]): Unit = {
+    if (resolvedColNameParts.length > 1 && resolvedColNameParts.exists(_.contains("."))) {
+      throw HyperspaceException(
+        s"Hyperspace does not support the nested column whose name contains dots: $origCol")
+    }
+  }
+
+  // Given resolved column name parts, return new column name parts using the name in the given
+  // schema to use the original name in order to preserve the casing.
+  private def getColumnNameFromSchema(
+      schema: StructType,
+      resolvedColNameParts: Seq[String],
+      resolver: Resolver): Seq[(String, Boolean)] = resolvedColNameParts match {
+    case h :: tail =>
+      val field = schema.find(f => resolver(f.name, h)).get
+      field match {
+        case StructField(name, s: StructType, _, _) =>
+          (name, true) +: getColumnNameFromSchema(s, tail, resolver)
+        case StructField(_, _: ArrayType, _, _) =>
+          // TODO: Nested arrays will be supported later
+          throw HyperspaceException("Array types are not supported.")
+        case StructField(_, _: MapType, _, _) =>
+          // TODO: Nested maps will be supported later
+          throw HyperspaceException("Map types are not supported")
+        case f => Seq((f.name, false))
+      }
   }
 }
