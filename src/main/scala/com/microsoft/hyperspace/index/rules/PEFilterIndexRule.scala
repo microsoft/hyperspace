@@ -100,6 +100,7 @@ object PEFilterIndexRule
         .parquet(index.content.files.map(_.toString): _*)
         .where(condition.sql)
         .select(IndexConstants.DATA_FILE_NAME_ID)
+        .distinct
     val fileIds = filteredDf.rdd.map(r => r(0)).collect.toSet
 
     index.fileIdTracker.getFileToIdMap
