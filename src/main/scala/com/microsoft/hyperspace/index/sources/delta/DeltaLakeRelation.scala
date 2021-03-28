@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRela
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
 /**
  * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
@@ -184,8 +184,13 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * @return IndexLogEntry of the closest version among available index versions.
    */
   override def closestIndex(index: IndexLogEntry): IndexLogEntry = {
+    // Not support append-only HybridScan.
+    if (!(HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn)) {
+      return index
+    }
+
     // Seq of (index log version, delta lake table version)
-    val versions = deltaLakeVersionHistory(index)
+    val versionsHistory = deltaLakeVersionHistory(index)
 
     lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
     def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
@@ -194,9 +199,12 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
         .get
         .asInstanceOf[IndexLogEntry]
     }
-    // TODO: Currently assume all versions of index data exist.
-    //  Need to check and remove candidate indexes.
-    //  See https://github.com/microsoft/hyperspace/issues/387
+
+    // Get available index log versions.
+    val availableLogVersions = indexManager.getAvailableIndexVersions(index.name)
+    val versions = versionsHistory.filter {
+      case (indexLogVersion, _) => availableLogVersions.contains(indexLogVersion)
+    }
 
     plan.relation match {
       case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
@@ -206,7 +214,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
         if (equalOrLessThanLastIndex == versions.size - 1) {
           // The given table version is equal or larger than the latest index's.
           // Use the latest version.
-          index
+          getIndexLogEntry(versions.last._1)
         } else if (equalOrLessThanLastIndex == -1) {
           // The given table version is smaller than the version at index creation.
           // Use the initial version.

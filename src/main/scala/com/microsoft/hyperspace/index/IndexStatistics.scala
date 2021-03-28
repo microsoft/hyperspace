@@ -98,7 +98,7 @@ private[hyperspace] object IndexStatistics {
         entry.appendedFiles.foldLeft(0L)(_ + _.size),
         entry.deletedFiles.size,
         entry.deletedFiles.foldLeft(0L)(_ + _.size),
-        getIndexContentDirectoryPaths(entry))
+        entry.indexContentDirectoryPaths)
     } else {
       IndexStatistics(
         entry.name,
@@ -150,28 +150,6 @@ private[hyperspace] object IndexStatistics {
       0,
       0L,
       Nil)
-  }
-
-  /**
-   * Extract top-most index directories which contain existing index files for
-   * the latest version of index. When refreshing index, depending on the mode,
-   * index files for the latest version of index may reside in multiple directories.
-   * This function extracts paths to top-level directories which
-   * contain those index files.
-   *
-   * @param entry Index log entry.
-   * @return List of directory paths containing index files for latest index version.
-   */
-  private def getIndexContentDirectoryPaths(entry: IndexLogEntry): Seq[String] = {
-    var root = entry.content.root
-    var prefix = entry.content.root.name
-    while (root.subDirs.size == 1 &&
-           !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
-      prefix += s"${root.subDirs.head.name}/"
-      root = root.subDirs.head
-    }
-
-    root.subDirs.map(d => s"$prefix${d.name}")
   }
 
   /**

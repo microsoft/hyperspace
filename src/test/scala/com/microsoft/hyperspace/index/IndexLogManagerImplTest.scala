@@ -144,6 +144,10 @@ class IndexLogManagerImplTest
       JsonUtils.toJson(getEntry("CREATING")))
     FileUtils.createFile(
       fs,
+      new Path(path, s"$HYPERSPACE_LOG/1"),
+      JsonUtils.toJson(getEntry("ACTIVE")))
+    FileUtils.createFile(
+      fs,
       new Path(path, s"$HYPERSPACE_LOG/3"),
       JsonUtils.toJson(getEntry("ACTIVE")))
     FileUtils.createFile(
@@ -158,6 +162,8 @@ class IndexLogManagerImplTest
     val expected = Some(getEntry("ACTIVE"))
     val actual = new IndexLogManagerImpl(path).getLatestStableLog()
     assert(actual.equals(expected))
+    val actualAvailable = new IndexLogManagerImpl(path).getActiveIndexVersions()
+    assert(actualAvailable.equals(Seq(3, 1)))
   }
 
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {

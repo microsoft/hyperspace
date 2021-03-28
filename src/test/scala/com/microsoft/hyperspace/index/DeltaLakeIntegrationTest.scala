@@ -31,7 +31,7 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_QUICK
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/deltaLakeIntegrationTest")
@@ -68,7 +68,9 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
       dfFromSample.write.format("delta").save(dataPath)
 
       val deltaDf = spark.read.format("delta").load(dataPath)
-      hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+      }
 
       withIndex("deltaIndex") {
         def query(version: Option[Long] = None): DataFrame = {
@@ -102,7 +104,7 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
         // The index should not be applied for the version at index creation.
         assert(!isIndexUsed(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
 
-        withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
           // The index should be applied for the updated version.
           assert(isIndexUsed(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex/v__=0"))
         }
@@ -376,6 +378,9 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           checkExpectedIndexUsed(indexName, path, Some(6, tsMap(6)), 5)
           // For delta table version 8, candidate log version is 7. (refresh)
           checkExpectedIndexUsed(indexName, path, Some(8, tsMap(8)), 7)
+
+          FileUtils.delete(new Path(systemPath, s"$indexName/v__=3"))
+          checkExpectedIndexUsed(indexName, path, None, 5)
         }
       }
     }

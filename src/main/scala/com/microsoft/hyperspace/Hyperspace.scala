@@ -163,17 +163,6 @@ class Hyperspace(spark: SparkSession) {
   def index(indexName: String): DataFrame = {
     indexManager.index(indexName)
   }
-
-  /**
-   * Get index metadata and detailed index statistics for a given index and log version.
-   *
-   * @param indexName Name of the index to get stats for.
-   * @param logVersion Index log version to retrieve.
-   * @return Index metadata and statistics as a [[DataFrame]].
-   */
-  def index(indexName: String, logVersion: Int): DataFrame = {
-    indexManager.index(indexName, logVersion)
-  }
 }
 
 object Hyperspace {

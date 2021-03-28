@@ -38,6 +38,7 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
         override def deleteLatestStableLog(): Boolean = throw new NotImplementedError
         override def writeLog(id: Int, log: LogEntry): Boolean = throw new NotImplementedError
         override def getLatestLog(): Option[LogEntry] = Some(testLogEntry)
+        override def getActiveIndexVersions(): Seq[Int] = Seq(0)
 
         private val testLogEntry: IndexLogEntry = {
           val sourcePlanProperties = SparkPlan.Properties(
