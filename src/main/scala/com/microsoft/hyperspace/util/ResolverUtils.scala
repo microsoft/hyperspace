@@ -138,8 +138,8 @@ object ResolverUtils {
    * @param spark Spark session.
    * @param requiredStrings List of strings to resolve.
    * @param plan Logical plan to resolve against.
-   * @return Optional sequence of tuples of resolved name string and whether the column is nested
-   *         if all required strings are resolved. Else, None.
+   * @return Optional sequence of ResolvedColumn objects if all required strings are resolved.
+   *         Else, None.
    */
   def resolve(
       spark: SparkSession,
