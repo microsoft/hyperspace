@@ -58,19 +58,11 @@ class SchemaUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
         "__hs_nested.already.prefixed")
   }
 
-  test("prefixNestedFieldNames") {
-    assert(prefixed == SchemaUtils.prefixNestedFieldNames(originals))
-  }
-
   test("removePrefixNestedFieldName") {
     prefixed.zipWithIndex.foreach {
       case (v, i) =>
         assert(SchemaUtils.removePrefixNestedFieldName(v) == originals.toSeq(i)._1)
     }
-  }
-
-  test("removePrefixNestedFieldNames") {
-    assert(originals == SchemaUtils.removePrefixNestedFieldNames(prefixed))
   }
 
   test("isFieldNamePrefixed") {
@@ -86,10 +78,5 @@ class SchemaUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
       case (v, i) =>
         assert(SchemaUtils.isFieldNamePrefixed(v) == expectedBooleans2(i))
     }
-  }
-
-  test("containsNestedFieldNames") {
-    assert(!SchemaUtils.containsNestedFieldNames(originals.map(_._1)))
-    assert(SchemaUtils.containsNestedFieldNames(prefixed))
   }
 }

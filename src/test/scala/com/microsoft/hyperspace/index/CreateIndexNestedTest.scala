@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import scala.collection.immutable.ListMap
 import scala.collection.mutable.WrappedArray
 
 import org.apache.hadoop.conf.Configuration
@@ -26,7 +25,8 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.functions._
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleNestedData}
-import com.microsoft.hyperspace.util.{FileUtils, SchemaUtils}
+import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
@@ -64,6 +64,13 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
 
   after {
     FileUtils.delete(systemPath)
+  }
+
+  test("terry") {
+    import spark.implicits._
+    Seq(1).toDF("a.b").write.mode("overwrite").parquet("/tmp/terry")
+    val df = spark.read.parquet("/tmp/terry")
+    hyperspace.createIndex(df, IndexConfig("i", Seq("`a.b`"), Nil))
   }
 
   test("Index creation with nested indexed and included columns.") {
@@ -160,9 +167,8 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       // should be added to index schema if they are not already among index config columns.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (SchemaUtils.prefixNestedFieldNames(
-            indexConfig2.indexedColumns.zip(Seq(true)) ++
-            indexConfig2.includedColumns.zip(Seq(true))) ++
+          ((indexConfig2.indexedColumns ++ indexConfig2.includedColumns).map(
+            ResolvedColumn(_, isNested = true).normalizedName) ++
             Seq(IndexConstants.DATA_FILE_NAME_ID) ++ partitionKeys).sorted)
     }
   }
@@ -176,9 +182,8 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       // For non-partitioned data, only file name lineage column should be added to index schema.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          (SchemaUtils.prefixNestedFieldNames(
-            indexConfig1.indexedColumns.zip(Seq(true)) ++
-            indexConfig1.includedColumns.zip(Seq(false, true))) ++
+          ((indexConfig1.indexedColumns ++ indexConfig1.includedColumns).map(
+            ResolvedColumn(_, isNested = true).normalizedName) ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }
   }

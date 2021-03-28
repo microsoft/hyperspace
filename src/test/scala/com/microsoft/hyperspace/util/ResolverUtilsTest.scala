@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.util
 import org.apache.spark.SparkFunSuite
 
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
 
@@ -31,13 +32,13 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("id", "name"), df.queryExecution.analyzed)
-        .contains(Seq(("id", false), ("name", false))))
+        .contains(Seq(ResolvedColumn("id", false), ResolvedColumn("name", false))))
     assert(
       ResolverUtils.resolve(spark, Seq("unknown", "name"), df.queryExecution.analyzed).isEmpty)
     assert(
       ResolverUtils
         .resolve(spark, Seq.empty[String], df.queryExecution.analyzed)
-        .contains(Seq.empty[(String, Boolean)]))
+        .contains(Seq.empty[ResolvedColumn]))
   }
 
   test("Verify testResolve against dataframe - case sensitiveness false") {
@@ -49,7 +50,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("iD", "nAme"), df.queryExecution.analyzed)
-        .contains(Seq(("Id", false), ("Name", false))))
+        .contains(Seq(ResolvedColumn("Id", false), ResolvedColumn("Name", false))))
   }
 
   test("Verify testResolve against dataframe - case sensitiveness true") {
@@ -74,7 +75,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("id", "nm"), df.queryExecution.analyzed)
-        .contains(Seq(("id", false), ("nm", false))))
+        .contains(Seq(ResolvedColumn("id", false), ResolvedColumn("nm", false))))
     assert(
       ResolverUtils
         .resolve(
@@ -83,10 +84,10 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
           df.queryExecution.analyzed)
         .contains(
           Seq(
-            ("nm", false),
-            ("nested.n.n.n.f2", true),
-            ("nested.n.n.nf1_b", true),
-            ("nested.nf1", true))))
+            ResolvedColumn("nm", false),
+            ResolvedColumn("nested.n.n.n.f2", true),
+            ResolvedColumn("nested.n.n.nf1_b", true),
+            ResolvedColumn("nested.nf1", true))))
   }
 
   test("Verify testResolve against dataframe - unsupported nested field names") {
@@ -98,7 +99,11 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(
       ResolverUtils
         .resolve(spark, Seq("id", "nm", "nested.n__y"), df.queryExecution.analyzed)
-        .contains(Seq(("id", false), ("nm", false), ("nested.n__y", true))))
+        .contains(
+          Seq(
+            ResolvedColumn("id", false),
+            ResolvedColumn("nm", false),
+            ResolvedColumn("nested.n__y", true))))
     val exc = intercept[HyperspaceException] {
       ResolverUtils.resolve(spark, Seq("nm", "nested.`nf9.x`"), df.queryExecution.analyzed)
     }

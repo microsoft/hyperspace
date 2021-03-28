@@ -25,7 +25,8 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils, SchemaUtils}
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils, ResolverUtils}
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 /**
  * CreateActionBase provides functionality to write dataframe as covering index.
@@ -158,7 +159,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
   private def resolveConfig(
       df: DataFrame,
-      indexConfig: IndexConfig): (Seq[(String, Boolean)], Seq[(String, Boolean)]) = {
+      indexConfig: IndexConfig): (Seq[ResolvedColumn], Seq[ResolvedColumn]) = {
     val spark = df.sparkSession
     val plan = df.queryExecution.analyzed
     val indexedColumns = indexConfig.indexedColumns
@@ -170,7 +171,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       case (Some(indexed), Some(included)) => (indexed, included)
       case _ =>
         val unresolvedColumns = (indexedColumns ++ includedColumns)
-          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan).map(_.map(_._1))))
+          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan).map(_.map(_.name))))
           .collect { case (c, r) if r.isEmpty => c }
         throw HyperspaceException(
           s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
@@ -183,12 +184,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df: DataFrame,
       indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val columnsFromIndexConfig =
-      resolvedIndexedColumns.map(_._1) ++ resolvedIncludedColumns.map(_._1)
-
-    val prefixedIndexedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIndexedColumns)
-    val prefixedIncludedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIncludedColumns)
-    val prefixedColumnsFromIndexConfig = prefixedIndexedColumns ++ prefixedIncludedColumns
+    val projectColumns = (resolvedIndexedColumns ++ resolvedIncludedColumns).map(_.toColumn)
 
     val indexDF = if (hasLineage(spark)) {
       val relation = getRelation(spark, df)
@@ -197,10 +193,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // 1. DATA_FILE_ID_COLUMN column contains source data file id for each index record.
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
-      val partitionColumns = relation.partitionSchema.map(_.name)
+      val partitionColumnNames = relation.partitionSchema.map(_.name)
+      // We use `name` instead of `normalizedName` because nested columns cannot be partition
+      // columns.
+      val resolvedColumnNames = (resolvedIndexedColumns ++ resolvedIncludedColumns).map(_.name)
       val missingPartitionColumns =
-        partitionColumns.filter(ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
-      val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
+        partitionColumnNames
+          .filter(ResolverUtils.resolve(spark, _, resolvedColumnNames).isEmpty)
+          .map(col(_))
 
       // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a
       // Long data type value. Each source data file has a unique file id, assigned by
@@ -217,25 +217,19 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       val dataPathColumn = "_data_path"
       val lineagePairs = relation.lineagePairs(fileIdTracker)
       val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
-      val prefixedAllIndexColumns = prefixedColumnsFromIndexConfig ++ missingPartitionColumns
 
       df.withColumn(dataPathColumn, input_file_name())
         .join(lineageDF.hint("broadcast"), dataPathColumn)
-        .select(prepareColumns(allIndexColumns, prefixedAllIndexColumns) :+
-          col(IndexConstants.DATA_FILE_NAME_ID): _*)
+        .select(
+          projectColumns ++ missingPartitionColumns :+ col(IndexConstants.DATA_FILE_NAME_ID): _*)
     } else {
-      df.select(prepareColumns(columnsFromIndexConfig, prefixedColumnsFromIndexConfig): _*)
+      df.select(projectColumns: _*)
     }
 
-    (indexDF, prefixedIndexedColumns, prefixedIncludedColumns)
-  }
-
-  private def prepareColumns(
-      originalColumns: Seq[String],
-      prefixedColumns: Seq[String]): Seq[Column] = {
-    originalColumns.zip(prefixedColumns).map {
-      case (original, prefixed) =>
-        col(original).as(prefixed)
-    }
+    // Return normalized names because indexDF will have normalized columns as output.
+    (
+      indexDF,
+      resolvedIndexedColumns.map(_.normalizedName),
+      resolvedIncludedColumns.map(_.normalizedName))
   }
 }

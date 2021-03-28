@@ -16,18 +16,59 @@
 
 package com.microsoft.hyperspace.util
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Column, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.Resolver
 import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Expression, ExtractValue, GetArrayStructFields, GetMapValue, GetStructField}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, MapType, StructField, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn.NESTED_FIELD_PREFIX
 
 /**
  * [[ResolverUtils]] provides utility functions to resolve strings based on spark's resolver.
  */
 object ResolverUtils {
+
+  /**
+   * [[ResolvedColumn]] stores information when a column name is resolved against the
+   * analyzed plan and its schema.
+   *
+   * @param name The column name resolved from an analyzed plan.
+   * @param isNested Flag to denote if this column is nested or not.
+   */
+  private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
+    assert(name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX))
+
+    lazy val normalizedName = {
+      if (isNested) {
+        s"$NESTED_FIELD_PREFIX$name"
+      } else {
+        name
+      }
+    }
+
+    def toColumn: Column = {
+      if (isNested) {
+        col(name).as(normalizedName)
+      } else {
+        col(name)
+      }
+    }
+  }
+
+  private[hyperspace] object ResolvedColumn {
+    private val NESTED_FIELD_PREFIX = "__hs_nested."
+
+    def apply(normalizedColumnName: String): ResolvedColumn = {
+      if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
+        ResolvedColumn(normalizedColumnName.substring(NESTED_FIELD_PREFIX.length), true)
+      } else {
+        ResolvedColumn(normalizedColumnName, false)
+      }
+    }
+  }
 
   /**
    * Return available string if required string can be resolved with it, based on spark resolver.
@@ -84,13 +125,13 @@ object ResolverUtils {
    * @param spark Spark session.
    * @param requiredStrings List of strings to resolve.
    * @param plan Logical plan to resolve against.
-   * @return Optional sequence of tuples of resolved name string and nested state boolean
+   * @return Optional sequence of tuples of resolved name string and whether the column is nested
    *         if all required strings are resolved. Else, None.
    */
   def resolve(
       spark: SparkSession,
       requiredStrings: Seq[String],
-      plan: LogicalPlan): Option[Seq[(String, Boolean)]] = {
+      plan: LogicalPlan): Option[Seq[ResolvedColumn]] = {
     val schema = plan.schema
     val resolver = spark.sessionState.conf.resolver
     val resolved = requiredStrings.map { requiredField =>
@@ -99,12 +140,8 @@ object ResolverUtils {
         .map { expr =>
           val resolvedColNameParts = extractColumnName(expr)
           validateResolvedColumnName(requiredField, resolvedColNameParts)
-          getColumnNameFromSchema(schema, resolvedColNameParts, resolver)
-            .foldLeft(("", false)) { (acc, i) =>
-              val name = Seq(acc._1, i._1).filter(_.nonEmpty).mkString(".")
-              val isNested = acc._2 || i._2
-              (name, isNested)
-            }
+          val origColNameParts = getColumnNameFromSchema(schema, resolvedColNameParts, resolver)
+          ResolvedColumn(origColNameParts.mkString("."), origColNameParts.length > 1)
         }
         .getOrElse { return None }
     }
@@ -144,19 +181,19 @@ object ResolverUtils {
   private def getColumnNameFromSchema(
       schema: StructType,
       resolvedColNameParts: Seq[String],
-      resolver: Resolver): Seq[(String, Boolean)] = resolvedColNameParts match {
+      resolver: Resolver): Seq[String] = resolvedColNameParts match {
     case h :: tail =>
       val field = schema.find(f => resolver(f.name, h)).get
       field match {
         case StructField(name, s: StructType, _, _) =>
-          (name, true) +: getColumnNameFromSchema(s, tail, resolver)
+          name +: getColumnNameFromSchema(s, tail, resolver)
         case StructField(_, _: ArrayType, _, _) =>
           // TODO: Nested arrays will be supported later
           throw HyperspaceException("Array types are not supported.")
         case StructField(_, _: MapType, _, _) =>
           // TODO: Nested maps will be supported later
           throw HyperspaceException("Map types are not supported")
-        case f => Seq((f.name, false))
+        case f => Seq(f.name)
       }
   }
 }

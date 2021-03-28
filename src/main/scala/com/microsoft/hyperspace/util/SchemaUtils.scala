@@ -17,9 +17,7 @@
 package com.microsoft.hyperspace.util
 
 object SchemaUtils {
-
   val NESTED_FIELD_PREFIX = "__hs_nested."
-  val NESTED_FIELD_PREFIX_REGEX = "^__hs_nested\\."
 
   /**
    * The method prefixes a nested field name that hasn't already been prefixed.
@@ -40,26 +38,6 @@ object SchemaUtils {
   }
 
   /**
-   * The method prefixes the nested field names from a map where the keys are
-   * the field names and the values are the nested state of that field
-   * which should be the result of [[ResolverUtils.resolve]].
-   * The field names that are not marked as nested will not be changed.
-   *
-   * See [[prefixNestedFieldName]] and [[ResolverUtils.resolve]] methods.
-   *
-   * @param fieldNames A sequence of tuples of field names and nested status.
-   * @return A collection with prefixed nested fields.
-   */
-  def prefixNestedFieldNames(fieldNames: Seq[(String, Boolean)]): Seq[String] = {
-    fieldNames.map {
-      case (fieldName, true) =>
-        prefixNestedFieldName(fieldName)
-      case (fieldName, false) =>
-        fieldName
-    }
-  }
-
-  /**
    * The method removes the prefix from a prefixed nested field name. It returns
    * the original nested field name.
    *
@@ -69,25 +47,10 @@ object SchemaUtils {
    * @return The original field name without prefix.
    */
   def removePrefixNestedFieldName(fieldName: String): String = {
-    fieldName.replaceAll(NESTED_FIELD_PREFIX_REGEX, "")
-  }
-
-  /**
-   * The method removes the prefix from a collection of prefixed nested field names.
-   * It returns the original sequence of tuples of field names and nested state.
-   *
-   * The inverse operation is [[prefixNestedFieldNames]].
-   *
-   * @param fieldNames The collection of prefixed field names.
-   * @return A sequence of tuples of field names and nested status.
-   */
-  def removePrefixNestedFieldNames(fieldNames: Seq[String]): Seq[(String, Boolean)] = {
-    fieldNames.map { fieldName =>
-      if (SchemaUtils.isFieldNamePrefixed(fieldName)) {
-        removePrefixNestedFieldName(fieldName) -> true
-      } else {
-        fieldName -> false
-      }
+    if (isFieldNamePrefixed(fieldName)) {
+      fieldName.substring(NESTED_FIELD_PREFIX.length)
+    } else {
+      fieldName
     }
   }
 
@@ -99,16 +62,5 @@ object SchemaUtils {
    */
   def isFieldNamePrefixed(fieldName: String): Boolean = {
     fieldName.startsWith(NESTED_FIELD_PREFIX)
-  }
-
-  /**
-   * The method checks if the collection of field names contains a nested one
-   * by checking the prefix.
-   *
-   * @param fieldNames The collection of field names to check.
-   * @return True is at leas one field name is prefixed.
-   */
-  def containsNestedFieldNames(fieldNames: Seq[String]): Boolean = {
-    fieldNames.exists(isFieldNamePrefixed)
   }
 }
