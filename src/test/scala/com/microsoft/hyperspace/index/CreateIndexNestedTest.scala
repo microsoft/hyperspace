@@ -66,13 +66,6 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
     FileUtils.delete(systemPath)
   }
 
-  test("terry") {
-    import spark.implicits._
-    Seq(1).toDF("a.b").write.mode("overwrite").parquet("/tmp/terry")
-    val df = spark.read.parquet("/tmp/terry")
-    hyperspace.createIndex(df, IndexConfig("i", Seq("`a.b`"), Nil))
-  }
-
   test("Index creation with nested indexed and included columns.") {
     hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     assert(hyperspace.indexes.where(s"name = 'index1' ").count == 1)
@@ -175,14 +168,14 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
 
   test("Check lineage in index records for non-partitioned data.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-      hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig2)
       val indexRecordsDF = spark.read.parquet(
-        s"$systemPath/${indexConfig1.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+        s"$systemPath/${indexConfig2.indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
 
       // For non-partitioned data, only file name lineage column should be added to index schema.
       assert(
         indexRecordsDF.schema.fieldNames.sorted ===
-          ((indexConfig1.indexedColumns ++ indexConfig1.includedColumns).map(
+          ((indexConfig2.indexedColumns ++ indexConfig2.includedColumns).map(
             ResolvedColumn(_, isNested = true).normalizedName) ++
             Seq(IndexConstants.DATA_FILE_NAME_ID)).sorted)
     }

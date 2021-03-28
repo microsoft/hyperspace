@@ -35,12 +35,16 @@ object ResolverUtils {
    * [[ResolvedColumn]] stores information when a column name is resolved against the
    * analyzed plan and its schema.
    *
+   * Outside unit tests, this object should not be created directly, but via the `resolve` function,
+   * or `ResolvedColumn.apply` with a normalized name.
+   *
    * @param name The column name resolved from an analyzed plan.
    * @param isNested Flag to denote if this column is nested or not.
    */
   private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
-    assert(name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX))
+    assert(!isNested || (name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX)))
 
+    // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
     lazy val normalizedName = {
       if (isNested) {
         s"$NESTED_FIELD_PREFIX$name"
@@ -49,13 +53,22 @@ object ResolverUtils {
       }
     }
 
+    // Create a column using the resolved name. Top level column names are quoted, and
+    // nested column names are aliased with normalized names.
     def toColumn: Column = {
       if (isNested) {
+        // No need to quote the string for "as" even if it contains dots.
         col(name).as(normalizedName)
       } else {
-        col(name)
+        col(quote(name))
       }
     }
+
+    // Create a column using the normalized name. Since the normalized name is already flattened
+    // with "dots", it is quoted.
+    def toNormalizedColumn: Column = col(quote(normalizedName))
+
+    private def quote(name: String) = s"`$name`"
   }
 
   private[hyperspace] object ResolvedColumn {

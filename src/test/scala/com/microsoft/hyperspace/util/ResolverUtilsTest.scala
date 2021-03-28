@@ -138,6 +138,31 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     }
     assert(exc2.getMessage.contains("Map types are not supported."))
   }
+
+  test("Verify ResolvedColumn functionality") {
+    val col1 = ResolvedColumn("a.b.c", isNested = false)
+    assert(col1.name == "a.b.c")
+    assert(col1.normalizedName == "a.b.c")
+    assert(col1 === ResolvedColumn(col1.normalizedName))
+    // toString() calls toPrettySQL() internally and this verifies we are creating the
+    // `Column` object correctly.
+    assert(col1.toColumn.toString === "`a.b.c`")
+    assert(col1.toNormalizedColumn.toString === "`a.b.c`")
+
+    val col2 = ResolvedColumn("abc", isNested = false)
+    assert(col2.name == "abc")
+    assert(col2.normalizedName == "abc")
+    assert(col2 === ResolvedColumn(col2.normalizedName))
+    assert(col2.toColumn.toString === "abc")
+    assert(col2.toNormalizedColumn.toString === "abc")
+
+    val col3 = ResolvedColumn("a.b.c", isNested = true)
+    assert(col3.name == "a.b.c")
+    assert(col3.normalizedName == "__hs_nested.a.b.c")
+    assert(col3 === ResolvedColumn(col3.normalizedName))
+    assert(col3.toColumn.toString === "a.b.c AS `__hs_nested.a.b.c`")
+    assert(col3.toNormalizedColumn.toString === "`__hs_nested.a.b.c`")
+  }
 }
 
 case class NType8(f1: String, maps: Map[NType, NType])

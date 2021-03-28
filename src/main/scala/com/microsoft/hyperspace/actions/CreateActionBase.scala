@@ -93,7 +93,9 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           CoveringIndex(
             CoveringIndex.Properties(
               CoveringIndex.Properties
-                .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
+                .Columns(
+                  resolvedIndexedColumns.map(_.normalizedName),
+                  resolvedIncludedColumns.map(_.normalizedName)),
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets,
               coveringIndexProperties)),
@@ -113,10 +115,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
     // Run job
     val repartitionedIndexDataFrame = {
-      // For nested fields, resolvedIndexedColumns will have flattened names with `.` (dots),
-      // thus they need to be enclosed in backticks to access them as top-level columns.
-      // Note that backticking the non-nested columns is a no-op.
-      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(c => col(s"`$c`")): _*)
+      // We are repartitioning with normalized columns (e.g., flattened nested column).
+      indexDataFrame.repartition(numBuckets, resolvedIndexedColumns.map(_.toNormalizedColumn): _*)
     }
 
     // Save the index with the number of buckets specified.
@@ -125,7 +125,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         repartitionedIndexDataFrame,
         indexDataPath.toString,
         numBuckets,
-        resolvedIndexedColumns,
+        resolvedIndexedColumns.map(_.normalizedName),
         SaveMode.Overwrite)
   }
 
@@ -182,7 +182,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   private def prepareIndexDataFrame(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
+      indexConfig: IndexConfig): (DataFrame, Seq[ResolvedColumn], Seq[ResolvedColumn]) = {
     val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
     val projectColumns = (resolvedIndexedColumns ++ resolvedIncludedColumns).map(_.toColumn)
 
@@ -194,8 +194,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       // 2. If source data is partitioned, all partitioning key(s) are added to index schema
       //    as columns if they are not already part of the schema.
       val partitionColumnNames = relation.partitionSchema.map(_.name)
-      // We use `name` instead of `normalizedName` because nested columns cannot be partition
-      // columns.
       val resolvedColumnNames = (resolvedIndexedColumns ++ resolvedIncludedColumns).map(_.name)
       val missingPartitionColumns =
         partitionColumnNames
@@ -226,10 +224,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       df.select(projectColumns: _*)
     }
 
-    // Return normalized names because indexDF will have normalized columns as output.
-    (
-      indexDF,
-      resolvedIndexedColumns.map(_.normalizedName),
-      resolvedIncludedColumns.map(_.normalizedName))
+    (indexDF, resolvedIndexedColumns, resolvedIncludedColumns)
   }
 }
