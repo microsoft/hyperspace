@@ -91,7 +91,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               HyperSpaceIndex.BloomFilterIndex(
                 HyperSpaceIndex.Properties.BloomFilter(
                   HyperSpaceIndex.Properties.CommonProperties
-                    .Columns(resolvedIncludedColumns, resolvedIncludedColumns),
+                    .Columns(resolvedIndexedColumns, resolvedIndexedColumns),
                   IndexLogEntry.schemaString(indexDataFrame.schema),
                   indexProperties))
             case _ => throw HyperspaceException("Invalid Index Config.")
@@ -305,7 +305,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         val resolvedIndexColumn = Seq(resolveBloomFilterIndexConfig(df, bloomIndexConfig))
         val indexDF = resolveDataFrameForLineage(spark, df, resolvedIndexColumn)
 
-        (indexDF, resolvedIndexColumn, Seq())
+        (indexDF, resolvedIndexColumn, df.columns)
     }
   }
 }

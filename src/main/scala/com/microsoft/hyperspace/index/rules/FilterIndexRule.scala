@@ -21,14 +21,15 @@ import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.HyperSpaceIndex.BloomFilterIndex
+import com.microsoft.hyperspace.index.{IndexDataManagerFactoryImpl, IndexLogEntry, PathResolver}
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+import org.apache.hadoop.fs.Path
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -59,6 +60,23 @@ object FilterIndexRule
               // As FilterIndexRule is not intended to support bucketed scan, we set
               // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
               // unnecessary shuffle for appended data to apply BucketUnion for merging data.
+
+              val files = index.derivedDataset match {
+                case _: BloomFilterIndex =>
+                  // Register udf to use bf, TODO also somehow find index log entry path
+                  val hadoopConf = spark.sessionState.newHadoopConf()
+                  val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+                    .getIndexPath(index.name)
+                  val indexManager = IndexDataManagerFactoryImpl.create(indexPath, hadoopConf)
+                  val id = indexManager.getLatestVersionId()
+                  if (id.isDefined) {
+                    val bfPath = new Path(indexManager.getPath(id.get), "bf.parquet")
+                    val bfDF = spark.read.parquet(bfPath.toString)
+                    filter.condition.foldable
+                  }
+                  None
+              }
+
               val transformedPlan =
                 RuleUtils.transformPlanToUseIndex(
                   spark,

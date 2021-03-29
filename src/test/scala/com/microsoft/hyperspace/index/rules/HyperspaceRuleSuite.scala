@@ -30,14 +30,15 @@ import com.microsoft.hyperspace.index.Hdfs.Properties
 
 trait HyperspaceRuleSuite extends HyperspaceSuite {
   private val filenames = Seq("f1.parquet", "f2.parquet")
+
   def createIndexLogEntry(
-      name: String,
-      indexCols: Seq[AttributeReference],
-      includedCols: Seq[AttributeReference],
-      plan: LogicalPlan,
-      numBuckets: Int = 10,
-      inputFiles: Seq[FileInfo] = Seq(),
-      writeLog: Boolean = true): IndexLogEntry = {
+                           name: String,
+                           indexCols: Seq[AttributeReference],
+                           includedCols: Seq[AttributeReference],
+                           plan: LogicalPlan,
+                           numBuckets: Int = 10,
+                           inputFiles: Seq[FileInfo] = Seq(),
+                           writeLog: Boolean = true): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
@@ -80,6 +81,67 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
 
       case None => throw HyperspaceException("Invalid plan for index dataFrame.")
     }
+  }
+
+  def createBloomIndexLogEntry(
+                                name: String,
+                                indexCols: Seq[AttributeReference],
+                                includedCols: Seq[AttributeReference],
+                                plan: LogicalPlan,
+                                inputFiles: Seq[FileInfo] = Seq(),
+                                writeLog: Boolean = true): IndexLogEntry = {
+    val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
+
+    LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
+      case Some(s) =>
+        val sourcePlanProperties = SparkPlan.Properties(
+          Seq(
+            Relation(
+              Seq("dummy"),
+              Hdfs(Properties(Content(Directory("/", files = inputFiles)))),
+              "schema",
+              "format",
+              Map())),
+          null,
+          null,
+          LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
+
+        val indexFiles = getIndexDataFilesPaths(name).map { path =>
+          new FileStatus(10, false, 1, 10, 10, path)
+        }
+
+        val indexLogEntry = IndexLogEntry(
+          name,
+          HyperSpaceIndex.BloomFilterIndex(
+            HyperSpaceIndex.Properties.BloomFilter(
+              HyperSpaceIndex.Properties.CommonProperties
+                .Columns(indexCols.map(_.name), includedCols.map(_.name)),
+              IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
+              Map())),
+          Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
+          Source(SparkPlan(sourcePlanProperties)),
+          Map())
+
+        val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
+        indexLogEntry.state = Constants.States.ACTIVE
+        if (writeLog) {
+          assert(logManager.writeLog(0, indexLogEntry))
+        }
+        indexLogEntry
+
+      case None => throw HyperspaceException("Invalid plan for index dataFrame.")
+    }
+  }
+
+  def getBloomDataFilePath(indexName: String): Option[Path] = {
+    Some(
+      new Path (
+        new Path (
+          new Path (systemPath, indexName),
+          s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
+        "bf.parquet"
+      )
+    )
   }
 
   def getIndexDataFilesPaths(indexName: String): Seq[Path] =
