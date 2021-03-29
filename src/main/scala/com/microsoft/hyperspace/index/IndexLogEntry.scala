@@ -548,7 +548,7 @@ case class IndexLogEntry(
   }
 
   @JsonIgnore
-  private[hyperspace] lazy val fileIdTracker: FileIdTracker = {
+  lazy val fileIdTracker: FileIdTracker = {
     val tracker = new FileIdTracker
     tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
     tracker
@@ -615,7 +615,7 @@ object IndexLogEntry {
 /**
  * Provides functionality to generate unique file ids for files.
  */
-private[hyperspace] class FileIdTracker {
+class FileIdTracker {
   private var maxId: Long = -1L
 
   // Combination of file properties, used as key, to identify a
@@ -629,7 +629,7 @@ private[hyperspace] class FileIdTracker {
 
   def getMaxFileId: Long = maxId
 
-  def getFileToIdMap: HashMap[key, Long] = fileToIdMap
+  def getFileToIdMap: Seq[(key, Long)] = fileToIdMap.toSeq
 
   def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
     fileToIdMap.get((path, size, modifiedTime))

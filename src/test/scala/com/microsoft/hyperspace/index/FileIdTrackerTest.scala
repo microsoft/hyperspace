@@ -56,7 +56,7 @@ class FileIdTrackerTest extends SparkFunSuite {
     "addFileInfo throws an exception if there is a conflict but modifications " +
       "before the exception are retained") {
     val tracker = new FileIdTracker
-    tracker.getFileToIdMap.put(("def", 123, 666), 10)
+    tracker.addFileInfo(Set(FileInfo("def", 123, 666, 10)))
     val ex = intercept[HyperspaceException] {
       implicit def ordering: Ordering[FileInfo] = new Ordering[FileInfo] {
         override def compare(x: FileInfo, y: FileInfo): Int = {
@@ -68,22 +68,23 @@ class FileIdTrackerTest extends SparkFunSuite {
         FileInfo("def", 123, 666, 11)))
     }
     assert(ex.getMessage.contains("Adding file info with a conflicting id"))
-    assert(tracker.getFileToIdMap.get("abc", 100, 666).contains(15))
+    assert(tracker.getFileId("abc", 100, 666).contains(15))
   }
 
   test("addFileInfo puts new records in the map and increase the max id on success") {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set(FileInfo("abc", 123, 666, 10), FileInfo("def", 234, 777, 5)))
-    assert(tracker.getFileToIdMap.get("abc", 123, 666).contains(10))
-    assert(tracker.getFileToIdMap.get("def", 234, 777).contains(5))
+    assert(tracker.getFileId("abc", 123, 666).contains(10))
+    assert(tracker.getFileId("def", 234, 777).contains(5))
     assert(tracker.getMaxFileId == 10)
   }
 
   test("addFile returns the existing id and max id is unchanged") {
     val tracker = new FileIdTracker
-    tracker.getFileToIdMap.put(("abc", 123, 666), 10)
+    tracker.addFileInfo(Set(FileInfo("abc", 123, 666, 10)))
+    assert(tracker.getMaxFileId == 10)
     assert(tracker.addFile(new FileStatus(123, false, 3, 1, 666, new Path("abc"))) == 10)
-    assert(tracker.getMaxFileId == -1)
+    assert(tracker.getMaxFileId == 10)
   }
 
   test("addFile returns a new id and max id is updated") {
@@ -92,8 +93,8 @@ class FileIdTrackerTest extends SparkFunSuite {
     assert(tracker.addFile(new FileStatus(123, false, 3, 1, 666, new Path("def"))) == 1)
     assert(tracker.addFile(new FileStatus(124, false, 3, 1, 777, new Path("xyz"))) == 2)
     assert(tracker.getMaxFileId == 2)
-    assert(tracker.getFileToIdMap.get("abc", 123, 666).contains(0))
-    assert(tracker.getFileToIdMap.get("def", 123, 666).contains(1))
-    assert(tracker.getFileToIdMap.get("xyz", 124, 777).contains(2))
+    assert(tracker.getFileId("abc", 123, 666).contains(0))
+    assert(tracker.getFileId("def", 123, 666).contains(1))
+    assert(tracker.getFileId("xyz", 124, 777).contains(2))
   }
 }
