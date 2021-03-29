@@ -94,7 +94,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     Content(Directory("rootContentPath")),
     Source(SparkPlan(expectedSourcePlanProperties)))
   val buildVersion: String = BuildInfo.version
-  val buildVersionKey: String = IndexLogEntry.HYPERSPACE_PROJECT_VERSION
+  val buildVersionKey: String = IndexConstants.HYPERSPACE_VERSION_PROPERTY
 
   override def beforeAll(): Unit = {
     val testDirPath = Paths.get("src/test/resources/testDir")

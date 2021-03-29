@@ -21,6 +21,8 @@ import org.apache.spark.sql.internal.SQLConf
 object IndexConstants {
   val INDEXES_DIR = "indexes"
 
+  val HYPERSPACE_VERSION_PROPERTY: String = "hyperspaceVersion"
+
   // Config used for setting the system path, which is considered as a "root" path for Hyperspace;
   // e.g, indexes are created under the system path.
   val INDEX_SYSTEM_PATH = "spark.hyperspace.system.path"

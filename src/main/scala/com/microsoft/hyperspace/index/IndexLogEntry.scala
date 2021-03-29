@@ -31,7 +31,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -430,7 +430,12 @@ object SparkPlan {
 // IndexLogEntry-specific Source that uses SparkPlan as a plan.
 case class Source(plan: SparkPlan)
 
-// IndexLogEntry that captures index-related information.
+/*
+ * IndexLogEntry that captures index-related information.
+ * Don't use this method to create a new IndexLogEntry, unless you specify all hyperspace project
+ * default properties.
+ * Refer the create method of IndexLogEntry Object for further details.
+ */
 case class IndexLogEntry(
     name: String,
     derivedDataset: CoveringIndex,
@@ -610,29 +615,28 @@ case class IndexLogEntryTag[T](name: String)
 object IndexLogEntry {
   val VERSION: String = "0.1"
 
-  val HYPERSPACE_PROJECT_VERSION: String = "hyperspaceVersion"
-
   def schemaString(schema: StructType): String = schema.json
 
   /*
-   * Use this method to create a new IndexLogEntry. Which automatically includes
+   * Use this method to create a new IndexLogEntry, which automatically includes
    * all common default hyperspace project properties.
    * TODO: force dev to use this method as this takes into account all
-   *  system properties that needed to be added by default. Currently, dev can also
+   *  project properties that needed to be added by default. Currently, dev can also
    *  create IndexLogEntry from case class.
    *  https://github.com/microsoft/hyperspace/issues/370
+   *  Also add require for hyperspace project version when we introduce breaking change.
    */
   def create(name: String,
             derivedDataset: CoveringIndex,
             content: Content,
             source: Source,
             properties: Map[String, String] = Map()): IndexLogEntry = {
-    new IndexLogEntry(
+    IndexLogEntry(
       name,
       derivedDataset,
       content,
       source,
-      properties + ((HYPERSPACE_PROJECT_VERSION, BuildInfo.version))
+      properties + ((IndexConstants.HYPERSPACE_VERSION_PROPERTY, BuildInfo.version))
     )
   }
 }
