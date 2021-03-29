@@ -125,7 +125,13 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
       val ex = intercept[HyperspaceException](action.op())
       assert(
         ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
-          "source columns 'Date,RGUID,Query,imprs,clicks'"))
+          "source columns:\n" +
+            "root\n " +
+            "|-- Date: string (nullable = true)\n " +
+            "|-- RGUID: string (nullable = true)\n " +
+            "|-- Query: string (nullable = true)\n " +
+            "|-- imprs: integer (nullable = true)\n " +
+            "|-- clicks: integer (nullable = true)"))
     }
   }
 

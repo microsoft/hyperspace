@@ -28,13 +28,13 @@ import org.apache.iceberg.spark.SparkSchemaUtil
 import org.apache.iceberg.spark.source.IcebergSource
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
-import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.sources.v2.DataSourceOptions
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -57,7 +57,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
   /**
    * All the files that the current Iceberg table uses for read.
    */
-  override def allFiles: Seq[FileStatus] = plan.source match {
+  override lazy val allFiles: Seq[FileStatus] = plan.source match {
     case _: IcebergSource =>
       loadIcebergTable.newScan().planFiles().iterator().asScala.toSeq.map(toFileStatus)
   }

@@ -22,7 +22,8 @@ import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
+import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -30,7 +31,7 @@ import com.microsoft.hyperspace.util.PathUtils
  * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
  */
 class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
-  extends DefaultFileBasedRelation(spark, plan) {
+    extends DefaultFileBasedRelation(spark, plan) {
 
   /**
    * Computes the signature of the current relation.
@@ -43,7 +44,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   /**
    * All the files that the current relation references to.
    */
-  override def allFiles: Seq[FileStatus] = plan.relation match {
+  lazy override val allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
       location
         .getSnapshot(stalenessAcceptable = false)
@@ -82,7 +83,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
         val sourceDataProperties =
-        Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
         val fileFormatName = "delta"
 
         // Use case-sensitive map if the provided options are case insensitive.
@@ -143,5 +144,101 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
       /* blockSize */ 1,
       /* modificationTime */ modificationTime,
       path)
+  }
+
+  /**
+   * Retrieve the history of index log version and delta table version from the given index.
+   *
+   * @param index Index to retrieve the version info.
+   * @return List of (index log version, delta table version) in ascending order.
+   */
+  private def deltaLakeVersionHistory(index: IndexLogEntry): Seq[(Int, Int)] = {
+    // Versions are comma separated - <index log version>:<delta table version>.
+    // e.g. "1:2,3:5,5:9"
+    val versions =
+      index.derivedDataset.properties.properties
+        .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
+
+    // Versions are processed in a reverse order to keep the higher index log version
+    // in case different index log versions refer to the same delta lake version.
+    // For example, "1:1,2:2,3:2" will become Seq((1, 1), (3, 2)).
+    versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (acc, versionStr) =>
+      val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
+      if (acc.nonEmpty && acc.head._2 == deltaTableVersion) {
+        // Omit if the delta lake version is the same. In this case, we only take the higher
+        // index log version as it's from index optimizations.
+        acc
+      } else {
+        (indexLogVersion, deltaTableVersion) +: acc
+      }
+    }
+  }
+
+  /**
+   * Returns IndexLogEntry of the closest version for the given index.
+   *
+   * Delta Lake source provider utilizes the history information of DELTA_VERSION_HISTORY_PROPERTY
+   * to find the closet version of the index.
+   *
+   * @param index Candidate index to be applied.
+   * @return IndexLogEntry of the closest version among available index versions.
+   */
+  override def closestIndex(index: IndexLogEntry): IndexLogEntry = {
+    // Seq of (index log version, delta lake table version)
+    val versions = deltaLakeVersionHistory(index)
+
+    lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
+    def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
+      indexManager
+        .getIndex(index.name, logVersion)
+        .get
+        .asInstanceOf[IndexLogEntry]
+    }
+    // TODO: Currently assume all versions of index data exist.
+    //  Need to check and remove candidate indexes.
+    //  See https://github.com/microsoft/hyperspace/issues/387
+
+    plan.relation match {
+      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+        // Find the largest index version whose delta table version is equal or less than
+        // the given relation.
+        val equalOrLessThanLastIndex = versions.lastIndexWhere(location.tableVersion >= _._2)
+        if (equalOrLessThanLastIndex == versions.size - 1) {
+          // The given table version is equal or larger than the latest index's.
+          // Use the latest version.
+          index
+        } else if (equalOrLessThanLastIndex == -1) {
+          // The given table version is smaller than the version at index creation.
+          // Use the initial version.
+          getIndexLogEntry(versions.head._1)
+        } else if (versions(equalOrLessThanLastIndex)._2 == location.tableVersion) {
+          // There is the index version that built for the given table version.
+          // Use the exact version.
+          getIndexLogEntry(versions(equalOrLessThanLastIndex)._1)
+        } else {
+          // Now, there are 2 candidate versions for the given table version:
+          // prevPair(indexVer1, tablePrevVersion), nextPair(indexVer2, tableNextVersion)
+          // which is (tablePrevVersion < TimeTravel table version < tableNextVersion).
+          val prevPair = versions(equalOrLessThanLastIndex)
+          val nextPair = versions(equalOrLessThanLastIndex + 1)
+
+          val prevLog = getIndexLogEntry(prevPair._1)
+          val nextLog = getIndexLogEntry(nextPair._1)
+
+          def getDiffBytes(logEntry: IndexLogEntry): Long = {
+            val commonBytes =
+              allFileInfos.filter(logEntry.sourceFileInfoSet.contains).map(_.size).sum
+            // appended bytes + deleted bytes
+            (allFileSizeInBytes - commonBytes) + (logEntry.sourceFilesSizeInBytes - commonBytes)
+          }
+
+          // Prefer index with less diff bytes to reduce the chance of regression from Hybrid Scan.
+          if (getDiffBytes(prevLog) < getDiffBytes(nextLog)) {
+            prevLog
+          } else {
+            nextLog
+          }
+        }
+    }
   }
 }

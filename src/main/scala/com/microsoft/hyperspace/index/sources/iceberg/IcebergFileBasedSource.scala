@@ -88,6 +88,23 @@ class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedS
       Some(new IcebergRelation(spark, l))
     case _ => None
   }
+
+  /**
+   * Returns enriched index properties.
+   *
+   * @param relation Relation to retrieve necessary information.
+   * @param properties Index properties to enrich.
+   * @return Updated index properties for index creation or refresh.
+   */
+  override def enrichIndexProperties(
+      relation: Relation,
+      properties: Map[String, String]): Option[Map[String, String]] = {
+    if (relation.fileFormat.equals(ICEBERG_FORMAT_STR)) {
+      Some(properties)
+    } else {
+      None
+    }
+  }
 }
 
 /**

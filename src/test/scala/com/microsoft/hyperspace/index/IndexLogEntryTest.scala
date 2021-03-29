@@ -488,7 +488,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       Content(rootDirectory, NoOpFingerprint())
     }
 
-    val actual = Content.fromDirectory(nestedDirPath, fileIdTracker)
+    val actual = Content.fromDirectory(nestedDirPath, fileIdTracker, new Configuration)
     assert(contentEquals(actual, expected))
   }
 
@@ -503,7 +503,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       Content(rootDirectory, NoOpFingerprint())
     }
 
-    val actual = Content.fromDirectory(nestedDirPath, fileIdTracker)
+    val actual = Content.fromDirectory(nestedDirPath, fileIdTracker, new Configuration)
     assert(contentEquals(actual, expected))
   }
 
