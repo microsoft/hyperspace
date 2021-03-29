@@ -548,7 +548,7 @@ case class IndexLogEntry(
   }
 
   @JsonIgnore
-  lazy val fileIdTracker: FileIdTracker = {
+  private[hyperspace] lazy val fileIdTracker: FileIdTracker = {
     val tracker = new FileIdTracker
     tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
     tracker
@@ -615,7 +615,7 @@ object IndexLogEntry {
 /**
  * Provides functionality to generate unique file ids for files.
  */
-class FileIdTracker {
+private[hyperspace] class FileIdTracker {
   private var maxId: Long = -1L
 
   // Combination of file properties, used as key, to identify a
