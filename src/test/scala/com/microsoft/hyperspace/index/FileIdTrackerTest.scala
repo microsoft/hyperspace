@@ -46,9 +46,10 @@ class FileIdTrackerTest extends SparkFunSuite {
 
   test("addFileInfo throws an exception if there is a FileInfo having an invalid file id") {
     val tracker = new FileIdTracker
-    assertThrows[HyperspaceException] {
+    val ex = intercept[HyperspaceException] {
       tracker.addFileInfo(Set(FileInfo("abc", 123, 666, IndexConstants.UNKNOWN_FILE_ID)))
     }
+    assert(ex.getMessage.contains("Cannot add file info with unknown id"))
   }
 
   test(
@@ -56,7 +57,7 @@ class FileIdTrackerTest extends SparkFunSuite {
       "before the exception are retained") {
     val tracker = new FileIdTracker
     tracker.getFileToIdMap.put(("def", 123, 666), 10)
-    assertThrows[HyperspaceException] {
+    val ex = intercept[HyperspaceException] {
       implicit def ordering: Ordering[FileInfo] = new Ordering[FileInfo] {
         override def compare(x: FileInfo, y: FileInfo): Int = {
           x.name.compareTo(y.name)
@@ -66,6 +67,7 @@ class FileIdTrackerTest extends SparkFunSuite {
         FileInfo("abc", 100, 666, 15),
         FileInfo("def", 123, 666, 11)))
     }
+    assert(ex.getMessage.contains("Adding file info with a conflicting id"))
     assert(tracker.getFileToIdMap.get("abc", 100, 666).contains(15))
   }
 
