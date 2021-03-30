@@ -58,13 +58,32 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
   }
 
   private def rec[T](
-      prefixPath: Path,
-      directory: Directory,
-      func: (FileInfo, Path) => T): Seq[T] = {
-    val files = directory.files.map(f => func(f, prefixPath))
-    files ++ directory.subDirs.flatMap { dir =>
-      rec(new Path(prefixPath, dir.name), dir, func)
+                      prefixPath: Path,
+                      directory: Directory,
+                      func: (FileInfo, Path) => T): Seq[T] = {
+    @tailrec
+    def recAcc[T](
+                   dirMap: List[(Path, Seq[Directory])],
+                   func: (FileInfo, Path) => T,
+                   acc: Seq[T] = Seq.empty): Seq[T] = {
+      dirMap match {
+        case Nil => acc
+        case (curPrefixPath, curDirs) :: xs =>
+
+          val curAcc = for {
+            dir <- curDirs
+            file <- dir.files
+          } yield func(file, new Path(curPrefixPath, dir.name))
+
+          val newLevels = curDirs
+            .filter(_.subDirs.nonEmpty)
+            .map(dir => (new Path(curPrefixPath, dir.name), dir.subDirs))
+
+          recAcc(xs ++ newLevels, func, curAcc ++ acc)
+      }
     }
+
+    recAcc(List(prefixPath -> Seq(directory)), func)
   }
 }
 
