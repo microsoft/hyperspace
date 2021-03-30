@@ -558,26 +558,6 @@ case class IndexLogEntry(
   }
 
   /**
-   * Extract top-most index directories which contain existing index files for
-   * the latest version of index. When refreshing index, depending on the mode,
-   * index files for the latest version of index may reside in multiple directories.
-   * This function extracts paths to top-level directories which
-   * contain those index files.
-   *
-   * @return List of directory paths containing index files for latest index version.
-   */
-  private[hyperspace] def indexContentDirectoryPaths: Seq[String] = {
-    var root = content.root
-    var prefix = content.root.name
-    while (root.subDirs.size == 1 &&
-      !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
-      prefix += s"${root.subDirs.head.name}/"
-      root = root.subDirs.head
-    }
-    root.subDirs.map(d => s"$prefix${d.name}")
-  }
-
-  /**
    * A mutable map for holding auxiliary information of this index log entry while applying rules.
    */
   @JsonIgnore

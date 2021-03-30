@@ -31,7 +31,7 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_QUICK
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   override val systemPath = new Path("src/test/resources/deltaLakeIntegrationTest")
