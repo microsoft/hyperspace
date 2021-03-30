@@ -148,8 +148,8 @@ class OptimizeAction(
           properties = Hyperspace
             .getContext(spark)
             .sourceProviderManager
+            .getRelationMetadata(previousIndexLogEntry.relations.head)
             .enrichIndexProperties(
-              previousIndexLogEntry.relations.head,
               prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
 
     if (filesToIgnore.nonEmpty) {

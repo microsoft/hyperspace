@@ -16,13 +16,13 @@
 
 package com.microsoft.hyperspace.index.sources.delta
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.index.{IndexConstants, Relation}
-import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedRelationMetadata, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
 
 object DeltaLakeConstants {
   val DELTA_FORMAT_STR = "delta"
@@ -38,35 +38,6 @@ object DeltaLakeConstants {
  *   - The relation is [[HadoopFsRelation]] with [[TahoeLogFileIndex]] as file index.
  */
 class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
-
-  /**
-   * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
-   *
-   * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
-   * @return [[Relation]] object if the given 'relation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  override def refreshRelationMetadata(relation: Relation): Option[Relation] = {
-    if (relation.fileFormat.equals(DeltaLakeConstants.DELTA_FORMAT_STR)) {
-      Some(relation.copy(options = relation.options - "versionAsOf" - "timestampAsOf"))
-    } else {
-      None
-    }
-  }
-
-  /**
-   * Returns a file format name to read internal data files for a given [[Relation]].
-   *
-   * @param relation [[Relation]] object to read internal data files.
-   * @return File format to read internal data files.
-   */
-  override def internalFileFormatName(relation: Relation): Option[String] = {
-    if (relation.fileFormat.equals(DeltaLakeConstants.DELTA_FORMAT_STR)) {
-      Some("parquet")
-    } else {
-      None
-    }
-  }
 
   /**
    * Returns true if the given logical plan is a relation for Delta Lake.
@@ -93,32 +64,19 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
     case _ => None
   }
 
-  /**
-   * Returns enriched index properties.
-   *
-   * Delta Lake source provider adds:
-   * 1) DELTA_VERSION_HISTORY_PROPERTY logs the history of INDEX_VERSION:DELTA_TABLE_VERSION
-   *    values for each index creation & refresh.
-   *
-   * @param relation Relation to retrieve necessary information.
-   * @param properties Index properties to enrich.
-   * @return Update index properties for index creation or refresh.
-   */
-  override def enrichIndexProperties(
-      relation: Relation,
-      properties: Map[String, String]): Option[Map[String, String]] = {
-    if (!relation.fileFormat.equals(DeltaLakeConstants.DELTA_FORMAT_STR)) {
-      None
+  override def isSupportedRelationMetadata(metadata: Relation): Option[Boolean] = {
+    if (metadata.fileFormat.equals(DeltaLakeConstants.DELTA_FORMAT_STR)) {
+      Some(true)
     } else {
-      val indexVersion = properties(IndexConstants.INDEX_LOG_VERSION)
-      val deltaVerHistory = relation.options.get("versionAsOf").map { deltaVersion =>
-        val newVersionMapping = s"$indexVersion:$deltaVersion"
-        DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY ->
-          properties.get(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY).map { prop =>
-            s"$prop,$newVersionMapping"
-          }.getOrElse(newVersionMapping)
-      }
-      Some(properties ++ deltaVerHistory)
+      None
+    }
+  }
+
+  override def getRelationMetadata(metadata: Relation): Option[FileBasedRelationMetadata] = {
+    if (isSupportedRelationMetadata(metadata).contains(true)) {
+      Some(new DeltaLakeRelationMetadata(metadata))
+    } else {
+      None
     }
   }
 }
