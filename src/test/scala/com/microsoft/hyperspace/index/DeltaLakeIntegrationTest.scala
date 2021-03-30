@@ -378,9 +378,6 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           checkExpectedIndexUsed(indexName, path, Some(6, tsMap(6)), 5)
           // For delta table version 8, candidate log version is 7. (refresh)
           checkExpectedIndexUsed(indexName, path, Some(8, tsMap(8)), 7)
-
-          FileUtils.delete(new Path(systemPath, s"$indexName/v__=3"))
-          checkExpectedIndexUsed(indexName, path, None, 5)
         }
       }
     }

@@ -118,16 +118,12 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
   override def getIndexVersions(states: Seq[String]): Seq[Int] = {
     val latestId = getLatestId()
     if (latestId.isDefined) {
-      var id = latestId.get
-      while (id >= 0) {
-        val entry = getLog(id)
-        if (entry.isDefined && entry.get.state.equals(Constants.States.ACTIVE)) {
-          Some(id)
-        } else {
-          None
+      (latestId.get to 0 by -1).map { id =>
+        getLog(id) match {
+          case Some(entry) if states.contains(entry.state) =>
+            Some(id)
+          case _ => None
         }
-      }
-
       }.flatten
     } else {
       Seq()

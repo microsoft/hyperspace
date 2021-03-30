@@ -146,13 +146,7 @@ class IndexCollectionManager(
 
   override def getAvailableIndexVersions(indexName: String): Seq[Int] = {
     withLogManager(indexName) { logManager =>
-      logManager.getIndexVersions().filter { id =>
-        val log = logManager.getLog(id).get
-        val indexDataPaths = log.asInstanceOf[IndexLogEntry].indexContentDirectoryPaths
-        val hadoopConf = spark.sessionState.newHadoopConf()
-        val fs = fileSystemFactory.create(new Path(indexDataPaths.head), hadoopConf)
-        indexDataPaths.forall(path => fs.exists(new Path(path)))
-      }
+      logManager.getIndexVersions(Seq(Constants.States.ACTIVE))
     }
   }
 
