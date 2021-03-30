@@ -240,6 +240,47 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.sourceFilesSizeInBytes == 200L)
   }
 
+  test("Content.recFilesApply apply function to all files ") {
+    val directory = Directory("file:/",
+      files = Seq(FileInfo("f0", 0, 0, UNKNOWN_FILE_ID)),
+      subDirs = Seq(
+        Directory("a",
+          files = Seq(FileInfo("f1", 0, 0, UNKNOWN_FILE_ID), FileInfo("f2", 0, 0, UNKNOWN_FILE_ID)),
+          subDirs = Seq(
+            Directory("b",
+              files =
+                Seq(FileInfo("f3", 0, 0, UNKNOWN_FILE_ID), FileInfo("f4", 0, 0, UNKNOWN_FILE_ID)),
+              subDirs = Seq(Directory("c"))
+            ),
+            Directory("d"))
+        )))
+
+    val res = Content.recFilesApply(
+      new Path("file:/"),
+      directory,
+      (f, prefix) => new Path(prefix, f.name)
+    )
+
+    val expected =
+      Seq("file:/f0", "file:/a/f1", "file:/a/f2", "file:/a/b/f3", "file:/a/b/f4")
+        .map(new Path(_)).toSet
+
+    val actual = res.toSet
+    assert(actual.equals(expected))
+  }
+
+  test("Content.recFilesApply return empty list for directories without files ") {
+    val directory = Directory("file:/")
+
+    val res = Content.recFilesApply(
+      new Path("file:/"),
+      directory,
+      (f, prefix) => new Path(prefix, f.name)
+    )
+
+    assert(res.isEmpty)
+  }
+
   test("Content.files api lists all files from Content object.") {
     val content = Content(Directory("file:/", subDirs =
       Seq(
