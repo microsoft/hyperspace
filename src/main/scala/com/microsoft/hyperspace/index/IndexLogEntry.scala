@@ -22,7 +22,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.mutable
 
-import com.fasterxml.jackson.annotation.{JsonIgnore, JsonIgnoreProperties}
+import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -33,9 +33,14 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
 
+// IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
+case class NoOpFingerprint() {
+  val kind: String = "NoOp"
+  val properties: Map[String, String] = Map()
+}
+
 // IndexLogEntry-specific Content that uses IndexLogEntry-specific fingerprint.
-@JsonIgnoreProperties(Array("fingerprint"))
-case class Content(root: Directory) {
+case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerprint()) {
   // List of fully qualified paths of all files mentioned in this Content object.
   @JsonIgnore
   lazy val files: Seq[Path] = {

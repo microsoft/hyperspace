@@ -265,7 +265,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
       val nestedDirDirectory = Directory("nested", fileInfos)
       val rootDirectory = createDirectory(nestedDirPath, nestedDirDirectory)
-      Content(rootDirectory)
+      Content(rootDirectory, NoOpFingerprint())
     }
 
     val actual = Content.fromDirectory(nestedDirPath, fileIdTracker, new Configuration)
@@ -280,7 +280,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
         FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
       val nestedDirDirectory = Directory("nested", fileInfos)
       val rootDirectory = createDirectory(nestedDirPath, nestedDirDirectory)
-      Content(rootDirectory)
+      Content(rootDirectory, NoOpFingerprint())
     }
 
     val actual = Content.fromDirectory(nestedDirPath, fileIdTracker, new Configuration)
