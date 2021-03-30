@@ -22,29 +22,29 @@ import org.apache.spark.SparkFunSuite
 import com.microsoft.hyperspace.HyperspaceException
 
 class FileIdTrackerTest extends SparkFunSuite {
-  test("getMaxFileId returns -1 on a new instance") {
+  test("getMaxFileId returns -1 on a new instance.") {
     val tracker = new FileIdTracker
     assert(tracker.getMaxFileId == -1)
   }
 
-  test("getFileToIdMap is empty on a new instance") {
+  test("getFileToIdMap is empty on a new instance.") {
     val tracker = new FileIdTracker
     assert(tracker.getFileToIdMap.isEmpty)
   }
 
-  test("getFileId returns None on unseen file properties") {
+  test("getFileId returns None on unseen file properties.") {
     val tracker = new FileIdTracker
     assert(tracker.getFileId(path = "abc", size = 123, modifiedTime = 666).isEmpty)
   }
 
-  test("addFileInfo does nothing with an empty files set") {
+  test("addFileInfo does nothing with an empty files set.") {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set[FileInfo]())
     assert(tracker.getFileToIdMap.isEmpty)
     assert(tracker.getMaxFileId == -1)
   }
 
-  test("addFileInfo throws an exception if there is a FileInfo having an invalid file id") {
+  test("addFileInfo throws an exception if there is a FileInfo having an invalid file id.") {
     val tracker = new FileIdTracker
     val ex = intercept[HyperspaceException] {
       tracker.addFileInfo(Set(FileInfo("abc", 123, 666, IndexConstants.UNKNOWN_FILE_ID)))
@@ -54,7 +54,7 @@ class FileIdTrackerTest extends SparkFunSuite {
 
   test(
     "addFileInfo throws an exception if there is a conflict but modifications " +
-      "before the exception are retained") {
+      "before the exception are retained.") {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set(FileInfo("def", 123, 666, 10)))
     val ex = intercept[HyperspaceException] {
@@ -71,7 +71,7 @@ class FileIdTrackerTest extends SparkFunSuite {
     assert(tracker.getFileId("abc", 100, 666).contains(15))
   }
 
-  test("addFileInfo puts new records in the map and increase the max id on success") {
+  test("addFileInfo puts new records in the map and increase the max id on success.") {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set(FileInfo("abc", 123, 666, 10), FileInfo("def", 234, 777, 5)))
     assert(tracker.getFileId("abc", 123, 666).contains(10))
@@ -79,7 +79,7 @@ class FileIdTrackerTest extends SparkFunSuite {
     assert(tracker.getMaxFileId == 10)
   }
 
-  test("addFile returns the existing id and max id is unchanged") {
+  test("addFile returns the existing id and max id is unchanged.") {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set(FileInfo("abc", 123, 666, 10)))
     assert(tracker.getMaxFileId == 10)
@@ -87,7 +87,7 @@ class FileIdTrackerTest extends SparkFunSuite {
     assert(tracker.getMaxFileId == 10)
   }
 
-  test("addFile returns a new id and max id is updated") {
+  test("addFile returns a new id and max id is updated.") {
     val tracker = new FileIdTracker
     assert(tracker.addFile(new FileStatus(123, false, 3, 1, 666, new Path("abc"))) == 0)
     assert(tracker.addFile(new FileStatus(123, false, 3, 1, 666, new Path("def"))) == 1)
