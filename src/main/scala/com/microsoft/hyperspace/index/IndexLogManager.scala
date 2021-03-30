@@ -45,7 +45,7 @@ trait IndexLogManager {
   def getLatestStableLog(): Option[LogEntry]
 
   /** Returns Active index log versions */
-  def getActiveIndexVersions(): Seq[Int]
+  def getIndexVersions(states: Seq[String]): Seq[Int]
 
   /** update latest.json symlink to the given id/path */
   def createLatestStableLog(id: Int): Boolean
@@ -115,16 +115,19 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
     }
   }
 
-  override def getActiveIndexVersions(): Seq[Int] = {
+  override def getIndexVersions(states: Seq[String]): Seq[Int] = {
     val latestId = getLatestId()
     if (latestId.isDefined) {
-      (latestId.get to 0 by -1).map { id =>
+      var id = latestId.get
+      while (id >= 0) {
         val entry = getLog(id)
         if (entry.isDefined && entry.get.state.equals(Constants.States.ACTIVE)) {
           Some(id)
         } else {
           None
         }
+      }
+
       }.flatten
     } else {
       Seq()

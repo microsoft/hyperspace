@@ -162,7 +162,7 @@ class IndexLogManagerImplTest
     val expected = Some(getEntry("ACTIVE"))
     val actual = new IndexLogManagerImpl(path).getLatestStableLog()
     assert(actual.equals(expected))
-    val actualAvailable = new IndexLogManagerImpl(path).getActiveIndexVersions()
+    val actualAvailable = new IndexLogManagerImpl(path).getIndexVersions()
     assert(actualAvailable.equals(Seq(3, 1)))
   }
 
