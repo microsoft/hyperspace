@@ -44,7 +44,7 @@ trait IndexLogManager {
   /** Returns the latest LogEntry whose state is STABLE */
   def getLatestStableLog(): Option[LogEntry]
 
-  /** Returns Active index log versions */
+  /** Returns index log versions whose state is in the given states */
   def getIndexVersions(states: Seq[String]): Seq[Int]
 
   /** update latest.json symlink to the given id/path */
