@@ -99,6 +99,10 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
           val entry = getLog(id)
           if (entry.isDefined && Constants.STABLE_STATES.contains(entry.get.state)) {
             return entry
+          } else if (entry.isDefined && (entry.get.state.equals(Constants.States.CREATING) ||
+                     entry.get.state.equals(Constants.States.VACUUMING))) {
+            // Not consider unrelated logs before creating or vacuuming state.
+            return None
           }
         }
       }
