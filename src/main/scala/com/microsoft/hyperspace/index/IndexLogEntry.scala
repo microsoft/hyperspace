@@ -629,7 +629,7 @@ class FileIdTracker {
 
   def getMaxFileId: Long = maxId
 
-  def getFileToIdMap: Seq[(key, Long)] = fileToIdMap.toSeq
+  def getFileToIdMapping: Seq[(key, Long)] = fileToIdMap.toSeq
 
   def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
     fileToIdMap.get((path, size, modifiedTime))

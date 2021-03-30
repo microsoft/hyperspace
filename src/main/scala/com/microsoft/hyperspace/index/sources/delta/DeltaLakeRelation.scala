@@ -131,7 +131,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * @return List of pairs of (file path, file id).
    */
   override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    fileIdTracker.getFileToIdMap.map { kv =>
+    fileIdTracker.getFileToIdMapping.map { kv =>
       (kv._1._1, kv._2)
     }
   }

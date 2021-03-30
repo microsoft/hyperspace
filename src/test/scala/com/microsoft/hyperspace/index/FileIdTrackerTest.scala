@@ -27,9 +27,9 @@ class FileIdTrackerTest extends SparkFunSuite {
     assert(tracker.getMaxFileId == -1)
   }
 
-  test("getFileToIdMap is empty on a new instance.") {
+  test("getFileToIdMapping is empty on a new instance.") {
     val tracker = new FileIdTracker
-    assert(tracker.getFileToIdMap.isEmpty)
+    assert(tracker.getFileToIdMapping.isEmpty)
   }
 
   test("getFileId returns None on unseen file properties.") {
@@ -40,7 +40,7 @@ class FileIdTrackerTest extends SparkFunSuite {
   test("addFileInfo does nothing with an empty files set.") {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set[FileInfo]())
-    assert(tracker.getFileToIdMap.isEmpty)
+    assert(tracker.getFileToIdMapping.isEmpty)
     assert(tracker.getMaxFileId == -1)
   }
 
