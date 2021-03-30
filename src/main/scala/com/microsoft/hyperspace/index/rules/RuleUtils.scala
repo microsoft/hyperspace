@@ -58,9 +58,7 @@ object RuleUtils {
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       entry.withCachedTag(relation.plan, IndexLogEntryTags.SIGNATURE_MATCHED) {
-        val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-        assert(sourcePlanSignatures.length == 1)
-        val sourcePlanSignature = sourcePlanSignatures.head
+        val sourcePlanSignature = entry.signature
 
         signatureMap.getOrElseUpdate(
           sourcePlanSignature.provider,
