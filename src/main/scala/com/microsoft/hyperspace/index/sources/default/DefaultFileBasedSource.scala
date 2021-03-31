@@ -90,7 +90,7 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
     if (isSupportedRelation(plan).contains(true)) {
-      Some (new DefaultFileBasedRelation (spark, plan.asInstanceOf[LogicalRelation]) )
+      Some(new DefaultFileBasedRelation(spark, plan.asInstanceOf[LogicalRelation]))
     } else {
       None
     }
