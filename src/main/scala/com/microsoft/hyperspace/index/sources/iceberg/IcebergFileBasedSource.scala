@@ -54,10 +54,12 @@ class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @param plan Logical plan to wrap to [[FileBasedRelation]]
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
-  override def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
-    case l @ DataSourceV2Relation(_: IcebergSource, _, _, _, _) =>
-      Some(new IcebergRelation(spark, l))
-    case _ => None
+  override def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
+    if (isSupportedRelation(plan).contains(true)) {
+      Some(new IcebergRelation(spark, plan.asInstanceOf[DataSourceV2Relation]))
+    } else {
+      None
+    }
   }
 
   override def isSupportedRelationMetadata(metadata: Relation): Option[Boolean] = {

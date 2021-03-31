@@ -88,14 +88,12 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @param plan Logical plan to wrap to [[FileBasedRelation]]
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
-  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
-    case l @ LogicalRelation(
-          HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, fileFormat, _),
-          _,
-          _,
-          _) if isSupportedFileFormat(fileFormat) =>
-      Some(new DefaultFileBasedRelation(spark, l))
-    case _ => None
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
+    if (isSupportedRelation(plan).contains(true)) {
+      Some (new DefaultFileBasedRelation (spark, plan.asInstanceOf[LogicalRelation]) )
+    } else {
+      None
+    }
   }
 
   override def isSupportedRelationMetadata(metadata: Relation): Option[Boolean] = {
