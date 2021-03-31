@@ -21,10 +21,16 @@ import com.microsoft.hyperspace.index.sources.FileBasedRelationMetadata
 
 class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMetadata {
 
+  /**
+   * @return new [[Relation]] metadata that will have the latest source
+   */
   override def refresh(): Relation = {
     metadata.copy(options = metadata.options - "versionAsOf" - "timestampAsOf")
   }
 
+  /**
+   * @return file format name to read internal data
+   */
   override def internalFileFormatName(): String = {
     "parquet"
   }
