@@ -249,7 +249,7 @@ trait FileBasedRelationMetadata extends SourceRelationMetadata {
   /**
    * Returns updated index properties for index creation or refresh.
    *
-   * @param properties index properties to enrich
+   * @param properties Index properties to enrich.
    */
   def enrichIndexProperties(properties: Map[String, String]): Map[String, String]
 }

@@ -36,7 +36,7 @@ class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMet
    * 1) DELTA_VERSION_HISTORY_PROPERTY logs the history of INDEX_VERSION:DELTA_TABLE_VERSION
    *    values for each index creation & refresh.
    *
-   * @param properties index properties to enrich
+   * @param properties Index properties to enrich.
    */
   override def enrichIndexProperties(properties: Map[String, String]): Map[String, String] = {
     val indexVersion = properties(IndexConstants.INDEX_LOG_VERSION)
