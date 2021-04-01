@@ -286,10 +286,12 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       withIndex("leftIndex", "rightIndex") {
         withTable("t1", "t2") {
           if (useDDL) {
-            spark.sql("CREATE TABLE t1 (c1 string, c3 string) USING PARQUET " +
-              s"LOCATION '$nonPartitionedDataPath'")
-            spark.sql("CREATE TABLE t2 (c3 string, c4 int) USING PARQUET " +
-              s"LOCATION '$nonPartitionedDataPath'")
+            spark.sql(
+              "CREATE TABLE t1 (c1 string, c3 string) USING PARQUET " +
+                s"LOCATION '$nonPartitionedDataPath'")
+            spark.sql(
+              "CREATE TABLE t2 (c3 string, c4 int) USING PARQUET " +
+                s"LOCATION '$nonPartitionedDataPath'")
           } else {
             val table1Location = testDir + "tables/t1"
             val table2Location = testDir + "tables/t2"
@@ -1007,7 +1009,8 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       Content
         .fromDirectory(
           new Path(systemPath, s"$indexName/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$v"),
-          new FileIdTracker)
+          new FileIdTracker,
+          new Configuration)
         .files
     }
   }

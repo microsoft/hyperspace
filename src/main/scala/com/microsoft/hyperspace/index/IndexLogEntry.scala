@@ -29,7 +29,7 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -75,6 +75,7 @@ object Content {
    * @param path Starting directory path under which the files will be considered part of the
    *             Directory object.
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
+   * @param hadoopConfiguration Hadoop configuration.
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
    * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
@@ -85,8 +86,8 @@ object Content {
   def fromDirectory(
       path: Path,
       fileIdTracker: FileIdTracker,
+      hadoopConfiguration: Configuration,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
-      hadoopConfiguration: Configuration = new Configuration,
       throwIfNotExists: Boolean = false): Content =
     Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration,
       throwIfNotExists))
@@ -618,7 +619,7 @@ class FileIdTracker {
 
   def getMaxFileId: Long = maxId
 
-  def getFileToIdMap: HashMap[key, Long] = fileToIdMap
+  def getFileToIdMapping: Seq[(key, Long)] = fileToIdMap.toSeq
 
   def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
     fileToIdMap.get((path, size, modifiedTime))

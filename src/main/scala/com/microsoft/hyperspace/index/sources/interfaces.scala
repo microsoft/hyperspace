@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
+import com.microsoft.hyperspace.index.{FileIdTracker, FileInfo, IndexConstants, IndexLogEntry, Relation}
 
 /**
  * ::Experimental::
@@ -61,9 +61,29 @@ trait FileBasedRelation extends SourceRelation {
   def signature: String
 
   /**
-   * All the files that the current relation references to.
+   * FileStatus list for all source files that the current relation references to.
    */
-  def allFiles: Seq[FileStatus]
+  val allFiles: Seq[FileStatus]
+
+  /**
+   * FileInfo list for all source files that the current relation references to.
+   */
+  final lazy val allFileInfos: Seq[FileInfo] = {
+    allFiles.map { f =>
+      FileInfo(
+        f.getPath.toString,
+        f.getLen,
+        f.getModificationTime,
+        IndexConstants.UNKNOWN_FILE_ID)
+    }
+  }
+
+  /**
+   * Summation of all source file size.
+   */
+  final lazy val allFileSizeInBytes: Long = {
+    allFileInfos.map(_.size).sum
+  }
 
   /**
    * The partition schema of the current relation.
@@ -113,6 +133,16 @@ trait FileBasedRelation extends SourceRelation {
    * Returns list of pairs of (file path, file id) to build lineage column.
    */
   def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)]
+
+  /**
+   * Returns IndexLogEntry of the closest version for the given index.
+   *
+   * @param index Candidate index to be applied.
+   * @return IndexLogEntry of the closest version among available index versions.
+   */
+  def closestIndex(index: IndexLogEntry): IndexLogEntry = {
+    index
+  }
 }
 
 /**
@@ -190,4 +220,15 @@ trait FileBasedSourceProvider extends SourceProvider {
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation]
+
+  /**
+   * Returns enriched index properties.
+   *
+   * @param relation Logical relation to retrieve necessary information.
+   * @param properties Index properties to enrich.
+   * @return Updated index properties for index creation or refresh.
+   */
+  def enrichIndexProperties(
+      relation: Relation,
+      properties: Map[String, String]): Option[Map[String, String]]
 }

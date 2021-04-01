@@ -17,7 +17,6 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.types.StructType
 import scala.util.Try
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
@@ -34,7 +33,8 @@ class CreateAction(
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
     with Action {
-  final override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+  final override def logEntry: LogEntry =
+    getIndexLogEntry(spark, df, indexConfig, indexDataPath, endId)
 
   final override val transientState: String = CREATING
 
@@ -49,7 +49,7 @@ class CreateAction(
     }
 
     // schema validity checks
-    if (!isValidIndexSchema(indexConfig, df.schema)) {
+    if (!isValidIndexSchema(indexConfig, df)) {
       throw HyperspaceException("Index config is not applicable to dataframe schema.")
     }
 
@@ -63,7 +63,7 @@ class CreateAction(
     }
   }
 
-  private def isValidIndexSchema(config: HyperSpaceIndexConfig, schema: StructType): Boolean = {
+  private def isValidIndexSchema(config: HyperSpaceIndexConfig, dataFrame: DataFrame): Boolean = {
     // Resolve index config columns from available column names present in the schema.
     config match {
       case indexConfig: IndexConfig =>
@@ -71,12 +71,11 @@ class CreateAction(
           .resolve(
             spark,
             indexConfig.indexedColumns ++ indexConfig.includedColumns,
-            schema.fieldNames)
+            dataFrame.queryExecution.analyzed)
           .isDefined
       case indexConfig: BloomFilterIndexConfig =>
-        ResolverUtils.resolve(spark, indexConfig.indexedColumn, schema.fieldNames).isDefined
+        ResolverUtils.resolve(spark, Seq(indexConfig.indexedColumn), dataFrame.queryExecution.analyzed).isDefined
     }
-
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
