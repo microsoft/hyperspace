@@ -35,11 +35,7 @@ trait IndexLogManager {
 
   def getLatestId(): Option[Int]
 
-  // TODO: This should be marked as final - remove test dependency.
-  def getLatestLog(): Option[LogEntry] = getLatestId() match {
-    case Some(id) => getLog(id)
-    case None => None
-  }
+  final def getLatestLog(): Option[LogEntry] = getLatestId().flatMap(getLog)
 
   /** Returns the latest LogEntry whose state is STABLE */
   def getLatestStableLog(): Option[LogEntry]
