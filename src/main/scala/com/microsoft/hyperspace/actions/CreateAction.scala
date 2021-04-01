@@ -16,9 +16,8 @@
 
 package com.microsoft.hyperspace.actions
 
-import scala.util.Try
-
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import scala.util.Try
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
@@ -29,7 +28,7 @@ import com.microsoft.hyperspace.util.ResolverUtils
 class CreateAction(
     spark: SparkSession,
     df: DataFrame,
-    indexConfig: IndexConfig,
+    indexConfig: HyperSpaceIndexConfig,
     final override protected val logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
@@ -64,14 +63,19 @@ class CreateAction(
     }
   }
 
-  private def isValidIndexSchema(config: IndexConfig, dataFrame: DataFrame): Boolean = {
-    // Resolve index config columns from available column names present in the dataframe.
-    ResolverUtils
-      .resolve(
-        spark,
-        config.indexedColumns ++ config.includedColumns,
-        dataFrame.queryExecution.analyzed)
-      .isDefined
+  private def isValidIndexSchema(config: HyperSpaceIndexConfig, dataFrame: DataFrame): Boolean = {
+    // Resolve index config columns from available column names present in the schema.
+    config match {
+      case indexConfig: IndexConfig =>
+        ResolverUtils
+          .resolve(
+            spark,
+            indexConfig.indexedColumns ++ indexConfig.includedColumns,
+            dataFrame.queryExecution.analyzed)
+          .isDefined
+      case indexConfig: BloomFilterIndexConfig =>
+        ResolverUtils.resolve(spark, Seq(indexConfig.indexedColumn), dataFrame.queryExecution.analyzed).isDefined
+    }
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
@@ -80,7 +84,13 @@ class CreateAction(
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.
+
     val index = Try(logEntry.asInstanceOf[IndexLogEntry]).toOption
-    CreateActionEvent(appInfo, indexConfig, index, df.queryExecution.logical.toString, message)
+    CreateActionEvent(
+      appInfo,
+      IndexConfigBundle(indexConfig),
+      index,
+      df.queryExecution.logical.toString,
+      message)
   }
 }

@@ -18,29 +18,45 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.SparkFunSuite
 
+import com.microsoft.hyperspace.index.configs.CoveringConfig
+
 class IndexConfigTest extends SparkFunSuite {
+  val CoveringIndexConfigBuilder: CoveringConfig.type = configs.CoveringConfig
+
   test("Empty index name is not allowed.") {
+
     intercept[IllegalArgumentException](IndexConfig("", Seq("c1"), Seq("c2")))
-    intercept[IllegalArgumentException](IndexConfig.builder.indexBy("c1").include("c2").create)
-    intercept[IllegalArgumentException](IndexConfig.builder.indexName(""))
+    intercept[IllegalArgumentException](
+      CoveringIndexConfigBuilder.builder().indexBy("c1").include("c2").build())
+    intercept[IllegalArgumentException](CoveringIndexConfigBuilder.builder().indexName(""))
   }
 
   test("Empty indexed columns are not allowed.") {
     intercept[IllegalArgumentException](IndexConfig("name", Seq(), Seq("c1")))
     intercept[IllegalArgumentException](
-      IndexConfig.builder.indexName("name").include("c1").create)
+      CoveringIndexConfigBuilder.builder().indexName("name").include("c1").build())
   }
 
   test("Same indexed column names (case-insensitive) are not allowed.") {
     intercept[IllegalArgumentException](IndexConfig("name", Seq("c1", "C1"), Seq("c2")))
     intercept[IllegalArgumentException](
-      IndexConfig.builder.indexName("name").indexBy("c1", "C1").include("c2").create)
+      CoveringIndexConfigBuilder
+        .builder()
+        .indexName("name")
+        .indexBy("c1", "C1")
+        .include("c2")
+        .build())
   }
 
   test("Same column names (case-insensitive) in indexed/included columns are not allowed.") {
     intercept[IllegalArgumentException](IndexConfig("name", Seq("c1"), Seq("C1", "c2")))
     intercept[IllegalArgumentException](
-      IndexConfig.builder.indexName("name").indexBy("c1").include("C1", "c2").create)
+      CoveringIndexConfigBuilder
+        .builder()
+        .indexName("name")
+        .indexBy("c1")
+        .include("C1", "c2")
+        .build())
   }
 
   test("Test equals() function.") {
@@ -98,11 +114,12 @@ class IndexConfigTest extends SparkFunSuite {
     val indexedColumns = Seq("C1", "c2", "C3")
     val includedColumns = Seq("C4", "c5", "C6")
 
-    val indexConfig = IndexConfig.builder
+    val indexConfig = CoveringIndexConfigBuilder
+      .builder()
       .indexName(indexName)
       .indexBy(indexedColumns.head, indexedColumns.tail: _*)
       .include(includedColumns.head, includedColumns.tail: _*)
-      .create
+      .build()
 
     assert(indexConfig.indexName.equals(indexName))
     assert(indexConfig.indexedColumns.equals(indexedColumns))
@@ -111,25 +128,28 @@ class IndexConfigTest extends SparkFunSuite {
 
   test("Test exception on multiple indexBy, include and index name on IndexConfig builder.") {
     intercept[UnsupportedOperationException](
-      IndexConfig.builder
+      CoveringIndexConfigBuilder
+        .builder()
         .indexName("name1")
         .indexName("name2")
         .indexBy("c1", "c2")
         .include("c3", "c4")
-        .create)
+        .build())
     intercept[UnsupportedOperationException](
-      IndexConfig.builder
+      CoveringIndexConfigBuilder
+        .builder()
         .indexName("name")
         .indexBy("c1")
         .indexBy("c2")
         .include("c3", "c4")
-        .create)
+        .build())
     intercept[UnsupportedOperationException](
-      IndexConfig.builder
+      CoveringIndexConfigBuilder
+        .builder()
         .indexName("name")
         .indexBy("c1")
         .include("c2")
         .include("c3")
-        .create)
+        .build())
   }
 }

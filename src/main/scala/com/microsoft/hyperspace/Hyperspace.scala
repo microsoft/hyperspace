@@ -39,7 +39,7 @@ class Hyperspace(spark: SparkSession) {
    * @param df the DataFrame object to build index on.
    * @param indexConfig the configuration of index to be created.
    */
-  def createIndex(df: DataFrame, indexConfig: IndexConfig): Unit = {
+  def createIndex(df: DataFrame, indexConfig: HyperSpaceIndexConfig): Unit = {
     indexManager.create(df, indexConfig)
   }
 

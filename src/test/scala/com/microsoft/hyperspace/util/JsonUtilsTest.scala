@@ -39,9 +39,9 @@ class JsonUtilsTest extends SparkFunSuite {
 
     val index = IndexLogEntry(
       "myIndex",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties.Columns(Seq("id"), Seq("name", "school")),
+      HyperSpaceIndex.CoveringIndex(
+        HyperSpaceIndex.Properties.Covering(
+          HyperSpaceIndex.Properties.CommonProperties.Columns(Seq("id"), Seq("name", "school")),
           IndexLogEntry.schemaString(schema),
           10,
           Map())),

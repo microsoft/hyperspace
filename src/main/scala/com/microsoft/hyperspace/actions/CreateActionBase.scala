@@ -16,10 +16,13 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.commons.io.output.ByteArrayOutputStream
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
+import org.apache.spark.sql.functions.{approx_count_distinct, col, input_file_name, udf}
 import org.apache.spark.sql.functions.{col, input_file_name}
+import org.apache.spark.util.sketch.BloomFilter
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
@@ -56,7 +59,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
   protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig,
+      indexConfig: HyperSpaceIndexConfig,
       path: Path,
       versionId: Int): IndexLogEntry = {
     val hadoopConf = spark.sessionState.newHadoopConf()
@@ -90,19 +93,87 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
         IndexLogEntry(
           indexConfig.indexName,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
-                .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
-              IndexLogEntry.schemaString(indexDataFrame.schema),
-              numBuckets,
-              coveringIndexProperties)),
+          indexConfig match {
+            case _: IndexConfig =>
+              HyperSpaceIndex.CoveringIndex(
+                HyperSpaceIndex.Properties.Covering(
+                  HyperSpaceIndex.Properties.CommonProperties
+                    .Columns(resolvedIndexedColumns, resolvedIncludedColumns),
+                  IndexLogEntry.schemaString(indexDataFrame.schema),
+                  numBuckets,
+                  coveringIndexProperties))
+            case _: BloomFilterIndexConfig =>
+              val bloomIndexProperties =
+                (hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation)).toMap
+              HyperSpaceIndex.BloomFilterIndex(
+                HyperSpaceIndex.Properties.BloomFilter(
+                  HyperSpaceIndex.Properties.CommonProperties
+                    .Columns(resolvedIndexedColumns, resolvedIndexedColumns),
+                  IndexLogEntry.schemaString(indexDataFrame.schema),
+                  bloomIndexProperties))
+            case _ => throw HyperspaceException("Invalid Index Config.")
+          },
           Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
+  }
+
+  protected def write(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: HyperSpaceIndexConfig): Unit = {
+    indexConfig match {
+      case ind: IndexConfig => write(spark, df, ind)
+      case ind: BloomFilterIndexConfig => write(spark, df, ind)
+      case _ => HyperspaceException("No write op supported")
+    }
+  }
+
+  private def write(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: BloomFilterIndexConfig): Unit = {
+    val (_, resolvedIndexedColumn, _) =
+      prepareIndexDataFrame(spark, df, indexConfig)
+
+    require(
+      resolvedIndexedColumn.size == 1,
+      "Resolved indexed columns for Bloom Filter can only be 1")
+
+    val resolvedNumBits = indexConfig.numBits match {
+      case -1 => BloomFilter.create(indexConfig.expectedNumItems).bitSize()
+      case _ => indexConfig.numBits
+    }
+
+    // TODO Begin has this op as relation is created there
+    // TODO Maybe use lineage to make file smaller
+    val relations = getRelation(spark, df).createRelationMetadata(fileIdTracker)
+    val bloomFilterUDF = udf((path: String) => {
+      val bfByteStream = new ByteArrayOutputStream()
+      val localBF = spark.read.schema(df.schema)
+        .format(relations.fileFormat)
+        .options(relations.options)
+        .load(path)
+        .select(resolvedIndexedColumn.head)
+        .stat
+        .bloomFilter(resolvedIndexedColumn.head, indexConfig.expectedNumItems, resolvedNumBits)
+      localBF.writeTo(bfByteStream)
+      bfByteStream.close()
+      bfByteStream.toByteArray.map(_.toChar).mkString
+    })
+
+    val bloomFilterDF = spark.createDataFrame(
+      relations.rootPaths.map(p => Tuple1(p))
+    ).toDF("FileName")
+    val createBloomFilterData = spark.udf.register("createBloomFilter", bloomFilterUDF)
+    val bloomFilterResult = bloomFilterDF.withColumn(
+      "Data",
+      createBloomFilterData(col("FileName"))
+    )
+    bloomFilterResult.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
   }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {
@@ -179,19 +250,29 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     }
   }
 
-  private def prepareIndexDataFrame(
+  private def resolveBloomFilterIndexConfig(
+      df: DataFrame,
+      indexConfig: BloomFilterIndexConfig): Seq[(String, Boolean)] = {
+    val spark = df.sparkSession
+    val plan = df.queryExecution.analyzed
+    val indexedColumn = Seq(indexConfig.indexedColumn)
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumn, plan)
+
+    resolvedIndexedColumns match {
+      case Some(indexed) => indexed
+      case _ =>
+        throw HyperspaceException(
+          s"Columns '${indexedColumn}' could not be resolved " +
+            s"from available source columns '${df.schema.treeString}'")
+    }
+  }
+
+  private def resolveDataFrameForLineage(
       spark: SparkSession,
       df: DataFrame,
-      indexConfig: IndexConfig): (DataFrame, Seq[String], Seq[String]) = {
-    val (resolvedIndexedColumns, resolvedIncludedColumns) = resolveConfig(df, indexConfig)
-    val columnsFromIndexConfig =
-      resolvedIndexedColumns.map(_._1) ++ resolvedIncludedColumns.map(_._1)
-
-    val prefixedIndexedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIndexedColumns)
-    val prefixedIncludedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIncludedColumns)
-    val prefixedColumnsFromIndexConfig = prefixedIndexedColumns ++ prefixedIncludedColumns
-
-    val indexDF = if (hasLineage(spark)) {
+      providedIndexColumns: Seq[String],
+      prefixedColumnsFromIndexConfig: Seq[String]): DataFrame = {
+    if (hasLineage(spark)) {
       val relation = getRelation(spark, df)
 
       // Lineage is captured using two sets of columns:
@@ -200,8 +281,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       //    as columns if they are not already part of the schema.
       val partitionColumns = relation.partitionSchema.map(_.name)
       val missingPartitionColumns =
-        partitionColumns.filter(ResolverUtils.resolve(spark, _, columnsFromIndexConfig).isEmpty)
-      val allIndexColumns = columnsFromIndexConfig ++ missingPartitionColumns
+        partitionColumns.filter(ResolverUtils.resolve(spark, _, providedIndexColumns).isEmpty)
+      val allIndexColumns = providedIndexColumns ++ missingPartitionColumns
 
       // File id value in DATA_FILE_ID_COLUMN column (lineage column) is stored as a
       // Long data type value. Each source data file has a unique file id, assigned by
@@ -225,10 +306,46 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
         .select(prepareColumns(allIndexColumns, prefixedAllIndexColumns) :+
           col(IndexConstants.DATA_FILE_NAME_ID): _*)
     } else {
-      df.select(prepareColumns(columnsFromIndexConfig, prefixedColumnsFromIndexConfig): _*)
+      df.select(prepareColumns(providedIndexColumns, prefixedColumnsFromIndexConfig): _*)
     }
+  }
 
-    (indexDF, prefixedIndexedColumns, prefixedIncludedColumns)
+  private def prepareIndexDataFrame(
+      spark: SparkSession,
+      df: DataFrame,
+      indexConfig: HyperSpaceIndexConfig): (DataFrame, Seq[String], Seq[String]) = {
+    indexConfig match {
+      case coveringIndexConfig: IndexConfig =>
+        val (resolvedIndexedColumns, resolvedIncludedColumns) =
+          resolveConfig(df, coveringIndexConfig)
+        val columnsFromIndexConfig =
+          resolvedIndexedColumns.map(_._1) ++ resolvedIncludedColumns.map(_._1)
+
+        val prefixedIndexedColumns =
+          SchemaUtils.prefixNestedFieldNames(resolvedIndexedColumns)
+        val prefixedIncludedColumns =
+          SchemaUtils.prefixNestedFieldNames(resolvedIncludedColumns)
+        val prefixedColumnsFromIndexConfig =
+          prefixedIndexedColumns ++ prefixedIncludedColumns
+
+        val indexDF = resolveDataFrameForLineage(
+          spark, df, columnsFromIndexConfig, prefixedColumnsFromIndexConfig)
+
+        (indexDF, prefixedIndexedColumns, prefixedIncludedColumns)
+      case bloomIndexConfig: BloomFilterIndexConfig =>
+        val resolvedIndexColumn = resolveBloomFilterIndexConfig(df, bloomIndexConfig)
+
+        val columnsFromIndexConfig = resolvedIndexColumn.map(_._1)
+        val prefixedIndexedColumns = SchemaUtils.prefixNestedFieldNames(resolvedIndexColumn)
+
+        val indexDF = resolveDataFrameForLineage(
+          spark, df, columnsFromIndexConfig, prefixedIndexedColumns)
+
+        (indexDF, prefixedIndexedColumns, df.columns)
+      case _ =>
+        throw HyperspaceException(
+          s"Cannot prepare dataframe ${df.schema} for ${indexConfig.indexName}")
+    }
   }
 
   private def prepareColumns(

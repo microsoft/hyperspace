@@ -16,18 +16,16 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.FileNotFoundException
-
-import scala.annotation.tailrec
-import scala.collection.mutable.{HashMap, ListBuffer}
-import scala.collection.mutable
-
 import com.fasterxml.jackson.annotation.JsonIgnore
+import java.io.FileNotFoundException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
@@ -344,21 +342,7 @@ object FileInfo {
   }
 }
 
-// IndexLogEntry-specific CoveringIndex that represents derived dataset.
-case class CoveringIndex(properties: CoveringIndex.Properties) {
-  val kind = "CoveringIndex"
-  val kindAbbr = "CI"
-}
-object CoveringIndex {
-  case class Properties(columns: Properties.Columns,
-    schemaString: String,
-    numBuckets: Int,
-    properties: Map[String, String])
 
-  object Properties {
-    case class Columns(indexed: Seq[String], included: Seq[String])
-  }
-}
 
 // IndexLogEntry-specific Signature that stores the signature provider and value.
 case class Signature(provider: String, value: String)
@@ -432,11 +416,11 @@ case class Source(plan: SparkPlan)
 
 // IndexLogEntry that captures index-related information.
 case class IndexLogEntry(
-    name: String,
-    derivedDataset: CoveringIndex,
-    content: Content,
-    source: Source,
-    properties: Map[String, String])
+                          name: String,
+                          derivedDataset: HyperSpaceIndex.IndexType,
+                          content: Content,
+                          source: Source,
+                          properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
   def schema: StructType =
@@ -522,7 +506,13 @@ case class IndexLogEntry(
     case _ => false
   }
 
-  def numBuckets: Int = derivedDataset.properties.numBuckets
+  derivedDataset.properties.isInstanceOf
+  def numBuckets: Int = {
+    derivedDataset.properties match {
+      case HyperSpaceIndex.Properties.Covering(_, _, buckets, _) => buckets
+      case _ => -1
+    }
+  }
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 

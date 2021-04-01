@@ -142,15 +142,21 @@ class OptimizeAction(
     val hadoopConf = spark.sessionState.newHadoopConf()
     val absolutePath = PathUtils.makeAbsolute(indexDataPath.toString, hadoopConf)
     val newContent = Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
-    val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.copy(
-      properties = previousIndexLogEntry.derivedDataset.properties
-        .copy(
-          properties = Hyperspace
-            .getContext(spark)
-            .sourceProviderManager
-            .enrichIndexProperties(
-              previousIndexLogEntry.relations.head,
-              prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
+    val updatedDerivedDataset = {
+      previousIndexLogEntry.derivedDataset match {
+        case coveringIndex: HyperSpaceIndex.CoveringIndex =>
+          coveringIndex.copy(
+            coveringProperties =
+              coveringIndex.properties.asInstanceOf[HyperSpaceIndex.Properties.Covering]
+              .copy(
+                properties = Hyperspace
+                  .getContext(spark)
+                  .sourceProviderManager
+                  .enrichIndexProperties(
+                    previousIndexLogEntry.relations.head,
+                    prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
+      }
+    }
 
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {

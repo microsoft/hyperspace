@@ -22,8 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
-
+import org.apache.spark.sql.types.{HIVE_TYPE_STRING, IntegerType, StringType, StructType}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.PathUtils
@@ -32,14 +31,21 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
   override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexTest")
   val indexName1 = "filterIxTestIndex1"
   val indexName2 = "filterIxTestIndex2"
+  val bloomIndexName = "bloomTestIndex"
 
   val c1 = AttributeReference("c1", StringType)()
   val c2 = AttributeReference("c2", StringType)()
   val c3 = AttributeReference("c3", StringType)()
   val c4 = AttributeReference("c4", IntegerType)()
+  val c5 = AttributeReference("c5", StringType)()
 
   val tableSchema = schemaFromAttributes(c1, c2, c3, c4)
   var scanNode: LogicalRelation = _
+
+  var indexLogEntry1: IndexLogEntry = _
+  var indexLogEntry2: IndexLogEntry = _
+  var bloomIndexLogEntry: IndexLogEntry = _
+
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -51,10 +57,14 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
 
     val indexPlan = Project(Seq(c1, c2, c3), scanNode)
-    createIndexLogEntry(indexName1, Seq(c3, c2), Seq(c1), indexPlan)
+    indexLogEntry1 = createIndexLogEntry(indexName1, Seq(c3, c2), Seq(c1), indexPlan)
 
     val index2Plan = Project(Seq(c1, c2, c3, c4), scanNode)
-    createIndexLogEntry(indexName2, Seq(c4, c2), Seq(c1, c3), index2Plan)
+    indexLogEntry2 = createIndexLogEntry(indexName2, Seq(c4, c2), Seq(c1, c3), index2Plan)
+
+    val bloomIndexPlan = Project(Seq(c1, c2, c3, c4), scanNode)
+    bloomIndexLogEntry = createBloomIndexLogEntry(
+      bloomIndexName, Seq(c5), Seq(c1, c2, c3, c4, c5), bloomIndexPlan)
   }
 
   before {
@@ -70,6 +80,17 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
 
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName1)
+  }
+
+  test("Verify FilterIndex rule is applied correctly for bloom filter.") {
+    val filterCondition = And(IsNotNull(c5), EqualTo(c5, Literal("bloom")))
+    val filterNode = Filter(filterCondition, scanNode)
+
+    val originalPlan = Project(Seq(c2, c3), filterNode)
+    val transformedPlan = FilterIndexRule(originalPlan)
+
+    assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
+    verifyTransformedPlanWithIndex(transformedPlan, bloomIndexName)
   }
 
   test("Verify FilterIndex rule is applied correctly for case insensitive query.") {
