@@ -237,18 +237,19 @@ trait SourceRelationMetadata
 trait FileBasedRelationMetadata extends SourceRelationMetadata {
 
   /**
-   * @return new [[Relation]] metadata that will have the latest source
+   * Returns new [[Relation]] metadata that will have the latest source.
    */
   def refresh(): Relation
 
   /**
-   * @return file format name to read internal data
+   * Returns file format name to read internal data.
    */
   def internalFileFormatName(): String
 
   /**
-   * @param properties Index properties to enrich
-   * @return updated index properties for index creation or refresh
+   * Returns updated index properties for index creation or refresh.
+   *
+   * @param properties index properties to enrich
    */
   def enrichIndexProperties(properties: Map[String, String]): Map[String, String]
 }

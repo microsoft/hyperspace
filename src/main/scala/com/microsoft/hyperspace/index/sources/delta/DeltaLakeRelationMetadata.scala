@@ -21,16 +21,10 @@ import com.microsoft.hyperspace.index.sources.FileBasedRelationMetadata
 
 class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMetadata {
 
-  /**
-   * @return new [[Relation]] metadata that will have the latest source
-   */
   override def refresh(): Relation = {
     metadata.copy(options = metadata.options - "versionAsOf" - "timestampAsOf")
   }
 
-  /**
-   * @return file format name to read internal data
-   */
   override def internalFileFormatName(): String = {
     "parquet"
   }
@@ -42,8 +36,7 @@ class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMet
    * 1) DELTA_VERSION_HISTORY_PROPERTY logs the history of INDEX_VERSION:DELTA_TABLE_VERSION
    *    values for each index creation & refresh.
    *
-   * @param properties Index properties to enrich.
-   * @return Update index properties for index creation or refresh.
+   * @param properties index properties to enrich
    */
   override def enrichIndexProperties(properties: Map[String, String]): Map[String, String] = {
     val indexVersion = properties(IndexConstants.INDEX_LOG_VERSION)
