@@ -269,7 +269,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(actual.equals(expected))
   }
 
-  test("Content.recFilesApply return empty list for directories without files ") {
+  test("Content.recFilesApply returns empty list for directories without files.") {
     val directory = Directory("file:/")
 
     val res = Content.recFilesApply(
