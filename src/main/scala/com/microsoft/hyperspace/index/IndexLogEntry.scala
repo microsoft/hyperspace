@@ -105,6 +105,7 @@ object Content {
 
   /**
    * Apply `func` to each file in directory recursively.
+   
    * @param prefixPath Root prefix
    * @param directory Root directory
    * @param func function which would apply to current prefix and file
