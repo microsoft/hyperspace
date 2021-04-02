@@ -107,7 +107,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       indexName: String,
       expectedDeletedFileNames: Seq[String]): Unit = {
 
-    val fileNameToId = getLatestStableLog(indexName).fileIdTracker.getFileToIdMap.toSeq.map {
+    val fileNameToId = getLatestStableLog(indexName).fileIdTracker.getFileToIdMapping.toSeq.map {
       kv =>
         (kv._1._1, kv._2)
     }.toMap
