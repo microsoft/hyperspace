@@ -23,6 +23,7 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.mutable
 
 import com.fasterxml.jackson.annotation.JsonIgnore
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -31,7 +32,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.Content.recFilesApply
+import com.microsoft.hyperspace.index.Content.{createFileInfoWithPrefix, recFilesApply}
 import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
@@ -51,17 +52,14 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
 
   @JsonIgnore
   lazy val fileInfos: Set[FileInfo] = {
-    recFilesApply(
-      new Path(root.name),
-      root,
-      (
-          f,
-          prefix) =>
-        FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
+    recFilesApply(new Path(root.name), root, createFileInfoWithPrefix).toSet
   }
 }
 
 object Content {
+
+  val createFileInfoWithPrefix: (FileInfo, Path) => FileInfo = (f, prefix) =>
+    FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)
 
   /**
    * Create a Content object from a directory path by recursively listing its leaf files. All
@@ -109,9 +107,9 @@ object Content {
    *
    * @param prefixPath Root prefix
    * @param directory Root directory
-   * @param func function which would apply to current prefix and file
+   * @param func Function which would apply to current prefix and file
    * @tparam T
-   * @return result list of applying function to all files
+   * @return Result list of applying function to all files
    */
   def recFilesApply[T](
       prefixPath: Path,
