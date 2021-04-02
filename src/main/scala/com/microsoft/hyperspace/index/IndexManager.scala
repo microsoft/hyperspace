@@ -115,10 +115,11 @@ trait IndexManager {
   def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry]
 
   /**
-   * Get available index log version ids of the given index.
+   * Get index log version ids of the given index that match any of the given stats.
    *
    * @param indexName Name of the index.
+   * @param states List of index states of interest.
    * @return Available index log versions.
    */
-  def getAvailableIndexVersions(indexName: String): Seq[Int]
+  def getIndexVersions(indexName: String, states: Seq[String]): Seq[Int]
 }

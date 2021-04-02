@@ -23,7 +23,8 @@ import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexLogEntry, Relation}
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
@@ -201,7 +202,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     }
 
     // Get available index log versions.
-    val availableLogVersions = indexManager.getAvailableIndexVersions(index.name)
+    val availableLogVersions =
+      indexManager.getIndexVersions(index.name, Seq(Constants.States.ACTIVE))
     val versions = versionsHistory.filter {
       case (indexLogVersion, _) => availableLogVersions.contains(indexLogVersion)
     }

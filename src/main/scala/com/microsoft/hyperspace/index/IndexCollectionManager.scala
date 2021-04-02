@@ -144,9 +144,9 @@ class IndexCollectionManager(
     }
   }
 
-  override def getAvailableIndexVersions(indexName: String): Seq[Int] = {
+  override def getIndexVersions(indexName: String, states: Seq[String]): Seq[Int] = {
     withLogManager(indexName) { logManager =>
-      logManager.getIndexVersions(Seq(Constants.States.ACTIVE))
+      logManager.getIndexVersions(states)
     }
   }
 
