@@ -23,7 +23,6 @@ import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.mutable
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
