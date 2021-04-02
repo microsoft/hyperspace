@@ -54,7 +54,9 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
     recFilesApply(
       new Path(root.name),
       root,
-      (f, prefix) =>
+      (
+          f,
+          prefix) =>
         FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
   }
 }
@@ -82,8 +84,9 @@ object Content {
       hadoopConfiguration: Configuration,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration,
-      throwIfNotExists))
+    Content(
+      Directory
+        .fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration, throwIfNotExists))
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
@@ -93,9 +96,7 @@ object Content {
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(
-      files: Seq[FileStatus],
-      fileIdTracker: FileIdTracker): Option[Content] = {
+  def fromLeafFiles(files: Seq[FileStatus], fileIdTracker: FileIdTracker): Option[Content] = {
     if (files.nonEmpty) {
       Some(Content(Directory.fromLeafFiles(files, fileIdTracker)))
     } else {
@@ -105,26 +106,25 @@ object Content {
 
   /**
    * Apply `func` to each file in directory recursively.
-   
+   *
    * @param prefixPath Root prefix
    * @param directory Root directory
    * @param func function which would apply to current prefix and file
    * @tparam T
-   * @return
+   * @return result list of applying function to all files
    */
   def recFilesApply[T](
-              prefixPath: Path,
-              directory: Directory,
-              func: (FileInfo, Path) => T): Seq[T] = {
+      prefixPath: Path,
+      directory: Directory,
+      func: (FileInfo, Path) => T): Seq[T] = {
     @tailrec
     def recAcc[A](
-                   dirMap: List[(Path, Seq[Directory])],
-                   func: (FileInfo, Path) => A,
-                   acc: Seq[A] = Seq.empty): Seq[A] = {
+        dirMap: List[(Path, Seq[Directory])],
+        func: (FileInfo, Path) => A,
+        acc: Seq[A] = Seq.empty): Seq[A] = {
       dirMap match {
         case Nil => acc
-        case (curPrefixPath, curDirs) :: xs =>
-
+        case (curPrefixPath, curDirs) :: otherDirs =>
           val curAcc = for {
             dir <- curDirs
             file <- dir.files
@@ -134,7 +134,7 @@ object Content {
             .filter(_.subDirs.nonEmpty)
             .map(dir => (new Path(curPrefixPath, dir.name), dir.subDirs))
 
-          recAcc(xs ++ newLevels, func, curAcc ++ acc)
+          recAcc(otherDirs ++ newLevels, func, curAcc ++ acc)
       }
     }
 
@@ -259,12 +259,10 @@ object Directory {
    * @param files List of leaf files.
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    *                      Note: If a new leaf file is discovered, the input fileIdTracker gets
-    *                     updated by adding it to the files it is tracking.
+   *                      updated by adding it to the files it is tracking.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(
-      files: Seq[FileStatus],
-      fileIdTracker: FileIdTracker): Directory = {
+  def fromLeafFiles(files: Seq[FileStatus], fileIdTracker: FileIdTracker): Directory = {
     require(
       files.nonEmpty,
       s"Empty files list found while creating a ${Directory.getClass.getName}.")
@@ -352,8 +350,8 @@ case class FileInfo(name: String, size: Long, modifiedTime: Long, id: Long) {
   override def equals(o: Any): Boolean = o match {
     case that: FileInfo =>
       name.equals(that.name) &&
-      size.equals(that.size) &&
-      modifiedTime.equals(that.modifiedTime)
+        size.equals(that.size) &&
+        modifiedTime.equals(that.modifiedTime)
     case _ => false
   }
 
@@ -379,10 +377,11 @@ case class CoveringIndex(properties: CoveringIndex.Properties) {
   val kindAbbr = "CI"
 }
 object CoveringIndex {
-  case class Properties(columns: Properties.Columns,
-    schemaString: String,
-    numBuckets: Int,
-    properties: Map[String, String])
+  case class Properties(
+      columns: Properties.Columns,
+      schemaString: String,
+      numBuckets: Int,
+      properties: Map[String, String])
 
   object Properties {
     case class Columns(indexed: Seq[String], included: Seq[String])
@@ -406,9 +405,7 @@ object LogicalPlanFingerprint {
  * @param appendedFiles Appended files.
  * @param deletedFiles Deleted files.
  */
-case class Update(
-    appendedFiles: Option[Content] = None,
-    deletedFiles: Option[Content] = None)
+case class Update(appendedFiles: Option[Content] = None, deletedFiles: Option[Content] = None)
 
 // IndexLogEntry-specific Hdfs that represents the source data.
 case class Hdfs(properties: Hdfs.Properties) {
@@ -517,21 +514,14 @@ case class IndexLogEntry(
     def toFileStatus(f: FileInfo) = {
       new FileStatus(f.size, false, 0, 1, f.modifiedTime, new Path(f.name))
     }
-    copy(
-      source = source.copy(
-        plan = source.plan.copy(
-          properties = source.plan.properties.copy(
-            fingerprint = latestFingerprint,
-            relations = Seq(
-              relations.head.copy(
-                data = relations.head.data.copy(
-                  properties = relations.head.data.properties.copy(
-                    update = Some(
-                      Update(
-                        appendedFiles =
-                          Content.fromLeafFiles(appended.map(toFileStatus), fileIdTracker),
-                        deletedFiles =
-                          Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
+    copy(source = source.copy(plan = source.plan.copy(properties = source.plan.properties.copy(
+      fingerprint = latestFingerprint,
+      relations = Seq(
+        relations.head.copy(data = relations.head.data.copy(properties =
+          relations.head.data.properties.copy(update = Some(Update(
+            appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus), fileIdTracker),
+            deletedFiles =
+              Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
   }
 
   def bucketSpec: BucketSpec =
@@ -566,14 +556,16 @@ case class IndexLogEntry(
   }
 
   def hasLineageColumn: Boolean = {
-    derivedDataset.properties.properties.getOrElse(
-      IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT).toBoolean
+    derivedDataset.properties.properties
+      .getOrElse(IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      .toBoolean
   }
 
   def hasParquetAsSourceFormat: Boolean = {
     relations.head.fileFormat.equals("parquet") ||
-      derivedDataset.properties.properties.getOrElse(
-        IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
+    derivedDataset.properties.properties
+      .getOrElse(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false")
+      .toBoolean
   }
 
   @JsonIgnore
@@ -650,10 +642,10 @@ class FileIdTracker {
   // Combination of file properties, used as key, to identify a
   // unique file for which an id is generated.
   type key = (
-    String, // Full path.
+      String, // Full path.
       Long, // Size.
-      Long  // Modified time.
-    )
+      Long // Modified time.
+  )
   private val fileToIdMap: mutable.HashMap[key, Long] = mutable.HashMap()
 
   def getMaxFileId: Long = maxId
@@ -678,8 +670,7 @@ class FileIdTracker {
     setSizeHint(files.size)
     files.foreach { f =>
       if (f.id == IndexConstants.UNKNOWN_FILE_ID) {
-        throw HyperspaceException(
-          s"Cannot add file info with unknown id. (file: ${f.name}).")
+        throw HyperspaceException(s"Cannot add file info with unknown id. (file: ${f.name}).")
       }
 
       val key = (f.name, f.size, f.modifiedTime)
@@ -707,8 +698,7 @@ class FileIdTracker {
    */
   def addFile(file: FileStatus): Long = {
     fileToIdMap.getOrElseUpdate(
-      (file.getPath.toString, file.getLen, file.getModificationTime),
-      {
+      (file.getPath.toString, file.getLen, file.getModificationTime), {
         maxId += 1
         maxId
       })
