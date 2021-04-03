@@ -60,7 +60,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
       indexConfig: IndexConfig,
       path: Path,
       versionId: Int): IndexLogEntry = {
-    val absolutePath = PathUtils.makeAbsolute(path, spark.sessionState.newHadoopConf())
+    val hadoopConf = spark.sessionState.newHadoopConf()
+    val absolutePath = PathUtils.makeAbsolute(path, hadoopConf)
     val numBuckets = numBucketsForIndex(spark)
 
     val signatureProvider = LogicalPlanSignatureProvider.create()
@@ -99,7 +100,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets,
               coveringIndexProperties)),
-          Content.fromDirectory(absolutePath, fileIdTracker),
+          Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 
