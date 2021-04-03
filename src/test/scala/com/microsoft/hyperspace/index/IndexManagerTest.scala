@@ -798,7 +798,8 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
             PathUtils.makeAbsolute(
               s"$systemPath/${indexConfig.indexName}" +
                 s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
-            fileIdTracker, new Configuration()),
+            fileIdTracker,
+            new Configuration()),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
         entry.state = state
