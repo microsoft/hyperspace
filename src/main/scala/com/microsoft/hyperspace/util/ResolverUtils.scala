@@ -43,6 +43,9 @@ object ResolverUtils {
    */
   private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
     assert(!isNested || (name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX)))
+    // Quotes will be removed from `resolve` and nested columns with quotes (e.g., "a.`b.c`.d")
+    // are not supported.
+    assert(!name.contains("`"))
 
     // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
     lazy val normalizedName = {
@@ -53,8 +56,12 @@ object ResolverUtils {
       }
     }
 
-    // Create a column using the resolved name. Top level column names are quoted, and
-    // nested column names are aliased with normalized names.
+    /**
+     * Create a column using the resolved name. Top level column names are quoted, and
+     * nested column names are aliased with normalized names.
+     *
+     * @return [[Column]] object created using the resolved name.
+     */
     def toColumn: Column = {
       if (isNested) {
         // No need to quote the string for "as" even if it contains dots.
@@ -64,8 +71,12 @@ object ResolverUtils {
       }
     }
 
-    // Create a column using the normalized name. Since the normalized name is already flattened
-    // with "dots", it is quoted.
+    /**
+     * Create a column using the normalized name. Since the normalized name is already flattened
+     * with "dots", it is quoted.
+     *
+     * @return [[Column]] object create using the normalized name.
+     */
     def toNormalizedColumn: Column = col(quote(normalizedName))
 
     private def quote(name: String) = s"`$name`"
@@ -74,11 +85,18 @@ object ResolverUtils {
   private[hyperspace] object ResolvedColumn {
     private val NESTED_FIELD_PREFIX = "__hs_nested."
 
+    /**
+     * Given a normalized column name, create [[ResolvedColumn]] after handling the prefix
+     * for nested columns.
+     *
+     * @param normalizedColumnName Normalized column name.
+     * @return [[ResolvedColumn]] created from the given normalized column name.
+     */
     def apply(normalizedColumnName: String): ResolvedColumn = {
       if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
-        ResolvedColumn(normalizedColumnName.substring(NESTED_FIELD_PREFIX.length), true)
+        ResolvedColumn(normalizedColumnName.substring(NESTED_FIELD_PREFIX.length), isNested = true)
       } else {
-        ResolvedColumn(normalizedColumnName, false)
+        ResolvedColumn(normalizedColumnName, isNested = false)
       }
     }
   }
