@@ -98,7 +98,8 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               numBuckets,
               coveringIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
-          Source(SparkPlan(sourcePlanProperties)))
+          Source(SparkPlan(sourcePlanProperties)),
+          Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }

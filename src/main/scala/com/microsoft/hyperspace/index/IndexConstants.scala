@@ -21,8 +21,6 @@ import org.apache.spark.sql.internal.SQLConf
 object IndexConstants {
   val INDEXES_DIR = "indexes"
 
-  val HYPERSPACE_VERSION_PROPERTY: String = "hyperspaceVersion"
-
   // Config used for setting the system path, which is considered as a "root" path for Hyperspace;
   // e.g, indexes are created under the system path.
   val INDEX_SYSTEM_PATH = "spark.hyperspace.system.path"
@@ -105,6 +103,7 @@ object IndexConstants {
   // Indicate whether the source file format is parquet.
   private[hyperspace] val HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY = "hasParquetAsSourceFormat"
   // Indicate index log version.
+  private[hyperspace] val HYPERSPACE_VERSION_PROPERTY: String = "hyperspaceVersion"
   private[hyperspace] val INDEX_LOG_VERSION = "indexLogVersion"
 
   // Hyperspace allows users to use globbing patterns to create indexes on. E.g. if user wants to

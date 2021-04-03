@@ -430,7 +430,7 @@ object SparkPlan {
 // IndexLogEntry-specific Source that uses SparkPlan as a plan.
 case class Source(plan: SparkPlan)
 
-/*
+/**
  * IndexLogEntry that captures index-related information.
  * Don't use this method to create a new IndexLogEntry, unless you specify all hyperspace project
  * default properties.
@@ -617,7 +617,7 @@ object IndexLogEntry {
 
   def schemaString(schema: StructType): String = schema.json
 
-  /*
+  /**
    * Use this method to create a new IndexLogEntry, which automatically includes
    * all common default hyperspace project properties.
    * TODO: force dev to use this method as this takes into account all
@@ -626,11 +626,12 @@ object IndexLogEntry {
    *  https://github.com/microsoft/hyperspace/issues/370
    *  Also add require for hyperspace project version when we introduce breaking change.
    */
-  def create(name: String,
-            derivedDataset: CoveringIndex,
-            content: Content,
-            source: Source,
-            properties: Map[String, String] = Map()): IndexLogEntry = {
+  def create(
+      name: String,
+      derivedDataset: CoveringIndex,
+      content: Content,
+      source: Source,
+      properties: Map[String, String]): IndexLogEntry = {
     IndexLogEntry(
       name,
       derivedDataset,
