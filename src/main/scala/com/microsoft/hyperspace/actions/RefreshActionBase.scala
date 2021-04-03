@@ -22,7 +22,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.SchemaUtils
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -95,8 +95,8 @@ private[actions] abstract class RefreshActionBase(
       previousIndexLogEntry.name,
       // As indexed & included columns in previousLogEntry are resolved & prefixed names,
       // need to remove the prefix to resolve with the dataframe for refresh.
-      SchemaUtils.removePrefixNestedFieldNames(ddColumns.indexed).map(_._1),
-      SchemaUtils.removePrefixNestedFieldNames(ddColumns.included).map(_._1))
+      ddColumns.indexed.map(ResolvedColumn(_).name),
+      ddColumns.included.map(ResolvedColumn(_).name))
   }
 
   final override val transientState: String = REFRESHING
