@@ -185,8 +185,13 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    * @return IndexLogEntry of the closest version among available index versions.
    */
   override def closestIndex(index: IndexLogEntry): IndexLogEntry = {
-    // Not support append-only HybridScan.
-    if (!(HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn)) {
+
+    // Only support when Hybrid Scan is enabled for both appended and deleted files.
+    // TODO: Support time travel utilizing Hybrid Scan append-only.
+    //   See https://github.com/microsoft/hyperspace/issues/408.
+    if (!(HyperspaceConf.hybridScanEnabled(spark) &&
+          HyperspaceConf.hybridScanDeleteEnabled(spark) &&
+          index.hasLineageColumn)) {
       return index
     }
 
@@ -201,11 +206,10 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
         .asInstanceOf[IndexLogEntry]
     }
 
-    // Get available index log versions.
-    val availableLogVersions =
+    val activeLogVersions =
       indexManager.getIndexVersions(index.name, Seq(Constants.States.ACTIVE))
     val versions = versionsHistory.filter {
-      case (indexLogVersion, _) => availableLogVersions.contains(indexLogVersion)
+      case (indexLogVersion, _) => activeLogVersions.contains(indexLogVersion)
     }
 
     plan.relation match {
