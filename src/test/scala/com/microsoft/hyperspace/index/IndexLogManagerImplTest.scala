@@ -162,8 +162,8 @@ class IndexLogManagerImplTest
     val expected = Some(getEntry("ACTIVE"))
     val actual = new IndexLogManagerImpl(path).getLatestStableLog()
     assert(actual.equals(expected))
-    val actualAvailable = new IndexLogManagerImpl(path).getIndexVersions(Seq("ACTIVE"))
-    assert(actualAvailable.equals(Seq(3, 1)))
+    val actualActiveVersions = new IndexLogManagerImpl(path).getIndexVersions(Seq("ACTIVE"))
+    assert(actualActiveVersions.equals(Seq(3, 1)))
   }
 
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {

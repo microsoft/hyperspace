@@ -119,7 +119,7 @@ trait IndexManager {
    *
    * @param indexName Name of the index.
    * @param states List of index states of interest.
-   * @return Available index log versions.
+   * @return Index log versions.
    */
   def getIndexVersions(indexName: String, states: Seq[String]): Seq[Int]
 }
