@@ -40,6 +40,9 @@ trait IndexLogManager {
   /** Returns the latest LogEntry whose state is STABLE */
   def getLatestStableLog(): Option[LogEntry]
 
+  /** Returns index log versions whose state is in the given states */
+  def getIndexVersions(states: Seq[String]): Seq[Int]
+
   /** update latest.json symlink to the given id/path */
   def createLatestStableLog(id: Int): Boolean
 
@@ -105,6 +108,21 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
     } else {
       assert(Constants.STABLE_STATES.contains(log.get.state))
       log
+    }
+  }
+
+  override def getIndexVersions(states: Seq[String]): Seq[Int] = {
+    val latestId = getLatestId()
+    if (latestId.isDefined) {
+      (latestId.get to 0 by -1).map { id =>
+        getLog(id) match {
+          case Some(entry) if states.contains(entry.state) =>
+            Some(id)
+          case _ => None
+        }
+      }.flatten
+    } else {
+      Seq()
     }
   }
 
