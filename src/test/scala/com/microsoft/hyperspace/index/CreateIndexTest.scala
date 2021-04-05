@@ -242,7 +242,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Verify that hyperspace version is written to the log entry") {
+  test("Verify that hyperspace version is written to the log entry.") {
     hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     val logManager = TestUtils.logManager(systemPath, indexConfig1.indexName)
     val logEntry = logManager.getLatestLog().get.asInstanceOf[IndexLogEntry]
