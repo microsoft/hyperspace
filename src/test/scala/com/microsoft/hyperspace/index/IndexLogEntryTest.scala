@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.BeforeAndAfter
 
-import com.microsoft.hyperspace.{HyperspaceException, TestUtils}
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
@@ -176,7 +176,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |      "kind" : "Spark"
          |    }
          |  },
-         |  "properties" : { },
+         |  "properties" : {
+         |    "${IndexConstants.HYPERSPACE_VERSION_PROPERTY}" : "${BuildInfo.version}"
+         |  },
          |  "version" : "0.1",
          |  "id" : 0,
          |  "state" : "ACTIVE",
@@ -220,7 +222,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
           .Properties(Seq(Signature("provider", "signatureValue")))
       ))
 
-    val expected = IndexLogEntry(
+    val expected = IndexLogEntry.create(
       "indexName",
       CoveringIndex(
         CoveringIndex.Properties(
