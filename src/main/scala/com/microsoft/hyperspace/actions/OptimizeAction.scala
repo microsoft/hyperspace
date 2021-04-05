@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.BucketingUtils

@@ -71,7 +71,8 @@ private[actions] abstract class RefreshActionBase(
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
-    val latestRelation = Hyperspace.getContext(spark)
+    val latestRelation = Hyperspace
+      .getContext(spark)
       .sourceProviderManager
       .getRelationMetadata(relations.head)
       .refresh()
