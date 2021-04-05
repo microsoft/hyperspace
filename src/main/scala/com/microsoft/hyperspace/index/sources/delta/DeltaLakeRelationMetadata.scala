@@ -40,6 +40,7 @@ class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMet
    *    values for each index creation & refresh.
    *
    * @param properties Index properties to enrich.
+   * @return Updated index properties for index creation or refresh.
    */
   override def enrichIndexProperties(properties: Map[String, String]): Map[String, String] = {
     val indexVersion = properties(IndexConstants.INDEX_LOG_VERSION)
