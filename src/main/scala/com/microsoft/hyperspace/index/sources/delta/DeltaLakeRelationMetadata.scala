@@ -19,6 +19,9 @@ package com.microsoft.hyperspace.index.sources.delta
 import com.microsoft.hyperspace.index.{IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelationMetadata
 
+/**
+ * Implementation for file-based relation metadata used by [[DeltaLakeFileBasedSource]]
+ */
 class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMetadata {
 
   override def refresh(): Relation = {

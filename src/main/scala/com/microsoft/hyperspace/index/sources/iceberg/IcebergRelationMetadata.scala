@@ -19,6 +19,9 @@ package com.microsoft.hyperspace.index.sources.iceberg
 import com.microsoft.hyperspace.index.Relation
 import com.microsoft.hyperspace.index.sources.FileBasedRelationMetadata
 
+/**
+ * Implementation for file-based relation metadata used by [[IcebergFileBasedSource]]
+ */
 class IcebergRelationMetadata(metadata: Relation) extends FileBasedRelationMetadata {
 
   override def refresh(): Relation = {

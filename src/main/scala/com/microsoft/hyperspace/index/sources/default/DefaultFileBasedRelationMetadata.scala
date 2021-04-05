@@ -19,6 +19,9 @@ package com.microsoft.hyperspace.index.sources.default
 import com.microsoft.hyperspace.index.Relation
 import com.microsoft.hyperspace.index.sources.FileBasedRelationMetadata
 
+/**
+ * Default file-based relation metadata implementation for file-based Spark built-in sources
+ */
 class DefaultFileBasedRelationMetadata(metadata: Relation) extends FileBasedRelationMetadata {
 
   override def refresh(): Relation = {
