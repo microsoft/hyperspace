@@ -89,7 +89,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
                 ++ hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation))
 
-        IndexLogEntry(
+        IndexLogEntry.create(
           indexConfig.indexName,
           CoveringIndex(
             CoveringIndex.Properties(
