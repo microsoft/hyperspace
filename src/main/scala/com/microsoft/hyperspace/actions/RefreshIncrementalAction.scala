@@ -60,7 +60,8 @@ class RefreshIncrementalAction(
       val internalFileFormatName = Hyperspace
         .getContext(spark)
         .sourceProviderManager
-        .internalFileFormatName(previousIndexLogEntry.relations.head)
+        .getRelationMetadata(previousIndexLogEntry.relations.head)
+        .internalFileFormatName()
 
       // Create a df with only appended files from original list of files.
       val dfWithAppendedFiles = spark.read
