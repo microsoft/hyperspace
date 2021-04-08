@@ -298,10 +298,10 @@ object RuleUtils {
           }
         relation.createLogicalRelation(indexFsRelation, updatedOutput)
 
-      case p: Project if provider.isSupportedProject(p, index) =>
+      case p: Project if provider.hasNestedColumns(p, index) =>
         transformProject(p)
 
-      case f: Filter if provider.isSupportedFilter(f, index) =>
+      case f: Filter if provider.hasNestedColumns(f, index) =>
         transformFilter(f)
     }
   }
@@ -627,7 +627,7 @@ object RuleUtils {
             case other: Expression => other
           }
           val newParentExpression =
-            replaceInSearchQuery(parentExpresion, exp, newExp)
+            replaceExpression(parentExpresion, exp, newExp)
           mutableFilter = filter.copy(condition = newParentExpression)
         case _ =>
           mutableFilter = filter

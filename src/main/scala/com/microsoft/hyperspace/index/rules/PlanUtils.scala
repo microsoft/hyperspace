@@ -70,7 +70,7 @@ object PlanUtils {
 
   /**
    * Given an Spark Catalyst [[Expression]] and a field name the method extracts
-   * the parent search expression and the expression that contains the field name
+   * the parent search expression and the expression that contains the field name.
    *
    * @param exp The Spark Catalyst [[Expression]] to extract from.
    * @param name The field name to search for.
@@ -101,7 +101,7 @@ object PlanUtils {
    * @param repl The replacement Spark Catalyst [[Expression]].
    * @return A new Spark Catalyst [[Expression]].
    */
-  def replaceInSearchQuery(
+  def replaceExpression(
       parent: Expression,
       needle: Expression,
       repl: Expression): Expression = {

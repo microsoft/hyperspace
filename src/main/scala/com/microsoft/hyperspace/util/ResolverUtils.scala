@@ -32,6 +32,78 @@ import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn.NESTED_FIELD_P
 object ResolverUtils {
 
   /**
+   * [[ResolvedColumn]] stores information when a column name is resolved against the
+   * analyzed plan and its schema.
+   *
+   * Outside unit tests, this object should not be created directly, but via the `resolve` function,
+   * or `ResolvedColumn.apply` with a normalized name.
+   *
+   * @param name The column name resolved from an analyzed plan.
+   * @param isNested Flag to denote if this column is nested or not.
+   */
+  private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
+    assert(!isNested || (name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX)))
+    // Quotes will be removed from `resolve` and nested columns with quotes (e.g., "a.`b.c`.d")
+    // are not supported.
+    assert(!name.contains("`"))
+
+    // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
+    lazy val normalizedName = {
+      if (isNested) {
+        s"$NESTED_FIELD_PREFIX$name"
+      } else {
+        name
+      }
+    }
+
+    /**
+     * Create a column using the resolved name. Top level column names are quoted, and
+     * nested column names are aliased with normalized names.
+     *
+     * @return [[Column]] object created using the resolved name.
+     */
+    def toColumn: Column = {
+      if (isNested) {
+        // No need to quote the string for "as" even if it contains dots.
+        col(name).as(normalizedName)
+      } else {
+        col(quote(name))
+      }
+    }
+
+    /**
+     * Create a column using the normalized name. Since the normalized name is already flattened
+     * with "dots", it is quoted.
+     *
+     * @return [[Column]] object create using the normalized name.
+     */
+    def toNormalizedColumn: Column = col(quote(normalizedName))
+
+    private def quote(name: String) = s"`$name`"
+  }
+
+  private[hyperspace] object ResolvedColumn {
+    private val NESTED_FIELD_PREFIX = "__hs_nested."
+
+    /**
+     * Given a normalized column name, create [[ResolvedColumn]] after handling the prefix
+     * for nested columns.
+     *
+     * @param normalizedColumnName Normalized column name.
+     * @return [[ResolvedColumn]] created from the given normalized column name.
+     */
+    def apply(normalizedColumnName: String): ResolvedColumn = {
+      if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
+        ResolvedColumn(
+          normalizedColumnName.substring(NESTED_FIELD_PREFIX.length),
+          isNested = true)
+      } else {
+        ResolvedColumn(normalizedColumnName, isNested = false)
+      }
+    }
+  }
+
+  /**
    * Return available string if required string can be resolved with it, based on spark resolver.
    *
    * @param resolver Resolver.
@@ -190,77 +262,5 @@ object ResolverUtils {
           }
       }
 
-  }
-
-  /**
-   * [[ResolvedColumn]] stores information when a column name is resolved against the
-   * analyzed plan and its schema.
-   *
-   * Outside unit tests, this object should not be created directly, but via the `resolve` function,
-   * or `ResolvedColumn.apply` with a normalized name.
-   *
-   * @param name The column name resolved from an analyzed plan.
-   * @param isNested Flag to denote if this column is nested or not.
-   */
-  private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
-    assert(!isNested || (name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX)))
-    // Quotes will be removed from `resolve` and nested columns with quotes (e.g., "a.`b.c`.d")
-    // are not supported.
-    assert(!name.contains("`"))
-
-    // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
-    lazy val normalizedName = {
-      if (isNested) {
-        s"$NESTED_FIELD_PREFIX$name"
-      } else {
-        name
-      }
-    }
-
-    /**
-     * Create a column using the resolved name. Top level column names are quoted, and
-     * nested column names are aliased with normalized names.
-     *
-     * @return [[Column]] object created using the resolved name.
-     */
-    def toColumn: Column = {
-      if (isNested) {
-        // No need to quote the string for "as" even if it contains dots.
-        col(name).as(normalizedName)
-      } else {
-        col(quote(name))
-      }
-    }
-
-    /**
-     * Create a column using the normalized name. Since the normalized name is already flattened
-     * with "dots", it is quoted.
-     *
-     * @return [[Column]] object create using the normalized name.
-     */
-    def toNormalizedColumn: Column = col(quote(normalizedName))
-
-    private def quote(name: String) = s"`$name`"
-  }
-
-  private[hyperspace] object ResolvedColumn {
-    private val NESTED_FIELD_PREFIX = "__hs_nested."
-
-    /**
-     * Given a normalized column name, create [[ResolvedColumn]] after handling the prefix
-     * for nested columns.
-     *
-     * @param normalizedColumnName Normalized column name.
-     * @return [[ResolvedColumn]] created from the given normalized column name.
-     */
-    def apply(normalizedColumnName: String): ResolvedColumn = {
-      if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
-        ResolvedColumn(
-          normalizedColumnName.substring(NESTED_FIELD_PREFIX.length),
-          isNested = true)
-      } else {
-        ResolvedColumn(normalizedColumnName, isNested = false)
-      }
-    }
   }
 }

@@ -117,36 +117,40 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * @param project Project to check if it's supported.
    * @return True if the given project is a supported relation.
    */
-  def isSupportedProject(project: Project, index: IndexLogEntry): Boolean = {
+  def hasNestedColumns(project: Project, index: IndexLogEntry): Boolean = {
     val indexCols = index.indexedColumns ++ index.includedColumns
-    val resolvedIndexCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i))
-    val hasNestedCols = resolvedIndexCols.exists(_.isNested)
-    val projectListFields = project.projectList.flatMap(extractNamesFromExpression)
-    val containsNestedFields = projectListFields.exists(i => indexCols.contains(i))
-    var containsNestedChildren = false
-    project.child.foreach {
-      case f: Filter =>
-        val filterSupported = isSupportedFilter(f, index)
-        containsNestedChildren = containsNestedChildren || filterSupported
-      case _ =>
+    val hasNestedCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i)).exists(_.isNested)
+    if (hasNestedCols) {
+      val projectListFields = project.projectList.flatMap(extractNamesFromExpression)
+      val containsNestedFields = projectListFields.exists(i => indexCols.contains(i))
+      var containsNestedChildren = false
+      project.child.foreach {
+        case f: Filter =>
+          val filterSupported = hasNestedColumns(f, index)
+          containsNestedChildren = containsNestedChildren || filterSupported
+        case _ =>
+      }
+      containsNestedFields || containsNestedChildren
+    } else {
+      false
     }
-    hasNestedCols && (containsNestedFields || containsNestedChildren)
   }
 
   /**
-   * Returns true if the given filter is a supported filter. If all of the registered
-   * providers return None, this returns false.
+   * Returns true if the given filter has nested columns.
    *
    * @param filter Filter to check if it's supported.
    * @return True if the given project is a supported relation.
    */
-  def isSupportedFilter(filter: Filter, index: IndexLogEntry): Boolean = {
+  def hasNestedColumns(filter: Filter, index: IndexLogEntry): Boolean = {
     val indexCols = index.indexedColumns ++ index.includedColumns
-    val resolvedIndexCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i))
-    val hasNestedCols = resolvedIndexCols.exists(_.isNested)
-    val filterFields = extractNamesFromExpression(filter.condition).toSeq
-    val supported = filterFields.exists(i => indexCols.contains(i))
-    hasNestedCols && supported
+    val hasNestedCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i)).exists(_.isNested)
+    if (hasNestedCols) {
+      val filterFields = extractNamesFromExpression(filter.condition).toSeq
+      filterFields.exists(i => indexCols.contains(i))
+    } else {
+      false
+    }
   }
 
   /**
