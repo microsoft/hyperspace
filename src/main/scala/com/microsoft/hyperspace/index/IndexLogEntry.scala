@@ -492,6 +492,7 @@ case class IndexLogEntry(
     tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
     tracker
   }
+
   /**
    * A mutable map for holding auxiliary information of this index log entry while applying rules.
    */
@@ -528,21 +529,11 @@ case class IndexLogEntry(
               Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
   }
 
-  def relations: Seq[Relation] = {
-    // Only one relation is currently supported.
-    assert(source.plan.properties.relations.size == 1)
-    source.plan.properties.relations
-  }
-
   def bucketSpec: BucketSpec =
     BucketSpec(
       numBuckets = numBuckets,
       bucketColumnNames = indexedColumns,
       sortColumnNames = indexedColumns)
-
-  def numBuckets: Int = derivedDataset.properties.numBuckets
-
-  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
 
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
@@ -556,7 +547,11 @@ case class IndexLogEntry(
     case _ => false
   }
 
+  def numBuckets: Int = derivedDataset.properties.numBuckets
+
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
+
+  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
 
   def includedColumns: Seq[String] = derivedDataset.properties.columns.included
 
@@ -577,6 +572,12 @@ case class IndexLogEntry(
     derivedDataset.properties.properties
       .getOrElse(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false")
       .toBoolean
+  }
+
+  def relations: Seq[Relation] = {
+    // Only one relation is currently supported.
+    assert(source.plan.properties.relations.size == 1)
+    source.plan.properties.relations
   }
 
   override def hashCode(): Int = {
