@@ -16,22 +16,20 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.FileNotFoundException
-
-import scala.annotation.tailrec
-import scala.collection.mutable.{HashMap, ListBuffer}
-import scala.collection.mutable
-
 import com.fasterxml.jackson.annotation.JsonIgnore
+import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.util.PathUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
+import java.io.FileNotFoundException
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -53,7 +51,9 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
     rec(
       new Path(root.name),
       root,
-      (f, prefix) =>
+      (
+          f,
+          prefix) =>
         FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
   }
 
@@ -91,8 +91,9 @@ object Content {
       hadoopConfiguration: Configuration,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
       throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration,
-      throwIfNotExists))
+    Content(
+      Directory
+        .fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration, throwIfNotExists))
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
@@ -102,9 +103,7 @@ object Content {
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(
-      files: Seq[FileStatus],
-      fileIdTracker: FileIdTracker): Option[Content] = {
+  def fromLeafFiles(files: Seq[FileStatus], fileIdTracker: FileIdTracker): Option[Content] = {
     if (files.nonEmpty) {
       Some(Content(Directory.fromLeafFiles(files, fileIdTracker)))
     } else {
@@ -210,15 +209,6 @@ object Directory {
     }
   }
 
-  @tailrec
-  private def createEmptyDirectory(path: Path, subDirs: Seq[Directory] = Seq()): Directory = {
-    if (path.isRoot) {
-      Directory(path.toString, subDirs = subDirs)
-    } else {
-      createEmptyDirectory(path.getParent, Seq(Directory(path.getName, subDirs = subDirs)))
-    }
-  }
-
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
    * NOT be part of the returned object.
@@ -230,12 +220,10 @@ object Directory {
    * @param files List of leaf files.
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    *                      Note: If a new leaf file is discovered, the input fileIdTracker gets
-    *                     updated by adding it to the files it is tracking.
+   *                     updated by adding it to the files it is tracking.
    * @return Content object with Directory tree from leaf files.
    */
-  def fromLeafFiles(
-      files: Seq[FileStatus],
-      fileIdTracker: FileIdTracker): Directory = {
+  def fromLeafFiles(files: Seq[FileStatus], fileIdTracker: FileIdTracker): Directory = {
     require(
       files.nonEmpty,
       s"Empty files list found while creating a ${Directory.getClass.getName}.")
@@ -291,6 +279,15 @@ object Directory {
     pathToDirectory(getRoot(files.head.getPath))
   }
 
+  @tailrec
+  private def createEmptyDirectory(path: Path, subDirs: Seq[Directory] = Seq()): Directory = {
+    if (path.isRoot) {
+      Directory(path.toString, subDirs = subDirs)
+    } else {
+      createEmptyDirectory(path.getParent, Seq(Directory(path.getName, subDirs = subDirs)))
+    }
+  }
+
   // Return file system root path from any path. E.g. "file:/C:/a/b/c" will have root "file:/C:/".
   // For linux systems, this root will be "file:/". Other hdfs compatible file systems will have
   // corresponding roots.
@@ -323,8 +320,8 @@ case class FileInfo(name: String, size: Long, modifiedTime: Long, id: Long) {
   override def equals(o: Any): Boolean = o match {
     case that: FileInfo =>
       name.equals(that.name) &&
-      size.equals(that.size) &&
-      modifiedTime.equals(that.modifiedTime)
+        size.equals(that.size) &&
+        modifiedTime.equals(that.modifiedTime)
     case _ => false
   }
 
@@ -350,10 +347,11 @@ case class CoveringIndex(properties: CoveringIndex.Properties) {
   val kindAbbr = "CI"
 }
 object CoveringIndex {
-  case class Properties(columns: Properties.Columns,
-    schemaString: String,
-    numBuckets: Int,
-    properties: Map[String, String])
+  case class Properties(
+      columns: Properties.Columns,
+      schemaString: String,
+      numBuckets: Int,
+      properties: Map[String, String])
 
   object Properties {
     case class Columns(indexed: Seq[String], included: Seq[String])
@@ -377,9 +375,7 @@ object LogicalPlanFingerprint {
  * @param appendedFiles Appended files.
  * @param deletedFiles Deleted files.
  */
-case class Update(
-    appendedFiles: Option[Content] = None,
-    deletedFiles: Option[Content] = None)
+case class Update(appendedFiles: Option[Content] = None, deletedFiles: Option[Content] = None)
 
 // IndexLogEntry-specific Hdfs that represents the source data.
 case class Hdfs(properties: Hdfs.Properties) {
@@ -439,46 +435,49 @@ case class IndexLogEntry(
     properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
 
-  def schema: StructType =
-    DataType.fromJson(derivedDataset.properties.schemaString).asInstanceOf[StructType]
-
-  def created: Boolean = state.equals(Constants.States.ACTIVE)
-
-  def relations: Seq[Relation] = {
-    // Only one relation is currently supported.
-    assert(source.plan.properties.relations.size == 1)
-    source.plan.properties.relations
-  }
-
   // FileInfo's 'name' contains the full path to the file.
   @JsonIgnore
   lazy val sourceFileInfoSet: Set[FileInfo] = {
     relations.head.data.properties.content.fileInfos
   }
-
   @JsonIgnore
   lazy val sourceFilesSizeInBytes: Long = {
     sourceFileInfoSet.foldLeft(0L)(_ + _.size)
   }
-
-  def sourceUpdate: Option[Update] = {
-    relations.head.data.properties.update
-  }
-
-  def hasSourceUpdate: Boolean = {
-    sourceUpdate.isDefined && (appendedFiles.nonEmpty || deletedFiles.nonEmpty)
-  }
-
   // FileInfo's 'name' contains the full path to the file.
   @JsonIgnore
   lazy val appendedFiles: Set[FileInfo] = {
     sourceUpdate.flatMap(_.appendedFiles).map(_.fileInfos).getOrElse(Set())
   }
-
   // FileInfo's 'name' contains the full path to the file.
   @JsonIgnore
   lazy val deletedFiles: Set[FileInfo] = {
     sourceUpdate.flatMap(_.deletedFiles).map(_.fileInfos).getOrElse(Set())
+  }
+  @JsonIgnore
+  lazy val fileIdTracker: FileIdTracker = {
+    val tracker = new FileIdTracker
+    tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
+    tracker
+  }
+
+  /**
+   * A mutable map for holding auxiliary information of this index log entry while applying rules.
+   */
+  @JsonIgnore
+  private val tags: mutable.Map[(LogicalPlan, IndexLogEntryTag[_]), Any] = mutable.Map.empty
+
+  def schema: StructType =
+    DataType.fromJson(derivedDataset.properties.schemaString).asInstanceOf[StructType]
+
+  def created: Boolean = state.equals(Constants.States.ACTIVE)
+
+  def hasSourceUpdate: Boolean = {
+    sourceUpdate.isDefined && (appendedFiles.nonEmpty || deletedFiles.nonEmpty)
+  }
+
+  def sourceUpdate: Option[Update] = {
+    relations.head.data.properties.update
   }
 
   def copyWithUpdate(
@@ -488,21 +487,20 @@ case class IndexLogEntry(
     def toFileStatus(f: FileInfo) = {
       new FileStatus(f.size, false, 0, 1, f.modifiedTime, new Path(f.name))
     }
-    copy(
-      source = source.copy(
-        plan = source.plan.copy(
-          properties = source.plan.properties.copy(
-            fingerprint = latestFingerprint,
-            relations = Seq(
-              relations.head.copy(
-                data = relations.head.data.copy(
-                  properties = relations.head.data.properties.copy(
-                    update = Some(
-                      Update(
-                        appendedFiles =
-                          Content.fromLeafFiles(appended.map(toFileStatus), fileIdTracker),
-                        deletedFiles =
-                          Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
+    copy(source = source.copy(plan = source.plan.copy(properties = source.plan.properties.copy(
+      fingerprint = latestFingerprint,
+      relations = Seq(
+        relations.head.copy(data = relations.head.data.copy(properties =
+          relations.head.data.properties.copy(update = Some(Update(
+            appendedFiles = Content.fromLeafFiles(appended.map(toFileStatus), fileIdTracker),
+            deletedFiles =
+              Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
+  }
+
+  def relations: Seq[Relation] = {
+    // Only one relation is currently supported.
+    assert(source.plan.properties.relations.size == 1)
+    source.plan.properties.relations
   }
 
   def bucketSpec: BucketSpec =
@@ -522,6 +520,23 @@ case class IndexLogEntry(
     case _ => false
   }
 
+  def hasLineageColumn: Boolean = {
+    derivedDataset.properties.properties
+      .getOrElse(IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
+  def hasParquetAsSourceFormat: Boolean = {
+    relations.head.fileFormat.equals("parquet") ||
+    derivedDataset.properties.properties
+      .getOrElse(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false")
+      .toBoolean
+  }
+
+  override def hashCode(): Int = {
+    config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
+  }
+
   def numBuckets: Int = derivedDataset.properties.numBuckets
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
@@ -536,54 +551,8 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
-  def hasLineageColumn: Boolean = {
-    derivedDataset.properties.properties.getOrElse(
-      IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT).toBoolean
-  }
-
-  def hasParquetAsSourceFormat: Boolean = {
-    relations.head.fileFormat.equals("parquet") ||
-      derivedDataset.properties.properties.getOrElse(
-        IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
-  }
-
-  @JsonIgnore
-  lazy val fileIdTracker: FileIdTracker = {
-    val tracker = new FileIdTracker
-    tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
-    tracker
-  }
-
-  override def hashCode(): Int = {
-    config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
-  }
-
-  /**
-   * A mutable map for holding auxiliary information of this index log entry while applying rules.
-   */
-  @JsonIgnore
-  private val tags: mutable.Map[(LogicalPlan, IndexLogEntryTag[_]), Any] = mutable.Map.empty
-
-  def setTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], value: T): Unit = {
-    tags((plan, tag)) = value
-  }
-
-  def getTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Option[T] = {
-    tags.get((plan, tag)).map(_.asInstanceOf[T])
-  }
-
   def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((plan, tag))
-  }
-
-  def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
-    getTagValue(plan, tag) match {
-      case Some(v) => v
-      case None =>
-        val ret = f
-        setTagValue(plan, tag, ret)
-        ret
-    }
   }
 
   def setTagValue[T](tag: IndexLogEntryTag[T], value: T): Unit = {
@@ -601,6 +570,24 @@ case class IndexLogEntry(
   def withCachedTag[T](tag: IndexLogEntryTag[T])(f: => T): T = {
     withCachedTag(null, tag)(f)
   }
+
+  def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
+    getTagValue(plan, tag) match {
+      case Some(v) => v
+      case None =>
+        val ret = f
+        setTagValue(plan, tag, ret)
+        ret
+    }
+  }
+
+  def setTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T], value: T): Unit = {
+    tags((plan, tag)) = value
+  }
+
+  def getTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Option[T] = {
+    tags.get((plan, tag)).map(_.asInstanceOf[T])
+  }
 }
 
 // A tag of a `IndexLogEntry`, which defines name and type.
@@ -616,16 +603,15 @@ object IndexLogEntry {
  * Provides functionality to generate unique file ids for files.
  */
 class FileIdTracker {
-  private var maxId: Long = -1L
-
   // Combination of file properties, used as key, to identify a
   // unique file for which an id is generated.
   type key = (
-    String, // Full path.
+      String, // Full path.
       Long, // Size.
-      Long  // Modified time.
-    )
+      Long // Modified time.
+  )
   private val fileToIdMap: mutable.HashMap[key, Long] = mutable.HashMap()
+  private var maxId: Long = -1L
 
   def getMaxFileId: Long = maxId
 
@@ -633,8 +619,6 @@ class FileIdTracker {
 
   def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
     fileToIdMap.get((path, size, modifiedTime))
-
-  def setSizeHint(size: Int): Unit = fileToIdMap.sizeHint(size)
 
   /**
    * Add a set of FileInfos to the fileToIdMap. The assumption is
@@ -649,8 +633,7 @@ class FileIdTracker {
     setSizeHint(files.size)
     files.foreach { f =>
       if (f.id == IndexConstants.UNKNOWN_FILE_ID) {
-        throw HyperspaceException(
-          s"Cannot add file info with unknown id. (file: ${f.name}).")
+        throw HyperspaceException(s"Cannot add file info with unknown id. (file: ${f.name}).")
       }
 
       val key = (f.name, f.size, f.modifiedTime)
@@ -668,6 +651,8 @@ class FileIdTracker {
     }
   }
 
+  def setSizeHint(size: Int): Unit = fileToIdMap.sizeHint(size)
+
   /**
    * Try to add file properties to fileToIdMap. If the file is already in
    * the map then return its current id. Otherwise, generate a new id,
@@ -678,8 +663,7 @@ class FileIdTracker {
    */
   def addFile(file: FileStatus): Long = {
     fileToIdMap.getOrElseUpdate(
-      (file.getPath.toString, file.getLen, file.getModificationTime),
-      {
+      (file.getPath.toString, file.getLen, file.getModificationTime), {
         maxId += 1
         maxId
       })

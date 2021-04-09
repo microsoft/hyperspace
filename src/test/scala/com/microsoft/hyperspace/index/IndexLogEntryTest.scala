@@ -68,9 +68,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     fileIdTracker = new FileIdTracker
   }
 
-  private def toPath(path: file.Path): Path = PathUtils.makeAbsolute(path.toString)
-
   private def toFileStatus(path: file.Path): FileStatus = fs.getFileStatus(toPath(path))
+
+  private def toPath(path: file.Path): Path = PathUtils.makeAbsolute(path.toString)
 
   test("IndexLogEntry spec example") {
     val schemaString =
@@ -191,34 +191,20 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       Seq(
         Relation(
           Seq("rootpath"),
-          Hdfs(
-            Hdfs.Properties(
-              Content(
-                Directory(
-                  "test",
-                  Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 100L, 200L, 1)),
-                  Seq()
-                )
-              ),
-              Some(
-                Update(
-                  None,
-                  Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2)))))
-                )
-              )
-            )
-          ),
+          Hdfs(Hdfs.Properties(
+            Content(Directory(
+              "test",
+              Seq(FileInfo("f1", 100L, 100L, 0), FileInfo("f2", 100L, 200L, 1)),
+              Seq())),
+            Some(Update(None, Some(Content(Directory("", Seq(FileInfo("f1", 10, 10, 2))))))))),
           "schema",
           "type",
-          Map()
-        )
-      ),
+          Map())),
       null,
       null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint
-          .Properties(Seq(Signature("provider", "signatureValue")))
-      ))
+          .Properties(Seq(Signature("provider", "signatureValue")))))
 
     val expected = IndexLogEntry(
       "indexName",
@@ -241,15 +227,19 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   }
 
   test("Content.files api lists all files from Content object.") {
-    val content = Content(Directory("file:/", subDirs =
-      Seq(
-        Directory("a",
-          files = Seq(FileInfo("f1", 0, 0, UNKNOWN_FILE_ID), FileInfo("f2", 0, 0, UNKNOWN_FILE_ID)),
+    val content = Content(
+      Directory(
+        "file:/",
+        subDirs = Seq(Directory(
+          "a",
+          files =
+            Seq(FileInfo("f1", 0, 0, UNKNOWN_FILE_ID), FileInfo("f2", 0, 0, UNKNOWN_FILE_ID)),
           subDirs = Seq(
-            Directory("b",
-              files =
-                Seq(FileInfo("f3", 0, 0, UNKNOWN_FILE_ID), FileInfo("f4", 0, 0, UNKNOWN_FILE_ID)))))
-      )))
+            Directory(
+              "b",
+              files = Seq(
+                FileInfo("f3", 0, 0, UNKNOWN_FILE_ID),
+                FileInfo("f4", 0, 0, UNKNOWN_FILE_ID))))))))
 
     val expected =
       Seq("file:/a/f1", "file:/a/f2", "file:/a/b/f3", "file:/a/b/f4").map(new Path(_)).toSet
@@ -261,8 +251,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val nestedDirPath = toPath(nestedDir)
 
     val expected = {
-      val fileInfos = Seq(f3, f4).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+      val fileInfos = Seq(f3, f4)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
       val nestedDirDirectory = Directory("nested", fileInfos)
       val rootDirectory = createDirectory(nestedDirPath, nestedDirDirectory)
       Content(rootDirectory, NoOpFingerprint())
@@ -276,8 +267,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val nestedDirPath = toPath(nestedDir)
 
     val expected = {
-      val fileInfos = Seq(f3, f4).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+      val fileInfos = Seq(f3, f4)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
       val nestedDirDirectory = Directory("nested", fileInfos)
       val rootDirectory = createDirectory(nestedDirPath, nestedDirDirectory)
       Content(rootDirectory, NoOpFingerprint())
@@ -291,8 +283,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val nestedDirPath = toPath(nestedDir)
 
     val expected = {
-      val fileInfos = Seq(f3, f4).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+      val fileInfos = Seq(f3, f4)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
       val nestedDirDirectory = Directory("nested", fileInfos)
       createDirectory(nestedDirPath, nestedDirDirectory)
     }
@@ -301,17 +294,21 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(directoryEquals(actual, expected))
   }
 
-  test("Directory.fromDirectory api creates the correct Directory objects, " +
-    "recursively listing all leaf files.") {
+  test(
+    "Directory.fromDirectory api creates the correct Directory objects, " +
+      "recursively listing all leaf files.") {
     val testDirPath = toPath(testDir)
 
     val testDirLeafFiles =
-      Seq(f1, f2).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+      Seq(f1, f2)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
     val nestedDirLeafFiles =
-      Seq(f3, f4).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
-    val testDirDirectory = Directory(name = "testDir",
+      Seq(f3, f4)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+    val testDirDirectory = Directory(
+      name = "testDir",
       files = testDirLeafFiles,
       subDirs = Seq(Directory(name = "nested", files = nestedDirLeafFiles)))
     val expected = createDirectory(testDirPath, testDirDirectory)
@@ -325,12 +322,15 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val testDirPath = toPath(testDir)
 
     val testDirLeafFiles =
-      Seq(f1, f2).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+      Seq(f1, f2)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
     val nestedDirLeafFiles =
-      Seq(f3, f4).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
-    val testDirDirectory = Directory(name = "testDir",
+      Seq(f3, f4)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+    val testDirDirectory = Directory(
+      name = "testDir",
       files = testDirLeafFiles,
       subDirs = Seq(Directory(name = "nested", files = nestedDirLeafFiles)))
 
@@ -344,12 +344,15 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   test("Directory.fromLeafFiles api does not include other files in the directory.") {
     val testDirPath = toPath(testDir)
 
-    val testDirLeafFiles = Seq(f1).map(toFileStatus).map(f =>
-      FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+    val testDirLeafFiles = Seq(f1)
+      .map(toFileStatus)
+      .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
     val nestedDirLeafFiles =
-      Seq(f4).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
-    val testDirDirectory = Directory(name = "testDir",
+      Seq(f4)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+    val testDirDirectory = Directory(
+      name = "testDir",
       files = testDirLeafFiles,
       subDirs = Seq(Directory(name = "nested", files = nestedDirLeafFiles)))
 
@@ -360,8 +363,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(directoryEquals(actual, expected))
   }
 
-  test("Directory.fromLeafFiles: throwIfNotExist flag throws exception for non-existent" +
-    "directory, otherwise works as expected.") {
+  test(
+    "Directory.fromLeafFiles: throwIfNotExist flag throws exception for non-existent" +
+      "directory, otherwise works as expected.") {
     val testDirPath = toPath(testDir)
     val nonExistentDir = new Path(testDirPath, "nonexistent")
 
@@ -402,8 +406,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       override def accept(path: Path): Boolean = path.getName.startsWith("f1")
     }
 
-    val testDirLeafFiles = Seq(f1).map(toFileStatus).map(f =>
-      FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
+    val testDirLeafFiles = Seq(f1)
+      .map(toFileStatus)
+      .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false))
     val testDirDirectory = Directory(name = "testDir", files = testDirLeafFiles)
     val expected = createDirectory(testDirPath, testDirDirectory)
 
@@ -413,8 +418,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     assert(directoryEquals(actual, expected))
   }
 
-  test("Directory.fromDirectory and fromLeafFileswhere files are at same level but different" +
-    "dirs.") {
+  test(
+    "Directory.fromDirectory and fromLeafFileswhere files are at same level but different" +
+      "dirs.") {
     // File Structure
     // testDir/temp/a/f1
     // testDir/temp/b/f2
@@ -426,11 +432,17 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val f2 = Files.createFile(Paths.get(b + "/f2"))
 
     val aDirectory =
-      Directory("a", Seq(f1).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
+      Directory(
+        "a",
+        Seq(f1)
+          .map(toFileStatus)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
     val bDirectory =
-      Directory("b", Seq(f2).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
+      Directory(
+        "b",
+        Seq(f2)
+          .map(toFileStatus)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
     val tempDirectory = Directory("temp", subDirs = Seq(aDirectory, bDirectory))
     val tempDirectoryPath = toPath(tempDir)
 
@@ -458,12 +470,18 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val f2 = Files.createFile(Paths.get(c + "/f2"))
 
     val cDirectory =
-      Directory("c", Seq(f2).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
+      Directory(
+        "c",
+        Seq(f2)
+          .map(toFileStatus)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
     val bDirectory = Directory("b", subDirs = Seq(cDirectory))
     val aDirectory =
-      Directory("a", Seq(f1).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
+      Directory(
+        "a",
+        Seq(f1)
+          .map(toFileStatus)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
 
     val tempDirectory = Directory("temp", subDirs = Seq(aDirectory, bDirectory))
     val tempDirectoryPath = toPath(tempDir)
@@ -478,8 +496,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
-  test("Directory.fromDirectory and fromLeafFiles where files belong to multiple" +
-    "subdirectories.") {
+  test(
+    "Directory.fromDirectory and fromLeafFiles where files belong to multiple" +
+      "subdirectories.") {
     // File Structure
     // testDir/temp/a/f1
     // testDir/temp/a/b/f2
@@ -494,17 +513,23 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     val f3 = Files.createFile(Paths.get(c + "/f3"))
 
     val bDirectory =
-      Directory("b", Seq(f2).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
+      Directory(
+        "b",
+        Seq(f2)
+          .map(toFileStatus)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
     val cDirectory =
-      Directory("c", Seq(f3).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
+      Directory(
+        "c",
+        Seq(f3)
+          .map(toFileStatus)
+          .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)))
     val aDirectory = Directory(
       "a",
-      Seq(f1).map(toFileStatus).map(f =>
-        FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)),
-      Seq(bDirectory, cDirectory)
-    )
+      Seq(f1)
+        .map(toFileStatus)
+        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = false)),
+      Seq(bDirectory, cDirectory))
     val tempDirectory = Directory("temp", subDirs = Seq(aDirectory))
     val tempDirectoryPath = toPath(tempDir)
 
@@ -524,11 +549,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     // a/f2
     val directory1 = Directory(
       name = "a",
-      files = Seq(
-        FileInfo("f1", 100L, 100L, 1L),
-        FileInfo("f2", 100L, 100L, 2L)
-      )
-    )
+      files = Seq(FileInfo("f1", 100L, 100L, 1L), FileInfo("f2", 100L, 100L, 2L)))
 
     // directory2:
     // a/b/f3
@@ -538,13 +559,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       subDirs = Seq(
         Directory(
           name = "b",
-          files = Seq(
-            FileInfo("f3", 100L, 100L, 3L),
-            FileInfo("f4", 100L, 100L, 4L)
-          )
-        )
-      )
-    )
+          files = Seq(FileInfo("f3", 100L, 100L, 3L), FileInfo("f4", 100L, 100L, 4L)))))
 
     // Expected result of merging directory1 and directory2:
     // a/f1
@@ -553,20 +568,11 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     // a/b/f4
     val expected = Directory(
       name = "a",
-      files = Seq(
-        FileInfo("f1", 100L, 100L, 1L),
-        FileInfo("f2", 100L, 100L, 2L)
-      ),
+      files = Seq(FileInfo("f1", 100L, 100L, 1L), FileInfo("f2", 100L, 100L, 2L)),
       subDirs = Seq(
         Directory(
           name = "b",
-          files = Seq(
-            FileInfo("f3", 100L, 100L, 3L),
-            FileInfo("f4", 100L, 100L, 4L)
-          )
-        )
-      )
-    )
+          files = Seq(FileInfo("f3", 100L, 100L, 3L), FileInfo("f4", 100L, 100L, 4L)))))
 
     val actual1 = directory1.merge(directory2)
     val actual2 = directory2.merge(directory1)
@@ -582,14 +588,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     // a/b/f3
     val directory1 = Directory(
       name = "a",
-      files = Seq(
-        FileInfo("f1", 100L, 100L, 1L),
-        FileInfo("f2", 100L, 100L, 2L)
-      ),
-      subDirs = Seq(
-        Directory(name = "b", files = Seq(FileInfo("f3", 100L, 100L, 3L)))
-      )
-    )
+      files = Seq(FileInfo("f1", 100L, 100L, 1L), FileInfo("f2", 100L, 100L, 2L)),
+      subDirs = Seq(Directory(name = "b", files = Seq(FileInfo("f3", 100L, 100L, 3L)))))
 
     // directory2:
     // a/f4
@@ -602,17 +602,8 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       subDirs = Seq(
         Directory(
           name = "b",
-          files = Seq(
-            FileInfo("f5", 100L, 100L, 5L),
-            FileInfo("f6", 100L, 100L, 6L)
-          ),
-          subDirs = Seq(Directory(
-            name = "c",
-            files = Seq(FileInfo("f7", 100L, 100L, 7L))
-          ))
-        )
-      )
-    )
+          files = Seq(FileInfo("f5", 100L, 100L, 5L), FileInfo("f6", 100L, 100L, 6L)),
+          subDirs = Seq(Directory(name = "c", files = Seq(FileInfo("f7", 100L, 100L, 7L)))))))
 
     // Expected result of merging directory1 and directory2:
     // directory1:
@@ -628,23 +619,15 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
       files = Seq(
         FileInfo("f1", 100L, 100L, 1L),
         FileInfo("f2", 100L, 100L, 2L),
-        FileInfo("f4", 100L, 100L, 4L)
-      ),
+        FileInfo("f4", 100L, 100L, 4L)),
       subDirs = Seq(
         Directory(
           name = "b",
           files = Seq(
             FileInfo("f3", 100L, 100L, 3L),
             FileInfo("f5", 100L, 100L, 5L),
-            FileInfo("f6", 100L, 100L, 6L)
-          ),
-          subDirs = Seq(
-            Directory("c",
-              files = Seq(FileInfo("f7", 100L, 100L, 7L)))
-          )
-        )
-      )
-    )
+            FileInfo("f6", 100L, 100L, 6L)),
+          subDirs = Seq(Directory("c", files = Seq(FileInfo("f7", 100L, 100L, 7L)))))))
 
     val actual1 = directory1.merge(directory2)
     val actual2 = directory2.merge(directory1)
@@ -659,19 +642,17 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     // a/f2
     val directory1 = Directory(
       name = "a",
-      files = Seq(FileInfo("f1", 100L, 100L, 1L), FileInfo("f2", 100L, 100L, 2L))
-    )
+      files = Seq(FileInfo("f1", 100L, 100L, 1L), FileInfo("f2", 100L, 100L, 2L)))
 
     // directory2:
     // b/f3
     // b/f4
     val directory2 = Directory(
       name = "b",
-      files = Seq(FileInfo("f3", 100L, 100L, 3L), FileInfo("f4", 100L, 100L, 4L))
-    )
+      files = Seq(FileInfo("f3", 100L, 100L, 3L), FileInfo("f4", 100L, 100L, 4L)))
 
-    val ex1 = intercept[HyperspaceException] (directory1.merge(directory2))
-    val ex2 = intercept[HyperspaceException] (directory2.merge(directory1))
+    val ex1 = intercept[HyperspaceException](directory1.merge(directory2))
+    val ex2 = intercept[HyperspaceException](directory2.merge(directory1))
 
     assert(ex1.msg.contains("Merging directories with names a and b failed."))
     assert(ex2.msg.contains("Merging directories with names b and a failed."))
@@ -683,19 +664,18 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
   private def directoryEquals(dir1: Directory, dir2: Directory): Boolean = {
     dir1.name.equals(dir2.name) &&
-      dir1.files.toSet.equals(dir2.files.toSet) &&
-      dir1.subDirs.size.equals(dir2.subDirs.size) &&
-      dir1.subDirs.sortBy(_.name).zip(dir2.subDirs.sortBy(_.name)).forall{
-        case (d1, d2) => directoryEquals(d1, d2)
-      }
+    dir1.files.toSet.equals(dir2.files.toSet) &&
+    dir1.subDirs.size.equals(dir2.subDirs.size) &&
+    dir1.subDirs.sortBy(_.name).zip(dir2.subDirs.sortBy(_.name)).forall { case (d1, d2) =>
+      directoryEquals(d1, d2)
+    }
   }
 
   // Using `directoryPath`, create a Directory tree starting from root and ending at
   // `leafDirectory`.
   private def createDirectory(directoryPath: Path, leafDirectory: Directory): Directory = {
-    TestUtils.splitPath(directoryPath.getParent).foldLeft(leafDirectory) {
-      (accum, name) =>
-        Directory(name, Seq(), Seq(accum))
+    TestUtils.splitPath(directoryPath.getParent).foldLeft(leafDirectory) { (accum, name) =>
+      Directory(name, Seq(), Seq(accum))
     }
   }
 }
