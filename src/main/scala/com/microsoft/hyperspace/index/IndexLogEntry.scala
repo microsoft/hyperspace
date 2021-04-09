@@ -16,20 +16,22 @@
 
 package com.microsoft.hyperspace.index
 
+import java.io.FileNotFoundException
+
+import scala.annotation.tailrec
+import scala.collection.mutable.{HashMap, ListBuffer}
+import scala.collection.mutable
+
 import com.fasterxml.jackson.annotation.JsonIgnore
-import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.PathUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import java.io.FileNotFoundException
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.mutable.{HashMap, ListBuffer}
+import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -520,6 +522,20 @@ case class IndexLogEntry(
     case _ => false
   }
 
+  def numBuckets: Int = derivedDataset.properties.numBuckets
+
+  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
+
+  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
+
+  def includedColumns: Seq[String] = derivedDataset.properties.columns.included
+
+  def signature: Signature = {
+    val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
+    assert(sourcePlanSignatures.length == 1)
+    sourcePlanSignatures.head
+  }
+
   def hasLineageColumn: Boolean = {
     derivedDataset.properties.properties
       .getOrElse(IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
@@ -535,20 +551,6 @@ case class IndexLogEntry(
 
   override def hashCode(): Int = {
     config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
-  }
-
-  def numBuckets: Int = derivedDataset.properties.numBuckets
-
-  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
-
-  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
-
-  def includedColumns: Seq[String] = derivedDataset.properties.columns.included
-
-  def signature: Signature = {
-    val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
-    assert(sourcePlanSignatures.length == 1)
-    sourcePlanSignatures.head
   }
 
   def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
