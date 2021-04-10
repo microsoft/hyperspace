@@ -66,7 +66,7 @@ object FilterColumnCheck extends HyperspacePlanCheck {
           .map(_.references.map(_.asInstanceOf[AttributeReference].name))
           .flatMap(_.toSeq)
         val filterColumnNames = condition.references.map(_.name).toSeq
-        (projectColumnNames, filterColumnNames)
+        (filterColumnNames, projectColumnNames)
 
       case filter @ Filter(condition: Expression, ExtractRelation(relation))
           if !RuleUtils.isIndexApplied(relation) =>

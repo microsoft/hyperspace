@@ -76,7 +76,7 @@ class ScoreBasedIndexApplication {
     var optResult = (plan, 0)
     ruleBatch.foreach { check =>
       val (transformedPlan, curScore) = check(plan, indexes)
-      if (!transformedPlan.equals(plan)) {
+      if (!transformedPlan.equals(plan) || check.equals(NoOpBatch)) {
         val result = recChildren(transformedPlan)
         if (optResult._2 < result._2 + curScore) {
           optResult = (result._1, result._2 + curScore)

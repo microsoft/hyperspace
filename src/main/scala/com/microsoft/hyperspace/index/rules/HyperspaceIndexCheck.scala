@@ -219,9 +219,13 @@ object IndexPriorityCheck extends HyperspaceIndexCheck {
             case (_, indexList) =>
               // TODO filter indexes which can be leveraged by other index.
               indexList
-                .sortWith((a, b) =>
-                  a.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).get
-                    > b.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES).get)
+                .sortWith(
+                  (a, b) =>
+                    a.getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+                      .getOrElse(a.sourceFilesSizeInBytes)
+                      > b
+                        .getTagValue(plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+                        .getOrElse(b.sourceFilesSizeInBytes))
             // TODO more condition to compare indexes
           }
           .toSeq
