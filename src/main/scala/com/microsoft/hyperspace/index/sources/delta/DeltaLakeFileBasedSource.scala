@@ -16,13 +16,20 @@
 
 package com.microsoft.hyperspace.index.sources.delta
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
-import com.microsoft.hyperspace.index.Relation
-import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.{IndexConstants, Relation}
+import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedRelationMetadata, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+
+object DeltaLakeConstants {
+  val DELTA_FORMAT_STR = "delta"
+
+  // JSON property name used in index metadata to store Delta Lake version history of refresh.
+  val DELTA_VERSION_HISTORY_PROPERTY = "deltaVersions"
+}
 
 /**
  * Delta Lake file-based source provider.
@@ -31,36 +38,6 @@ import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourc
  *   - The relation is [[HadoopFsRelation]] with [[TahoeLogFileIndex]] as file index.
  */
 class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
-  private val DELTA_FORMAT_STR = "delta"
-
-  /**
-   * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
-   *
-   * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
-   * @return [[Relation]] object if the given 'relation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  override def refreshRelationMetadata(relation: Relation): Option[Relation] = {
-    if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
-      Some(relation.copy(options = relation.options - "versionAsOf" - "timestampAsOf"))
-    } else {
-      None
-    }
-  }
-
-  /**
-   * Returns a file format name to read internal data files for a given [[Relation]].
-   *
-   * @param relation [[Relation]] object to read internal data files.
-   * @return File format to read internal data files.
-   */
-  override def internalFileFormatName(relation: Relation): Option[String] = {
-    if (relation.fileFormat.equals(DELTA_FORMAT_STR)) {
-      Some("parquet")
-    } else {
-      None
-    }
-  }
 
   /**
    * Returns true if the given logical plan is a relation for Delta Lake.
@@ -81,10 +58,28 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * @param plan Logical plan to wrap to [[FileBasedRelation]]
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
-  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
-    case l @ LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
-      Some(new DeltaLakeRelation(spark, l))
-    case _ => None
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
+    if (isSupportedRelation(plan).contains(true)) {
+      Some(new DeltaLakeRelation(spark, plan.asInstanceOf[LogicalRelation]))
+    } else {
+      None
+    }
+  }
+
+  override def isSupportedRelationMetadata(metadata: Relation): Option[Boolean] = {
+    if (metadata.fileFormat.equals(DeltaLakeConstants.DELTA_FORMAT_STR)) {
+      Some(true)
+    } else {
+      None
+    }
+  }
+
+  override def getRelationMetadata(metadata: Relation): Option[FileBasedRelationMetadata] = {
+    if (isSupportedRelationMetadata(metadata).contains(true)) {
+      Some(new DeltaLakeRelationMetadata(metadata))
+    } else {
+      None
+    }
   }
 }
 

@@ -48,7 +48,8 @@ class RefreshIncrementalAction(
     spark: SparkSession,
     logManager: IndexLogManager,
     dataManager: IndexDataManager)
-    extends RefreshActionBase(spark, logManager, dataManager) {
+    extends RefreshActionBase(spark, logManager, dataManager)
+    with Action {
 
   final override def op(): Unit = {
     logInfo(
@@ -59,7 +60,8 @@ class RefreshIncrementalAction(
       val internalFileFormatName = Hyperspace
         .getContext(spark)
         .sourceProviderManager
-        .internalFileFormatName(previousIndexLogEntry.relations.head)
+        .getRelationMetadata(previousIndexLogEntry.relations.head)
+        .internalFileFormatName()
 
       // Create a df with only appended files from original list of files.
       val dfWithAppendedFiles = spark.read
@@ -90,7 +92,8 @@ class RefreshIncrementalAction(
         refreshDF,
         indexDataPath.toString,
         previousIndexLogEntry.numBuckets,
-        indexConfig.indexedColumns,
+        // previousIndexLogEntry should contain the resolved and prefixed field names.
+        previousIndexLogEntry.derivedDataset.properties.columns.indexed,
         writeMode)
     }
   }
@@ -114,10 +117,6 @@ class RefreshIncrementalAction(
     }
   }
 
-  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
-  }
-
   /**
    * Create a log entry with all source data files, and all required index content. This contains
    * ALL source data files (files which were indexed previously, and files which are being indexed
@@ -127,7 +126,7 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath)
+    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath, endId)
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.
@@ -141,5 +140,9 @@ class RefreshIncrementalAction(
       // New entry.
       entry
     }
+  }
+
+  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{FileIdTracker, Relation}
+import com.microsoft.hyperspace.index.{FileIdTracker, FileInfo, IndexConstants, IndexLogEntry, Relation}
 
 /**
  * ::Experimental::
@@ -61,9 +61,29 @@ trait FileBasedRelation extends SourceRelation {
   def signature: String
 
   /**
-   * All the files that the current relation references to.
+   * FileStatus list for all source files that the current relation references to.
    */
-  def allFiles: Seq[FileStatus]
+  val allFiles: Seq[FileStatus]
+
+  /**
+   * FileInfo list for all source files that the current relation references to.
+   */
+  final lazy val allFileInfos: Seq[FileInfo] = {
+    allFiles.map { f =>
+      FileInfo(
+        f.getPath.toString,
+        f.getLen,
+        f.getModificationTime,
+        IndexConstants.UNKNOWN_FILE_ID)
+    }
+  }
+
+  /**
+   * Summation of all source file size.
+   */
+  final lazy val allFileSizeInBytes: Long = {
+    allFileInfos.map(_.size).sum
+  }
 
   /**
    * The partition schema of the current relation.
@@ -113,6 +133,16 @@ trait FileBasedRelation extends SourceRelation {
    * Returns list of pairs of (file path, file id) to build lineage column.
    */
   def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)]
+
+  /**
+   * Returns IndexLogEntry of the closest version for the given index.
+   *
+   * @param index Candidate index to be applied.
+   * @return IndexLogEntry of the closest version among available index versions.
+   */
+  def closestIndex(index: IndexLogEntry): IndexLogEntry = {
+    index
+  }
 }
 
 /**
@@ -154,27 +184,6 @@ trait SourceProviderBuilder {
 trait FileBasedSourceProvider extends SourceProvider {
 
   /**
-   * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
-   *
-   * This API is used when an index is refreshed.
-   *
-   * If the given relation does not belong to this provider, None should be returned.
-   *
-   * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
-   * @return [[Relation]] object if the given 'relation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  def refreshRelationMetadata(relation: Relation): Option[Relation]
-
-  /**
-   * Returns a file format name to read internal data for a given [[Relation]].
-   *
-   * @param relation [[Relation]] object to read internal data files.
-   * @return File format to read internal data files.
-   */
-  def internalFileFormatName(relation: Relation): Option[String]
-
-  /**
    * Returns true if the given logical plan is a supported relation.
    *
    * @param plan Logical plan to check if it's supported.
@@ -190,4 +199,57 @@ trait FileBasedSourceProvider extends SourceProvider {
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
   def getRelation(plan: LogicalPlan): Option[FileBasedRelation]
+
+  /**
+   * Returns true if the given relation metadata is supported relation metadata.
+   *
+   * @param metadata Relation metadata to check if it's supported.
+   * @return Some(true) if the given relation metadata is supported relation metadata, otherwise
+   *         None.
+   */
+  def isSupportedRelationMetadata(metadata: Relation): Option[Boolean]
+
+  /**
+   * Returns the [[FileBasedRelationMetadata]] that wraps the given relation metadata
+   * if the given relation metadata is supported relation metadata
+   *
+   * @param metadata Relation metadata to wrap to [[FileBasedRelationMetadata]]
+   * @return [[FileBasedRelationMetadata]] that wraps the given relation metadata
+   */
+  def getRelationMetadata(metadata: Relation): Option[FileBasedRelationMetadata]
+}
+
+/**
+ * ::Experimental::
+ * A trait that represents relation metadata for a source provider.
+ *
+ * @since 0.5.0
+ */
+trait SourceRelationMetadata
+
+/**
+ * ::Experimental::
+ * A trait that a source provider should implement to represent the source relation metadata
+ * that is based on files.
+ *
+ * @since 0.5.0
+ */
+trait FileBasedRelationMetadata extends SourceRelationMetadata {
+
+  /**
+   * Returns new [[Relation]] metadata that will have the latest source.
+   */
+  def refresh(): Relation
+
+  /**
+   * Returns file format name to read internal data.
+   */
+  def internalFileFormatName(): String
+
+  /**
+   * Returns updated index properties for index creation or refresh.
+   *
+   * @param properties Index properties to enrich.
+   */
+  def enrichIndexProperties(properties: Map[String, String]): Map[String, String]
 }

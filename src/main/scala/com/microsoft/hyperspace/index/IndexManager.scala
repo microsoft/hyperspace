@@ -104,4 +104,22 @@ trait IndexManager {
    * @return Index metadata and statistics as a [[DataFrame]].
    */
   def index(indexName: String): DataFrame
+
+  /**
+   * Get IndexLogEntry of the given index log version.
+   *
+   * @param indexName Name of the index to get.
+   * @param logVersion Index log version to retrieve.
+   * @return IndexLogEntry if the index of the given log version exists, otherwise None.
+   */
+  def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry]
+
+  /**
+   * Get index log version ids of the given index that match any of the given states.
+   *
+   * @param indexName Name of the index.
+   * @param states List of index states of interest.
+   * @return Index log versions.
+   */
+  def getIndexVersions(indexName: String, states: Seq[String]): Seq[Int]
 }

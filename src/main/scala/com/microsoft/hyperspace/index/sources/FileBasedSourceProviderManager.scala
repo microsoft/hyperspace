@@ -44,28 +44,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
     })
 
   /**
-   * Runs refreshRelationMetadata() for each provider.
-   *
-   * @param relation [[Relation]] to refresh.
-   * @return Refreshed [[Relation]].
-   * @throws [[HyperspaceException]] if multiple providers returns [[Some]] or
-   *         if no providers return [[Some]].
-   */
-  def refreshRelationMetadata(relation: Relation): Relation = {
-    run(p => p.refreshRelationMetadata(relation))
-  }
-
-  /**
-   * Runs internalFileFormatName() for each provider.
-   *
-   * @param relation [[Relation]] object to read internal data files.
-   * @return File format to read internal data files.
-   */
-  def internalFileFormatName(relation: Relation): String = {
-    run(p => p.internalFileFormatName(relation))
-  }
-
-  /**
    * Returns true if the given logical plan is a supported relation. If all of the registered
    * providers return None, this returns false. (e.g, the given plan could be RDD-based relation,
    * which is not applicable).
@@ -88,6 +66,30 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    */
   def getRelation(plan: LogicalPlan): FileBasedRelation = {
     run(p => p.getRelation(plan))
+  }
+
+  /**
+   * Returns true if the given relation metadata is a supported relation metadata. If all of the
+   * registered providers return None, this returns false.
+   *
+   * @param metadata Relation metadata to check if it's supported.
+   * @return True if the given plan is supported relation metadata.
+   */
+  def isSupportedRelationMetadata(metadata: Relation): Boolean = {
+    runWithDefault(p => p.isSupportedRelationMetadata(metadata))(false)
+  }
+
+  /**
+   * Returns the [[FileBasedRelationMetadata]] that wraps the given relation metadata.
+   * If you are using this from an extractor, check if the relation metadata
+   * is supported first by using [[isSupportedRelationMetadata]]. Otherwise, HyperspaceException
+   * can be thrown if none of the registered providers supports the given relation metadata.
+   *
+   * @param metadata Relation metadata to wrap to [[FileBasedRelationMetadata]]
+   * @return [[FileBasedRelationMetadata]] that wraps the given relation metadata.
+   */
+  def getRelationMetadata(metadata: Relation): FileBasedRelationMetadata = {
+    run(p => p.getRelationMetadata(metadata))
   }
 
   /**

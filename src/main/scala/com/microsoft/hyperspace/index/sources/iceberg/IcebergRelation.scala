@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index.sources.iceberg
 
+import java.util.Locale
+
 import collection.JavaConverters._
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.iceberg.{FileScanTask, Schema, Table}
@@ -26,13 +28,13 @@ import org.apache.iceberg.spark.SparkSchemaUtil
 import org.apache.iceberg.spark.source.IcebergSource
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
-import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.sources.v2.DataSourceOptions
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -55,7 +57,7 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
   /**
    * All the files that the current Iceberg table uses for read.
    */
-  override def allFiles: Seq[FileStatus] = plan.source match {
+  override lazy val allFiles: Seq[FileStatus] = plan.source match {
     case _: IcebergSource =>
       loadIcebergTable.newScan().planFiles().iterator().asScala.toSeq.map(toFileStatus)
   }
@@ -122,15 +124,29 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
+   * input_file_name() could be different depending on the OS and source.
+   *
    * For [[IcebergRelation]], each file path should be in this format:
-   *   `/path/to/file`
+   *   `/path/to/file` or `X:/path/to/file` for Windows file system.
    *
    * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
    * @return List of pairs of (file path, file id).
    */
   override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    fileIdTracker.getFileToIdMap.toSeq.map { kv =>
-      (kv._1._1.replaceAll("^file:/{1,3}", "/"), kv._2)
+    // For Windows,
+    //   original file path: file:/C:/path/to/file
+    //   input_file_name(): C:/path/to/file
+    // For Linux,
+    //   original file path: file:///path/to/file or file:/path/to/file
+    //   input_file_name(): /path/to/file
+    if (Path.WINDOWS) {
+      fileIdTracker.getFileToIdMapping.map { kv =>
+        (kv._1._1.stripPrefix("file:/"), kv._2)
+      }
+    } else {
+      fileIdTracker.getFileToIdMapping.map { kv =>
+        (kv._1._1.replaceFirst("^file:/{1,3}", "/"), kv._2)
+      }
     }
   }
 

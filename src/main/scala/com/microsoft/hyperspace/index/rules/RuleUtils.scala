@@ -56,14 +56,9 @@ object RuleUtils {
     // Map of a signature provider to a signature generated for the given plan.
     val signatureMap = mutable.Map[String, Option[String]]()
 
-    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
-    val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
-
     def signatureValid(entry: IndexLogEntry): Boolean = {
       entry.withCachedTag(relation.plan, IndexLogEntryTags.SIGNATURE_MATCHED) {
-        val sourcePlanSignatures = entry.source.plan.properties.fingerprint.properties.signatures
-        assert(sourcePlanSignatures.length == 1)
-        val sourcePlanSignature = sourcePlanSignatures.head
+        val sourcePlanSignature = entry.signature
 
         signatureMap.getOrElseUpdate(
           sourcePlanSignature.provider,
@@ -76,56 +71,62 @@ object RuleUtils {
       }
     }
 
-    def isHybridScanCandidate(
-        entry: IndexLogEntry,
-        inputSourceFiles: Seq[FileInfo],
-        inputSourceFilesSizeInBytes: Long): Boolean = {
-      // TODO: Some threshold about the similarity of source data files - number of common files or
-      //  total size of common files.
-      //  See https://github.com/microsoft/hyperspace/issues/159
+    val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
+    val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
+
+    def getHybridScanCandidate(index: IndexLogEntry): Option[IndexLogEntry] = {
       // TODO: As in [[PlanSignatureProvider]], Source plan signature comparison is required to
       //  support arbitrary source plans at index creation.
       //  See https://github.com/microsoft/hyperspace/issues/158
 
-      entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
-        // Find the number of common files between the source relation and index source files.
-        // The total size of common files are collected and tagged for candidate.
-        val (commonCnt, commonBytes) = inputSourceFiles.foldLeft(0L, 0L) { (res, f) =>
-          if (entry.sourceFileInfoSet.contains(f)) {
-            (res._1 + 1, res._2 + f.size) // count, total bytes
-          } else {
-            res
+      val entry = relation.closestIndex(index)
+
+      val isHybridScanCandidate =
+        entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
+          // Find the number of common files between the source relation and index source files.
+          // The total size of common files are collected and tagged for candidate.
+          val (commonCnt, commonBytes) = relation.allFileInfos.foldLeft(0L, 0L) { (res, f) =>
+            if (entry.sourceFileInfoSet.contains(f)) {
+              (res._1 + 1, res._2 + f.size) // count, total bytes
+            } else {
+              res
+            }
           }
+
+          val appendedBytesRatio = 1 - commonBytes / relation.allFileSizeInBytes.toFloat
+          val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
+
+          val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
+          val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
+            commonCnt > 0 &&
+            appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
+            deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
+
+          // For append-only Hybrid Scan, deleted files are not allowed.
+          lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
+            appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
+
+          val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
+          if (isCandidate) {
+            entry.setTagValue(
+              relation.plan,
+              IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES,
+              commonBytes)
+
+            // If there is no change in source dataset, the index will be applied by
+            // transformPlanToUseIndexOnlyScan.
+            entry.setTagValue(
+              relation.plan,
+              IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
+              !(commonCnt == entry.sourceFileInfoSet.size
+                && commonCnt == relation.allFileInfos.size))
+          }
+          isCandidate
         }
-
-        val appendedBytesRatio = 1 - commonBytes / inputSourceFilesSizeInBytes.toFloat
-        val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
-
-        val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-        val isAppendAndDeleteCandidate = hybridScanDeleteEnabled && entry.hasLineageColumn &&
-          commonCnt > 0 &&
-          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark) &&
-          deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
-
-        // For append-only Hybrid Scan, deleted files are not allowed.
-        lazy val isAppendOnlyCandidate = deletedCnt == 0 && commonCnt > 0 &&
-          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
-
-        val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
-        if (isCandidate) {
-          entry.setTagValue(
-            relation.plan,
-            IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES,
-            commonBytes)
-
-          // If there is no change in source dataset, the index will be applied by
-          // transformPlanToUseIndexOnlyScan.
-          entry.setTagValue(
-            relation.plan,
-            IndexLogEntryTags.HYBRIDSCAN_REQUIRED,
-            !(commonCnt == entry.sourceFileInfoSet.size && commonCnt == inputSourceFiles.size))
-        }
-        isCandidate
+      if (isHybridScanCandidate) {
+        Some(entry)
+      } else {
+        None
       }
     }
 
@@ -152,20 +153,9 @@ object RuleUtils {
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
-      val inputSourceFiles = relation.allFiles.map { f =>
-        // For a given file, file id is only meaningful in the context of a given
-        // index. At this point, we do not know which index, if any, would be picked.
-        // Therefore, we simply set the file id to UNKNOWN_FILE_ID.
-        FileInfo(
-          f.getPath.toString,
-          f.getLen,
-          f.getModificationTime,
-          IndexConstants.UNKNOWN_FILE_ID)
-      }
       prepareHybridScanCandidateSelection(spark, relation.plan, indexes)
-      val totalSizeInBytes = inputSourceFiles.map(_.size).sum
-      indexes.filter(index =>
-        index.created && isHybridScanCandidate(index, inputSourceFiles, totalSizeInBytes))
+
+      indexes.filter(_.created).flatMap(getHybridScanCandidate)
     } else {
       indexes.filter(index => index.created && signatureValid(index))
     }

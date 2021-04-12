@@ -52,9 +52,9 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   }
 
   /**
-   * All the files that the current relation references to.
+   * FileStatus list for all source files that the current relation references to.
    */
-  override def allFiles: Seq[FileStatus] = plan.relation match {
+  override lazy val allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
       filesFromIndex(location)
   }
@@ -224,6 +224,8 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
    * Returns list of pairs of (file path, file id) to build lineage column.
    *
    * File paths should be the same format as "input_file_name()" of the given relation type.
+   * input_file_name() could be different depending on the OS and source.
+   *
    * For [[DefaultFileBasedRelation]], each file path should be in this format:
    *   `file:///path/to/file`
    *
@@ -231,7 +233,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
    * @return List of pairs of (file path, file id).
    */
   override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+    fileIdTracker.getFileToIdMapping.map { kv =>
       (kv._1._1.replace("file:/", "file:///"), kv._2)
     }
   }

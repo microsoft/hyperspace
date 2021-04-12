@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
+import com.microsoft.hyperspace.{BuildInfo, Hyperspace, HyperspaceException, SampleData, TestUtils}
 import com.microsoft.hyperspace.util.FileUtils
 
 class CreateIndexTest extends HyperspaceSuite with SQLHelper {
@@ -240,5 +240,14 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
 
       lineageValues.forall(lineageRange.contains(_))
     }
+  }
+
+  test("Verify that hyperspace version is written to the log entry.") {
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+    val logManager = TestUtils.logManager(systemPath, indexConfig1.indexName)
+    val logEntry = logManager.getLatestLog().get.asInstanceOf[IndexLogEntry]
+    val version = logEntry.properties.get(IndexConstants.HYPERSPACE_VERSION_PROPERTY)
+    assert(version.isDefined)
+    assert(version.get === BuildInfo.version)
   }
 }
