@@ -118,11 +118,13 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * @return True if the given project is a supported relation.
    */
   def hasNestedColumns(project: Project, index: IndexLogEntry): Boolean = {
-    val indexCols = index.indexedColumns ++ index.includedColumns
-    val hasNestedCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i)).exists(_.isNested)
+    val indexCols =
+      (index.indexedColumns ++ index.includedColumns).map(i => ResolverUtils.ResolvedColumn(i))
+    val hasNestedCols = indexCols.exists(_.isNested)
     if (hasNestedCols) {
-      val projectListFields = project.projectList.flatMap(extractNamesFromExpression)
-      val containsNestedFields = projectListFields.exists(i => indexCols.contains(i))
+      val projectListFields = project.projectList.flatMap(extractNamesFromExpression(_).toKeep)
+      val containsNestedFields =
+        projectListFields.exists(i => indexCols.exists(j => j.isNested && j.name == i))
       var containsNestedChildren = false
       project.child.foreach {
         case f: Filter =>
@@ -143,11 +145,13 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
    * @return True if the given project is a supported relation.
    */
   def hasNestedColumns(filter: Filter, index: IndexLogEntry): Boolean = {
-    val indexCols = index.indexedColumns ++ index.includedColumns
-    val hasNestedCols = indexCols.map(i => ResolverUtils.ResolvedColumn(i)).exists(_.isNested)
+    val indexCols =
+      (index.indexedColumns ++ index.includedColumns).map(i => ResolverUtils.ResolvedColumn(i))
+    val hasNestedCols = indexCols.exists(_.isNested)
     if (hasNestedCols) {
-      val filterFields = extractNamesFromExpression(filter.condition).toSeq
-      filterFields.exists(i => indexCols.contains(i))
+      val filterFields = extractNamesFromExpression(filter.condition).toKeep.toSeq
+      val resolvedFilterFields = filterFields.map(ResolverUtils.ResolvedColumn(_))
+      resolvedFilterFields.exists(i => indexCols.exists(j => j == i || j.name == i.name))
     } else {
       false
     }

@@ -135,8 +135,8 @@ object FilterIndexRule
           case (Some(resolvedOutputColumns), Some(resolvedFilterColumns)) =>
             val candidateIndexes = allIndexes.filter { index =>
               indexCoversPlan(
-                resolvedOutputColumns.map(_.name),
-                resolvedFilterColumns.map(_.name),
+                resolvedOutputColumns.map(_.normalizedName),
+                resolvedFilterColumns.map(_.normalizedName),
                 index.indexedColumns,
                 index.includedColumns)
             }
@@ -188,20 +188,35 @@ object ExtractFilterNode {
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
     case project @ Project(_, filter @ Filter(condition: Expression, ExtractRelation(relation)))
         if !RuleUtils.isIndexApplied(relation) =>
+      /**
+       * Due to the fact that there is a different way to get their full nested access path,
+       * we need to go through project columns and filter solumns to extract the columns
+       * that are required in the query to be part of the index in order to properly work.
+       *
+       * For example, given the following simple plan:
+       * {{{
+       *   Project [id#100, name#101, nested#102.nst.field2]
+       *   +- Filter (isnotnull(nested#102) && (nested#102.nst.field1 = wa1))
+       *      +- Relation[id#100,name#101,nested#102] parquet
+       * }}}
+       *
+       * It should be transformed to
+       * {{{
+       *   Project [id#1, name#2, __hs_nested.nested.nst.field2#3]
+       *   +- Filter (isnotnull(__hs_nested.nested.nst.field1#0) &&
+       *             (__hs_nested.nested.nst.field1#0 = wa1))
+       *      +- Relation[__hs_nested.nested.nst.field1#0,id#1,name#2,
+       *                  __hs_nested.nested.nst.field2#3]
+       *         Hyperspace(Type: CI, Name: idx_nested, LogVersion: 1)
+       *
+       * }}}
+       */
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
-        .map(extractNamesFromExpression)
+        .map(i => extractNamesFromExpression(i).toKeep)
         .flatMap(_.toSeq)
-      val filterColumnNames = extractNamesFromExpression(condition).toSeq
-        .sortBy(-_.length)
-        .foldLeft(Seq.empty[String]) { (acc, e) =>
-          if (!acc.exists(i => i.startsWith(e))) {
-            acc :+ e
-          } else {
-            acc
-          }
-        }
+      val filterColumnNames = extractNamesFromExpression(condition).toKeep.toSeq
 
       Some(project, filter, projectColumnNames, filterColumnNames)
 

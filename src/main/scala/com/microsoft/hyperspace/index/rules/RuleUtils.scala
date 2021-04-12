@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, ExprId, GetStructField, In, Literal, NamedExpression, Not}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, BinaryOperator, ExprId, GetStructField, In, IsNotNull, Literal, NamedExpression, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
@@ -272,16 +272,21 @@ object RuleUtils {
           new InMemoryFileIndex(spark, index.content.files, Map(), None)
         }
 
+        val newSchema = StructType(
+          index.schema.filter(i => relation.plan.schema.exists(j => i.name.contains(j.name))))
+
         val indexFsRelation = new IndexHadoopFsRelation(
           location,
           new StructType(),
-          StructType(index.schema.filter(relation.plan.schema.contains(_))),
+          StructType(newSchema),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val resolvedFields =
-          ResolverUtils.resolve(spark, index.indexedColumns ++ index.includedColumns, relation.plan)
+        val resolvedFields = ResolverUtils.resolve(
+          spark,
+          (index.indexedColumns ++ index.includedColumns).map(ResolverUtils.ResolvedColumn(_).name),
+          relation.plan)
         val updatedOutput =
           if (resolvedFields.isDefined && resolvedFields.get.exists(_.isNested)) {
             indexFsRelation.schema.flatMap { s =>
@@ -592,11 +597,11 @@ object RuleUtils {
 
   private def transformProject(project: Project): Project = {
     val projectedFields = project.projectList.map { exp =>
-      val fieldName = extractNamesFromExpression(exp).head
+      val fieldName = extractNamesFromExpression(exp).toKeep.head
       val escapedFieldName = PlanUtils.prefixNestedField(fieldName)
       val attr = extractAttributeRef(exp, fieldName)
       val fieldType = extractTypeFromExpression(exp, fieldName)
-      getExprId(project, escapedFieldName) match {
+      getExprId(project.child, escapedFieldName) match {
         case Some(exprId) =>
           attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
             exprId,
@@ -609,31 +614,42 @@ object RuleUtils {
   }
 
   private def transformFilter(filter: Filter): Filter = {
-    val fieldNames = extractNamesFromExpression(filter.condition)
-    var mutableFilter = filter
-    fieldNames.foreach { fieldName =>
-      val escapedFieldName = PlanUtils.prefixNestedField(fieldName)
-      getExprId(filter, escapedFieldName) match {
-        case Some(exprId) =>
-          val (parentExpresion, exp) =
-            extractSearchQuery(filter.condition, fieldName)
-          val fieldType = extractTypeFromExpression(exp, fieldName)
-          val attr = extractAttributeRef(exp, fieldName)
-          val newAttr = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
-            exprId,
-            attr.qualifier)
-          val newExp = exp match {
-            case _: GetStructField => newAttr
-            case other: Expression => other
+    val names = extractNamesFromExpression(filter.condition)
+    val transformedCondition = filter.condition.transformDown {
+      case bo @ BinaryOperator(IsNotNull(AttributeReference(name, _, _, _)), other) =>
+        if (names.toDiscard.contains(name)) {
+          other
+        } else {
+          bo
+        }
+      case bo @ BinaryOperator(other, IsNotNull(AttributeReference(name, _, _, _))) =>
+        if (names.toDiscard.contains(name)) {
+          other
+        } else {
+          bo
+        }
+      case g: GetStructField =>
+        val n = getChildNameFromStruct(g)
+        if (names.toKeep.contains(n)) {
+          val escapedFieldName = PlanUtils.prefixNestedField(n)
+          getExprId(filter, escapedFieldName) match {
+            case Some(exprId) =>
+              val fieldType = extractTypeFromExpression(g, n)
+              val attr = extractAttributeRef(g, n)
+              attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
+                exprId,
+                attr.qualifier
+              )
+            case _ =>
+              g
           }
-          val newParentExpression =
-            replaceExpression(parentExpresion, exp, newExp)
-          mutableFilter = filter.copy(condition = newParentExpression)
-        case _ =>
-          mutableFilter = filter
-      }
+        } else {
+          g
+        }
+      case o =>
+       o
     }
-    mutableFilter
+    filter.copy(condition = transformedCondition)
   }
 
   private def getExprId(plan: LogicalPlan, fieldName: String): Option[ExprId] = {

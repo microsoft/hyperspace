@@ -18,12 +18,14 @@ package com.microsoft.hyperspace.index.rules
 
 import scala.util.Try
 
-import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, Expression, GetStructField}
+import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, BinaryExpression, Expression, GetStructField, IsNotNull, UnaryExpression}
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.util.ResolverUtils
 
 object PlanUtils {
+
+  private[hyperspace] case class ExtractedNames(toKeep: Set[String], toDiscard: Set[String])
 
   /**
    * The method extract field names from a Spark Catalyst [[Expression]].
@@ -31,22 +33,44 @@ object PlanUtils {
    * @param exp The Spark Catalyst expression from which to extract names.
    * @return A set of distinct field names.
    */
-  def extractNamesFromExpression(exp: Expression): Set[String] = {
-    exp match {
-      case AttributeReference(name, _, _, _) =>
-        Set(s"$name")
-      case Alias(child, _) =>
-        extractNamesFromExpression(child)
-      case otherExp =>
-        otherExp.containsChild.flatMap {
-          case g: GetStructField =>
-            Some(s"${getChildNameFromStruct(g)}")
-          case e: Expression =>
-            Some(extractNamesFromExpression(e).filter(_.nonEmpty).mkString("."))
-          case _ =>
-            None
-        }
+  def extractNamesFromExpression(exp: Expression): ExtractedNames = {
+
+    def extractNames(
+        e: Expression,
+        prevExpStrTypes: Seq[String] = Seq.empty): Set[(String, Seq[String])] = {
+      e match {
+        case g: GetStructField =>
+          Set((s"${getChildNameFromStruct(g)}", prevExpStrTypes :+ "getStructField"))
+        case AttributeReference(name, _, _, _) =>
+          Set((s"$name", prevExpStrTypes :+ "attrRef"))
+        case Alias(child, _) =>
+          extractNames(child, prevExpStrTypes :+ "alias")
+        case b: BinaryExpression =>
+          val leftFields = extractNames(b.left, prevExpStrTypes :+ "binaryLeft")
+          val rightFields = extractNames(b.right, prevExpStrTypes :+ "binaryRight")
+          leftFields ++ rightFields
+        case u: IsNotNull =>
+          extractNames(u.child, prevExpStrTypes :+ "isNotNull")
+        case u: UnaryExpression =>
+          extractNames(u.child, prevExpStrTypes :+ "unary")
+        case _ =>
+          Set.empty[(String, Seq[String])]
+      }
     }
+
+    var toRemove = Seq.empty[String]
+    val toKeep = extractNames(exp).toSeq
+      .sortBy(-_._1.length)
+      .foldLeft(Seq.empty[String]) { (acc, e) =>
+        val (fieldName, expStrType) = e
+        if (expStrType.contains("isNotNull") && acc.exists(i => i.startsWith(fieldName))) {
+          toRemove :+= fieldName
+          acc
+        } else {
+          acc :+ fieldName
+        }
+      }
+    ExtractedNames(toKeep.toSet, toRemove.toSet)
   }
 
   /**
@@ -78,7 +102,7 @@ object PlanUtils {
    *         contains the given name.
    */
   def extractSearchQuery(exp: Expression, name: String): (Expression, Expression) = {
-    val splits = name.split(".")
+    val splits = name.split("\\.")
     val expFound = exp.find {
       case a: AttributeReference if splits.forall(s => a.name.contains(s)) => true
       case f: GetStructField if splits.forall(s => f.toString().contains(s)) => true
@@ -101,10 +125,7 @@ object PlanUtils {
    * @param repl The replacement Spark Catalyst [[Expression]].
    * @return A new Spark Catalyst [[Expression]].
    */
-  def replaceExpression(
-      parent: Expression,
-      needle: Expression,
-      repl: Expression): Expression = {
+  def replaceExpression(parent: Expression, needle: Expression, repl: Expression): Expression = {
     parent.mapChildren { c =>
       if (c == needle) {
         repl
@@ -123,7 +144,7 @@ object PlanUtils {
    * @return A Spark Catalyst [[AttributeReference]] pointing to the field name.
    */
   def extractAttributeRef(exp: Expression, name: String): AttributeReference = {
-    val splits = name.split(".")
+    val splits = name.split("\\.")
     val elem = exp.find {
       case a: AttributeReference if splits.contains(a.name) => true
       case _ => false
@@ -140,7 +161,7 @@ object PlanUtils {
    * @return A Spark SQL [[DataType]] of the given field name.
    */
   def extractTypeFromExpression(exp: Expression, name: String): DataType = {
-    val splits = name.split(".")
+    val splits = name.split("\\.")
     val elem = exp.flatMap {
       case a: AttributeReference =>
         if (splits.forall(s => a.name == s)) {

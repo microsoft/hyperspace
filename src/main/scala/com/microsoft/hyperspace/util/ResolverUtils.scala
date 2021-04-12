@@ -209,9 +209,11 @@ object ResolverUtils {
         extractColumnName(child) :+ name
       case _: GetArrayStructFields =>
         // TODO: Nested arrays will be supported later
+        // See https://github.com/microsoft/hyperspace/issues/372
         throw HyperspaceException("Array types are not supported.")
       case _: GetMapValue =>
         // TODO: Nested maps will be supported later
+        // See https://github.com/microsoft/hyperspace/issues/411
         throw HyperspaceException("Map types are not supported.")
       case Alias(nested: ExtractValue, _) =>
         extractColumnName(nested)
@@ -244,9 +246,11 @@ object ResolverUtils {
               name +: getColumnNameFromSchema(s, tail, resolver)
             case StructField(_, _: ArrayType, _, _) =>
               // TODO: Nested arrays will be supported later
+              // See https://github.com/microsoft/hyperspace/issues/372
               throw HyperspaceException("Array types are not supported.")
             case StructField(_, _: MapType, _, _) =>
               // TODO: Nested maps will be supported later
+              // See https://github.com/microsoft/hyperspace/issues/411
               throw HyperspaceException("Map types are not supported")
             case f => Seq(f.name)
           }

@@ -24,11 +24,10 @@ import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
+import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, SampleNestedData, TestConfig, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
-import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.PathUtils
 
@@ -117,6 +116,44 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         }
       }
     }
+  }
+
+  test(
+    "E2E test for filter query on nested columns") {
+      val loc = testDir + "samplenestedparquet"
+      val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks", "nested")
+      SampleNestedData.save(spark, loc, dataColumns)
+
+      Seq(true, false).foreach { enableLineage =>
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> enableLineage.toString) {
+          withIndex("filterNestedIndex") {
+            val df = spark.read.parquet(loc)
+            val indexConfig = IndexConfig("filterNestedIndex",
+              Seq("nested.leaf.id", "nested.leaf.cnt"), Seq("Date"))
+
+            hyperspace.createIndex(df, indexConfig)
+
+            def query(): DataFrame =
+              df.filter("nested.leaf.cnt > 10 and nested.leaf.id == 'leaf_id9'")
+                .select("Date", "nested.leaf.cnt", "nested.leaf.id")
+
+            verifyIndexUsage(query, getIndexFilesPath(indexConfig.indexName))
+
+            val res = query().collect().sortWith((r1, r2) => r1.getInt(1) < r2.getInt(1))
+
+            assert(res.length == 3)
+            assert(res(0).getString(0) == "2019-10-03")
+            assert(res(0).getInt(1) == 12)
+            assert(res(0).getString(2) == "leaf_id9")
+            assert(res(1).getString(0) == "2019-10-03")
+            assert(res(1).getInt(1) == 21)
+            assert(res(1).getString(2) == "leaf_id9")
+            assert(res(2).getString(0) == "2019-10-03")
+            assert(res(2).getInt(1) == 22)
+            assert(res(2).getString(2) == "leaf_id9")
+          }
+        }
+      }
   }
 
   test("E2E test for case insensitive filter query utilizing indexes.") {
