@@ -152,7 +152,7 @@ class IndexCollectionManager(
 
   private def indexLogManagers: Seq[IndexLogManager] = {
     val hadoopConf = spark.sessionState.newHadoopConf()
-    val rootPath = PathResolver(conf, hadoopConf).systemPath
+    val rootPath = PathResolver(conf, hadoopConf).indexLocationDir
     val fs = fileSystemFactory.create(rootPath, hadoopConf)
     val indexPaths: Seq[Path] = if (fs.exists(rootPath)) {
       fs.listStatus(rootPath).map(_.getPath)

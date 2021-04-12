@@ -25,7 +25,7 @@ object IndexConstants {
 
   // Config used for subdirectory name under the system path.
   val INDEX_DIR_NAME = "spark.hyperspace.system.indexDirName"
-  val INDEX_DIR_NAME_DEFAULT = "indexes"
+  val INDEX_DIR_NAME_DEFAULT = "hyperspace"
 
   // Config used to set the number of buckets for the index.
   val INDEX_NUM_BUCKETS_LEGACY = "spark.hyperspace.index.num.buckets"
