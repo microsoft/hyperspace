@@ -67,7 +67,7 @@ jobs:
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 package
+        - script: /tmp/sbt/bin/sbt ++2.12.8 package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
