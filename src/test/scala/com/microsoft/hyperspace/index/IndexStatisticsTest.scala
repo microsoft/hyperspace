@@ -62,8 +62,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test(
-    "index() on an index refreshed in incremental or quick mode returns correct result.") {
+  test("index() on an index refreshed in incremental or quick mode returns correct result.") {
     Seq("incremental", "quick").foreach { mode =>
       withTempPathAsString { testPath =>
         withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {

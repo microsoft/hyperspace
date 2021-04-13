@@ -68,7 +68,11 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
       dfFromSample.write.format("delta").save(dataPath)
 
       val deltaDf = spark.read.format("delta").load(dataPath)
-      hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+
+      // Enable lineage column for Hybrid Scan delete support to test time travel.
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        hyperspace.createIndex(deltaDf, IndexConfig("deltaIndex", Seq("clicks"), Seq("Query")))
+      }
 
       withIndex("deltaIndex") {
         def query(version: Option[Long] = None): DataFrame = {
@@ -102,7 +106,8 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
         // The index should not be applied for the version at index creation.
         assert(!isIndexUsed(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex"))
 
-        withSQLConf(TestConfig.HybridScanEnabledAppendOnly: _*) {
+        // Enable Hybrid Scan for time travel query validation.
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
           // The index should be applied for the updated version.
           assert(isIndexUsed(query(Some(0)).queryExecution.optimizedPlan, "deltaIndex/v__=0"))
         }
