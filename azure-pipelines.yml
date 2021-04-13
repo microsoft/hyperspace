@@ -17,17 +17,24 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 clean
+      # Use sbt 1.4.9. The default sbt launcher in ubuntu-18.04 20210405 image is
+      # 1.5.0, but the version has an issue to compile with 0.13.18.
+      # See: https://github.com/sbt/sbt/issues/6447
+      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.4.9/sbt-1.4.9.tgz"
+        displayName: 'Download sbt 1.4.9'
+      - script: tar zxf /tmp/sbt.tgz -C /tmp/
+        displayName: 'Extract sbt'
+      - script: /tmp/sbt//bin/sbt ++2.11.12 clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.11.12 update
+      - script: /tmp/sbt/bin/sbt ++2.11.12 update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.11.12 compile
+      - script: /tmp/sbt/bin/sbt ++2.11.12 compile
         displayName: 'Running $sbt compile'
-      - script: sbt ++2.11.12 test
+      - script: /tmp/sbt/bin/sbt ++2.11.12 test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.11.12 package
+        - script: /tmp/sbt/bin/sbt ++2.11.12 package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -46,17 +53,21 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 clean
+      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.4.9/sbt-1.4.9.tgz"
+        displayName: 'Download sbt 1.4.9'
+      - script: tar zxf /tmp/sbt.tgz -C /tmp/
+        displayName: 'Extract sbt'
+      - script: /tmp/sbt/bin/sbt ++2.12.8 clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.12.8 update
+      - script: /tmp/sbt/bin/sbt ++2.12.8 update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.12.8 compile
+      - script: /tmp/sbt/bin/sbt ++2.12.8 compile
         displayName: 'Running $sbt compile'
-      - script: sbt ++2.12.8 test
+      - script: /tmp/sbt/bin/sbt ++2.12.8 test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 package
+        - script: /tmp/sbt/bin/sbt ++2.12.8 package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -86,11 +97,15 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 clean
+      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.4.9/sbt-1.4.9.tgz"
+        displayName: 'Download sbt 1.4.9'
+      - script: tar zxf /tmp/sbt.tgz -C /tmp/
+        displayName: 'Extract sbt'
+      - script: /tmp/sbt/bin/sbt ++2.11.12 clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.11.12 update
+      - script: /tmp/sbt/bin/sbt ++2.11.12 update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.11.12 compile
+      - script: /tmp/sbt/bin/sbt ++2.11.12 compile
         displayName: 'Running $sbt compile'
       - task: Bash@3
         inputs:
