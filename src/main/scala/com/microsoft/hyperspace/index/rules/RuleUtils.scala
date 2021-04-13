@@ -278,35 +278,44 @@ object RuleUtils {
         val indexFsRelation = new IndexHadoopFsRelation(
           location,
           new StructType(),
-          StructType(newSchema),
+          newSchema,
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
         val resolvedFields = ResolverUtils.resolve(
           spark,
-          (index.indexedColumns ++ index.includedColumns).map(ResolverUtils.ResolvedColumn(_).name),
+          (index.indexedColumns ++ index.includedColumns)
+            .map(ResolverUtils.ResolvedColumn(_).name),
           relation.plan)
         val updatedOutput =
           if (resolvedFields.isDefined && resolvedFields.get.exists(_.isNested)) {
             indexFsRelation.schema.flatMap { s =>
-              relation.plan.output.find(a => s.name.contains(a.name)).map { a =>
-                AttributeReference(s.name, s.dataType, a.nullable, a.metadata)(
-                  NamedExpression.newExprId,
-                  a.qualifier)
-              }
+              relation.plan.output
+                .find { a =>
+                  ResolverUtils.ResolvedColumn(s.name).name.startsWith(a.name)
+                }
+                .map { a =>
+                  AttributeReference(s.name, s.dataType, a.nullable, a.metadata)(
+                    NamedExpression.newExprId,
+                    a.qualifier)
+                }
             }
           } else {
             relation.plan.output
-                .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
-                .map(_.asInstanceOf[AttributeReference])
+              .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+              .map(_.asInstanceOf[AttributeReference])
           }
         relation.createLogicalRelation(indexFsRelation, updatedOutput)
 
-      case p: Project if provider.hasNestedColumns(p, index) =>
+      // Given that the index may have top level field for a nested one
+      // it is needed to transform the projection to use that index field
+      case p: Project if hasNestedColumns(p, index) =>
         transformProject(p)
 
-      case f: Filter if provider.hasNestedColumns(f, index) =>
+      // Given that the index may have top level field for a nested one
+      // it is needed to transform the filter to use that index field
+      case f: Filter if hasNestedColumns(f, index) =>
         transformFilter(f)
     }
   }
@@ -595,12 +604,37 @@ object RuleUtils {
     shuffled
   }
 
-  private def transformProject(project: Project): Project = {
+  /**
+   * The method transforms the project part of a plan to support indexes on
+   * nested fields.
+   *
+   * For example, given the following query:
+   * {{{
+   *   df
+   *     .filter("nested.leaf.cnt > 10 and nested.leaf.id == 'leaf_id9'")
+   *     .select("Date", "nested.leaf.cnt")
+   * }}}
+   *
+   * Having this simple projection:
+   * {{{
+   *   Project [Date#100, nested#102.leaf.cnt]
+   * }}}
+   *
+   * The projection part should become:
+   * {{{
+   *   Project [Date#330, __hs_nested.nested.leaf.cnt#335]
+   * }}}
+   *
+   * @param project The project that needs to be transformed.
+   * @return The transformed project with support for nested indexed fields.
+   */
+  private[rules] def transformProject(project: Project): Project = {
     val projectedFields = project.projectList.map { exp =>
       val fieldName = extractNamesFromExpression(exp).toKeep.head
       val escapedFieldName = PlanUtils.prefixNestedField(fieldName)
       val attr = extractAttributeRef(exp, fieldName)
       val fieldType = extractTypeFromExpression(exp, fieldName)
+      // Try to find it in the project transformed child.
       getExprId(project.child, escapedFieldName) match {
         case Some(exprId) =>
           attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
@@ -613,7 +647,38 @@ object RuleUtils {
     project.copy(projectList = projectedFields)
   }
 
-  private def transformFilter(filter: Filter): Filter = {
+  /**
+   * The method transforms the filter part of a plan to support indexes on
+   * nested fields. The process is to go through all expression nodes and
+   * do the following things:
+   *  - Replace retrieval of nested values with index ones.
+   *  - In some specific cases remove the `isnotnull` check because that
+   *    is used on the root of the nested field (ie: `isnotnull(nested#102)`
+   *    does not makes any sense when using the index field).
+   *
+   * For example, given the following query:
+   * {{{
+   *   df
+   *     .filter("nested.leaf.cnt > 10 and nested.leaf.id == 'leaf_id9'")
+   *     .select("Date", "nested.leaf.cnt")
+   * }}}
+   *
+   * Having this simple filter:
+   * {{{
+   *   Filter (isnotnull(nested#102) && (nested#102.leaf.cnt > 10) &&
+   *           (nested#102.leaf.id = leaf_id9))
+   * }}}
+   *
+   * The filter part should become:
+   * {{{
+   *   Filter ((__hs_nested.nested.leaf.cnt#335 > 10) &&
+   *           (__hs_nested.nested#.leaf.id#336 = leaf_id9))
+   * }}}
+   *
+   * @param filter The filter that needs to be transformed.
+   * @return The transformed filter with support for nested indexed fields.
+   */
+  private[rules] def transformFilter(filter: Filter): Filter = {
     val names = extractNamesFromExpression(filter.condition)
     val transformedCondition = filter.condition.transformDown {
       case bo @ BinaryOperator(IsNotNull(AttributeReference(name, _, _, _)), other) =>
@@ -638,8 +703,7 @@ object RuleUtils {
               val attr = extractAttributeRef(g, n)
               attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
                 exprId,
-                attr.qualifier
-              )
+                attr.qualifier)
             case _ =>
               g
           }
@@ -647,12 +711,69 @@ object RuleUtils {
           g
         }
       case o =>
-       o
+        o
     }
     filter.copy(condition = transformedCondition)
   }
 
-  private def getExprId(plan: LogicalPlan, fieldName: String): Option[ExprId] = {
+  /**
+   * The method retrieves the expression id for a given field name.
+   *
+   * This method should be mainly used when transforming plans and the
+   * leaves are already transformed.
+   *
+   * @param plan The logical plan from which to get the expression id.
+   * @param fieldName The name of the field to search for.
+   * @return An [[ExprId]] if that could be found in the plan otherwise [[None]].
+   */
+  private[rules] def getExprId(plan: LogicalPlan, fieldName: String): Option[ExprId] = {
     plan.output.find(a => a.name.equalsIgnoreCase(fieldName)).map(_.exprId)
+  }
+
+  /**
+   * Returns true if the given project is a supported project. If all of the registered
+   * providers return None, this returns false.
+   *
+   * @param project Project to check if it's supported.
+   * @return True if the given project is a supported relation.
+   */
+  private[rules] def hasNestedColumns(project: Project, index: IndexLogEntry): Boolean = {
+    val indexCols =
+      (index.indexedColumns ++ index.includedColumns).map(i => ResolverUtils.ResolvedColumn(i))
+    val hasNestedCols = indexCols.exists(_.isNested)
+    if (hasNestedCols) {
+      val projectListFields = project.projectList.flatMap(extractNamesFromExpression(_).toKeep)
+      val containsNestedFields =
+        projectListFields.exists(i => indexCols.exists(j => j.isNested && j.name == i))
+      var containsNestedChildren = false
+      project.child.foreach {
+        case f: Filter =>
+          val filterSupported = hasNestedColumns(f, index)
+          containsNestedChildren = containsNestedChildren || filterSupported
+        case _ =>
+      }
+      containsNestedFields || containsNestedChildren
+    } else {
+      false
+    }
+  }
+
+  /**
+   * Returns true if the given filter has nested columns.
+   *
+   * @param filter Filter to check if it's supported.
+   * @return True if the given project is a supported relation.
+   */
+  private[rules] def hasNestedColumns(filter: Filter, index: IndexLogEntry): Boolean = {
+    val indexCols =
+      (index.indexedColumns ++ index.includedColumns).map(i => ResolverUtils.ResolvedColumn(i))
+    val hasNestedCols = indexCols.exists(_.isNested)
+    if (hasNestedCols) {
+      val filterFields = extractNamesFromExpression(filter.condition).toKeep.toSeq
+      val resolvedFilterFields = filterFields.map(ResolverUtils.ResolvedColumn(_))
+      resolvedFilterFields.exists(i => indexCols.exists(j => j == i || j.name == i.name))
+    } else {
+      false
+    }
   }
 }

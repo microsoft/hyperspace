@@ -111,53 +111,6 @@ class FileBasedSourceProviderManager(spark: SparkSession) {
   }
 
   /**
-   * Returns true if the given project is a supported project. If all of the registered
-   * providers return None, this returns false.
-   *
-   * @param project Project to check if it's supported.
-   * @return True if the given project is a supported relation.
-   */
-  def hasNestedColumns(project: Project, index: IndexLogEntry): Boolean = {
-    val indexCols =
-      (index.indexedColumns ++ index.includedColumns).map(i => ResolverUtils.ResolvedColumn(i))
-    val hasNestedCols = indexCols.exists(_.isNested)
-    if (hasNestedCols) {
-      val projectListFields = project.projectList.flatMap(extractNamesFromExpression(_).toKeep)
-      val containsNestedFields =
-        projectListFields.exists(i => indexCols.exists(j => j.isNested && j.name == i))
-      var containsNestedChildren = false
-      project.child.foreach {
-        case f: Filter =>
-          val filterSupported = hasNestedColumns(f, index)
-          containsNestedChildren = containsNestedChildren || filterSupported
-        case _ =>
-      }
-      containsNestedFields || containsNestedChildren
-    } else {
-      false
-    }
-  }
-
-  /**
-   * Returns true if the given filter has nested columns.
-   *
-   * @param filter Filter to check if it's supported.
-   * @return True if the given project is a supported relation.
-   */
-  def hasNestedColumns(filter: Filter, index: IndexLogEntry): Boolean = {
-    val indexCols =
-      (index.indexedColumns ++ index.includedColumns).map(i => ResolverUtils.ResolvedColumn(i))
-    val hasNestedCols = indexCols.exists(_.isNested)
-    if (hasNestedCols) {
-      val filterFields = extractNamesFromExpression(filter.condition).toKeep.toSeq
-      val resolvedFilterFields = filterFields.map(ResolverUtils.ResolvedColumn(_))
-      resolvedFilterFields.exists(i => indexCols.exists(j => j == i || j.name == i.name))
-    } else {
-      false
-    }
-  }
-
-  /**
    * Runs the given function 'f', which executes a [[FileBasedSourceProvider]]'s API that returns
    * [[Option]] for each provider built. This function ensures that only one provider returns
    * [[Some]] when 'f' is executed. If all of the providers return None, it will return the given

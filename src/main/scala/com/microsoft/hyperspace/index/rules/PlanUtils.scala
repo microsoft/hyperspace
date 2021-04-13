@@ -146,7 +146,7 @@ object PlanUtils {
   def extractAttributeRef(exp: Expression, name: String): AttributeReference = {
     val splits = name.split("\\.")
     val elem = exp.find {
-      case a: AttributeReference if splits.contains(a.name) => true
+      case a: AttributeReference if name == a.name || splits.contains(a.name) => true
       case _ => false
     }
     elem.get.asInstanceOf[AttributeReference]
