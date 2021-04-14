@@ -94,14 +94,14 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
           // Validate only index records whose lineage is the deleted file are removed.
           val originalIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
-              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")
           val originalIndexWithoutDeletedFile = originalIndexDF
-              .filter(s"""${IndexConstants.DATA_FILE_NAME_ID} != ${fileId.get}""")
+            .filter(s"""${IndexConstants.DATA_FILE_NAME_ID} != ${fileId.get}""")
 
           hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL)
 
           val refreshedIndexDF = spark.read.parquet(s"$systemPath/${indexConfig.indexName}/" +
-              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
 
           checkAnswer(originalIndexWithoutDeletedFile, refreshedIndexDF)
         }
@@ -111,7 +111,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate incremental refresh index (to handle deletes from the source data) " +
-        "fails as expected on an index without lineage.") {
+      "fails as expected on an index without lineage.") {
     SampleNestedData.save(
       spark,
       nonPartitionedDataPath,
@@ -127,13 +127,13 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
         hyperspace.refreshIndex(indexConfig.indexName, REFRESH_MODE_INCREMENTAL))
       assert(
         ex.getMessage.contains(s"Index refresh (to handle deleted source data) is " +
-            "only supported on an index with lineage."))
+          "only supported on an index with lineage."))
     }
   }
 
   test(
     "Validate incremental refresh index is a no-op if no source data file is deleted or " +
-        "appended.") {
+      "appended.") {
     SampleNestedData.save(
       spark,
       nonPartitionedDataPath,
@@ -153,8 +153,8 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
       // Check emitted events.
       MockEventLogger.emittedEvents match {
         case Seq(
-        RefreshIncrementalActionEvent(_, _, "Operation started."),
-        RefreshIncrementalActionEvent(_, _, msg)) =>
+            RefreshIncrementalActionEvent(_, _, "Operation started."),
+            RefreshIncrementalActionEvent(_, _, msg)) =>
           assert(msg.contains("Refresh incremental aborted as no source data change found."))
         case _ => fail()
       }
@@ -163,7 +163,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate incremental refresh index (to handle deletes from the source data) " +
-        "fails as expected when all source data files are deleted.") {
+      "fails as expected when all source data files are deleted.") {
     Seq(true, false).foreach { deleteDataFolder =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         SampleNestedData.save(
@@ -184,9 +184,9 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
         } else {
           val dataPath = new Path(nonPartitionedDataPath, "*parquet")
           dataPath
-              .getFileSystem(new Configuration)
-              .globStatus(dataPath)
-              .foreach(p => FileUtils.delete(p.getPath))
+            .getFileSystem(new Configuration)
+            .globStatus(dataPath)
+            .foreach(p => FileUtils.delete(p.getPath))
 
           val ex =
             intercept[HyperspaceException](
@@ -201,7 +201,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate incremental refresh index (to handle deletes from the source data) " +
-        "works well when file info for an existing source data file changes.") {
+      "works well when file info for an existing source data file changes.") {
     SampleNestedData.save(
       spark,
       nonPartitionedDataPath,
@@ -230,7 +230,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
       spark,
       IndexLogManagerFactoryImpl.create(indexPath),
       IndexDataManagerFactoryImpl.create(indexPath))
-        .run()
+      .run()
 
     {
       // Check the index log entry after RefreshIncrementalAction.
@@ -253,7 +253,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
       spark,
       IndexLogManagerFactoryImpl.create(indexPath),
       IndexDataManagerFactoryImpl.create(indexPath))
-        .run()
+      .run()
 
     {
       // Check non-empty deletedFiles after RefreshIncrementalAction.
@@ -270,11 +270,13 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate RefreshIncrementalAction updates appended and deleted files in metadata " +
-        "as expected, when some file gets deleted and some appended to source data.") {
+      "as expected, when some file gets deleted and some appended to source data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
-          SampleNestedData.save(spark, testPath,
+          SampleNestedData.save(
+            spark,
+            testPath,
             Seq("Date", "RGUID", "Query", "imprs", "clicks", "nested"))
           val df = spark.read.parquet(testPath)
           hyperspace.createIndex(df, indexConfig)
@@ -287,18 +289,18 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
           // Add some new data to source.
           import spark.implicits._
           SampleNestedData.testData
-              .take(3)
-              .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
-              .write
-              .mode("append")
-              .parquet(testPath)
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
+            .write
+            .mode("append")
+            .parquet(testPath)
 
           val indexPath = PathUtils.makeAbsolute(s"$systemPath/${indexConfig.indexName}")
           new RefreshIncrementalAction(
             spark,
             IndexLogManagerFactoryImpl.create(indexPath),
             IndexDataManagerFactoryImpl.create(indexPath))
-              .run()
+            .run()
 
           // Verify "appendedFiles" is cleared and "deletedFiles" is updated after refresh.
           val indexLogEntry = getLatestStableLog(indexConfig.indexName)
@@ -319,12 +321,14 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate incremental refresh index when some file gets deleted and some appended to " +
-        "source data.") {
+      "source data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
           // Save test data non-partitioned.
-          SampleNestedData.save(spark, testPath,
+          SampleNestedData.save(
+            spark,
+            testPath,
             Seq("Date", "RGUID", "Query", "imprs", "clicks", "nested"))
           val df = spark.read.parquet(testPath)
           hyperspace.createIndex(df, indexConfig)
@@ -338,11 +342,11 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
           // Add some new data to source.
           import spark.implicits._
           SampleNestedData.testData
-              .take(3)
-              .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
-              .write
-              .mode("append")
-              .parquet(testPath)
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
+            .write
+            .mode("append")
+            .parquet(testPath)
 
           val countAfterAppend = spark.read.parquet(testPath).count()
           assert(countAfterDelete + 3 == countAfterAppend)
@@ -351,8 +355,8 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
           // Check if refreshed index is updated appropriately.
           val indexDf = spark.read
-              .parquet(s"$systemPath/${indexConfig.indexName}/" +
-                  s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
+            .parquet(s"$systemPath/${indexConfig.indexName}/" +
+              s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=1")
 
           assert(indexDf.count() == countAfterAppend)
         }
@@ -362,9 +366,11 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate the configs for incremental index data is consistent with" +
-        "the previous version.") {
+      "the previous version.") {
     withTempPathAsString { testPath =>
-      SampleNestedData.save(spark, testPath,
+      SampleNestedData.save(
+        spark,
+        testPath,
         Seq("Date", "RGUID", "Query", "imprs", "clicks", "nested"))
       val df = spark.read.parquet(testPath)
 
@@ -377,11 +383,11 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
       // Add some new data to source.
       import spark.implicits._
       SampleNestedData.testData
-          .take(3)
-          .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
-          .write
-          .mode("append")
-          .parquet(testPath)
+        .take(3)
+        .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
+        .write
+        .mode("append")
+        .parquet(testPath)
 
       withSQLConf(
         IndexConstants.INDEX_LINEAGE_ENABLED -> "true",
@@ -397,11 +403,13 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   test(
     "Validate RefreshQuickAction updates appended and deleted files in metadata " +
-        "as expected, when some file gets deleted and some appended to source data.") {
+      "as expected, when some file gets deleted and some appended to source data.") {
     withTempPathAsString { testPath =>
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         withIndex(indexConfig.indexName) {
-          SampleNestedData.save(spark, testPath,
+          SampleNestedData.save(
+            spark,
+            testPath,
             Seq("Date", "RGUID", "Query", "imprs", "clicks", "nested"))
           val df = spark.read.parquet(testPath)
           hyperspace.createIndex(df, indexConfig)
@@ -414,11 +422,11 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
           // Add some new data to source.
           import spark.implicits._
           SampleNestedData.testData
-              .take(3)
-              .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
-              .write
-              .mode("append")
-              .parquet(testPath)
+            .take(3)
+            .toDF("Date", "RGUID", "Query", "imprs", "clicks", "nested")
+            .write
+            .mode("append")
+            .parquet(testPath)
 
           val prevIndexLogEntry = getLatestStableLog(indexConfig.indexName)
 
@@ -427,7 +435,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
             spark,
             IndexLogManagerFactoryImpl.create(indexPath),
             IndexDataManagerFactoryImpl.create(indexPath))
-              .run()
+            .run()
 
           val indexLogEntry = getLatestStableLog(indexConfig.indexName)
           val latestFiles = listFiles(testPath, getFileIdTracker(systemPath, indexConfig)).toSet
@@ -443,14 +451,14 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
           assert(indexLogEntry.sourceUpdate.isDefined)
           assert(
             indexLogEntry.source.plan.properties.fingerprint.properties.signatures.head.value
-                == expectedLatestSignature)
+              == expectedLatestSignature)
           assert(indexLogEntry.appendedFiles === expectedAppendedFiles)
           assert(indexLogEntry.deletedFiles === expectedDeletedFiles)
 
           // Check index data files and source data files are not updated.
           assert(
             indexLogEntry.relations.head.data.properties.content.fileInfos
-                === prevIndexLogEntry.relations.head.data.properties.content.fileInfos)
+              === prevIndexLogEntry.relations.head.data.properties.content.fileInfos)
           assert(indexLogEntry.content.fileInfos === prevIndexLogEntry.content.fileInfos)
         }
       }
@@ -473,9 +481,9 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
     val absolutePath = PathUtils.makeAbsolute(path)
     val fs = absolutePath.getFileSystem(new Configuration)
     fs.listStatus(absolutePath)
-        .toSeq
-        .filter(f => DataPathFilter.accept(f.getPath))
-        .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
+      .toSeq
+      .filter(f => DataPathFilter.accept(f.getPath))
+      .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
   }
 
   private def getLatestStableLog(indexName: String): IndexLogEntry = {
@@ -490,7 +498,7 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
       version: Int,
       allowEmpty: Boolean = false) = {
     val cnt = entry.content.fileInfos
-        .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version"))
+      .count(_.name.contains(s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version"))
     assert(allowEmpty || cnt > 0)
     cnt
   }

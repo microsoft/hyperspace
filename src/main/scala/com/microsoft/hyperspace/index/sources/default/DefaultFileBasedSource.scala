@@ -18,13 +18,13 @@ package com.microsoft.hyperspace.index.sources.default
 
 import java.util.Locale
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.sources.DataSourceRegister
 
 import com.microsoft.hyperspace.index.Relation
-import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
+import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedRelationMetadata, FileBasedSourceProvider, SourceProvider, SourceProviderBuilder}
 import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
 
 /**
@@ -66,37 +66,6 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
   }
 
   /**
-   * Given a [[Relation]], returns a new [[Relation]] that will have the latest source.
-   *
-   * @param relation [[Relation]] object to reconstruct [[DataFrame]] with.
-   * @return [[Relation]] object if the given 'relation' can be processed by this provider.
-   *         Otherwise, None.
-   */
-  override def refreshRelationMetadata(relation: Relation): Option[Relation] = {
-    if (isSupportedFileFormatName(relation.fileFormat)) {
-      // No change is needed because rootPaths will be pointing to the latest source files.
-      Some(relation)
-    } else {
-      None
-    }
-  }
-
-  /**
-   * Returns a file format name to read internal data files for a given [[Relation]].
-   *
-   * @param relation [[Relation]] object to read internal data files.
-   * @return File format to read internal data files.
-   */
-  override def internalFileFormatName(relation: Relation): Option[String] = {
-    if (isSupportedFileFormatName(relation.fileFormat)) {
-      // Same as original file format.
-      Some(relation.fileFormat)
-    } else {
-      None
-    }
-  }
-
-  /**
    * Returns true if the given logical plan is a supported relation.
    *
    * @param plan Logical plan to check if it's supported.
@@ -119,28 +88,25 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @param plan Logical plan to wrap to [[FileBasedRelation]]
    * @return [[FileBasedRelation]] that wraps the given logical plan.
    */
-  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = plan match {
-    case l @ LogicalRelation(
-          HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, fileFormat, _),
-          _,
-          _,
-          _) if isSupportedFileFormat(fileFormat) =>
-      Some(new DefaultFileBasedRelation(spark, l))
-    case _ => None
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
+    if (isSupportedRelation(plan).contains(true)) {
+      Some(new DefaultFileBasedRelation(spark, plan.asInstanceOf[LogicalRelation]))
+    } else {
+      None
+    }
   }
 
-  /**
-   * Returns enriched index properties.
-   *
-   * @param relation Relation to retrieve necessary information.
-   * @param properties Index properties to enrich.
-   * @return Updated index properties for index creation or refresh.
-   */
-  override def enrichIndexProperties(
-      relation: Relation,
-      properties: Map[String, String]): Option[Map[String, String]] = {
-    if (isSupportedFileFormatName(relation.fileFormat)) {
-      Some(properties)
+  override def isSupportedRelationMetadata(metadata: Relation): Option[Boolean] = {
+    if (isSupportedFileFormatName(metadata.fileFormat)) {
+      Some(true)
+    } else {
+      None
+    }
+  }
+
+  override def getRelationMetadata(metadata: Relation): Option[FileBasedRelationMetadata] = {
+    if (isSupportedRelationMetadata(metadata).contains(true)) {
+      Some(new DefaultFileBasedRelationMetadata(metadata))
     } else {
       None
     }
