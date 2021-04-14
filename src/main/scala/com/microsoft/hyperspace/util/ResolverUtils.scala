@@ -17,8 +17,8 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.{Column, SparkSession}
-import org.apache.spark.sql.catalyst.analysis.Resolver
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Expression, ExtractValue, GetArrayStructFields, GetMapValue, GetStructField}
+import org.apache.spark.sql.catalyst.analysis.{Resolver, UnresolvedAttribute}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Expression, ExtractValue, GetArrayStructFields, GetMapValue, GetStructField, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, MapType, StructField, StructType}
@@ -198,6 +198,14 @@ object ResolverUtils {
       plan: LogicalPlan,
       resolver: Resolver): Option[Expression] = {
     plan.resolveQuoted(fieldName, resolver)
+  }
+
+  // The resolve children approach for resolving filter field names.
+  protected[hyperspace] def resolveWithChildren(
+      fieldName: String,
+      plan: LogicalPlan,
+      resolver: Resolver): Option[NamedExpression] = {
+    plan.resolveChildren(UnresolvedAttribute.parseAttributeName(fieldName), resolver)
   }
 
   // Extracts the parts of a nested field access path from an expression.

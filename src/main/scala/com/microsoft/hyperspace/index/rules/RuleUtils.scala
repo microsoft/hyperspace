@@ -341,7 +341,7 @@ object RuleUtils {
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
-    var unhandledAppendedFiles: Seq[Path] = Nil
+    var unhandledAppendedFiles = Seq.empty[Path]
     // Get transformed plan with index data and appended files if applicable.
     val indexPlan = plan transformUp {
       // Use transformUp here as currently one relation is allowed (pre-requisite).
@@ -379,8 +379,12 @@ object RuleUtils {
           }
 
         val filesToRead = {
+          val resolvedFields =
+            (index.indexedColumns ++ index.includedColumns).map(ResolverUtils.ResolvedColumn(_))
+          val hasNestedFields = resolvedFields.exists(_.isNested)
+
           if (useBucketSpec || !index.hasParquetAsSourceFormat || filesDeleted.nonEmpty ||
-              relation.partitionSchema.nonEmpty) {
+              relation.partitionSchema.nonEmpty || hasNestedFields) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -404,10 +408,18 @@ object RuleUtils {
         // In order to handle deleted files, read index data with the lineage column so that
         // we could inject Filter-Not-In conditions on the lineage column to exclude the indexed
         // rows from the deleted files.
-        val newSchema = StructType(
-          index.schema.filter(s =>
-            relation.plan.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
-              IndexConstants.DATA_FILE_NAME_ID))))
+        val newSchema = StructType(index.schema.filter { s =>
+          val woPrefix = ResolverUtils.ResolvedColumn(s.name).name
+          val resolved = ResolverUtils
+            .resolve(
+              spark,
+              Seq(woPrefix),
+              plan,
+              ResolverUtils.resolveWithChildren,
+              throwIfNotInSchema = false)
+          resolved.isDefined || (filesDeleted.nonEmpty && s.name.equals(
+            IndexConstants.DATA_FILE_NAME_ID))
+        })
 
         def fileIndex: InMemoryFileIndex = {
           new InMemoryFileIndex(spark, filesToRead, Map(), None)
@@ -427,9 +439,29 @@ object RuleUtils {
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput = relation.plan.output
-          .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
-          .map(_.asInstanceOf[AttributeReference])
+        val resolvedFields = ResolverUtils.resolve(
+          spark,
+          (index.indexedColumns ++ index.includedColumns)
+            .map(ResolverUtils.ResolvedColumn(_).name),
+          relation.plan)
+        val updatedOutput =
+          if (resolvedFields.isDefined && resolvedFields.get.exists(_.isNested)) {
+            indexFsRelation.schema.flatMap { s =>
+              relation.plan.output
+                .find { a =>
+                  ResolverUtils.ResolvedColumn(s.name).name.startsWith(a.name)
+                }
+                .map { a =>
+                  AttributeReference(s.name, s.dataType, a.nullable, a.metadata)(
+                    NamedExpression.newExprId,
+                    a.qualifier)
+                }
+            }
+          } else {
+            relation.plan.output
+              .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
+              .map(_.asInstanceOf[AttributeReference])
+          }
 
         if (filesDeleted.isEmpty) {
           relation.createLogicalRelation(indexFsRelation, updatedOutput)
@@ -441,6 +473,13 @@ object RuleUtils {
           val filterForDeleted = Filter(Not(In(lineageAttr, deletedFileIds)), rel)
           Project(updatedOutput, OptimizeIn(filterForDeleted))
         }
+
+      case p: Project if hasNestedColumns(p, index) =>
+        transformProject(p)
+
+      case f: Filter if hasNestedColumns(f, index) =>
+        transformFilter(f)
+
     }
 
     if (unhandledAppendedFiles.nonEmpty) {
@@ -514,11 +553,17 @@ object RuleUtils {
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
         val partitionColumns = relation.partitionSchema.map(_.name)
-        val updatedSchema = StructType(relation.plan.schema.filter(col =>
-          index.schema.contains(col) || relation.partitionSchema.contains(col)))
+        val updatedSchema = StructType(relation.plan.schema.filter { col =>
+          index.schema.exists { i =>
+            ResolverUtils.ResolvedColumn(i.name).name.startsWith(col.name)
+          } || relation.partitionSchema.contains(col)
+        })
         val updatedOutput = relation.plan.output
-          .filter(attr =>
-            index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+          .filter { attr =>
+            index.schema.fieldNames.exists { i =>
+              ResolverUtils.ResolvedColumn(i).name.startsWith(attr.name)
+            } || partitionColumns.contains(attr.name)
+          }
           .map(_.asInstanceOf[AttributeReference])
         val newRelation = relation.createHadoopFsRelation(
           newLocation,
