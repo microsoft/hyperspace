@@ -27,10 +27,9 @@ import com.microsoft.hyperspace.{BuildInfo, Hyperspace, HyperspaceException, Sam
 import com.microsoft.hyperspace.util.FileUtils
 
 class CreateIndexTest extends HyperspaceSuite with SQLHelper {
-  override val systemPath = new Path("src/test/resources/indexLocation")
-  private val testDir = "src/test/resources/createIndexTests/"
-  private val nonPartitionedDataPath = testDir + "sampleparquet"
-  private val partitionedDataPath = testDir + "samplepartitionedparquet"
+  private val testDir = inTempDir("createIndexTests")
+  private val nonPartitionedDataPath = testDir + "/sampleparquet"
+  private val partitionedDataPath = testDir + "/samplepartitionedparquet"
   private val partitionKeys = Seq("Date", "Query")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))

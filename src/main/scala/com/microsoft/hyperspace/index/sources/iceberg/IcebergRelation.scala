@@ -16,65 +16,54 @@
 
 package com.microsoft.hyperspace.index.sources.iceberg
 
-import java.util.Locale
-
 import collection.JavaConverters._
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.iceberg.{FileScanTask, Schema, Table}
-import org.apache.iceberg.catalog.TableIdentifier
-import org.apache.iceberg.hadoop.HadoopTables
-import org.apache.iceberg.hive.HiveCatalogs
 import org.apache.iceberg.spark.SparkSchemaUtil
-import org.apache.iceberg.spark.source.IcebergSource
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
-import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation, PartitioningAwareFileIndex}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
-import org.apache.spark.sql.sources.v2.DataSourceOptions
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.index.{Content, FileIdTracker, FileInfo, Hdfs, IndexConstants, Relation}
+import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
 
 /**
  * Implementation for file-based relation used by [[IcebergFileBasedSource]]
  */
-class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relation)
+class IcebergRelation(
+    spark: SparkSession,
+    table: Table,
+    snapshotId: Option[Long],
+    override val plan: LogicalPlan)
     extends FileBasedRelation {
 
   /**
    * Computes the signature of the current relation.
    */
-  override def signature: String = plan.source match {
-    case _: IcebergSource =>
-      val table = loadIcebergTable
-      val snapshotId = plan.options.getOrElse("snapshot-id", table.currentSnapshot().snapshotId())
-      snapshotId + table.location()
+  override def signature: String = {
+    snapshotId.getOrElse(table.currentSnapshot().snapshotId()).toString + table.location()
   }
 
   /**
    * All the files that the current Iceberg table uses for read.
    */
-  override lazy val allFiles: Seq[FileStatus] = plan.source match {
-    case _: IcebergSource =>
-      loadIcebergTable.newScan().planFiles().iterator().asScala.toSeq.map(toFileStatus)
+  override lazy val allFiles: Seq[FileStatus] = {
+    table.newScan().planFiles().iterator().asScala.toSeq.map(toFileStatus)
   }
 
   /**
    * The optional partition base path of the current relation.
    */
-  override def partitionBasePath: Option[String] = plan.source match {
-    case _: IcebergSource =>
-      val table = loadIcebergTable
-      if (table.spec().isUnpartitioned) {
-        None
-      } else {
-        Some(
-          PathUtils.makeAbsolute(table.location(), spark.sessionState.newHadoopConf()).toString)
-      }
-    case _ => None
+  override def partitionBasePath: Option[String] = {
+    if (table.spec().isUnpartitioned) {
+      None
+    } else {
+      Some(PathUtils.makeAbsolute(table.location(), spark.sessionState.newHadoopConf()).toString)
+    }
   }
 
   /**
@@ -84,33 +73,28 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
    * @return [[Relation]] object that describes the current relation.
    */
   override def createRelationMetadata(fileIdTracker: FileIdTracker): Relation = {
-    plan.source match {
-      case source: IcebergSource =>
-        val dsOpts = new DataSourceOptions(plan.options.asJava)
-        val table = loadIcebergTable
-        val reader = source.createReader(dsOpts)
-        val files = allFiles
+    val files = allFiles
 
-        val sourceDataProperties =
-          Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
-        val fileFormatName = "iceberg"
-        val currentSnapshot = table.currentSnapshot()
-        val basePathOpt = partitionBasePath.map(p => Map("basePath" -> p)).getOrElse(Map.empty)
-        val opts = plan.options - "path" +
-          ("snapshot-id" -> currentSnapshot.snapshotId().toString) +
-          ("as-of-timestamp" -> currentSnapshot.timestampMillis().toString) ++
-          basePathOpt
+    val sourceDataProperties =
+      Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)
+    val fileFormatName = "iceberg"
+    val currentSnapshot = table.currentSnapshot()
+    val basePathOpt =
+      partitionBasePath.map(p => Map("basePath" -> p)).getOrElse(Map.empty)
+    val opts = Map(
+      "snapshot-id" -> currentSnapshot.snapshotId().toString,
+      "as-of-timestamp" -> currentSnapshot.timestampMillis().toString) ++
+      basePathOpt
 
-        Relation(
-          Seq(
-            PathUtils
-              .makeAbsolute(table.location(), spark.sessionState.newHadoopConf())
-              .toString),
-          Hdfs(sourceDataProperties),
-          reader.readSchema().json,
-          fileFormatName,
-          opts)
-    }
+    Relation(
+      Seq(
+        PathUtils
+          .makeAbsolute(table.location(), spark.sessionState.newHadoopConf())
+          .toString),
+      Hdfs(sourceDataProperties),
+      SparkSchemaUtil.convert(table.schema).json,
+      fileFormatName,
+      opts)
   }
 
   /**
@@ -153,19 +137,17 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
   /**
    * Options of the current relation.
    */
-  override def options: Map[String, String] = plan.options
+  override def options: Map[String, String] = Map[String, String]()
 
   /**
    * The partition schema of the current relation.
    */
-  override def partitionSchema: StructType = plan.source match {
-    case _: IcebergSource =>
-      val tbl = loadIcebergTable
-      val fields = tbl.spec().fields().asScala.map { p =>
-        tbl.schema().findField(p.name())
-      }
-      val schema = new Schema(fields.asJava)
-      SparkSchemaUtil.convert(schema)
+  override def partitionSchema: StructType = {
+    val fields = table.spec().fields().asScala.map { p =>
+      table.schema().findField(p.name())
+    }
+    val schema = new Schema(fields.asJava)
+    SparkSchemaUtil.convert(schema)
   }
 
   /**
@@ -176,15 +158,14 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
   override def createHadoopFsRelation(
       location: FileIndex,
       dataSchema: StructType,
-      options: Map[String, String]): HadoopFsRelation = plan.source match {
-    case _: IcebergSource =>
-      HadoopFsRelation(
-        location,
-        partitionSchema,
-        dataSchema,
-        None,
-        new ParquetFileFormat,
-        options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
+      options: Map[String, String]): HadoopFsRelation = {
+    HadoopFsRelation(
+      location,
+      partitionSchema,
+      dataSchema,
+      None,
+      new ParquetFileFormat,
+      options + IndexConstants.INDEX_RELATION_IDENTIFIER)(spark)
   }
 
   /**
@@ -198,23 +179,6 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     val updatedOutput =
       newOutput.filter(attr => hadoopFsRelation.schema.fieldNames.contains(attr.name))
     new LogicalRelation(hadoopFsRelation, updatedOutput, None, false)
-  }
-
-  private def loadIcebergTable: Table = {
-    val options = new DataSourceOptions(plan.options.asJava)
-    val conf = spark.sessionState.newHadoopConf()
-    val path = options.get("path")
-    if (!path.isPresent) {
-      throw new IllegalArgumentException("Cannot open table: path is not set")
-    }
-    if (path.get.contains("/")) {
-      val tables = new HadoopTables(conf)
-      tables.load(path.get)
-    } else {
-      val hiveCatalog = HiveCatalogs.loadCatalog(conf)
-      val tableIdentifier = TableIdentifier.parse(path.get)
-      hiveCatalog.loadTable(tableIdentifier)
-    }
   }
 
   private def toFileStatus(fileScanTask: FileScanTask): FileStatus = {

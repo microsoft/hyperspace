@@ -16,23 +16,46 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.File
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.util.hyperspace.Utils
+import org.scalatest.{BeforeAndAfterAllConfigMap, ConfigMap}
 
 import com.microsoft.hyperspace.{Hyperspace, SparkInvolvedSuite}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
+trait HyperspaceSuite
+    extends SparkFunSuite
+    with SparkInvolvedSuite
+    with BeforeAndAfterAllConfigMap {
+
+  // Needed to resolve conflicts between BeforeAndAfterAll and BeforeAndAfterAllConfigMap
+  override val invokeBeforeAllAndAfterAllEvenIfNoTestsAreExpected = false
+
+  // The default working directory is unstable for multi-project build,
+  // so we should pass the base directory as an argument.
+  var baseDirectory: Path = _
+
+  // Returns a path staring from the base directory.
+  def inTestResourcesDir(path: String): String =
+    new Path(baseDirectory, s"src/test/resources/$path").toString
+
+  // Temporary directory
+  lazy val tempDir: Path = new Path(Utils.createTempDir().getAbsolutePath)
+
+  // Returns a path starting from a temporary directory for the test.
+  def inTempDir(path: String): String = new Path(tempDir, path).toString
+
+  val indexLocationDirName: String = "indexLocation"
+
   // This is the system path that PathResolver uses to get the root of the indexes.
   // Each test suite that extends HyperspaceSuite should define this.
-  val systemPath: Path
+  lazy val systemPath: Path = PathUtils.makeAbsolute(inTempDir(indexLocationDirName))
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(cm: ConfigMap): Unit = {
     super.beforeAll()
-    FileUtils.delete(systemPath)
+    baseDirectory = new Path(cm.getRequired[String]("baseDirectory"))
+    FileUtils.delete(tempDir)
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
   }
@@ -40,7 +63,7 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
   override def afterAll(): Unit = {
     clearCache()
     spark.conf.unset(IndexConstants.INDEX_SYSTEM_PATH)
-    FileUtils.delete(systemPath)
+    FileUtils.delete(tempDir)
     super.afterAll()
   }
 
@@ -87,20 +110,6 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
         hs.deleteIndex(name)
         hs.vacuumIndex(name)
       }
-    }
-  }
-
-  /**
-   * Creates a temporary directory, which is then passed to `f` and will be deleted after `f`
-   * returns. This is copied from SparkFunSuite.scala in Spark 3.0.
-   *
-   * TODO: This can be removed when we support Spark 3.0.
-   */
-  protected def withTempDir(f: File => Unit): Unit = {
-    val dir = Utils.createTempDir()
-    try f(dir)
-    finally {
-      Utils.deleteRecursively(dir)
     }
   }
 

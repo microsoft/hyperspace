@@ -39,6 +39,8 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.ExplainCommand
 import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
 
+import com.microsoft.hyperspace.util.SparkTestUtils.ExplainCommandExtended
+
 // scalastyle:off filelinelengthchecker
 /**
  * Check that TPC-DS SparkPlans don't change.
@@ -255,7 +257,7 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
   }
 
   def explainString(queryExecution: QueryExecution): String = {
-    val explain = ExplainCommand(queryExecution.logical, extended = false)
+    val explain = ExplainCommandExtended(queryExecution.logical)
     spark.sessionState
       .executePlan(explain)
       .executedPlan

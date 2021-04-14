@@ -14,84 +14,106 @@
  * limitations under the License.
  */
 
-name := "hyperspace-core"
+import Dependencies._
 
-sparkVersion := "2.4.2"
+lazy val spark24 = Version(2, 4, 2)
+lazy val spark30 = Version(3, 0, 1)
 
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
-lazy val supportedScalaVersions = List(scala212, scala211)
 
 scalaVersion := scala212
 
-crossScalaVersions := supportedScalaVersions
-
-libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "provided" withSources (),
-  "org.apache.spark" %% "spark-core" % sparkVersion.value % "provided" withSources (),
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "provided" withSources (),
-  "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
-  "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources (),
-  // Test dependencies
-  "org.scalatest" %% "scalatest" % "3.0.5" % "test",
-  "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
-  "org.apache.spark" %% "spark-catalyst" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-core" % sparkVersion.value % "test" classifier "tests",
-  "org.apache.spark" %% "spark-sql" % sparkVersion.value % "test" classifier "tests")
-
-assemblyMergeStrategy in assembly := {
+assembly / assemblyMergeStrategy := {
   case PathList("run-tests.py") => MergeStrategy.first
-  case x => (assemblyMergeStrategy in assembly).value(x)
+  case x => (assembly / assemblyMergeStrategy).value(x)
 }
 
-scalacOptions ++= Seq("-target:jvm-1.8")
+ThisBuild / scalacOptions ++= Seq("-target:jvm-1.8")
 
-javaOptions += "-Xmx1024m"
+ThisBuild / javaOptions += "-Xmx1024m"
 
-// The following creates target/scala-2.*/src_managed/main/sbt-buildinfo/BuildInfo.scala.
+// The root project is a virtual project aggregating the spark2 and spark3 projects.
+// It cannot compile, as necessary utility code is only in those projects.
 lazy val root = (project in file("."))
+  .aggregate(spark2, spark3)
+  .settings(
+    compile / skip := true,
+    publish / skip := true,
+    Keys.`package` := { new File("") }, // skip package
+    Keys.`packageBin` := { new File("") } // skip packageBin
+  )
+
+lazy val spark2 = (project in file("spark2"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
-    buildInfoPackage := "com.microsoft.hyperspace")
+    commonSettings,
+    sparkVersion := spark24,
+    crossScalaVersions := List(scala212, scala211),
+    inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
+    inConfig(Test)(addSparkVersionSpecificSourceDirectories))
+
+lazy val spark3 = (project in file("spark3"))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    commonSettings,
+    sparkVersion := spark30,
+    crossScalaVersions := List(scala212), // Spark 3 doesn't support Scala 2.11
+    inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
+    inConfig(Test)(addSparkVersionSpecificSourceDirectories))
+
+lazy val sparkVersion = settingKey[Version]("sparkVersion")
+
+// In addition to the usual scala/ and scala-<version>/ source directories,
+// add the following source directories for different Spark versions:
+// * scala-spark<spark major version>
+// * scala-spark<spark major version>.<spark minor version>
+// * scala-<scala version>-spark<spark major version>
+// * scala-<scala version>-spark<spark major version>.<spark minor version>
+lazy val addSparkVersionSpecificSourceDirectories = unmanagedSourceDirectories ++= Seq(
+  sourceDirectory.value / s"scala-spark${sparkVersion.value.major}",
+  sourceDirectory.value / s"scala-spark${sparkVersion.value.short}",
+  sourceDirectory.value / s"scala-${scalaBinaryVersion.value}-spark${sparkVersion.value.major}",
+  sourceDirectory.value / s"scala-${scalaBinaryVersion.value}-spark${sparkVersion.value.short}")
+
+lazy val commonSettings = Seq(
+  // The following creates target/scala-2.*/src_managed/main/sbt-buildinfo/BuildInfo.scala.
+  buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+  buildInfoPackage := "com.microsoft.hyperspace",
+
+  name := "hyperspace-core",
+  moduleName := name.value + s"_spark${sparkVersion.value.short}",
+  libraryDependencies ++= deps(sparkVersion.value),
+
+  Test / testOptions += Tests.Argument(s"-DbaseDirectory=${baseDirectory.value.getPath}"),
+
+  // Scalastyle
+  scalastyleConfig := (ThisBuild / scalastyleConfig).value,
+  compileScalastyle := (Compile / scalastyle).toTask("").value,
+  Compile / compile := ((Compile / compile) dependsOn compileScalastyle).value,
+  testScalastyle := (Test / scalastyle).toTask("").value,
+  Test / test := ((Test / test) dependsOn testScalastyle).value)
 
 /**
  * ScalaStyle configurations
  */
-scalastyleConfig := baseDirectory.value / "scalastyle-config.xml"
+ThisBuild / scalastyleConfig := baseDirectory.value / "scalastyle-config.xml"
 
 // Run as part of compile task.
 lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
-compileScalastyle := scalastyle.in(Compile).toTask("").value
-(compile in Compile) := ((compile in Compile) dependsOn compileScalastyle).value
 
 // Run as part of test task.
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
-testScalastyle := scalastyle.in(Test).toTask("").value
-(test in Test) := ((test in Test) dependsOn testScalastyle).value
-
-/**
- * Spark Packages settings
- */
-spName := "microsoft/hyperspace-core"
-
-spAppendScalaVersion := true
-
-spIncludeMaven := true
-
-spIgnoreProvided := true
-
-packageBin in Compile := spPackage.value
 
 /**
  * Test configurations
  */
 // Tests cannot be run in parallel since mutiple Spark contexts cannot run in the same JVM.
-parallelExecution in Test := false
+ThisBuild / Test / parallelExecution := false
 
-fork in Test := true
+ThisBuild / Test / fork := true
 
-javaOptions in Test ++= Seq(
+ThisBuild / Test / javaOptions ++= Seq(
   "-Dspark.ui.enabled=false",
   "-Dspark.ui.showConsoleProgress=false",
   "-Dspark.databricks.delta.snapshotPartitions=2",
@@ -103,18 +125,18 @@ javaOptions in Test ++= Seq(
 /**
  * Release configurations
  */
-organization := "com.microsoft.hyperspace"
-organizationName := "Microsoft"
-organizationHomepage := Some(url("http://www.microsoft.com/"))
+ThisBuild / organization := "com.microsoft.hyperspace"
+ThisBuild / organizationName := "Microsoft"
+ThisBuild / organizationHomepage := Some(url("http://www.microsoft.com/"))
 
-releaseCrossBuild := true
+ThisBuild / releaseCrossBuild := true
 
-scmInfo := Some(
+ThisBuild / scmInfo := Some(
   ScmInfo(
     url("https://github.com/microsoft/hyperspace"),
     "scm:git@github.com:microsoft/hyperspace.git"))
 
-developers := List(
+ThisBuild / developers := List(
   Developer(
     id = "rapoth",
     name = "Rahul Potharaju",
@@ -151,27 +173,31 @@ developers := List(
     email = "",
     url = url("https://github.com/thugsatbay")))
 
-description := "Hyperspace: An Indexing Subsystem for Apache Spark"
-licenses := List("Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.txt"))
-homepage := Some(url("https://github.com/microsoft/hyperspace"))
+ThisBuild / description := "Hyperspace: An Indexing Subsystem for Apache Spark"
+ThisBuild / licenses := List(
+  "Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+ThisBuild / homepage := Some(url("https://github.com/microsoft/hyperspace"))
 
 // Remove all additional repository other than Maven Central from POM
-pomIncludeRepository := { _ =>
+ThisBuild / pomIncludeRepository := { _ =>
   false
 }
-publishTo := {
+ThisBuild / publishTo := {
   val nexus = "https://oss.sonatype.org/"
-  if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
-  else Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  if (isSnapshot.value) {
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  } else {
+    Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  }
 }
 
-publishMavenStyle := true
+ThisBuild / publishMavenStyle := true
 
 import ReleaseTransformations._
 
-releasePublishArtifactsAction := PgpKeys.publishSigned.value
+ThisBuild / releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
-releaseProcess := Seq[ReleaseStep](
+ThisBuild / releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
   runClean,

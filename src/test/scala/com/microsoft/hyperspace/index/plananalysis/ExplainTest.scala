@@ -28,8 +28,7 @@ import com.microsoft.hyperspace.util.PathUtils
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private var sampleParquetDataFullPath: String = ""
   private var hyperspace: Hyperspace = _

@@ -26,6 +26,7 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
+import com.microsoft.hyperspace.util.SparkUtils.JoinWithoutHint
 
 class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength1 = 100
@@ -113,7 +114,7 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
       t2Schema)
 
     val joinCondition = EqualTo(t1c3, t2c2)
-    val joinNode = Join(r1, r2, JoinType("inner"), Some(joinCondition))
+    val joinNode = JoinWithoutHint(r1, r2, JoinType("inner"), Some(joinCondition))
 
     val filterCondition = And(EqualTo(t1c1, Literal("ABC")), IsNotNull(t1c1))
     val filterNode = Filter(filterCondition, joinNode)

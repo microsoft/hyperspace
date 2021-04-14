@@ -29,10 +29,9 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 import com.microsoft.hyperspace.util.FileUtils
 
-class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHelper {
-  private val indexSystemPath = "src/test/resources/indexLocation"
+class CreateActionTest extends HyperspaceSuite with SQLHelper {
   private val sampleData = SampleData.testData
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
+  private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private var df: DataFrame = _
 
@@ -52,12 +51,10 @@ class CreateActionTest extends SparkFunSuite with SparkInvolvedSuite with SQLHel
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
     when(mockLogManager.getLatestLog()).thenReturn(None)
     when(mockLogManager.getLatestId()).thenReturn(None)
 
     import spark.implicits._
-    FileUtils.delete(new Path(indexSystemPath))
     FileUtils.delete(new Path(sampleParquetDataLocation))
 
     val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")

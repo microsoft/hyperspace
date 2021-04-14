@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.PathUtils
 
 class FilterIndexRuleTest extends HyperspaceRuleSuite {
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexTest")
+  override val indexLocationDirName = "joinIndexTest"
   val indexName1 = "filterIxTestIndex1"
   val indexName2 = "filterIxTestIndex2"
 

@@ -252,4 +252,9 @@ trait FileBasedRelationMetadata extends SourceRelationMetadata {
    * @param properties Index properties to enrich.
    */
   def enrichIndexProperties(properties: Map[String, String]): Map[String, String]
+
+  /**
+   * Returns true if the source supports user specified schema, false otherwise.
+   */
+  def supportsUserSpecifiedSchema: Boolean
 }

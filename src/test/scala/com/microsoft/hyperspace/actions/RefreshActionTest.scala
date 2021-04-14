@@ -29,8 +29,8 @@ import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
-class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
+class RefreshActionTest extends HyperspaceSuite {
+  private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])

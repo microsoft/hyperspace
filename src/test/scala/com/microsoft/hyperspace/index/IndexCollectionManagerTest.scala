@@ -26,8 +26,7 @@ import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 
-class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
-  private val indexSystemPath = "src/test/resources/indexLocation"
+class IndexCollectionManagerTest extends HyperspaceSuite {
   private val testLogManagerFactory: IndexLogManagerFactory = new IndexLogManagerFactory {
     override def create(indexPath: Path, hadoopConfiguration: Configuration): IndexLogManager =
       new IndexLogManager {
@@ -70,7 +69,6 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
     when(mockFileSystemFactory.create(any[Path], any[Configuration])).thenReturn(mockFileSystem)
 
     indexCollectionManager = new IndexCollectionManager(
@@ -121,27 +119,27 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
   }
 
   test("delete() throws exception if index is not found") {
-    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    when(mockFileSystem.exists(new Path(systemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.delete("idx4"))
   }
 
   test("vacuum() throws exception if index is not found") {
-    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    when(mockFileSystem.exists(new Path(systemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.vacuum("idx4"))
   }
 
   test("restore() throws exception if index is not found") {
-    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    when(mockFileSystem.exists(new Path(systemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.restore("idx4"))
   }
 
   test("refresh() with mode = 'full' throws exception if index is not found") {
-    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    when(mockFileSystem.exists(new Path(systemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](indexCollectionManager.refresh("idx4", REFRESH_MODE_FULL))
   }
 
   test("refresh() with mode = 'incremental' throws exception if index is not found") {
-    when(mockFileSystem.exists(new Path(indexSystemPath, "idx4"))).thenReturn(false)
+    when(mockFileSystem.exists(new Path(systemPath, "idx4"))).thenReturn(false)
     intercept[HyperspaceException](
       indexCollectionManager.refresh("idx4", REFRESH_MODE_INCREMENTAL))
   }

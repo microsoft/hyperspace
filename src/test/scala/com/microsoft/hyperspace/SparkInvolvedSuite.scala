@@ -34,6 +34,9 @@ trait SparkInvolvedSuite extends BeforeAndAfterAll with BeforeAndAfter {
     .builder()
     .master(s"local[$numParallelism]")
     .config(HYPERSPACE_EVENT_LOGGER_CLASS_KEY, "com.microsoft.hyperspace.MockEventLogger")
+    .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
     .appName(suiteName)
     .getOrCreate()
 

@@ -32,6 +32,7 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils._
+import com.microsoft.hyperspace.util.SparkUtils.JoinWithoutHint
 
 /**
  * Rule to optimize a join between two indexed dataframes.
@@ -55,7 +56,7 @@ object JoinIndexRule
     with HyperspaceEventLogging
     with ActiveSparkSession {
   def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
-    case join @ Join(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
+    case join @ JoinWithoutHint(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
       try {
         getBestIndexPair(l, r, condition)
           .map {

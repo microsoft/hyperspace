@@ -33,7 +33,7 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
 
 trait HybridScanSuite extends QueryTest with HyperspaceSuite {
-  override val systemPath = new Path("src/test/resources/hybridScanTest")
+  override val indexLocationDirName = "hybridScanTest"
 
   val sampleData = SampleData.testData
   var hyperspace: Hyperspace = _

@@ -35,7 +35,7 @@ import com.microsoft.hyperspace.util.PathUtils
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/icebergIntegrationTest")
+  override val indexLocationDirName = "icebergIntegrationTest"
 
   private val sampleData = SampleData.testData
   private var hyperspace: Hyperspace = _

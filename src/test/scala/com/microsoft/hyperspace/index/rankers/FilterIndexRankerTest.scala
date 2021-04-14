@@ -27,7 +27,7 @@ import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
 import com.microsoft.hyperspace.util.FileUtils
 
 class FilterIndexRankerTest extends HyperspaceRuleSuite {
-  override val systemPath = new Path("src/test/resources/FilterRankerTest")
+  override val indexLocationDirName = "FilterRankerTest"
   var tempPlan: LogicalPlan = _
 
   override def beforeAll(): Unit = {

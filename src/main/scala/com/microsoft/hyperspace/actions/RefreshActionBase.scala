@@ -71,16 +71,18 @@ private[actions] abstract class RefreshActionBase(
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
-    val latestRelation = Hyperspace
+    val relationMetadata = Hyperspace
       .getContext(spark)
       .sourceProviderManager
       .getRelationMetadata(relations.head)
-      .refresh()
+    val latestRelation = relationMetadata.refresh()
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
-    val df = spark.read
-      .schema(dataSchema)
+    var df = spark.read
       .format(latestRelation.fileFormat)
       .options(latestRelation.options)
+    if (relationMetadata.supportsUserSpecifiedSchema) {
+      df = df.schema(dataSchema)
+    }
     // Due to the difference in how the "path" option is set: https://github.com/apache/spark/
     // blob/ef1441b56c5cab02335d8d2e4ff95cf7e9c9b9ca/sql/core/src/main/scala/org/apache/spark/
     // sql/DataFrameReader.scala#L197

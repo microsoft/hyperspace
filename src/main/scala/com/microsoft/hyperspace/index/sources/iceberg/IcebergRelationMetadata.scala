@@ -35,4 +35,6 @@ class IcebergRelationMetadata(metadata: Relation) extends FileBasedRelationMetad
   override def enrichIndexProperties(properties: Map[String, String]): Map[String, String] = {
     properties
   }
+
+  override def supportsUserSpecifiedSchema: Boolean = false
 }
