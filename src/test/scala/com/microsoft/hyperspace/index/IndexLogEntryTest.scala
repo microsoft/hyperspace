@@ -68,9 +68,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
     fileIdTracker = new FileIdTracker
   }
 
-  private def toPath(path: file.Path): Path = PathUtils.makeAbsolute(path.toString)
-
   private def toFileStatus(path: file.Path): FileStatus = fs.getFileStatus(toPath(path))
+
+  private def toPath(path: file.Path): Path = PathUtils.makeAbsolute(path.toString)
 
   test("IndexLogEntry spec example") {
     val schemaString =
