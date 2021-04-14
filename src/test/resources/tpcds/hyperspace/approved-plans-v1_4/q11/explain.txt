@@ -1,0 +1,84 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[customer_preferred_cust_flag#1 ASC NULLS FIRST], output=[customer_preferred_cust_flag#1])
++- *(39) Project [customer_preferred_cust_flag#1]
+   +- *(39) SortMergeJoin [customer_id#2], [customer_id#3], Inner, (CASE WHEN (year_total#4 > 0.00) THEN CheckOverflow((promote_precision(year_total#5) / promote_precision(year_total#4)), DecimalType(38,20)) ELSE null END > CASE WHEN (year_total#6 > 0.00) THEN CheckOverflow((promote_precision(year_total#7) / promote_precision(year_total#6)), DecimalType(38,20)) ELSE null END)
+      :- *(29) Project [customer_id#2, year_total#6, customer_preferred_cust_flag#1, year_total#7, year_total#4]
+      :  +- *(29) SortMergeJoin [customer_id#2], [customer_id#8], Inner
+      :     :- *(19) Project [customer_id#2, year_total#6, customer_preferred_cust_flag#1, year_total#7]
+      :     :  +- *(19) SortMergeJoin [customer_id#2], [customer_id#9], Inner
+      :     :     :- *(9) Sort [customer_id#2 ASC NULLS FIRST], false, 0
+      :     :     :  +- Exchange hashpartitioning(customer_id#2, 5)
+      :     :     :     +- Union
+      :     :     :        :- *(8) Filter (isnotnull(year_total#6) && (year_total#6 > 0.00))
+      :     :     :        :  +- *(8) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
+      :     :     :        :     +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, 5)
+      :     :     :        :        +- *(7) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
+      :     :     :        :           +- *(7) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ss_ext_discount_amt#19, ss_ext_list_price#18, d_year#13]
+      :     :     :        :              +- *(7) SortMergeJoin [ss_sold_date_sk#20], [d_date_sk#21], Inner
+      :     :     :        :                 :- *(4) Sort [ss_sold_date_sk#20 ASC NULLS FIRST], false, 0
+      :     :     :        :                 :  +- Exchange hashpartitioning(ss_sold_date_sk#20, 5)
+      :     :     :        :                 :     +- *(3) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ss_sold_date_sk#20, ss_ext_discount_amt#19, ss_ext_list_price#18]
+      :     :     :        :                 :        +- *(3) SortMergeJoin [c_customer_sk#22], [ss_customer_sk#23], Inner
+      :     :     :        :                 :           :- *(1) Project [c_customer_sk#22, c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17]
+      :     :     :        :                 :           :  +- *(1) Filter (isnotnull(c_customer_sk#22) && isnotnull(c_customer_id#10))
+      :     :     :        :                 :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#22,c_customer_id#10,c_first_name#11,c_last_name#12,c_preferred_cust_flag#14,c_birth_country#15,c_login#16,c_email_address#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk), IsNotNull(c_customer_id)], ReadSchema: struct<c_customer_sk:int,c_customer_id:string,c_first_name:string,c_last_name:string,c_preferred_..., SelectedBucketsCount: 200 out of 200
+      :     :     :        :                 :           +- *(2) Project [ss_sold_date_sk#20, ss_customer_sk#23, ss_ext_discount_amt#19, ss_ext_list_price#18]
+      :     :     :        :                 :              +- *(2) Filter (isnotnull(ss_customer_sk#23) && isnotnull(ss_sold_date_sk#20))
+      :     :     :        :                 :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex15-index-12-ss_customer_sk-20, LogVersion: 0) default.store_sales[ss_sold_date_sk#20,ss_customer_sk#23,ss_ext_discount_amt#19,ss_ext_list_price#18] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_customer_sk), IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_customer_sk:int,ss_ext_discount_amt:decimal(7,2),ss_ext_list_price:..., SelectedBucketsCount: 200 out of 200
+      :     :     :        :                 +- *(6) Sort [d_date_sk#21 ASC NULLS FIRST], false, 0
+      :     :     :        :                    +- Exchange hashpartitioning(d_date_sk#21, 5)
+      :     :     :        :                       +- *(5) Project [d_date_sk#21, d_year#13]
+      :     :     :        :                          +- *(5) Filter ((isnotnull(d_year#13) && (d_year#13 = 2001)) && isnotnull(d_date_sk#21))
+      :     :     :        :                             +- *(5) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#21,d_year#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :     :     :        +- LocalTableScan <empty>, [customer_id#24, year_total#25]
+      :     :     +- *(18) Sort [customer_id#9 ASC NULLS FIRST], false, 0
+      :     :        +- Exchange hashpartitioning(customer_id#9, 5)
+      :     :           +- Union
+      :     :              :- *(17) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
+      :     :              :  +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, 5)
+      :     :              :     +- *(16) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, d_year#13, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price#18 as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt#19 as decimal(8,2)))), DecimalType(8,2))))])
+      :     :              :        +- *(16) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ss_ext_discount_amt#19, ss_ext_list_price#18, d_year#13]
+      :     :              :           +- *(16) SortMergeJoin [ss_sold_date_sk#20], [d_date_sk#21], Inner
+      :     :              :              :- *(13) Sort [ss_sold_date_sk#20 ASC NULLS FIRST], false, 0
+      :     :              :              :  +- ReusedExchange [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ss_sold_date_sk#20, ss_ext_discount_amt#19, ss_ext_list_price#18], Exchange hashpartitioning(ss_sold_date_sk#20, 5)
+      :     :              :              +- *(15) Sort [d_date_sk#21 ASC NULLS FIRST], false, 0
+      :     :              :                 +- Exchange hashpartitioning(d_date_sk#21, 5)
+      :     :              :                    +- *(14) Project [d_date_sk#21, d_year#13]
+      :     :              :                       +- *(14) Filter ((isnotnull(d_year#13) && (d_year#13 = 2002)) && isnotnull(d_date_sk#21))
+      :     :              :                          +- *(14) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#21,d_year#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2002), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :     :              +- LocalTableScan <empty>, [customer_id#24, customer_preferred_cust_flag#26, year_total#25]
+      :     +- *(28) Sort [customer_id#8 ASC NULLS FIRST], false, 0
+      :        +- Exchange hashpartitioning(customer_id#8, 5)
+      :           +- Union
+      :              :- LocalTableScan <empty>, [customer_id#8, year_total#4]
+      :              +- *(27) Filter (isnotnull(year_total#25) && (year_total#25 > 0.00))
+      :                 +- *(27) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
+      :                    +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13, 5)
+      :                       +- *(26) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
+      :                          +- *(26) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ws_ext_discount_amt#28, ws_ext_list_price#27, d_year#13]
+      :                             +- *(26) SortMergeJoin [ws_sold_date_sk#29], [d_date_sk#21], Inner
+      :                                :- *(23) Sort [ws_sold_date_sk#29 ASC NULLS FIRST], false, 0
+      :                                :  +- Exchange hashpartitioning(ws_sold_date_sk#29, 5)
+      :                                :     +- *(22) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ws_sold_date_sk#29, ws_ext_discount_amt#28, ws_ext_list_price#27]
+      :                                :        +- *(22) SortMergeJoin [c_customer_sk#22], [ws_bill_customer_sk#30], Inner
+      :                                :           :- *(20) Project [c_customer_sk#22, c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17]
+      :                                :           :  +- *(20) Filter (isnotnull(c_customer_sk#22) && isnotnull(c_customer_id#10))
+      :                                :           :     +- *(20) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#22,c_customer_id#10,c_first_name#11,c_last_name#12,c_preferred_cust_flag#14,c_birth_country#15,c_login#16,c_email_address#17] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk), IsNotNull(c_customer_id)], ReadSchema: struct<c_customer_sk:int,c_customer_id:string,c_first_name:string,c_last_name:string,c_preferred_..., SelectedBucketsCount: 200 out of 200
+      :                                :           +- *(21) Project [ws_sold_date_sk#29, ws_bill_customer_sk#30, ws_ext_discount_amt#28, ws_ext_list_price#27]
+      :                                :              +- *(21) Filter (isnotnull(ws_bill_customer_sk#30) && isnotnull(ws_sold_date_sk#29))
+      :                                :                 +- *(21) FileScan Hyperspace(Type: CI, Name: JoinIndex39-index-30-ws_bill_customer_sk-10, LogVersion: 0) default.web_sales[ws_sold_date_sk#29,ws_bill_customer_sk#30,ws_ext_discount_amt#28,ws_ext_list_price#27] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ws_bill_customer_sk), IsNotNull(ws_sold_date_sk)], ReadSchema: struct<ws_sold_date_sk:int,ws_bill_customer_sk:int,ws_ext_discount_amt:decimal(7,2),ws_ext_list_p..., SelectedBucketsCount: 200 out of 200
+      :                                +- *(25) Sort [d_date_sk#21 ASC NULLS FIRST], false, 0
+      :                                   +- ReusedExchange [d_date_sk#21, d_year#13], Exchange hashpartitioning(d_date_sk#21, 5)
+      +- *(38) Sort [customer_id#3 ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(customer_id#3, 5)
+            +- Union
+               :- LocalTableScan <empty>, [customer_id#3, year_total#5]
+               +- *(37) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
+                  +- Exchange hashpartitioning(c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13, 5)
+                     +- *(36) HashAggregate(keys=[c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, d_year#13], functions=[partial_sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price#27 as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt#28 as decimal(8,2)))), DecimalType(8,2))))])
+                        +- *(36) Project [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ws_ext_discount_amt#28, ws_ext_list_price#27, d_year#13]
+                           +- *(36) SortMergeJoin [ws_sold_date_sk#29], [d_date_sk#21], Inner
+                              :- *(33) Sort [ws_sold_date_sk#29 ASC NULLS FIRST], false, 0
+                              :  +- ReusedExchange [c_customer_id#10, c_first_name#11, c_last_name#12, c_preferred_cust_flag#14, c_birth_country#15, c_login#16, c_email_address#17, ws_sold_date_sk#29, ws_ext_discount_amt#28, ws_ext_list_price#27], Exchange hashpartitioning(ws_sold_date_sk#29, 5)
+                              +- *(35) Sort [d_date_sk#21 ASC NULLS FIRST], false, 0
+                                 +- ReusedExchange [d_date_sk#21, d_year#13], Exchange hashpartitioning(d_date_sk#21, 5)

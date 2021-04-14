@@ -1,0 +1,42 @@
+TakeOrderedAndProject [ss_customer_sk,sumsales]
+  WholeStageCodegen
+    HashAggregate [ss_customer_sk,sum,sum(act_sales)] [sum,sum(act_sales),sumsales]
+      InputAdapter
+        Exchange [ss_customer_sk] #1
+          WholeStageCodegen
+            HashAggregate [act_sales,ss_customer_sk,sum,sum] [sum,sum]
+              Project [sr_return_quantity,ss_customer_sk,ss_quantity,ss_sales_price]
+                SortMergeJoin [r_reason_sk,sr_reason_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [sr_reason_sk]
+                        InputAdapter
+                          Exchange [sr_reason_sk] #2
+                            WholeStageCodegen
+                              Project [sr_reason_sk,sr_return_quantity,ss_customer_sk,ss_quantity,ss_sales_price]
+                                SortMergeJoin [sr_item_sk,sr_ticket_number,ss_item_sk,ss_ticket_number]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ss_item_sk,ss_ticket_number]
+                                        InputAdapter
+                                          Exchange [ss_item_sk,ss_ticket_number] #3
+                                            WholeStageCodegen
+                                              Scan parquet default.store_sales [ss_customer_sk,ss_item_sk,ss_quantity,ss_sales_price,ss_ticket_number] [ss_customer_sk,ss_item_sk,ss_quantity,ss_sales_price,ss_ticket_number]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [sr_item_sk,sr_ticket_number]
+                                        InputAdapter
+                                          Exchange [sr_item_sk,sr_ticket_number] #4
+                                            WholeStageCodegen
+                                              Project [sr_item_sk,sr_reason_sk,sr_return_quantity,sr_ticket_number]
+                                                Filter [sr_item_sk,sr_reason_sk,sr_ticket_number]
+                                                  Scan Hyperspace(Type: CI, Name: JoinIndex21-index-20-sr_item_sk-7, LogVersion: 0) default.store_returns [sr_item_sk,sr_reason_sk,sr_return_quantity,sr_ticket_number] [sr_item_sk,sr_reason_sk,sr_return_quantity,sr_ticket_number]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [r_reason_sk]
+                        InputAdapter
+                          Exchange [r_reason_sk] #5
+                            WholeStageCodegen
+                              Project [r_reason_sk]
+                                Filter [r_reason_desc,r_reason_sk]
+                                  Scan parquet default.reason [r_reason_desc,r_reason_sk] [r_reason_desc,r_reason_sk]

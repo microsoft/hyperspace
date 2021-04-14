@@ -1,0 +1,51 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[channel#1 ASC NULLS FIRST,col_name#2 ASC NULLS FIRST,d_year#3 ASC NULLS FIRST,d_qoy#4 ASC NULLS FIRST,i_category#5 ASC NULLS FIRST], output=[channel#1,col_name#2,d_year#3,d_qoy#4,i_category#5,sales_cnt#6,sales_amt#7])
++- *(23) HashAggregate(keys=[channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5], functions=[count(1), sum(UnscaledValue(ext_sales_price#8))])
+   +- Exchange hashpartitioning(channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5, 5)
+      +- *(22) HashAggregate(keys=[channel#1, col_name#2, d_year#3, d_qoy#4, i_category#5], functions=[partial_count(1), partial_sum(UnscaledValue(ext_sales_price#8))])
+         +- Union
+            :- *(7) Project [store AS channel#1, ss_store_sk#9 AS col_name#2, d_year#3, d_qoy#4, i_category#5, ss_ext_sales_price#10 AS ext_sales_price#8]
+            :  +- *(7) SortMergeJoin [ss_sold_date_sk#11], [d_date_sk#12], Inner
+            :     :- *(4) Sort [ss_sold_date_sk#11 ASC NULLS FIRST], false, 0
+            :     :  +- Exchange hashpartitioning(ss_sold_date_sk#11, 5)
+            :     :     +- *(3) Project [ss_sold_date_sk#11, ss_store_sk#9, ss_ext_sales_price#10, i_category#5]
+            :     :        +- *(3) SortMergeJoin [ss_item_sk#13], [i_item_sk#14], Inner
+            :     :           :- *(1) Project [ss_sold_date_sk#11, ss_item_sk#13, ss_store_sk#9, ss_ext_sales_price#10]
+            :     :           :  +- *(1) Filter ((isnull(ss_store_sk#9) && isnotnull(ss_item_sk#13)) && isnotnull(ss_sold_date_sk#11))
+            :     :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex13-index-3-ss_item_sk-16, LogVersion: 0) default.store_sales[ss_sold_date_sk#11,ss_item_sk#13,ss_store_sk#9,ss_ext_sales_price#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNull(ss_store_sk), IsNotNull(ss_item_sk), IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_item_sk:int,ss_store_sk:int,ss_ext_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+            :     :           +- *(2) Project [i_item_sk#14, i_category#5]
+            :     :              +- *(2) Filter isnotnull(i_item_sk#14)
+            :     :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#14,i_category#5] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_category:string>, SelectedBucketsCount: 200 out of 200
+            :     +- *(6) Sort [d_date_sk#12 ASC NULLS FIRST], false, 0
+            :        +- Exchange hashpartitioning(d_date_sk#12, 5)
+            :           +- *(5) Project [d_date_sk#12, d_year#3, d_qoy#4]
+            :              +- *(5) Filter isnotnull(d_date_sk#12)
+            :                 +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#12,d_year#3,d_qoy#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int,d_qoy:int>
+            :- *(14) Project [web AS channel#15, ws_ship_customer_sk#16 AS col_name#17, d_year#3, d_qoy#4, i_category#5, ws_ext_sales_price#18 AS ext_sales_price#19]
+            :  +- *(14) SortMergeJoin [ws_sold_date_sk#20], [d_date_sk#12], Inner
+            :     :- *(11) Sort [ws_sold_date_sk#20 ASC NULLS FIRST], false, 0
+            :     :  +- Exchange hashpartitioning(ws_sold_date_sk#20, 5)
+            :     :     +- *(10) Project [ws_sold_date_sk#20, ws_ship_customer_sk#16, ws_ext_sales_price#18, i_category#5]
+            :     :        +- *(10) SortMergeJoin [ws_item_sk#21], [i_item_sk#14], Inner
+            :     :           :- *(8) Project [ws_sold_date_sk#20, ws_item_sk#21, ws_ship_customer_sk#16, ws_ext_sales_price#18]
+            :     :           :  +- *(8) Filter ((isnull(ws_ship_customer_sk#16) && isnotnull(ws_item_sk#21)) && isnotnull(ws_sold_date_sk#20))
+            :     :           :     +- *(8) FileScan Hyperspace(Type: CI, Name: JoinIndex38-index-15-ws_item_sk-16, LogVersion: 0) default.web_sales[ws_sold_date_sk#20,ws_item_sk#21,ws_ship_customer_sk#16,ws_ext_sales_price#18] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNull(ws_ship_customer_sk), IsNotNull(ws_item_sk), IsNotNull(ws_sold_date_sk)], ReadSchema: struct<ws_sold_date_sk:int,ws_item_sk:int,ws_ship_customer_sk:int,ws_ext_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+            :     :           +- *(9) Project [i_item_sk#14, i_category#5]
+            :     :              +- *(9) Filter isnotnull(i_item_sk#14)
+            :     :                 +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#14,i_category#5] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_category:string>, SelectedBucketsCount: 200 out of 200
+            :     +- *(13) Sort [d_date_sk#12 ASC NULLS FIRST], false, 0
+            :        +- ReusedExchange [d_date_sk#12, d_year#3, d_qoy#4], Exchange hashpartitioning(d_date_sk#12, 5)
+            +- *(21) Project [catalog AS channel#22, cs_ship_addr_sk#23 AS col_name#24, d_year#3, d_qoy#4, i_category#5, cs_ext_sales_price#25 AS ext_sales_price#26]
+               +- *(21) SortMergeJoin [cs_sold_date_sk#27], [d_date_sk#12], Inner
+                  :- *(18) Sort [cs_sold_date_sk#27 ASC NULLS FIRST], false, 0
+                  :  +- Exchange hashpartitioning(cs_sold_date_sk#27, 5)
+                  :     +- *(17) Project [cs_sold_date_sk#27, cs_ship_addr_sk#23, cs_ext_sales_price#25, i_category#5]
+                  :        +- *(17) SortMergeJoin [cs_item_sk#28], [i_item_sk#14], Inner
+                  :           :- *(15) Project [cs_sold_date_sk#27, cs_ship_addr_sk#23, cs_item_sk#28, cs_ext_sales_price#25]
+                  :           :  +- *(15) Filter ((isnull(cs_ship_addr_sk#23) && isnotnull(cs_item_sk#28)) && isnotnull(cs_sold_date_sk#27))
+                  :           :     +- *(15) FileScan Hyperspace(Type: CI, Name: JoinIndex27-index-10-cs_item_sk-22, LogVersion: 0) default.catalog_sales[cs_sold_date_sk#27,cs_ship_addr_sk#23,cs_item_sk#28,cs_ext_sales_price#25] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNull(cs_ship_addr_sk), IsNotNull(cs_item_sk), IsNotNull(cs_sold_date_sk)], ReadSchema: struct<cs_sold_date_sk:int,cs_ship_addr_sk:int,cs_item_sk:int,cs_ext_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+                  :           +- *(16) Project [i_item_sk#14, i_category#5]
+                  :              +- *(16) Filter isnotnull(i_item_sk#14)
+                  :                 +- *(16) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#14,i_category#5] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_category:string>, SelectedBucketsCount: 200 out of 200
+                  +- *(20) Sort [d_date_sk#12 ASC NULLS FIRST], false, 0
+                     +- ReusedExchange [d_date_sk#12, d_year#3, d_qoy#4], Exchange hashpartitioning(d_date_sk#12, 5)

@@ -1,0 +1,148 @@
+TakeOrderedAndProject [customer_preferred_cust_flag]
+  WholeStageCodegen
+    Project [customer_preferred_cust_flag]
+      SortMergeJoin [customer_id,customer_id,year_total,year_total,year_total,year_total]
+        InputAdapter
+          WholeStageCodegen
+            Project [customer_id,customer_preferred_cust_flag,year_total,year_total,year_total]
+              SortMergeJoin [customer_id,customer_id]
+                InputAdapter
+                  WholeStageCodegen
+                    Project [customer_id,customer_preferred_cust_flag,year_total,year_total]
+                      SortMergeJoin [customer_id,customer_id]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [customer_id]
+                              InputAdapter
+                                Exchange [customer_id] #1
+                                  Union
+                                    WholeStageCodegen
+                                      Filter [year_total]
+                                        HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt as decimal(8,2)))), DecimalType(8,2))))] [customer_id,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt as decimal(8,2)))), DecimalType(8,2)))),year_total]
+                                          InputAdapter
+                                            Exchange [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year] #2
+                                              WholeStageCodegen
+                                                HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,ss_ext_discount_amt,ss_ext_list_price,sum,sum] [sum,sum]
+                                                  Project [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,ss_ext_discount_amt,ss_ext_list_price]
+                                                    SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                                      InputAdapter
+                                                        WholeStageCodegen
+                                                          Sort [ss_sold_date_sk]
+                                                            InputAdapter
+                                                              Exchange [ss_sold_date_sk] #3
+                                                                WholeStageCodegen
+                                                                  Project [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,ss_ext_discount_amt,ss_ext_list_price,ss_sold_date_sk]
+                                                                    SortMergeJoin [c_customer_sk,ss_customer_sk]
+                                                                      InputAdapter
+                                                                        WholeStageCodegen
+                                                                          Project [c_birth_country,c_customer_id,c_customer_sk,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag]
+                                                                            Filter [c_customer_id,c_customer_sk]
+                                                                              Scan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer [c_birth_country,c_customer_id,c_customer_sk,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag] [c_birth_country,c_customer_id,c_customer_sk,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag]
+                                                                      InputAdapter
+                                                                        WholeStageCodegen
+                                                                          Project [ss_customer_sk,ss_ext_discount_amt,ss_ext_list_price,ss_sold_date_sk]
+                                                                            Filter [ss_customer_sk,ss_sold_date_sk]
+                                                                              Scan Hyperspace(Type: CI, Name: JoinIndex15-index-12-ss_customer_sk-20, LogVersion: 0) default.store_sales [ss_customer_sk,ss_ext_discount_amt,ss_ext_list_price,ss_sold_date_sk] [ss_customer_sk,ss_ext_discount_amt,ss_ext_list_price,ss_sold_date_sk]
+                                                      InputAdapter
+                                                        WholeStageCodegen
+                                                          Sort [d_date_sk]
+                                                            InputAdapter
+                                                              Exchange [d_date_sk] #4
+                                                                WholeStageCodegen
+                                                                  Project [d_date_sk,d_year]
+                                                                    Filter [d_date_sk,d_year]
+                                                                      Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                    LocalTableScan [customer_id,year_total] [customer_id,year_total]
+                        InputAdapter
+                          WholeStageCodegen
+                            Sort [customer_id]
+                              InputAdapter
+                                Exchange [customer_id] #5
+                                  Union
+                                    WholeStageCodegen
+                                      HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt as decimal(8,2)))), DecimalType(8,2))))] [customer_id,customer_preferred_cust_flag,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ss_ext_list_price as decimal(8,2))) - promote_precision(cast(ss_ext_discount_amt as decimal(8,2)))), DecimalType(8,2)))),year_total]
+                                        InputAdapter
+                                          Exchange [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year] #6
+                                            WholeStageCodegen
+                                              HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,ss_ext_discount_amt,ss_ext_list_price,sum,sum] [sum,sum]
+                                                Project [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,ss_ext_discount_amt,ss_ext_list_price]
+                                                  SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                                    InputAdapter
+                                                      WholeStageCodegen
+                                                        Sort [ss_sold_date_sk]
+                                                          InputAdapter
+                                                            ReusedExchange [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,ss_ext_discount_amt,ss_ext_list_price,ss_sold_date_sk] [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,ss_ext_discount_amt,ss_ext_list_price,ss_sold_date_sk] #3
+                                                    InputAdapter
+                                                      WholeStageCodegen
+                                                        Sort [d_date_sk]
+                                                          InputAdapter
+                                                            Exchange [d_date_sk] #7
+                                                              WholeStageCodegen
+                                                                Project [d_date_sk,d_year]
+                                                                  Filter [d_date_sk,d_year]
+                                                                    Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+                                    LocalTableScan [customer_id,customer_preferred_cust_flag,year_total] [customer_id,customer_preferred_cust_flag,year_total]
+                InputAdapter
+                  WholeStageCodegen
+                    Sort [customer_id]
+                      InputAdapter
+                        Exchange [customer_id] #8
+                          Union
+                            LocalTableScan [customer_id,year_total] [customer_id,year_total]
+                            WholeStageCodegen
+                              Filter [year_total]
+                                HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt as decimal(8,2)))), DecimalType(8,2))))] [customer_id,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt as decimal(8,2)))), DecimalType(8,2)))),year_total]
+                                  InputAdapter
+                                    Exchange [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year] #9
+                                      WholeStageCodegen
+                                        HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,sum,sum,ws_ext_discount_amt,ws_ext_list_price] [sum,sum]
+                                          Project [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,ws_ext_discount_amt,ws_ext_list_price]
+                                            SortMergeJoin [d_date_sk,ws_sold_date_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [ws_sold_date_sk]
+                                                    InputAdapter
+                                                      Exchange [ws_sold_date_sk] #10
+                                                        WholeStageCodegen
+                                                          Project [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,ws_ext_discount_amt,ws_ext_list_price,ws_sold_date_sk]
+                                                            SortMergeJoin [c_customer_sk,ws_bill_customer_sk]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Project [c_birth_country,c_customer_id,c_customer_sk,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag]
+                                                                    Filter [c_customer_id,c_customer_sk]
+                                                                      Scan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer [c_birth_country,c_customer_id,c_customer_sk,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag] [c_birth_country,c_customer_id,c_customer_sk,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag]
+                                                              InputAdapter
+                                                                WholeStageCodegen
+                                                                  Project [ws_bill_customer_sk,ws_ext_discount_amt,ws_ext_list_price,ws_sold_date_sk]
+                                                                    Filter [ws_bill_customer_sk,ws_sold_date_sk]
+                                                                      Scan Hyperspace(Type: CI, Name: JoinIndex39-index-30-ws_bill_customer_sk-10, LogVersion: 0) default.web_sales [ws_bill_customer_sk,ws_ext_discount_amt,ws_ext_list_price,ws_sold_date_sk] [ws_bill_customer_sk,ws_ext_discount_amt,ws_ext_list_price,ws_sold_date_sk]
+                                              InputAdapter
+                                                WholeStageCodegen
+                                                  Sort [d_date_sk]
+                                                    InputAdapter
+                                                      ReusedExchange [d_date_sk,d_year] [d_date_sk,d_year] #4
+        InputAdapter
+          WholeStageCodegen
+            Sort [customer_id]
+              InputAdapter
+                Exchange [customer_id] #11
+                  Union
+                    LocalTableScan [customer_id,year_total] [customer_id,year_total]
+                    WholeStageCodegen
+                      HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt as decimal(8,2)))), DecimalType(8,2))))] [customer_id,sum,sum(UnscaledValue(CheckOverflow((promote_precision(cast(ws_ext_list_price as decimal(8,2))) - promote_precision(cast(ws_ext_discount_amt as decimal(8,2)))), DecimalType(8,2)))),year_total]
+                        InputAdapter
+                          Exchange [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year] #12
+                            WholeStageCodegen
+                              HashAggregate [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,sum,sum,ws_ext_discount_amt,ws_ext_list_price] [sum,sum]
+                                Project [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,d_year,ws_ext_discount_amt,ws_ext_list_price]
+                                  SortMergeJoin [d_date_sk,ws_sold_date_sk]
+                                    InputAdapter
+                                      WholeStageCodegen
+                                        Sort [ws_sold_date_sk]
+                                          InputAdapter
+                                            ReusedExchange [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,ws_ext_discount_amt,ws_ext_list_price,ws_sold_date_sk] [c_birth_country,c_customer_id,c_email_address,c_first_name,c_last_name,c_login,c_preferred_cust_flag,ws_ext_discount_amt,ws_ext_list_price,ws_sold_date_sk] #10
+                                    InputAdapter
+                                      WholeStageCodegen
+                                        Sort [d_date_sk]
+                                          InputAdapter
+                                            ReusedExchange [d_date_sk,d_year] [d_date_sk,d_year] #7

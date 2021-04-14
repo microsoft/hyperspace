@@ -1,0 +1,53 @@
+TakeOrderedAndProject [count(1)]
+  WholeStageCodegen
+    HashAggregate [count,count(1)] [count,count(1),count(1)]
+      InputAdapter
+        Exchange #1
+          WholeStageCodegen
+            HashAggregate [count,count] [count,count]
+              Project
+                SortMergeJoin [s_store_sk,ss_store_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [ss_store_sk]
+                        InputAdapter
+                          Exchange [ss_store_sk] #2
+                            WholeStageCodegen
+                              Project [ss_store_sk]
+                                SortMergeJoin [ss_sold_time_sk,t_time_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ss_sold_time_sk]
+                                        InputAdapter
+                                          Exchange [ss_sold_time_sk] #3
+                                            WholeStageCodegen
+                                              Project [ss_sold_time_sk,ss_store_sk]
+                                                SortMergeJoin [hd_demo_sk,ss_hdemo_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Project [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk]
+                                                        Filter [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk]
+                                                          Scan Hyperspace(Type: CI, Name: JoinIndex17-index-27-ss_hdemo_sk-19, LogVersion: 0) default.store_sales [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk] [ss_hdemo_sk,ss_sold_time_sk,ss_store_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Project [hd_demo_sk]
+                                                        Filter [hd_demo_sk,hd_dep_count]
+                                                          Scan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics [hd_demo_sk,hd_dep_count] [hd_demo_sk,hd_dep_count]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [t_time_sk]
+                                        InputAdapter
+                                          Exchange [t_time_sk] #4
+                                            WholeStageCodegen
+                                              Project [t_time_sk]
+                                                Filter [t_hour,t_minute,t_time_sk]
+                                                  Scan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim [t_hour,t_minute,t_time_sk] [t_hour,t_minute,t_time_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [s_store_sk]
+                        InputAdapter
+                          Exchange [s_store_sk] #5
+                            WholeStageCodegen
+                              Project [s_store_sk]
+                                Filter [s_store_name,s_store_sk]
+                                  Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_name,s_store_sk] [s_store_name,s_store_sk]

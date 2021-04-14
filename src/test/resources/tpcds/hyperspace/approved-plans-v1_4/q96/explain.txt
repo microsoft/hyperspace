@@ -1,0 +1,31 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[count(1)#1 ASC NULLS FIRST], output=[count(1)#1])
++- *(12) HashAggregate(keys=[], functions=[count(1)])
+   +- Exchange SinglePartition
+      +- *(11) HashAggregate(keys=[], functions=[partial_count(1)])
+         +- *(11) Project
+            +- *(11) SortMergeJoin [ss_store_sk#2], [s_store_sk#3], Inner
+               :- *(8) Sort [ss_store_sk#2 ASC NULLS FIRST], false, 0
+               :  +- Exchange hashpartitioning(ss_store_sk#2, 5)
+               :     +- *(7) Project [ss_store_sk#2]
+               :        +- *(7) SortMergeJoin [ss_sold_time_sk#4], [t_time_sk#5], Inner
+               :           :- *(4) Sort [ss_sold_time_sk#4 ASC NULLS FIRST], false, 0
+               :           :  +- Exchange hashpartitioning(ss_sold_time_sk#4, 5)
+               :           :     +- *(3) Project [ss_sold_time_sk#4, ss_store_sk#2]
+               :           :        +- *(3) SortMergeJoin [ss_hdemo_sk#6], [hd_demo_sk#7], Inner
+               :           :           :- *(1) Project [ss_sold_time_sk#4, ss_hdemo_sk#6, ss_store_sk#2]
+               :           :           :  +- *(1) Filter ((isnotnull(ss_hdemo_sk#6) && isnotnull(ss_sold_time_sk#4)) && isnotnull(ss_store_sk#2))
+               :           :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex17-index-27-ss_hdemo_sk-19, LogVersion: 0) default.store_sales[ss_sold_time_sk#4,ss_hdemo_sk#6,ss_store_sk#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_hdemo_sk), IsNotNull(ss_sold_time_sk), IsNotNull(ss_store_sk)], ReadSchema: struct<ss_sold_time_sk:int,ss_hdemo_sk:int,ss_store_sk:int>, SelectedBucketsCount: 200 out of 200
+               :           :           +- *(2) Project [hd_demo_sk#7]
+               :           :              +- *(2) Filter ((isnotnull(hd_dep_count#8) && (hd_dep_count#8 = 7)) && isnotnull(hd_demo_sk#7))
+               :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics[hd_demo_sk#7,hd_dep_count#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(hd_dep_count), EqualTo(hd_dep_count,7), IsNotNull(hd_demo_sk)], ReadSchema: struct<hd_demo_sk:int,hd_dep_count:int>, SelectedBucketsCount: 200 out of 200
+               :           +- *(6) Sort [t_time_sk#5 ASC NULLS FIRST], false, 0
+               :              +- Exchange hashpartitioning(t_time_sk#5, 5)
+               :                 +- *(5) Project [t_time_sk#5]
+               :                    +- *(5) Filter ((((isnotnull(t_hour#9) && isnotnull(t_minute#10)) && (t_hour#9 = 20)) && (t_minute#10 >= 30)) && isnotnull(t_time_sk#5))
+               :                       +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex20-index-43-t_time_sk-4, LogVersion: 0) default.time_dim[t_time_sk#5,t_hour#9,t_minute#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(t_hour), IsNotNull(t_minute), EqualTo(t_hour,20), GreaterThanOrEqual(t_minute,30), IsN..., ReadSchema: struct<t_time_sk:int,t_hour:int,t_minute:int>
+               +- *(10) Sort [s_store_sk#3 ASC NULLS FIRST], false, 0
+                  +- Exchange hashpartitioning(s_store_sk#3, 5)
+                     +- *(9) Project [s_store_sk#3]
+                        +- *(9) Filter ((isnotnull(s_store_name#11) && (s_store_name#11 = ese)) && isnotnull(s_store_sk#3))
+                           +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#3,s_store_name#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_name), EqualTo(s_store_name,ese), IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int,s_store_name:string>

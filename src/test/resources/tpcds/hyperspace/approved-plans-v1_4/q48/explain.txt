@@ -1,0 +1,39 @@
+== Physical Plan ==
+*(16) HashAggregate(keys=[], functions=[sum(cast(ss_quantity#1 as bigint))])
++- Exchange SinglePartition
+   +- *(15) HashAggregate(keys=[], functions=[partial_sum(cast(ss_quantity#1 as bigint))])
+      +- *(15) Project [ss_quantity#1]
+         +- *(15) SortMergeJoin [ss_sold_date_sk#2], [d_date_sk#3], Inner
+            :- *(12) Sort [ss_sold_date_sk#2 ASC NULLS FIRST], false, 0
+            :  +- Exchange hashpartitioning(ss_sold_date_sk#2, 5)
+            :     +- *(11) Project [ss_sold_date_sk#2, ss_quantity#1]
+            :        +- *(11) SortMergeJoin [ss_addr_sk#4], [ca_address_sk#5], Inner, ((((ca_state#6 IN (CO,OH,TX) && (ss_net_profit#7 >= 0.00)) && (ss_net_profit#7 <= 2000.00)) || ((ca_state#6 IN (OR,MN,KY) && (ss_net_profit#7 >= 150.00)) && (ss_net_profit#7 <= 3000.00))) || ((ca_state#6 IN (VA,CA,MS) && (ss_net_profit#7 >= 50.00)) && (ss_net_profit#7 <= 25000.00)))
+            :           :- *(8) Sort [ss_addr_sk#4 ASC NULLS FIRST], false, 0
+            :           :  +- Exchange hashpartitioning(ss_addr_sk#4, 5)
+            :           :     +- *(7) Project [ss_sold_date_sk#2, ss_addr_sk#4, ss_quantity#1, ss_net_profit#7]
+            :           :        +- *(7) SortMergeJoin [ss_cdemo_sk#8], [cd_demo_sk#9], Inner, ((((((cd_marital_status#10 = M) && (cd_education_status#11 = 4 yr Degree)) && (ss_sales_price#12 >= 100.00)) && (ss_sales_price#12 <= 150.00)) || ((((cd_marital_status#10 = D) && (cd_education_status#11 = 2 yr Degree)) && (ss_sales_price#12 >= 50.00)) && (ss_sales_price#12 <= 100.00))) || ((((cd_marital_status#10 = S) && (cd_education_status#11 = College)) && (ss_sales_price#12 >= 150.00)) && (ss_sales_price#12 <= 200.00)))
+            :           :           :- *(4) Sort [ss_cdemo_sk#8 ASC NULLS FIRST], false, 0
+            :           :           :  +- Exchange hashpartitioning(ss_cdemo_sk#8, 5)
+            :           :           :     +- *(3) Project [ss_sold_date_sk#2, ss_cdemo_sk#8, ss_addr_sk#4, ss_quantity#1, ss_sales_price#12, ss_net_profit#7]
+            :           :           :        +- *(3) SortMergeJoin [ss_store_sk#13], [s_store_sk#14], Inner
+            :           :           :           :- *(1) Project [ss_sold_date_sk#2, ss_cdemo_sk#8, ss_addr_sk#4, ss_store_sk#13, ss_quantity#1, ss_sales_price#12, ss_net_profit#7]
+            :           :           :           :  +- *(1) Filter (((isnotnull(ss_store_sk#13) && isnotnull(ss_cdemo_sk#8)) && isnotnull(ss_addr_sk#4)) && isnotnull(ss_sold_date_sk#2))
+            :           :           :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex14-index-5-ss_store_sk-20, LogVersion: 0) default.store_sales[ss_sold_date_sk#2,ss_cdemo_sk#8,ss_addr_sk#4,ss_store_sk#13,ss_quantity#1,ss_sales_price#12,ss_net_profit#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_store_sk), IsNotNull(ss_cdemo_sk), IsNotNull(ss_addr_sk), IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_cdemo_sk:int,ss_addr_sk:int,ss_store_sk:int,ss_quantity:int,ss_sale..., SelectedBucketsCount: 200 out of 200
+            :           :           :           +- *(2) Project [s_store_sk#14]
+            :           :           :              +- *(2) Filter isnotnull(s_store_sk#14)
+            :           :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store[s_store_sk#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(s_store_sk)], ReadSchema: struct<s_store_sk:int>, SelectedBucketsCount: 200 out of 200
+            :           :           +- *(6) Sort [cd_demo_sk#9 ASC NULLS FIRST], false, 0
+            :           :              +- Exchange hashpartitioning(cd_demo_sk#9, 5)
+            :           :                 +- *(5) Project [cd_demo_sk#9, cd_marital_status#10, cd_education_status#11]
+            :           :                    +- *(5) Filter isnotnull(cd_demo_sk#9)
+            :           :                       +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics[cd_demo_sk#9,cd_marital_status#10,cd_education_status#11] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cd_demo_sk)], ReadSchema: struct<cd_demo_sk:int,cd_marital_status:string,cd_education_status:string>
+            :           +- *(10) Sort [ca_address_sk#5 ASC NULLS FIRST], false, 0
+            :              +- Exchange hashpartitioning(ca_address_sk#5, 5)
+            :                 +- *(9) Project [ca_address_sk#5, ca_state#6]
+            :                    +- *(9) Filter ((isnotnull(ca_country#15) && (ca_country#15 = United States)) && isnotnull(ca_address_sk#5))
+            :                       +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address[ca_address_sk#5,ca_state#6,ca_country#15] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ca_country), EqualTo(ca_country,United States), IsNotNull(ca_address_sk)], ReadSchema: struct<ca_address_sk:int,ca_state:string,ca_country:string>
+            +- *(14) Sort [d_date_sk#3 ASC NULLS FIRST], false, 0
+               +- Exchange hashpartitioning(d_date_sk#3, 5)
+                  +- *(13) Project [d_date_sk#3]
+                     +- *(13) Filter ((isnotnull(d_year#16) && (d_year#16 = 2001)) && isnotnull(d_date_sk#3))
+                        +- *(13) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#3,d_year#16] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>

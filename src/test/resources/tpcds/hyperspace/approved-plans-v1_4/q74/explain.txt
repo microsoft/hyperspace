@@ -1,0 +1,83 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[customer_id#1 ASC NULLS FIRST,customer_id#1 ASC NULLS FIRST,customer_id#1 ASC NULLS FIRST], output=[customer_id#1,customer_first_name#2,customer_last_name#3])
++- *(39) Project [customer_id#1, customer_first_name#2, customer_last_name#3]
+   +- *(39) SortMergeJoin [customer_id#4], [customer_id#5], Inner, (CASE WHEN (year_total#6 > 0.00) THEN CheckOverflow((promote_precision(year_total#7) / promote_precision(year_total#6)), DecimalType(37,20)) ELSE null END > CASE WHEN (year_total#8 > 0.00) THEN CheckOverflow((promote_precision(year_total#9) / promote_precision(year_total#8)), DecimalType(37,20)) ELSE null END)
+      :- *(29) Project [customer_id#4, year_total#8, customer_id#1, customer_first_name#2, customer_last_name#3, year_total#9, year_total#6]
+      :  +- *(29) SortMergeJoin [customer_id#4], [customer_id#10], Inner
+      :     :- *(19) SortMergeJoin [customer_id#4], [customer_id#1], Inner
+      :     :  :- *(9) Sort [customer_id#4 ASC NULLS FIRST], false, 0
+      :     :  :  +- Exchange hashpartitioning(customer_id#4, 5)
+      :     :  :     +- Union
+      :     :  :        :- *(8) Filter (isnotnull(year_total#8) && (year_total#8 > 0.00))
+      :     :  :        :  +- *(8) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ss_net_paid#15))])
+      :     :  :        :     +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
+      :     :  :        :        +- *(7) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ss_net_paid#15))])
+      :     :  :        :           +- *(7) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ss_net_paid#15, d_year#14]
+      :     :  :        :              +- *(7) SortMergeJoin [ss_sold_date_sk#16], [d_date_sk#17], Inner
+      :     :  :        :                 :- *(4) Sort [ss_sold_date_sk#16 ASC NULLS FIRST], false, 0
+      :     :  :        :                 :  +- Exchange hashpartitioning(ss_sold_date_sk#16, 5)
+      :     :  :        :                 :     +- *(3) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ss_sold_date_sk#16, ss_net_paid#15]
+      :     :  :        :                 :        +- *(3) SortMergeJoin [c_customer_sk#18], [ss_customer_sk#19], Inner
+      :     :  :        :                 :           :- *(1) Project [c_customer_sk#18, c_customer_id#11, c_first_name#12, c_last_name#13]
+      :     :  :        :                 :           :  +- *(1) Filter (isnotnull(c_customer_sk#18) && isnotnull(c_customer_id#11))
+      :     :  :        :                 :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#18,c_customer_id#11,c_first_name#12,c_last_name#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk), IsNotNull(c_customer_id)], ReadSchema: struct<c_customer_sk:int,c_customer_id:string,c_first_name:string,c_last_name:string>, SelectedBucketsCount: 200 out of 200
+      :     :  :        :                 :           +- *(2) Project [ss_sold_date_sk#16, ss_customer_sk#19, ss_net_paid#15]
+      :     :  :        :                 :              +- *(2) Filter (isnotnull(ss_customer_sk#19) && isnotnull(ss_sold_date_sk#16))
+      :     :  :        :                 :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex15-index-12-ss_customer_sk-20, LogVersion: 0) default.store_sales[ss_sold_date_sk#16,ss_customer_sk#19,ss_net_paid#15] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_customer_sk), IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_customer_sk:int,ss_net_paid:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+      :     :  :        :                 +- *(6) Sort [d_date_sk#17 ASC NULLS FIRST], false, 0
+      :     :  :        :                    +- Exchange hashpartitioning(d_date_sk#17, 5)
+      :     :  :        :                       +- *(5) Project [d_date_sk#17, d_year#14]
+      :     :  :        :                          +- *(5) Filter (((isnotnull(d_year#14) && d_year#14 IN (2001,2002)) && (d_year#14 = 2001)) && isnotnull(d_date_sk#17))
+      :     :  :        :                             +- *(5) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), In(d_year, [2001,2002]), EqualTo(d_year,2001), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :     :  :        +- LocalTableScan <empty>, [customer_id#20, year_total#21]
+      :     :  +- *(18) Sort [customer_id#1 ASC NULLS FIRST], false, 0
+      :     :     +- Exchange hashpartitioning(customer_id#1, 5)
+      :     :        +- Union
+      :     :           :- *(17) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ss_net_paid#15))])
+      :     :           :  +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
+      :     :           :     +- *(16) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ss_net_paid#15))])
+      :     :           :        +- *(16) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ss_net_paid#15, d_year#14]
+      :     :           :           +- *(16) SortMergeJoin [ss_sold_date_sk#16], [d_date_sk#17], Inner
+      :     :           :              :- *(13) Sort [ss_sold_date_sk#16 ASC NULLS FIRST], false, 0
+      :     :           :              :  +- ReusedExchange [c_customer_id#11, c_first_name#12, c_last_name#13, ss_sold_date_sk#16, ss_net_paid#15], Exchange hashpartitioning(ss_sold_date_sk#16, 5)
+      :     :           :              +- *(15) Sort [d_date_sk#17 ASC NULLS FIRST], false, 0
+      :     :           :                 +- Exchange hashpartitioning(d_date_sk#17, 5)
+      :     :           :                    +- *(14) Project [d_date_sk#17, d_year#14]
+      :     :           :                       +- *(14) Filter (((isnotnull(d_year#14) && d_year#14 IN (2001,2002)) && (d_year#14 = 2002)) && isnotnull(d_date_sk#17))
+      :     :           :                          +- *(14) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#17,d_year#14] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), In(d_year, [2001,2002]), EqualTo(d_year,2002), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>
+      :     :           +- LocalTableScan <empty>, [customer_id#20, customer_first_name#22, customer_last_name#23, year_total#21]
+      :     +- *(28) Sort [customer_id#10 ASC NULLS FIRST], false, 0
+      :        +- Exchange hashpartitioning(customer_id#10, 5)
+      :           +- Union
+      :              :- LocalTableScan <empty>, [customer_id#10, year_total#6]
+      :              +- *(27) Filter (isnotnull(year_total#21) && (year_total#21 > 0.00))
+      :                 +- *(27) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ws_net_paid#24))])
+      :                    +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
+      :                       +- *(26) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ws_net_paid#24))])
+      :                          +- *(26) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ws_net_paid#24, d_year#14]
+      :                             +- *(26) SortMergeJoin [ws_sold_date_sk#25], [d_date_sk#17], Inner
+      :                                :- *(23) Sort [ws_sold_date_sk#25 ASC NULLS FIRST], false, 0
+      :                                :  +- Exchange hashpartitioning(ws_sold_date_sk#25, 5)
+      :                                :     +- *(22) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ws_sold_date_sk#25, ws_net_paid#24]
+      :                                :        +- *(22) SortMergeJoin [c_customer_sk#18], [ws_bill_customer_sk#26], Inner
+      :                                :           :- *(20) Project [c_customer_sk#18, c_customer_id#11, c_first_name#12, c_last_name#13]
+      :                                :           :  +- *(20) Filter (isnotnull(c_customer_sk#18) && isnotnull(c_customer_id#11))
+      :                                :           :     +- *(20) FileScan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer[c_customer_sk#18,c_customer_id#11,c_first_name#12,c_last_name#13] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_customer_sk), IsNotNull(c_customer_id)], ReadSchema: struct<c_customer_sk:int,c_customer_id:string,c_first_name:string,c_last_name:string>, SelectedBucketsCount: 200 out of 200
+      :                                :           +- *(21) Project [ws_sold_date_sk#25, ws_bill_customer_sk#26, ws_net_paid#24]
+      :                                :              +- *(21) Filter (isnotnull(ws_bill_customer_sk#26) && isnotnull(ws_sold_date_sk#25))
+      :                                :                 +- *(21) FileScan Hyperspace(Type: CI, Name: JoinIndex39-index-30-ws_bill_customer_sk-10, LogVersion: 0) default.web_sales[ws_sold_date_sk#25,ws_bill_customer_sk#26,ws_net_paid#24] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ws_bill_customer_sk), IsNotNull(ws_sold_date_sk)], ReadSchema: struct<ws_sold_date_sk:int,ws_bill_customer_sk:int,ws_net_paid:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+      :                                +- *(25) Sort [d_date_sk#17 ASC NULLS FIRST], false, 0
+      :                                   +- ReusedExchange [d_date_sk#17, d_year#14], Exchange hashpartitioning(d_date_sk#17, 5)
+      +- *(38) Sort [customer_id#5 ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(customer_id#5, 5)
+            +- Union
+               :- LocalTableScan <empty>, [customer_id#5, year_total#7]
+               +- *(37) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[sum(UnscaledValue(ws_net_paid#24))])
+                  +- Exchange hashpartitioning(c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14, 5)
+                     +- *(36) HashAggregate(keys=[c_customer_id#11, c_first_name#12, c_last_name#13, d_year#14], functions=[partial_sum(UnscaledValue(ws_net_paid#24))])
+                        +- *(36) Project [c_customer_id#11, c_first_name#12, c_last_name#13, ws_net_paid#24, d_year#14]
+                           +- *(36) SortMergeJoin [ws_sold_date_sk#25], [d_date_sk#17], Inner
+                              :- *(33) Sort [ws_sold_date_sk#25 ASC NULLS FIRST], false, 0
+                              :  +- ReusedExchange [c_customer_id#11, c_first_name#12, c_last_name#13, ws_sold_date_sk#25, ws_net_paid#24], Exchange hashpartitioning(ws_sold_date_sk#25, 5)
+                              +- *(35) Sort [d_date_sk#17 ASC NULLS FIRST], false, 0
+                                 +- ReusedExchange [d_date_sk#17, d_year#14], Exchange hashpartitioning(d_date_sk#17, 5)

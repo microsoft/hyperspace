@@ -1,0 +1,54 @@
+TakeOrderedAndProject [i_brand,i_category,i_class,i_product_name,qoh]
+  WholeStageCodegen
+    HashAggregate [avg(cast(inv_quantity_on_hand as bigint)),count,i_brand,i_category,i_class,i_product_name,spark_grouping_id,sum] [avg(cast(inv_quantity_on_hand as bigint)),count,qoh,sum]
+      InputAdapter
+        Exchange [i_brand,i_category,i_class,i_product_name,spark_grouping_id] #1
+          WholeStageCodegen
+            HashAggregate [count,count,i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand,spark_grouping_id,sum,sum] [count,count,sum,sum]
+              Expand [i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand]
+                Project [i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand]
+                  SortMergeJoin [inv_warehouse_sk,w_warehouse_sk]
+                    InputAdapter
+                      WholeStageCodegen
+                        Sort [inv_warehouse_sk]
+                          InputAdapter
+                            Exchange [inv_warehouse_sk] #2
+                              WholeStageCodegen
+                                Project [i_brand,i_category,i_class,i_product_name,inv_quantity_on_hand,inv_warehouse_sk]
+                                  SortMergeJoin [i_item_sk,inv_item_sk]
+                                    InputAdapter
+                                      WholeStageCodegen
+                                        Sort [inv_item_sk]
+                                          InputAdapter
+                                            Exchange [inv_item_sk] #3
+                                              WholeStageCodegen
+                                                Project [inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                                                  SortMergeJoin [d_date_sk,inv_date_sk]
+                                                    InputAdapter
+                                                      WholeStageCodegen
+                                                        Project [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                                                          Filter [inv_date_sk,inv_item_sk,inv_warehouse_sk]
+                                                            Scan Hyperspace(Type: CI, Name: JoinIndex01-index-34-inv_date_sk-3, LogVersion: 0) default.inventory [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk] [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                                                    InputAdapter
+                                                      WholeStageCodegen
+                                                        Project [d_date_sk]
+                                                          Filter [d_date_sk,d_month_seq]
+                                                            Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_month_seq] [d_date_sk,d_month_seq]
+                                    InputAdapter
+                                      WholeStageCodegen
+                                        Sort [i_item_sk]
+                                          InputAdapter
+                                            Exchange [i_item_sk] #4
+                                              WholeStageCodegen
+                                                Project [i_brand,i_category,i_class,i_item_sk,i_product_name]
+                                                  Filter [i_item_sk]
+                                                    Scan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item [i_brand,i_category,i_class,i_item_sk,i_product_name] [i_brand,i_category,i_class,i_item_sk,i_product_name]
+                    InputAdapter
+                      WholeStageCodegen
+                        Sort [w_warehouse_sk]
+                          InputAdapter
+                            Exchange [w_warehouse_sk] #5
+                              WholeStageCodegen
+                                Project [w_warehouse_sk]
+                                  Filter [w_warehouse_sk]
+                                    Scan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse [w_warehouse_sk] [w_warehouse_sk]

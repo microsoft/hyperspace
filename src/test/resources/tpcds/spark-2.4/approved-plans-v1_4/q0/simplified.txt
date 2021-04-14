@@ -1,0 +1,13 @@
+CollectLimit
+  WholeStageCodegen
+    Project [d_year,ss_customer_sk]
+      BroadcastHashJoin [d_date_sk,ss_sold_date_sk]
+        Project [d_date_sk,d_year]
+          Filter [d_date_sk]
+            Scan parquet default.date_dim [d_date_sk,d_year] [d_date_sk,d_year]
+        InputAdapter
+          BroadcastExchange #1
+            WholeStageCodegen
+              Project [ss_customer_sk,ss_sold_date_sk]
+                Filter [ss_sold_date_sk]
+                  Scan parquet default.store_sales [ss_customer_sk,ss_sold_date_sk] [ss_customer_sk,ss_sold_date_sk]

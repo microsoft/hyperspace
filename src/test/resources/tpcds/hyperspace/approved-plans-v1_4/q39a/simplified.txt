@@ -1,0 +1,94 @@
+WholeStageCodegen
+  Sort [cov,cov,d_moy,d_moy,i_item_sk,mean,mean,w_warehouse_sk]
+    InputAdapter
+      Exchange [cov,cov,d_moy,d_moy,i_item_sk,mean,mean,w_warehouse_sk] #1
+        WholeStageCodegen
+          SortMergeJoin [i_item_sk,i_item_sk,w_warehouse_sk,w_warehouse_sk]
+            InputAdapter
+              WholeStageCodegen
+                Sort [i_item_sk,w_warehouse_sk]
+                  InputAdapter
+                    Exchange [i_item_sk,w_warehouse_sk] #2
+                      WholeStageCodegen
+                        Project [d_moy,i_item_sk,mean,stdev,w_warehouse_sk]
+                          Filter [mean,stdev]
+                            HashAggregate [avg,avg(cast(inv_quantity_on_hand as bigint)),count,d_moy,i_item_sk,m2,n,stddev_samp(cast(inv_quantity_on_hand as double)),sum,w_warehouse_name,w_warehouse_sk] [avg,avg(cast(inv_quantity_on_hand as bigint)),count,m2,mean,n,stddev_samp(cast(inv_quantity_on_hand as double)),stdev,sum]
+                              InputAdapter
+                                Exchange [d_moy,i_item_sk,w_warehouse_name,w_warehouse_sk] #3
+                                  WholeStageCodegen
+                                    HashAggregate [avg,avg,count,count,d_moy,i_item_sk,inv_quantity_on_hand,m2,m2,n,n,sum,sum,w_warehouse_name,w_warehouse_sk] [avg,avg,count,count,m2,m2,n,n,sum,sum]
+                                      Project [d_moy,i_item_sk,inv_quantity_on_hand,w_warehouse_name,w_warehouse_sk]
+                                        SortMergeJoin [d_date_sk,inv_date_sk]
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [inv_date_sk]
+                                                InputAdapter
+                                                  Exchange [inv_date_sk] #4
+                                                    WholeStageCodegen
+                                                      Project [i_item_sk,inv_date_sk,inv_quantity_on_hand,w_warehouse_name,w_warehouse_sk]
+                                                        SortMergeJoin [inv_warehouse_sk,w_warehouse_sk]
+                                                          InputAdapter
+                                                            WholeStageCodegen
+                                                              Sort [inv_warehouse_sk]
+                                                                InputAdapter
+                                                                  Exchange [inv_warehouse_sk] #5
+                                                                    WholeStageCodegen
+                                                                      Project [i_item_sk,inv_date_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                                                                        SortMergeJoin [i_item_sk,inv_item_sk]
+                                                                          InputAdapter
+                                                                            WholeStageCodegen
+                                                                              Project [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                                                                                Filter [inv_date_sk,inv_item_sk,inv_warehouse_sk]
+                                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex00-index-33-inv_item_sk-3, LogVersion: 0) default.inventory [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk] [inv_date_sk,inv_item_sk,inv_quantity_on_hand,inv_warehouse_sk]
+                                                                          InputAdapter
+                                                                            WholeStageCodegen
+                                                                              Project [i_item_sk]
+                                                                                Filter [i_item_sk]
+                                                                                  Scan Hyperspace(Type: CI, Name: FilterIndex09-index-32-i_item_sk-1, LogVersion: 0) default.item [i_item_sk] [i_item_sk]
+                                                          InputAdapter
+                                                            WholeStageCodegen
+                                                              Sort [w_warehouse_sk]
+                                                                InputAdapter
+                                                                  Exchange [w_warehouse_sk] #6
+                                                                    WholeStageCodegen
+                                                                      Project [w_warehouse_name,w_warehouse_sk]
+                                                                        Filter [w_warehouse_sk]
+                                                                          Scan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse [w_warehouse_name,w_warehouse_sk] [w_warehouse_name,w_warehouse_sk]
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [d_date_sk]
+                                                InputAdapter
+                                                  Exchange [d_date_sk] #7
+                                                    WholeStageCodegen
+                                                      Project [d_date_sk,d_moy]
+                                                        Filter [d_date_sk,d_moy,d_year]
+                                                          Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_moy,d_year] [d_date_sk,d_moy,d_year]
+            InputAdapter
+              WholeStageCodegen
+                Sort [i_item_sk,w_warehouse_sk]
+                  InputAdapter
+                    Exchange [i_item_sk,w_warehouse_sk] #8
+                      WholeStageCodegen
+                        Project [d_moy,i_item_sk,mean,stdev,w_warehouse_sk]
+                          Filter [mean,stdev]
+                            HashAggregate [avg,avg(cast(inv_quantity_on_hand as bigint)),count,d_moy,i_item_sk,m2,n,stddev_samp(cast(inv_quantity_on_hand as double)),sum,w_warehouse_name,w_warehouse_sk] [avg,avg(cast(inv_quantity_on_hand as bigint)),count,m2,mean,n,stddev_samp(cast(inv_quantity_on_hand as double)),stdev,sum]
+                              InputAdapter
+                                Exchange [d_moy,i_item_sk,w_warehouse_name,w_warehouse_sk] #9
+                                  WholeStageCodegen
+                                    HashAggregate [avg,avg,count,count,d_moy,i_item_sk,inv_quantity_on_hand,m2,m2,n,n,sum,sum,w_warehouse_name,w_warehouse_sk] [avg,avg,count,count,m2,m2,n,n,sum,sum]
+                                      Project [d_moy,i_item_sk,inv_quantity_on_hand,w_warehouse_name,w_warehouse_sk]
+                                        SortMergeJoin [d_date_sk,inv_date_sk]
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [inv_date_sk]
+                                                InputAdapter
+                                                  ReusedExchange [i_item_sk,inv_date_sk,inv_quantity_on_hand,w_warehouse_name,w_warehouse_sk] [i_item_sk,inv_date_sk,inv_quantity_on_hand,w_warehouse_name,w_warehouse_sk] #4
+                                          InputAdapter
+                                            WholeStageCodegen
+                                              Sort [d_date_sk]
+                                                InputAdapter
+                                                  Exchange [d_date_sk] #10
+                                                    WholeStageCodegen
+                                                      Project [d_date_sk,d_moy]
+                                                        Filter [d_date_sk,d_moy,d_year]
+                                                          Scan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim [d_date_sk,d_moy,d_year] [d_date_sk,d_moy,d_year]

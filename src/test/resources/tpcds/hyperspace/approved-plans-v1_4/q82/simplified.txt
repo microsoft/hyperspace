@@ -1,0 +1,53 @@
+TakeOrderedAndProject [i_current_price,i_item_desc,i_item_id]
+  WholeStageCodegen
+    HashAggregate [i_current_price,i_item_desc,i_item_id]
+      InputAdapter
+        Exchange [i_current_price,i_item_desc,i_item_id] #1
+          WholeStageCodegen
+            HashAggregate [i_current_price,i_item_desc,i_item_id]
+              Project [i_current_price,i_item_desc,i_item_id]
+                SortMergeJoin [i_item_sk,ss_item_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [i_item_sk]
+                        InputAdapter
+                          Exchange [i_item_sk] #2
+                            WholeStageCodegen
+                              Project [i_current_price,i_item_desc,i_item_id,i_item_sk]
+                                SortMergeJoin [d_date_sk,inv_date_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [inv_date_sk]
+                                        InputAdapter
+                                          Exchange [inv_date_sk] #3
+                                            WholeStageCodegen
+                                              Project [i_current_price,i_item_desc,i_item_id,i_item_sk,inv_date_sk]
+                                                SortMergeJoin [i_item_sk,inv_item_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Project [i_current_price,i_item_desc,i_item_id,i_item_sk]
+                                                        Filter [i_current_price,i_item_sk,i_manufact_id]
+                                                          Scan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item [i_current_price,i_item_desc,i_item_id,i_item_sk,i_manufact_id] [i_current_price,i_item_desc,i_item_id,i_item_sk,i_manufact_id]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Project [inv_date_sk,inv_item_sk]
+                                                        Filter [inv_date_sk,inv_item_sk,inv_quantity_on_hand]
+                                                          Scan Hyperspace(Type: CI, Name: JoinIndex00-index-33-inv_item_sk-3, LogVersion: 0) default.inventory [inv_date_sk,inv_item_sk,inv_quantity_on_hand] [inv_date_sk,inv_item_sk,inv_quantity_on_hand]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [d_date_sk]
+                                        InputAdapter
+                                          Exchange [d_date_sk] #4
+                                            WholeStageCodegen
+                                              Project [d_date_sk]
+                                                Filter [d_date,d_date_sk]
+                                                  Scan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim [d_date,d_date_sk] [d_date,d_date_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [ss_item_sk]
+                        InputAdapter
+                          Exchange [ss_item_sk] #5
+                            WholeStageCodegen
+                              Project [ss_item_sk]
+                                Filter [ss_item_sk]
+                                  Scan Hyperspace(Type: CI, Name: JoinIndex13-index-3-ss_item_sk-16, LogVersion: 0) default.store_sales [ss_item_sk] [ss_item_sk]

@@ -1,0 +1,98 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[total_cnt#1 DESC NULLS LAST,i_item_desc#2 ASC NULLS FIRST,w_warehouse_name#3 ASC NULLS FIRST,d_week_seq#4 ASC NULLS FIRST], output=[i_item_desc#2,w_warehouse_name#3,d_week_seq#4,no_promo#5,promo#6,total_cnt#1])
++- *(42) HashAggregate(keys=[i_item_desc#2, w_warehouse_name#3, d_week_seq#4], functions=[count(1)])
+   +- Exchange hashpartitioning(i_item_desc#2, w_warehouse_name#3, d_week_seq#4, 5)
+      +- *(41) HashAggregate(keys=[i_item_desc#2, w_warehouse_name#3, d_week_seq#4], functions=[partial_count(1)])
+         +- *(41) Project [w_warehouse_name#3, i_item_desc#2, d_week_seq#4]
+            +- SortMergeJoin [cs_item_sk#7, cs_order_number#8], [cr_item_sk#9, cr_order_number#10], LeftOuter
+               :- *(38) Sort [cs_item_sk#7 ASC NULLS FIRST, cs_order_number#8 ASC NULLS FIRST], false, 0
+               :  +- Exchange hashpartitioning(cs_item_sk#7, cs_order_number#8, 5)
+               :     +- *(37) Project [cs_item_sk#7, cs_order_number#8, w_warehouse_name#3, i_item_desc#2, d_week_seq#4]
+               :        +- SortMergeJoin [cs_promo_sk#11], [p_promo_sk#12], LeftOuter
+               :           :- *(34) Sort [cs_promo_sk#11 ASC NULLS FIRST], false, 0
+               :           :  +- Exchange hashpartitioning(cs_promo_sk#11, 5)
+               :           :     +- *(33) Project [cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, w_warehouse_name#3, i_item_desc#2, d_week_seq#4]
+               :           :        +- *(33) SortMergeJoin [cs_ship_date_sk#13], [d_date_sk#14], Inner, (d_date#15 > cast(cast(d_date#16 as timestamp) + interval 5 days as date))
+               :           :           :- *(30) Sort [cs_ship_date_sk#13 ASC NULLS FIRST], false, 0
+               :           :           :  +- Exchange hashpartitioning(cs_ship_date_sk#13, 5)
+               :           :           :     +- *(29) Project [cs_ship_date_sk#13, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, w_warehouse_name#3, i_item_desc#2, d_date#16, d_week_seq#4]
+               :           :           :        +- *(29) SortMergeJoin [d_week_seq#4, inv_date_sk#17], [d_week_seq#18, d_date_sk#19], Inner
+               :           :           :           :- *(26) Sort [d_week_seq#4 ASC NULLS FIRST, inv_date_sk#17 ASC NULLS FIRST], false, 0
+               :           :           :           :  +- Exchange hashpartitioning(d_week_seq#4, inv_date_sk#17, 5)
+               :           :           :           :     +- *(25) Project [cs_ship_date_sk#13, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, inv_date_sk#17, w_warehouse_name#3, i_item_desc#2, d_date#16, d_week_seq#4]
+               :           :           :           :        +- *(25) SortMergeJoin [cs_sold_date_sk#20], [d_date_sk#21], Inner
+               :           :           :           :           :- *(22) Sort [cs_sold_date_sk#20 ASC NULLS FIRST], false, 0
+               :           :           :           :           :  +- Exchange hashpartitioning(cs_sold_date_sk#20, 5)
+               :           :           :           :           :     +- *(21) Project [cs_sold_date_sk#20, cs_ship_date_sk#13, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, inv_date_sk#17, w_warehouse_name#3, i_item_desc#2]
+               :           :           :           :           :        +- *(21) SortMergeJoin [cs_bill_hdemo_sk#22], [hd_demo_sk#23], Inner
+               :           :           :           :           :           :- *(18) Sort [cs_bill_hdemo_sk#22 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :  +- Exchange hashpartitioning(cs_bill_hdemo_sk#22, 5)
+               :           :           :           :           :           :     +- *(17) Project [cs_sold_date_sk#20, cs_ship_date_sk#13, cs_bill_hdemo_sk#22, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, inv_date_sk#17, w_warehouse_name#3, i_item_desc#2]
+               :           :           :           :           :           :        +- *(17) SortMergeJoin [cs_bill_cdemo_sk#24], [cd_demo_sk#25], Inner
+               :           :           :           :           :           :           :- *(14) Sort [cs_bill_cdemo_sk#24 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :  +- Exchange hashpartitioning(cs_bill_cdemo_sk#24, 5)
+               :           :           :           :           :           :           :     +- *(13) Project [cs_sold_date_sk#20, cs_ship_date_sk#13, cs_bill_cdemo_sk#24, cs_bill_hdemo_sk#22, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, inv_date_sk#17, w_warehouse_name#3, i_item_desc#2]
+               :           :           :           :           :           :           :        +- *(13) SortMergeJoin [cs_item_sk#7], [i_item_sk#26], Inner
+               :           :           :           :           :           :           :           :- *(10) Sort [cs_item_sk#7 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :           :  +- Exchange hashpartitioning(cs_item_sk#7, 5)
+               :           :           :           :           :           :           :           :     +- *(9) Project [cs_sold_date_sk#20, cs_ship_date_sk#13, cs_bill_cdemo_sk#24, cs_bill_hdemo_sk#22, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, inv_date_sk#17, w_warehouse_name#3]
+               :           :           :           :           :           :           :           :        +- *(9) SortMergeJoin [inv_warehouse_sk#27], [w_warehouse_sk#28], Inner
+               :           :           :           :           :           :           :           :           :- *(6) Sort [inv_warehouse_sk#27 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :           :           :  +- Exchange hashpartitioning(inv_warehouse_sk#27, 5)
+               :           :           :           :           :           :           :           :           :     +- *(5) Project [cs_sold_date_sk#20, cs_ship_date_sk#13, cs_bill_cdemo_sk#24, cs_bill_hdemo_sk#22, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, inv_date_sk#17, inv_warehouse_sk#27]
+               :           :           :           :           :           :           :           :           :        +- *(5) SortMergeJoin [cs_item_sk#7], [inv_item_sk#29], Inner, (inv_quantity_on_hand#30 < cs_quantity#31)
+               :           :           :           :           :           :           :           :           :           :- *(2) Sort [cs_item_sk#7 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :           :           :           :  +- Exchange hashpartitioning(cs_item_sk#7, 5)
+               :           :           :           :           :           :           :           :           :           :     +- *(1) Project [cs_sold_date_sk#20, cs_ship_date_sk#13, cs_bill_cdemo_sk#24, cs_bill_hdemo_sk#22, cs_item_sk#7, cs_promo_sk#11, cs_order_number#8, cs_quantity#31]
+               :           :           :           :           :           :           :           :           :           :        +- *(1) Filter (((((isnotnull(cs_quantity#31) && isnotnull(cs_item_sk#7)) && isnotnull(cs_bill_cdemo_sk#24)) && isnotnull(cs_bill_hdemo_sk#22)) && isnotnull(cs_sold_date_sk#20)) && isnotnull(cs_ship_date_sk#13))
+               :           :           :           :           :           :           :           :           :           :           +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex26-index-6-cs_sold_date_sk-26, LogVersion: 0) default.catalog_sales[cs_sold_date_sk#20,cs_ship_date_sk#13,cs_bill_cdemo_sk#24,cs_bill_hdemo_sk#22,cs_item_sk#7,cs_promo_sk#11,cs_order_number#8,cs_quantity#31] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cs_quantity), IsNotNull(cs_item_sk), IsNotNull(cs_bill_cdemo_sk), IsNotNull(cs_bill_hd..., ReadSchema: struct<cs_sold_date_sk:int,cs_ship_date_sk:int,cs_bill_cdemo_sk:int,cs_bill_hdemo_sk:int,cs_item_...
+               :           :           :           :           :           :           :           :           :           +- *(4) Sort [inv_item_sk#29 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :           :           :              +- Exchange hashpartitioning(inv_item_sk#29, 5)
+               :           :           :           :           :           :           :           :           :                 +- *(3) Project [inv_date_sk#17, inv_item_sk#29, inv_warehouse_sk#27, inv_quantity_on_hand#30]
+               :           :           :           :           :           :           :           :           :                    +- *(3) Filter (((isnotnull(inv_quantity_on_hand#30) && isnotnull(inv_item_sk#29)) && isnotnull(inv_warehouse_sk#27)) && isnotnull(inv_date_sk#17))
+               :           :           :           :           :           :           :           :           :                       +- *(3) FileScan Hyperspace(Type: CI, Name: JoinIndex00-index-33-inv_item_sk-3, LogVersion: 0) default.inventory[inv_date_sk#17,inv_item_sk#29,inv_warehouse_sk#27,inv_quantity_on_hand#30] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(inv_quantity_on_hand), IsNotNull(inv_item_sk), IsNotNull(inv_warehouse_sk), IsNotNull(..., ReadSchema: struct<inv_date_sk:int,inv_item_sk:int,inv_warehouse_sk:int,inv_quantity_on_hand:int>
+               :           :           :           :           :           :           :           :           +- *(8) Sort [w_warehouse_sk#28 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :           :              +- Exchange hashpartitioning(w_warehouse_sk#28, 5)
+               :           :           :           :           :           :           :           :                 +- *(7) Project [w_warehouse_sk#28, w_warehouse_name#3]
+               :           :           :           :           :           :           :           :                    +- *(7) Filter isnotnull(w_warehouse_sk#28)
+               :           :           :           :           :           :           :           :                       +- *(7) FileScan Hyperspace(Type: CI, Name: JoinIndex35-index-24-w_warehouse_sk-6, LogVersion: 0) default.warehouse[w_warehouse_sk#28,w_warehouse_name#3] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(w_warehouse_sk)], ReadSchema: struct<w_warehouse_sk:int,w_warehouse_name:string>
+               :           :           :           :           :           :           :           +- *(12) Sort [i_item_sk#26 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :           :              +- Exchange hashpartitioning(i_item_sk#26, 5)
+               :           :           :           :           :           :           :                 +- *(11) Project [i_item_sk#26, i_item_desc#2]
+               :           :           :           :           :           :           :                    +- *(11) Filter isnotnull(i_item_sk#26)
+               :           :           :           :           :           :           :                       +- *(11) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#26,i_item_desc#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk)], ReadSchema: struct<i_item_sk:int,i_item_desc:string>
+               :           :           :           :           :           :           +- *(16) Sort [cd_demo_sk#25 ASC NULLS FIRST], false, 0
+               :           :           :           :           :           :              +- Exchange hashpartitioning(cd_demo_sk#25, 5)
+               :           :           :           :           :           :                 +- *(15) Project [cd_demo_sk#25]
+               :           :           :           :           :           :                    +- *(15) Filter ((isnotnull(cd_marital_status#32) && (cd_marital_status#32 = D)) && isnotnull(cd_demo_sk#25))
+               :           :           :           :           :           :                       +- *(15) FileScan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics[cd_demo_sk#25,cd_marital_status#32] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cd_marital_status), EqualTo(cd_marital_status,D), IsNotNull(cd_demo_sk)], ReadSchema: struct<cd_demo_sk:int,cd_marital_status:string>
+               :           :           :           :           :           +- *(20) Sort [hd_demo_sk#23 ASC NULLS FIRST], false, 0
+               :           :           :           :           :              +- Exchange hashpartitioning(hd_demo_sk#23, 5)
+               :           :           :           :           :                 +- *(19) Project [hd_demo_sk#23]
+               :           :           :           :           :                    +- *(19) Filter ((isnotnull(hd_buy_potential#33) && (hd_buy_potential#33 = >10000)) && isnotnull(hd_demo_sk#23))
+               :           :           :           :           :                       +- *(19) FileScan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics[hd_demo_sk#23,hd_buy_potential#33] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(hd_buy_potential), EqualTo(hd_buy_potential,>10000), IsNotNull(hd_demo_sk)], ReadSchema: struct<hd_demo_sk:int,hd_buy_potential:string>
+               :           :           :           :           +- *(24) Sort [d_date_sk#21 ASC NULLS FIRST], false, 0
+               :           :           :           :              +- Exchange hashpartitioning(d_date_sk#21, 5)
+               :           :           :           :                 +- *(23) Project [d_date_sk#21, d_date#16, d_week_seq#4]
+               :           :           :           :                    +- *(23) Filter (((isnotnull(d_year#34) && (d_year#34 = 1999)) && isnotnull(d_date_sk#21)) && isnotnull(d_week_seq#4))
+               :           :           :           :                       +- *(23) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#21,d_date#16,d_week_seq#4,d_year#34] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_year), EqualTo(d_year,1999), IsNotNull(d_date_sk), IsNotNull(d_week_seq)], ReadSchema: struct<d_date_sk:int,d_date:date,d_week_seq:int,d_year:int>
+               :           :           :           +- *(28) Sort [d_week_seq#18 ASC NULLS FIRST, d_date_sk#19 ASC NULLS FIRST], false, 0
+               :           :           :              +- Exchange hashpartitioning(d_week_seq#18, d_date_sk#19, 5)
+               :           :           :                 +- *(27) Project [d_date_sk#19, d_week_seq#18]
+               :           :           :                    +- *(27) Filter (isnotnull(d_week_seq#18) && isnotnull(d_date_sk#19))
+               :           :           :                       +- *(27) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#19,d_week_seq#18] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_week_seq), IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_week_seq:int>
+               :           :           +- *(32) Sort [d_date_sk#14 ASC NULLS FIRST], false, 0
+               :           :              +- Exchange hashpartitioning(d_date_sk#14, 5)
+               :           :                 +- *(31) Project [d_date_sk#14, d_date#15]
+               :           :                    +- *(31) Filter (isnotnull(d_date_sk#14) && isnotnull(d_date#15))
+               :           :                       +- *(31) FileScan Hyperspace(Type: CI, Name: FilterIndex06-index-14-d_date-2, LogVersion: 0) default.date_dim[d_date_sk#14,d_date#15] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk), IsNotNull(d_date)], ReadSchema: struct<d_date_sk:int,d_date:date>
+               :           +- *(36) Sort [p_promo_sk#12 ASC NULLS FIRST], false, 0
+               :              +- Exchange hashpartitioning(p_promo_sk#12, 5)
+               :                 +- *(35) Project [p_promo_sk#12]
+               :                    +- *(35) Filter isnotnull(p_promo_sk#12)
+               :                       +- *(35) FileScan Hyperspace(Type: CI, Name: JoinIndex49-index-40-p_promo_sk-4, LogVersion: 0) default.promotion[p_promo_sk#12] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(p_promo_sk)], ReadSchema: struct<p_promo_sk:int>
+               +- *(40) Sort [cr_item_sk#9 ASC NULLS FIRST, cr_order_number#10 ASC NULLS FIRST], false, 0
+                  +- Exchange hashpartitioning(cr_item_sk#9, cr_order_number#10, 5)
+                     +- *(39) Project [cr_item_sk#9, cr_order_number#10]
+                        +- *(39) Filter (isnotnull(cr_item_sk#9) && isnotnull(cr_order_number#10))
+                           +- *(39) FileScan Hyperspace(Type: CI, Name: JoinIndex47-index-26-cr_item_sk-8, LogVersion: 0) default.catalog_returns[cr_item_sk#9,cr_order_number#10] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cr_item_sk), IsNotNull(cr_order_number)], ReadSchema: struct<cr_item_sk:int,cr_order_number:int>

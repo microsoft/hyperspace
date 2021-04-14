@@ -1,0 +1,60 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[CheckOverflow((promote_precision(cast(sum_sales#1 as decimal(22,6))) - promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(22,6)) ASC NULLS FIRST,cc_name#3 ASC NULLS FIRST], output=[i_category#4,i_brand#5,cc_name#3,d_year#6,d_moy#7,avg_monthly_sales#2,sum_sales#1,psum#8,nsum#9])
++- *(48) Project [i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7, avg_monthly_sales#2, sum_sales#1, sum_sales#10 AS psum#8, sum_sales#11 AS nsum#9]
+   +- *(48) SortMergeJoin [i_category#4, i_brand#5, cc_name#3, rn#12], [i_category#13, i_brand#14, cc_name#15, (rn#16 - 1)], Inner
+      :- *(32) Project [i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7, sum_sales#1, avg_monthly_sales#2, rn#12, sum_sales#10]
+      :  +- *(32) SortMergeJoin [i_category#4, i_brand#5, cc_name#3, rn#12], [i_category#17, i_brand#18, cc_name#19, (rn#20 + 1)], Inner
+      :     :- *(16) Sort [i_category#4 ASC NULLS FIRST, i_brand#5 ASC NULLS FIRST, cc_name#3 ASC NULLS FIRST, rn#12 ASC NULLS FIRST], false, 0
+      :     :  +- Exchange hashpartitioning(i_category#4, i_brand#5, cc_name#3, rn#12, 5)
+      :     :     +- *(15) Project [i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7, sum_sales#1, avg_monthly_sales#2, rn#12]
+      :     :        +- *(15) Filter (((isnotnull(avg_monthly_sales#2) && (avg_monthly_sales#2 > 0.000000)) && (CASE WHEN (avg_monthly_sales#2 > 0.000000) THEN CheckOverflow((promote_precision(abs(CheckOverflow((promote_precision(cast(sum_sales#1 as decimal(22,6))) - promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(22,6)))) / promote_precision(cast(avg_monthly_sales#2 as decimal(22,6)))), DecimalType(38,16)) ELSE null END > 0.1000000000000000)) && isnotnull(rn#12))
+      :     :           +- Window [avg(_w0#21) windowspecdefinition(i_category#4, i_brand#5, cc_name#3, d_year#6, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS avg_monthly_sales#2], [i_category#4, i_brand#5, cc_name#3, d_year#6]
+      :     :              +- *(14) Filter (isnotnull(d_year#6) && (d_year#6 = 1999))
+      :     :                 +- Window [rank(d_year#6, d_moy#7) windowspecdefinition(i_category#4, i_brand#5, cc_name#3, d_year#6 ASC NULLS FIRST, d_moy#7 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rn#12], [i_category#4, i_brand#5, cc_name#3], [d_year#6 ASC NULLS FIRST, d_moy#7 ASC NULLS FIRST]
+      :     :                    +- *(13) Sort [i_category#4 ASC NULLS FIRST, i_brand#5 ASC NULLS FIRST, cc_name#3 ASC NULLS FIRST, d_year#6 ASC NULLS FIRST, d_moy#7 ASC NULLS FIRST], false, 0
+      :     :                       +- Exchange hashpartitioning(i_category#4, i_brand#5, cc_name#3, 5)
+      :     :                          +- *(12) HashAggregate(keys=[i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7], functions=[sum(UnscaledValue(cs_sales_price#22))])
+      :     :                             +- Exchange hashpartitioning(i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7, 5)
+      :     :                                +- *(11) HashAggregate(keys=[i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7], functions=[partial_sum(UnscaledValue(cs_sales_price#22))])
+      :     :                                   +- *(11) Project [i_brand#5, i_category#4, cs_sales_price#22, d_year#6, d_moy#7, cc_name#3]
+      :     :                                      +- *(11) SortMergeJoin [cs_call_center_sk#23], [cc_call_center_sk#24], Inner
+      :     :                                         :- *(8) Sort [cs_call_center_sk#23 ASC NULLS FIRST], false, 0
+      :     :                                         :  +- Exchange hashpartitioning(cs_call_center_sk#23, 5)
+      :     :                                         :     +- *(7) Project [i_brand#5, i_category#4, cs_call_center_sk#23, cs_sales_price#22, d_year#6, d_moy#7]
+      :     :                                         :        +- *(7) SortMergeJoin [cs_sold_date_sk#25], [d_date_sk#26], Inner
+      :     :                                         :           :- *(4) Sort [cs_sold_date_sk#25 ASC NULLS FIRST], false, 0
+      :     :                                         :           :  +- Exchange hashpartitioning(cs_sold_date_sk#25, 5)
+      :     :                                         :           :     +- *(3) Project [i_brand#5, i_category#4, cs_sold_date_sk#25, cs_call_center_sk#23, cs_sales_price#22]
+      :     :                                         :           :        +- *(3) SortMergeJoin [i_item_sk#27], [cs_item_sk#28], Inner
+      :     :                                         :           :           :- *(1) Project [i_item_sk#27, i_brand#5, i_category#4]
+      :     :                                         :           :           :  +- *(1) Filter ((isnotnull(i_item_sk#27) && isnotnull(i_brand#5)) && isnotnull(i_category#4))
+      :     :                                         :           :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex08-index-2-i_item_sk-17, LogVersion: 0) default.item[i_item_sk#27,i_brand#5,i_category#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(i_item_sk), IsNotNull(i_brand), IsNotNull(i_category)], ReadSchema: struct<i_item_sk:int,i_brand:string,i_category:string>, SelectedBucketsCount: 200 out of 200
+      :     :                                         :           :           +- *(2) Project [cs_sold_date_sk#25, cs_call_center_sk#23, cs_item_sk#28, cs_sales_price#22]
+      :     :                                         :           :              +- *(2) Filter ((isnotnull(cs_item_sk#28) && isnotnull(cs_sold_date_sk#25)) && isnotnull(cs_call_center_sk#23))
+      :     :                                         :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex27-index-10-cs_item_sk-22, LogVersion: 0) default.catalog_sales[cs_sold_date_sk#25,cs_call_center_sk#23,cs_item_sk#28,cs_sales_price#22] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cs_item_sk), IsNotNull(cs_sold_date_sk), IsNotNull(cs_call_center_sk)], ReadSchema: struct<cs_sold_date_sk:int,cs_call_center_sk:int,cs_item_sk:int,cs_sales_price:decimal(7,2)>, SelectedBucketsCount: 200 out of 200
+      :     :                                         :           +- *(6) Sort [d_date_sk#26 ASC NULLS FIRST], false, 0
+      :     :                                         :              +- Exchange hashpartitioning(d_date_sk#26, 5)
+      :     :                                         :                 +- *(5) Project [d_date_sk#26, d_year#6, d_moy#7]
+      :     :                                         :                    +- *(5) Filter ((((d_year#6 = 1999) || ((d_year#6 = 1998) && (d_moy#7 = 12))) || ((d_year#6 = 2000) && (d_moy#7 = 1))) && isnotnull(d_date_sk#26))
+      :     :                                         :                       +- *(5) FileScan Hyperspace(Type: CI, Name: FilterIndex04-index-11-d_year-5, LogVersion: 0) default.date_dim[d_date_sk#26,d_year#6,d_moy#7] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [Or(Or(EqualTo(d_year,1999),And(EqualTo(d_year,1998),EqualTo(d_moy,12))),And(EqualTo(d_year,2000)..., ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
+      :     :                                         +- *(10) Sort [cc_call_center_sk#24 ASC NULLS FIRST], false, 0
+      :     :                                            +- Exchange hashpartitioning(cc_call_center_sk#24, 5)
+      :     :                                               +- *(9) Project [cc_call_center_sk#24, cc_name#3]
+      :     :                                                  +- *(9) Filter (isnotnull(cc_call_center_sk#24) && isnotnull(cc_name#3))
+      :     :                                                     +- *(9) FileScan parquet default.call_center[cc_call_center_sk#24,cc_name#3] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/call_center], PartitionFilters: [], PushedFilters: [IsNotNull(cc_call_center_sk), IsNotNull(cc_name)], ReadSchema: struct<cc_call_center_sk:int,cc_name:string>
+      :     +- *(31) Sort [i_category#17 ASC NULLS FIRST, i_brand#18 ASC NULLS FIRST, cc_name#19 ASC NULLS FIRST, (rn#20 + 1) ASC NULLS FIRST], false, 0
+      :        +- Exchange hashpartitioning(i_category#17, i_brand#18, cc_name#19, (rn#20 + 1), 5)
+      :           +- *(30) Project [i_category#17, i_brand#18, cc_name#19, sum_sales#10, rn#20]
+      :              +- *(30) Filter isnotnull(rn#20)
+      :                 +- Window [rank(d_year#29, d_moy#30) windowspecdefinition(i_category#17, i_brand#18, cc_name#19, d_year#29 ASC NULLS FIRST, d_moy#30 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rn#20], [i_category#17, i_brand#18, cc_name#19], [d_year#29 ASC NULLS FIRST, d_moy#30 ASC NULLS FIRST]
+      :                    +- *(29) Sort [i_category#17 ASC NULLS FIRST, i_brand#18 ASC NULLS FIRST, cc_name#19 ASC NULLS FIRST, d_year#29 ASC NULLS FIRST, d_moy#30 ASC NULLS FIRST], false, 0
+      :                       +- Exchange hashpartitioning(i_category#17, i_brand#18, cc_name#19, 5)
+      :                          +- *(28) HashAggregate(keys=[i_category#17, i_brand#18, cc_name#19, d_year#29, d_moy#30], functions=[sum(UnscaledValue(cs_sales_price#22))])
+      :                             +- ReusedExchange [i_category#17, i_brand#18, cc_name#19, d_year#29, d_moy#30, sum#31], Exchange hashpartitioning(i_category#4, i_brand#5, cc_name#3, d_year#6, d_moy#7, 5)
+      +- *(47) Sort [i_category#13 ASC NULLS FIRST, i_brand#14 ASC NULLS FIRST, cc_name#15 ASC NULLS FIRST, (rn#16 - 1) ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(i_category#13, i_brand#14, cc_name#15, (rn#16 - 1), 5)
+            +- *(46) Project [i_category#13, i_brand#14, cc_name#15, sum_sales#11, rn#16]
+               +- *(46) Filter isnotnull(rn#16)
+                  +- Window [rank(d_year#32, d_moy#33) windowspecdefinition(i_category#13, i_brand#14, cc_name#15, d_year#32 ASC NULLS FIRST, d_moy#33 ASC NULLS FIRST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rn#16], [i_category#13, i_brand#14, cc_name#15], [d_year#32 ASC NULLS FIRST, d_moy#33 ASC NULLS FIRST]
+                     +- *(45) Sort [i_category#13 ASC NULLS FIRST, i_brand#14 ASC NULLS FIRST, cc_name#15 ASC NULLS FIRST, d_year#32 ASC NULLS FIRST, d_moy#33 ASC NULLS FIRST], false, 0
+                        +- ReusedExchange [i_category#13, i_brand#14, cc_name#15, d_year#32, d_moy#33, sum_sales#11], Exchange hashpartitioning(i_category#17, i_brand#18, cc_name#19, 5)

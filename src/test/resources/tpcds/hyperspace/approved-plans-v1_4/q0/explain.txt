@@ -1,0 +1,10 @@
+== Physical Plan ==
+CollectLimit 100
++- *(3) Project [d_year#1, ss_customer_sk#2]
+   +- *(3) SortMergeJoin [d_date_sk#3], [ss_sold_date_sk#4], Inner
+      :- *(1) Project [d_date_sk#3, d_year#1]
+      :  +- *(1) Filter isnotnull(d_date_sk#3)
+      :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim[d_date_sk#3,d_year#1] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(d_date_sk)], ReadSchema: struct<d_date_sk:int,d_year:int>, SelectedBucketsCount: 200 out of 200
+      +- *(2) Project [ss_sold_date_sk#4, ss_customer_sk#2]
+         +- *(2) Filter isnotnull(ss_sold_date_sk#4)
+            +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales[ss_sold_date_sk#4,ss_customer_sk#2] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_customer_sk:int>, SelectedBucketsCount: 200 out of 200

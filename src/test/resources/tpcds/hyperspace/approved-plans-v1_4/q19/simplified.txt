@@ -1,0 +1,87 @@
+TakeOrderedAndProject [brand,brand_id,ext_price,i_manufact,i_manufact_id]
+  WholeStageCodegen
+    HashAggregate [i_brand,i_brand_id,i_manufact,i_manufact_id,sum,sum(UnscaledValue(ss_ext_sales_price))] [brand,brand_id,ext_price,sum,sum(UnscaledValue(ss_ext_sales_price))]
+      InputAdapter
+        Exchange [i_brand,i_brand_id,i_manufact,i_manufact_id] #1
+          WholeStageCodegen
+            HashAggregate [i_brand,i_brand_id,i_manufact,i_manufact_id,ss_ext_sales_price,sum,sum] [sum,sum]
+              Project [i_brand,i_brand_id,i_manufact,i_manufact_id,ss_ext_sales_price]
+                SortMergeJoin [ca_zip,s_store_sk,s_zip,ss_store_sk]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [ss_store_sk]
+                        InputAdapter
+                          Exchange [ss_store_sk] #2
+                            WholeStageCodegen
+                              Project [ca_zip,i_brand,i_brand_id,i_manufact,i_manufact_id,ss_ext_sales_price,ss_store_sk]
+                                SortMergeJoin [c_current_addr_sk,ca_address_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [c_current_addr_sk]
+                                        InputAdapter
+                                          Exchange [c_current_addr_sk] #3
+                                            WholeStageCodegen
+                                              Project [c_current_addr_sk,i_brand,i_brand_id,i_manufact,i_manufact_id,ss_ext_sales_price,ss_store_sk]
+                                                SortMergeJoin [c_customer_sk,ss_customer_sk]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [ss_customer_sk]
+                                                        InputAdapter
+                                                          Exchange [ss_customer_sk] #4
+                                                            WholeStageCodegen
+                                                              Project [i_brand,i_brand_id,i_manufact,i_manufact_id,ss_customer_sk,ss_ext_sales_price,ss_store_sk]
+                                                                SortMergeJoin [i_item_sk,ss_item_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [ss_item_sk]
+                                                                        InputAdapter
+                                                                          Exchange [ss_item_sk] #5
+                                                                            WholeStageCodegen
+                                                                              Project [ss_customer_sk,ss_ext_sales_price,ss_item_sk,ss_store_sk]
+                                                                                SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                                                                  InputAdapter
+                                                                                    WholeStageCodegen
+                                                                                      Project [d_date_sk]
+                                                                                        Filter [d_date_sk,d_moy,d_year]
+                                                                                          Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date_sk,d_moy,d_year] [d_date_sk,d_moy,d_year]
+                                                                                  InputAdapter
+                                                                                    WholeStageCodegen
+                                                                                      Project [ss_customer_sk,ss_ext_sales_price,ss_item_sk,ss_sold_date_sk,ss_store_sk]
+                                                                                        Filter [ss_customer_sk,ss_item_sk,ss_sold_date_sk,ss_store_sk]
+                                                                                          Scan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales [ss_customer_sk,ss_ext_sales_price,ss_item_sk,ss_sold_date_sk,ss_store_sk] [ss_customer_sk,ss_ext_sales_price,ss_item_sk,ss_sold_date_sk,ss_store_sk]
+                                                                  InputAdapter
+                                                                    WholeStageCodegen
+                                                                      Sort [i_item_sk]
+                                                                        InputAdapter
+                                                                          Exchange [i_item_sk] #6
+                                                                            WholeStageCodegen
+                                                                              Project [i_brand,i_brand_id,i_item_sk,i_manufact,i_manufact_id]
+                                                                                Filter [i_item_sk,i_manager_id]
+                                                                                  Scan Hyperspace(Type: CI, Name: FilterIndex11-index-48-i_manager_id-7, LogVersion: 0) default.item [i_brand,i_brand_id,i_item_sk,i_manager_id,i_manufact,i_manufact_id] [i_brand,i_brand_id,i_item_sk,i_manager_id,i_manufact,i_manufact_id]
+                                                  InputAdapter
+                                                    WholeStageCodegen
+                                                      Sort [c_customer_sk]
+                                                        InputAdapter
+                                                          Exchange [c_customer_sk] #7
+                                                            WholeStageCodegen
+                                                              Project [c_current_addr_sk,c_customer_sk]
+                                                                Filter [c_current_addr_sk,c_customer_sk]
+                                                                  Scan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer [c_current_addr_sk,c_customer_sk] [c_current_addr_sk,c_customer_sk]
+                                  InputAdapter
+                                    WholeStageCodegen
+                                      Sort [ca_address_sk]
+                                        InputAdapter
+                                          Exchange [ca_address_sk] #8
+                                            WholeStageCodegen
+                                              Project [ca_address_sk,ca_zip]
+                                                Filter [ca_address_sk,ca_zip]
+                                                  Scan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address [ca_address_sk,ca_zip] [ca_address_sk,ca_zip]
+                  InputAdapter
+                    WholeStageCodegen
+                      Sort [s_store_sk]
+                        InputAdapter
+                          Exchange [s_store_sk] #9
+                            WholeStageCodegen
+                              Project [s_store_sk,s_zip]
+                                Filter [s_store_sk,s_zip]
+                                  Scan Hyperspace(Type: CI, Name: JoinIndex24-index-4-s_store_sk-15, LogVersion: 0) default.store [s_store_sk,s_zip] [s_store_sk,s_zip]

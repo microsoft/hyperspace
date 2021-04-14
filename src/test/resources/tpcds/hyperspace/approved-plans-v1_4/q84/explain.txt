@@ -1,0 +1,46 @@
+== Physical Plan ==
+TakeOrderedAndProject(limit=100, orderBy=[c_customer_id#1 ASC NULLS FIRST], output=[customer_id#2,customername#3])
++- *(19) Project [c_customer_id#1 AS customer_id#2, concat(c_last_name#4, , , c_first_name#5) AS customername#3, c_customer_id#1]
+   +- *(19) SortMergeJoin [cast(cd_demo_sk#6 as bigint)], [sr_cdemo_sk#7], Inner
+      :- *(16) Sort [cast(cd_demo_sk#6 as bigint) ASC NULLS FIRST], false, 0
+      :  +- Exchange hashpartitioning(cast(cd_demo_sk#6 as bigint), 5)
+      :     +- *(15) Project [c_customer_id#1, c_first_name#5, c_last_name#4, cd_demo_sk#6]
+      :        +- *(15) SortMergeJoin [hd_income_band_sk#8], [ib_income_band_sk#9], Inner
+      :           :- *(12) Sort [hd_income_band_sk#8 ASC NULLS FIRST], false, 0
+      :           :  +- Exchange hashpartitioning(hd_income_band_sk#8, 5)
+      :           :     +- *(11) Project [c_customer_id#1, c_first_name#5, c_last_name#4, cd_demo_sk#6, hd_income_band_sk#8]
+      :           :        +- *(11) SortMergeJoin [c_current_hdemo_sk#10], [hd_demo_sk#11], Inner
+      :           :           :- *(8) Sort [c_current_hdemo_sk#10 ASC NULLS FIRST], false, 0
+      :           :           :  +- Exchange hashpartitioning(c_current_hdemo_sk#10, 5)
+      :           :           :     +- *(7) Project [c_customer_id#1, c_current_hdemo_sk#10, c_first_name#5, c_last_name#4, cd_demo_sk#6]
+      :           :           :        +- *(7) SortMergeJoin [c_current_cdemo_sk#12], [cd_demo_sk#6], Inner
+      :           :           :           :- *(4) Sort [c_current_cdemo_sk#12 ASC NULLS FIRST], false, 0
+      :           :           :           :  +- Exchange hashpartitioning(c_current_cdemo_sk#12, 5)
+      :           :           :           :     +- *(3) Project [c_customer_id#1, c_current_cdemo_sk#12, c_current_hdemo_sk#10, c_first_name#5, c_last_name#4]
+      :           :           :           :        +- *(3) SortMergeJoin [c_current_addr_sk#13], [ca_address_sk#14], Inner
+      :           :           :           :           :- *(1) Project [c_customer_id#1, c_current_cdemo_sk#12, c_current_hdemo_sk#10, c_current_addr_sk#13, c_first_name#5, c_last_name#4]
+      :           :           :           :           :  +- *(1) Filter ((isnotnull(c_current_addr_sk#13) && isnotnull(c_current_cdemo_sk#12)) && isnotnull(c_current_hdemo_sk#10))
+      :           :           :           :           :     +- *(1) FileScan Hyperspace(Type: CI, Name: JoinIndex44-index-16-c_current_addr_sk-17, LogVersion: 0) default.customer[c_customer_id#1,c_current_cdemo_sk#12,c_current_hdemo_sk#10,c_current_addr_sk#13,c_first_name#5,c_last_name#4] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(c_current_addr_sk), IsNotNull(c_current_cdemo_sk), IsNotNull(c_current_hdemo_sk)], ReadSchema: struct<c_customer_id:string,c_current_cdemo_sk:int,c_current_hdemo_sk:int,c_current_addr_sk:int,c..., SelectedBucketsCount: 200 out of 200
+      :           :           :           :           +- *(2) Project [ca_address_sk#14]
+      :           :           :           :              +- *(2) Filter ((isnotnull(ca_city#15) && (ca_city#15 = Edgewood)) && isnotnull(ca_address_sk#14))
+      :           :           :           :                 +- *(2) FileScan Hyperspace(Type: CI, Name: JoinIndex31-index-7-ca_address_sk-11, LogVersion: 0) default.customer_address[ca_address_sk#14,ca_city#15] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(ca_city), EqualTo(ca_city,Edgewood), IsNotNull(ca_address_sk)], ReadSchema: struct<ca_address_sk:int,ca_city:string>, SelectedBucketsCount: 200 out of 200
+      :           :           :           +- *(6) Sort [cd_demo_sk#6 ASC NULLS FIRST], false, 0
+      :           :           :              +- Exchange hashpartitioning(cd_demo_sk#6, 5)
+      :           :           :                 +- *(5) Project [cd_demo_sk#6]
+      :           :           :                    +- *(5) Filter isnotnull(cd_demo_sk#6)
+      :           :           :                       +- *(5) FileScan Hyperspace(Type: CI, Name: JoinIndex25-index-18-cd_demo_sk-8, LogVersion: 0) default.customer_demographics[cd_demo_sk#6] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(cd_demo_sk)], ReadSchema: struct<cd_demo_sk:int>
+      :           :           +- *(10) Sort [hd_demo_sk#11 ASC NULLS FIRST], false, 0
+      :           :              +- Exchange hashpartitioning(hd_demo_sk#11, 5)
+      :           :                 +- *(9) Project [hd_demo_sk#11, hd_income_band_sk#8]
+      :           :                    +- *(9) Filter (isnotnull(hd_demo_sk#11) && isnotnull(hd_income_band_sk#8))
+      :           :                       +- *(9) FileScan Hyperspace(Type: CI, Name: JoinIndex46-index-19-hd_demo_sk-4, LogVersion: 0) default.household_demographics[hd_demo_sk#11,hd_income_band_sk#8] Batched: true, Format: Parquet, Location: InMemoryFileIndex[], PartitionFilters: [], PushedFilters: [IsNotNull(hd_demo_sk), IsNotNull(hd_income_band_sk)], ReadSchema: struct<hd_demo_sk:int,hd_income_band_sk:int>
+      :           +- *(14) Sort [ib_income_band_sk#9 ASC NULLS FIRST], false, 0
+      :              +- Exchange hashpartitioning(ib_income_band_sk#9, 5)
+      :                 +- *(13) Project [ib_income_band_sk#9]
+      :                    +- *(13) Filter ((((isnotnull(ib_lower_bound#16) && isnotnull(ib_upper_bound#17)) && (ib_lower_bound#16 >= 38128)) && (ib_upper_bound#17 <= 88128)) && isnotnull(ib_income_band_sk#9))
+      :                       +- *(13) FileScan parquet default.income_band[ib_income_band_sk#9,ib_lower_bound#16,ib_upper_bound#17] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/income_band], PartitionFilters: [], PushedFilters: [IsNotNull(ib_lower_bound), IsNotNull(ib_upper_bound), GreaterThanOrEqual(ib_lower_bound,38128), ..., ReadSchema: struct<ib_income_band_sk:int,ib_lower_bound:int,ib_upper_bound:int>
+      +- *(18) Sort [sr_cdemo_sk#7 ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(sr_cdemo_sk#7, 5)
+            +- *(17) Project [sr_cdemo_sk#7]
+               +- *(17) Filter isnotnull(sr_cdemo_sk#7)
+                  +- *(17) FileScan parquet default.store_returns[sr_cdemo_sk#7] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_returns], PartitionFilters: [], PushedFilters: [IsNotNull(sr_cdemo_sk)], ReadSchema: struct<sr_cdemo_sk:bigint>

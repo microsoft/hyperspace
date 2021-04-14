@@ -1,0 +1,135 @@
+CollectLimit
+  WholeStageCodegen
+    HashAggregate [count,count(1)] [count,count(1),count(1)]
+      InputAdapter
+        Exchange #1
+          WholeStageCodegen
+            HashAggregate [count,count] [count,count]
+              HashAggregate [c_first_name,c_last_name,d_date]
+                InputAdapter
+                  Exchange [c_first_name,c_last_name,d_date] #2
+                    WholeStageCodegen
+                      HashAggregate [c_first_name,c_last_name,d_date]
+                        InputAdapter
+                          SortMergeJoin [c_first_name,c_first_name,c_last_name,c_last_name,d_date,d_date]
+                            WholeStageCodegen
+                              Sort [c_first_name,c_last_name,d_date]
+                                InputAdapter
+                                  Exchange [c_first_name,c_last_name,d_date] #3
+                                    WholeStageCodegen
+                                      HashAggregate [c_first_name,c_last_name,d_date]
+                                        InputAdapter
+                                          Exchange [c_first_name,c_last_name,d_date] #4
+                                            WholeStageCodegen
+                                              HashAggregate [c_first_name,c_last_name,d_date]
+                                                InputAdapter
+                                                  SortMergeJoin [c_first_name,c_first_name,c_last_name,c_last_name,d_date,d_date]
+                                                    WholeStageCodegen
+                                                      Sort [c_first_name,c_last_name,d_date]
+                                                        InputAdapter
+                                                          Exchange [c_first_name,c_last_name,d_date] #5
+                                                            WholeStageCodegen
+                                                              HashAggregate [c_first_name,c_last_name,d_date]
+                                                                InputAdapter
+                                                                  Exchange [c_first_name,c_last_name,d_date] #6
+                                                                    WholeStageCodegen
+                                                                      HashAggregate [c_first_name,c_last_name,d_date]
+                                                                        Project [c_first_name,c_last_name,d_date]
+                                                                          SortMergeJoin [c_customer_sk,ss_customer_sk]
+                                                                            InputAdapter
+                                                                              WholeStageCodegen
+                                                                                Sort [ss_customer_sk]
+                                                                                  InputAdapter
+                                                                                    Exchange [ss_customer_sk] #7
+                                                                                      WholeStageCodegen
+                                                                                        Project [d_date,ss_customer_sk]
+                                                                                          SortMergeJoin [d_date_sk,ss_sold_date_sk]
+                                                                                            InputAdapter
+                                                                                              WholeStageCodegen
+                                                                                                Project [ss_customer_sk,ss_sold_date_sk]
+                                                                                                  Filter [ss_customer_sk,ss_sold_date_sk]
+                                                                                                    Scan Hyperspace(Type: CI, Name: JoinIndex12-index-1-ss_sold_date_sk-21, LogVersion: 0) default.store_sales [ss_customer_sk,ss_sold_date_sk] [ss_customer_sk,ss_sold_date_sk]
+                                                                                            InputAdapter
+                                                                                              WholeStageCodegen
+                                                                                                Project [d_date,d_date_sk]
+                                                                                                  Filter [d_date_sk,d_month_seq]
+                                                                                                    Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date,d_date_sk,d_month_seq] [d_date,d_date_sk,d_month_seq]
+                                                                            InputAdapter
+                                                                              WholeStageCodegen
+                                                                                Sort [c_customer_sk]
+                                                                                  InputAdapter
+                                                                                    Exchange [c_customer_sk] #8
+                                                                                      WholeStageCodegen
+                                                                                        Project [c_customer_sk,c_first_name,c_last_name]
+                                                                                          Filter [c_customer_sk]
+                                                                                            Scan Hyperspace(Type: CI, Name: JoinIndex43-index-8-c_customer_sk-17, LogVersion: 0) default.customer [c_customer_sk,c_first_name,c_last_name] [c_customer_sk,c_first_name,c_last_name]
+                                                    WholeStageCodegen
+                                                      Sort [c_first_name,c_last_name,d_date]
+                                                        InputAdapter
+                                                          Exchange [c_first_name,c_last_name,d_date] #9
+                                                            WholeStageCodegen
+                                                              HashAggregate [c_first_name,c_last_name,d_date]
+                                                                InputAdapter
+                                                                  Exchange [c_first_name,c_last_name,d_date] #10
+                                                                    WholeStageCodegen
+                                                                      HashAggregate [c_first_name,c_last_name,d_date]
+                                                                        Project [c_first_name,c_last_name,d_date]
+                                                                          SortMergeJoin [c_customer_sk,cs_bill_customer_sk]
+                                                                            InputAdapter
+                                                                              WholeStageCodegen
+                                                                                Sort [cs_bill_customer_sk]
+                                                                                  InputAdapter
+                                                                                    Exchange [cs_bill_customer_sk] #11
+                                                                                      WholeStageCodegen
+                                                                                        Project [cs_bill_customer_sk,d_date]
+                                                                                          SortMergeJoin [cs_sold_date_sk,d_date_sk]
+                                                                                            InputAdapter
+                                                                                              WholeStageCodegen
+                                                                                                Project [cs_bill_customer_sk,cs_sold_date_sk]
+                                                                                                  Filter [cs_bill_customer_sk,cs_sold_date_sk]
+                                                                                                    Scan Hyperspace(Type: CI, Name: JoinIndex26-index-6-cs_sold_date_sk-26, LogVersion: 0) default.catalog_sales [cs_bill_customer_sk,cs_sold_date_sk] [cs_bill_customer_sk,cs_sold_date_sk]
+                                                                                            InputAdapter
+                                                                                              WholeStageCodegen
+                                                                                                Project [d_date,d_date_sk]
+                                                                                                  Filter [d_date_sk,d_month_seq]
+                                                                                                    Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date,d_date_sk,d_month_seq] [d_date,d_date_sk,d_month_seq]
+                                                                            InputAdapter
+                                                                              WholeStageCodegen
+                                                                                Sort [c_customer_sk]
+                                                                                  InputAdapter
+                                                                                    ReusedExchange [c_customer_sk,c_first_name,c_last_name] [c_customer_sk,c_first_name,c_last_name] #8
+                            WholeStageCodegen
+                              Sort [c_first_name,c_last_name,d_date]
+                                InputAdapter
+                                  Exchange [c_first_name,c_last_name,d_date] #12
+                                    WholeStageCodegen
+                                      HashAggregate [c_first_name,c_last_name,d_date]
+                                        InputAdapter
+                                          Exchange [c_first_name,c_last_name,d_date] #13
+                                            WholeStageCodegen
+                                              HashAggregate [c_first_name,c_last_name,d_date]
+                                                Project [c_first_name,c_last_name,d_date]
+                                                  SortMergeJoin [c_customer_sk,ws_bill_customer_sk]
+                                                    InputAdapter
+                                                      WholeStageCodegen
+                                                        Sort [ws_bill_customer_sk]
+                                                          InputAdapter
+                                                            Exchange [ws_bill_customer_sk] #14
+                                                              WholeStageCodegen
+                                                                Project [d_date,ws_bill_customer_sk]
+                                                                  SortMergeJoin [d_date_sk,ws_sold_date_sk]
+                                                                    InputAdapter
+                                                                      WholeStageCodegen
+                                                                        Project [ws_bill_customer_sk,ws_sold_date_sk]
+                                                                          Filter [ws_bill_customer_sk,ws_sold_date_sk]
+                                                                            Scan Hyperspace(Type: CI, Name: JoinIndex37-index-9-ws_sold_date_sk-21, LogVersion: 0) default.web_sales [ws_bill_customer_sk,ws_sold_date_sk] [ws_bill_customer_sk,ws_sold_date_sk]
+                                                                    InputAdapter
+                                                                      WholeStageCodegen
+                                                                        Project [d_date,d_date_sk]
+                                                                          Filter [d_date_sk,d_month_seq]
+                                                                            Scan Hyperspace(Type: CI, Name: JoinIndex03-index-0-d_date_sk-10, LogVersion: 0) default.date_dim [d_date,d_date_sk,d_month_seq] [d_date,d_date_sk,d_month_seq]
+                                                    InputAdapter
+                                                      WholeStageCodegen
+                                                        Sort [c_customer_sk]
+                                                          InputAdapter
+                                                            ReusedExchange [c_customer_sk,c_first_name,c_last_name] [c_customer_sk,c_first_name,c_last_name] #8
