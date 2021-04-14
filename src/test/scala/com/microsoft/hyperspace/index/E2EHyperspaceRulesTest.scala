@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFR
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.rules.HyperspaceOneRule
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
@@ -71,7 +71,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   }
 
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
-    val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationRuleBatch = Seq(HyperspaceOneRule)
     val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
 
     assert(
@@ -228,7 +228,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     def verifyNoChange(f: () => DataFrame): Unit = {
       spark.disableHyperspace()
       val originalPlan = f().queryExecution.optimizedPlan
-      val updatedPlan = JoinIndexRule(originalPlan)
+      val updatedPlan = HyperspaceOneRule(originalPlan)
       assert(originalPlan.equals(updatedPlan))
     }
 

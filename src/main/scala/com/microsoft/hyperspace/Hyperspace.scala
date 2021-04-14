@@ -40,7 +40,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexConfig the configuration of index to be created.
    */
   def createIndex(df: DataFrame, indexConfig: IndexConfig): Unit = {
-    indexManager.create(df, indexConfig)
+    withHyperspaceDisabled(spark) {
+      indexManager.create(df, indexConfig)
+    }
   }
 
   /**
@@ -49,7 +51,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName the name of index to delete.
    */
   def deleteIndex(indexName: String): Unit = {
-    indexManager.delete(indexName)
+    withHyperspaceDisabled(spark) {
+      indexManager.delete(indexName)
+    }
   }
 
   /**
@@ -58,7 +62,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to restore.
    */
   def restoreIndex(indexName: String): Unit = {
-    indexManager.restore(indexName)
+    withHyperspaceDisabled(spark) {
+      indexManager.restore(indexName)
+    }
   }
 
   /**
@@ -67,7 +73,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to restore.
    */
   def vacuumIndex(indexName: String): Unit = {
-    indexManager.vacuum(indexName)
+    withHyperspaceDisabled(spark) {
+      indexManager.vacuum(indexName)
+    }
   }
 
   /**
@@ -76,7 +84,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to refresh.
    */
   def refreshIndex(indexName: String): Unit = {
-    refreshIndex(indexName, REFRESH_MODE_FULL)
+    withHyperspaceDisabled(spark) {
+      refreshIndex(indexName, REFRESH_MODE_FULL)
+    }
   }
 
   /**
@@ -87,7 +97,9 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
    */
   def refreshIndex(indexName: String, mode: String): Unit = {
-    indexManager.refresh(indexName, mode)
+    withHyperspaceDisabled(spark) {
+      indexManager.refresh(indexName, mode)
+    }
   }
 
   /**
@@ -102,7 +114,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to optimize.
    */
   def optimizeIndex(indexName: String): Unit = {
-    indexManager.optimize(indexName, OPTIMIZE_MODE_QUICK)
+    withHyperspaceDisabled(spark) {
+      indexManager.optimize(indexName, OPTIMIZE_MODE_QUICK)
+    }
   }
 
   /**
@@ -125,7 +139,9 @@ class Hyperspace(spark: SparkSession) {
    *             files, based on a threshold. "full" refers to recreation of index.
    */
   def optimizeIndex(indexName: String, mode: String): Unit = {
-    indexManager.optimize(indexName, mode)
+    withHyperspaceDisabled(spark) {
+      indexManager.optimize(indexName, mode)
+    }
   }
 
   /**
@@ -139,7 +155,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to cancel.
    */
   def cancel(indexName: String): Unit = {
-    indexManager.cancel(indexName)
+    withHyperspaceDisabled(spark) {
+      indexManager.cancel(indexName)
+    }
   }
 
   /**
@@ -162,6 +180,18 @@ class Hyperspace(spark: SparkSession) {
    */
   def index(indexName: String): DataFrame = {
     indexManager.index(indexName)
+  }
+
+  private def withHyperspaceDisabled(spark: SparkSession)(f: => Unit): Unit = {
+    val prev = spark.isHyperspaceEnabled()
+    try {
+      spark.disableHyperspace
+      f
+    } finally {
+      if (prev) {
+        spark.enableHyperspace()
+      }
+    }
   }
 }
 

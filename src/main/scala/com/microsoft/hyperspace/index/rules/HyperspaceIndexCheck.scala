@@ -28,69 +28,37 @@ import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 object ColumnSchemaCheck extends HyperspaceIndexCheck {
-  override def apply(planToIndexes: Map[LogicalPlan, Seq[IndexLogEntry]])
-    : Map[LogicalPlan, Seq[IndexLogEntry]] = {
-    planToIndexes
-      .map {
-        case (plan, indexes) =>
-          val relationColumnsName = plan.output.map(_.name)
-          val candidateIndexes = indexes.filter { index =>
-            ResolverUtils
-              .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnsName)
-              .isDefined
-          }
-          if (candidateIndexes.nonEmpty) {
-            Some(plan, candidateIndexes)
-          } else {
-            None
-          }
-      }
-      .flatten
-      .toMap
+  override def apply(plan: LogicalPlan, indexes: Seq[IndexLogEntry]): Seq[IndexLogEntry] = {
+    val relationColumnsName = plan.output.map(_.name)
+    indexes.filter { index =>
+      ResolverUtils
+        .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnsName)
+        .isDefined
+    }
   }
-
   override def reason: String = {
-    "Column schema does not match with indexes."
+    "Column schema does not match."
   }
 }
 
 object FileSignatureCheck extends HyperspaceIndexCheck {
-  override def apply(planToIndexes: Map[LogicalPlan, Seq[IndexLogEntry]])
-    : Map[LogicalPlan, Seq[IndexLogEntry]] = {
+  override def apply(plan: LogicalPlan, indexes: Seq[IndexLogEntry]): Seq[IndexLogEntry] = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     val hybridScanDeleteEnabled = HyperspaceConf.hybridScanDeleteEnabled(spark)
 
-    planToIndexes
-      .map {
-        case (plan, indexes) =>
-          val relation = provider.getRelation(plan)
-          val candidateIndexes = if (hybridScanEnabled) {
-            val inputSourceFiles = relation.allFileInfos
-            indexes.map { index =>
-              prepareHybridScanCandidateSelection(spark, relation.plan, indexes)
-              getHybridScanCandidate(relation, index, hybridScanDeleteEnabled)
-            }.flatten
-          } else {
-            // Map of a signature provider to a signature generated for the given plan.
-            val signatureMap = mutable.Map[String, Option[String]]()
-
-            indexes.map { index =>
-              if (signatureValid(relation, index, signatureMap)) {
-                Some(index)
-              } else {
-                None
-              }
-            }.flatten
-          }
-          if (candidateIndexes.nonEmpty) {
-            Some(plan, candidateIndexes)
-          } else {
-            None
-          }
-      }
-      .flatten
-      .toMap
+    if (hybridScanEnabled) {
+      val relation = provider.getRelation(plan)
+      indexes.map { index =>
+        prepareHybridScanCandidateSelection(spark, relation.plan, indexes)
+        getHybridScanCandidate(relation, index, hybridScanDeleteEnabled)
+      }.flatten
+    } else {
+      val relation = provider.getRelation(plan)
+      // Map of a signature provider to a signature generated for the given plan.
+      val signatureMap = mutable.Map[String, Option[String]]()
+      indexes.filter(index => signatureValid(relation, index, signatureMap))
+    }
   }
 
   def signatureValid(
@@ -201,15 +169,14 @@ object FileSignatureCheck extends HyperspaceIndexCheck {
   }
 }
 
-object IndexPriorityCheck extends HyperspaceIndexCheck {
-
+object IndexPriorityCheck extends HyperspacePlanCheck {
   def indexTypeRank(index: IndexLogEntry): Int = {
     index.derivedDataset.kindAbbr match {
       case "CI" => 1
     }
   }
 
-  override def apply(planToIndexes: Map[LogicalPlan, Seq[IndexLogEntry]])
+  override def apply(p: LogicalPlan, planToIndexes: Map[LogicalPlan, Seq[IndexLogEntry]])
     : Map[LogicalPlan, Seq[IndexLogEntry]] = {
     planToIndexes.map {
       case (plan, indexes) =>
@@ -236,6 +203,6 @@ object IndexPriorityCheck extends HyperspaceIndexCheck {
   }
 
   override def reason: String = {
-    "Another candidate index exist"
+    "Another candidate index has a higher priority."
   }
 }

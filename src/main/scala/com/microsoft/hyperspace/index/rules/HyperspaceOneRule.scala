@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
 
 object CandidateIndexCollector extends ActiveSparkSession {
-  val checkBatch = ColumnSchemaCheck :: FileSignatureCheck :: IndexPriorityCheck :: Nil
+  val checkBatch = ColumnSchemaCheck :: FileSignatureCheck :: Nil
 
   def initializePlanToIndexes(
       plan: LogicalPlan,
@@ -44,14 +44,18 @@ object CandidateIndexCollector extends ActiveSparkSession {
       plan: LogicalPlan,
       allIndexes: Seq[IndexLogEntry]): Map[LogicalPlan, Seq[IndexLogEntry]] = {
     val planToIndexes = initializePlanToIndexes(plan, allIndexes)
-    checkBatch.foldLeft(planToIndexes) { (pti, check) =>
-      check(pti)
+    planToIndexes.flatMap { case (node, indexes) =>
+      Some(node, checkBatch.foldLeft(indexes) { (idxs, check) =>
+        val res = check(node, idxs)
+        res
+      })
+        .filterNot(_._2.isEmpty)
     }
   }
 }
 
 class ScoreBasedIndexApplication {
-  val ruleBatch = NoOpBatch :: FilterIndexBatch :: Nil
+  val ruleBatch = NoOpBatch :: FilterIndexBatch :: JoinIndexBatch :: Nil
   // Map for memoization
   val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
 
@@ -76,7 +80,8 @@ class ScoreBasedIndexApplication {
     var optResult = (plan, 0)
     ruleBatch.foreach { check =>
       val (transformedPlan, curScore) = check(plan, indexes)
-      if (!transformedPlan.equals(plan) || check.equals(NoOpBatch)) {
+      if (curScore > 0 || check.equals(NoOpBatch)) {
+        // Positive curScore means an index is applied.
         val result = recChildren(transformedPlan)
         if (optResult._2 < result._2 + curScore) {
           optResult = (result._1, result._2 + curScore)
@@ -88,7 +93,8 @@ class ScoreBasedIndexApplication {
   }
 
   def apply(plan: LogicalPlan, indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): LogicalPlan = {
-    rec(plan, indexes)._1
+    val selectedIndexes = IndexPriorityCheck.apply(plan, indexes)
+    rec(plan, selectedIndexes)._1
   }
 }
 
@@ -102,10 +108,18 @@ object HyperspaceOneRule
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
-
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-    val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
-
-    new ScoreBasedIndexApplication().apply(plan, candidateIndexes)
+    if (allIndexes.isEmpty) {
+      plan
+    } else {
+      try {
+        val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
+        val res = new ScoreBasedIndexApplication().apply(plan, candidateIndexes)
+        res
+      }
+      catch { case e: Exception =>
+        plan
+      }
+    }
   }
 }
