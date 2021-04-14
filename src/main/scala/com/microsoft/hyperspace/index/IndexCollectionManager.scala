@@ -138,6 +138,18 @@ class IndexCollectionManager(
     }
   }
 
+  override def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
+    withLogManager(indexName) { logManager =>
+      logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry])
+    }
+  }
+
+  override def getIndexVersions(indexName: String, states: Seq[String]): Seq[Int] = {
+    withLogManager(indexName) { logManager =>
+      logManager.getIndexVersions(states)
+    }
+  }
+
   private def indexLogManagers: Seq[IndexLogManager] = {
     val hadoopConf = spark.sessionState.newHadoopConf()
     val rootPath = PathResolver(conf, hadoopConf).systemPath
@@ -159,12 +171,6 @@ class IndexCollectionManager(
       Some(indexLogManagerFactory.create(indexPath, hadoopConf))
     } else {
       None
-    }
-  }
-
-  override def getIndex(indexName: String, logVersion: Int): Option[IndexLogEntry] = {
-    withLogManager(indexName) { logManager =>
-      logManager.getLog(logVersion).map(_.asInstanceOf[IndexLogEntry])
     }
   }
 

@@ -140,11 +140,11 @@ class IcebergRelation(spark: SparkSession, override val plan: DataSourceV2Relati
     //   original file path: file:///path/to/file or file:/path/to/file
     //   input_file_name(): /path/to/file
     if (Path.WINDOWS) {
-      fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+      fileIdTracker.getFileToIdMapping.map { kv =>
         (kv._1._1.stripPrefix("file:/"), kv._2)
       }
     } else {
-      fileIdTracker.getFileToIdMap.toSeq.map { kv =>
+      fileIdTracker.getFileToIdMapping.map { kv =>
         (kv._1._1.replaceFirst("^file:/{1,3}", "/"), kv._2)
       }
     }

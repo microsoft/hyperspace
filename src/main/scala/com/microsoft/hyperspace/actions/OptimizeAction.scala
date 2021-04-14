@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.BucketingUtils
@@ -141,18 +140,16 @@ class OptimizeAction(
     // the list of newly created index files.
     val hadoopConf = spark.sessionState.newHadoopConf()
     val absolutePath = PathUtils.makeAbsolute(indexDataPath.toString, hadoopConf)
-    val newContent =
-      Content.fromDirectory(absolutePath, fileIdTracker, hadoopConfiguration = hadoopConf)
+    val newContent = Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
     val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.copy(
       properties = previousIndexLogEntry.derivedDataset.properties
         .copy(
-          properties =
-              Hyperspace
-                .getContext(spark)
-                .sourceProviderManager
-                .enrichIndexProperties(
-                  previousIndexLogEntry.relations.head,
-                  prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
+          properties = Hyperspace
+            .getContext(spark)
+            .sourceProviderManager
+            .getRelationMetadata(previousIndexLogEntry.relations.head)
+            .enrichIndexProperties(
+              prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
 
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {

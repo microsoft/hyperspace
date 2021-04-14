@@ -60,7 +60,8 @@ class RefreshIncrementalAction(
       val internalFileFormatName = Hyperspace
         .getContext(spark)
         .sourceProviderManager
-        .internalFileFormatName(previousIndexLogEntry.relations.head)
+        .getRelationMetadata(previousIndexLogEntry.relations.head)
+        .internalFileFormatName()
 
       // Create a df with only appended files from original list of files.
       val dfWithAppendedFiles = spark.read
@@ -91,7 +92,8 @@ class RefreshIncrementalAction(
         refreshDF,
         indexDataPath.toString,
         previousIndexLogEntry.numBuckets,
-        indexConfig.indexedColumns,
+        // previousIndexLogEntry should contain the resolved and prefixed field names.
+        previousIndexLogEntry.derivedDataset.properties.columns.indexed,
         writeMode)
     }
   }
@@ -113,10 +115,6 @@ class RefreshIncrementalAction(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
     }
-  }
-
-  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
-    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 
   /**
@@ -142,5 +140,9 @@ class RefreshIncrementalAction(
       // New entry.
       entry
     }
+  }
+
+  override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
+    RefreshIncrementalActionEvent(appInfo, logEntry.asInstanceOf[IndexLogEntry], message)
   }
 }

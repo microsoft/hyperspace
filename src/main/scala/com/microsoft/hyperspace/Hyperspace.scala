@@ -195,7 +195,7 @@ class Hyperspace(spark: SparkSession) {
   }
 }
 
-object Hyperspace {
+object Hyperspace extends ActiveSparkSession {
   private lazy val context = new ThreadLocal[HyperspaceContext]
 
   private[hyperspace] def getContext(spark: SparkSession): HyperspaceContext = {
@@ -211,19 +211,11 @@ object Hyperspace {
   }
 
   private[hyperspace] def getContext: HyperspaceContext = {
-    val sparkSession = SparkSession.getActiveSession.getOrElse {
-      throw HyperspaceException("Could not find active SparkSession.")
-    }
-
-    getContext(sparkSession)
+    getContext(spark)
   }
 
   def apply(): Hyperspace = {
-    val sparkSession = SparkSession.getActiveSession.getOrElse {
-      throw HyperspaceException("Could not find active SparkSession.")
-    }
-
-    new Hyperspace(sparkSession)
+    new Hyperspace(spark)
   }
 }
 

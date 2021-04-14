@@ -22,6 +22,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 /**
  * Base abstract class containing common code for different types of index refresh actions.
@@ -70,8 +71,11 @@ private[actions] abstract class RefreshActionBase(
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
-    val latestRelation =
-      Hyperspace.getContext(spark).sourceProviderManager.refreshRelationMetadata(relations.head)
+    val latestRelation = Hyperspace
+      .getContext(spark)
+      .sourceProviderManager
+      .getRelationMetadata(relations.head)
+      .refresh()
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
     val df = spark.read
       .schema(dataSchema)
@@ -90,7 +94,12 @@ private[actions] abstract class RefreshActionBase(
 
   protected lazy val indexConfig: IndexConfig = {
     val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
+    IndexConfig(
+      previousIndexLogEntry.name,
+      // As indexed & included columns in previousLogEntry are resolved & prefixed names,
+      // need to remove the prefix to resolve with the dataframe for refresh.
+      ddColumns.indexed.map(ResolvedColumn(_).name),
+      ddColumns.included.map(ResolvedColumn(_).name))
   }
 
   final override val transientState: String = REFRESHING
