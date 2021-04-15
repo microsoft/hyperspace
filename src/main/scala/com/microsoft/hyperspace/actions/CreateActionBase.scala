@@ -84,12 +84,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           Hyperspace
             .getContext(spark)
             .sourceProviderManager
+            .getRelationMetadata(sourcePlanProperties.relations.head)
             .enrichIndexProperties(
-              sourcePlanProperties.relations.head,
               prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
                 ++ hasLineageProperty(spark) ++ hasParquetAsSourceFormatProperty(relation))
 
-        IndexLogEntry(
+        IndexLogEntry.create(
           indexConfig.indexName,
           CoveringIndex(
             CoveringIndex.Properties(
