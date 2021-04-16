@@ -42,13 +42,9 @@ class CancelAction(final override protected val logManager: IndexLogManager) ext
   final override val transientState: String = CANCELLING
 
   final override lazy val finalState: String = {
-    logEntry.state match {
-      case VACUUMING => DOESNOTEXIST
-      case _ =>
-        logManager.getLatestStableLog() match {
-          case None => DOESNOTEXIST
-          case Some(entry) => entry.state
-        }
+    logManager.getLatestStableLog() match {
+      case None => DOESNOTEXIST
+      case Some(entry) => entry.state
     }
   }
 

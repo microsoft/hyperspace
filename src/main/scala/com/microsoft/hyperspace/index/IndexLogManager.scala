@@ -52,7 +52,7 @@ trait IndexLogManager {
 }
 
 class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = new Configuration)
-    extends IndexLogManager
+  extends IndexLogManager
     with Logging {
   // Use FileContext instead of FileSystem for atomic renames?
   private lazy val fs: FileSystem = indexPath.getFileSystem(hadoopConfiguration)
@@ -97,11 +97,12 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
       if (idOpt.isDefined) {
         (idOpt.get to 0 by -1).foreach { id =>
           val entry = getLog(id)
-          if (entry.isDefined && Constants.STABLE_STATES.contains(entry.get.state)) {
+          if (entry.exists(e => Constants.STABLE_STATES.contains(e.state))) {
             return entry
-          } else if (entry.isDefined && (entry.get.state.equals(Constants.States.CREATING) ||
-                     entry.get.state.equals(Constants.States.VACUUMING))) {
-            // Not consider unrelated logs before creating or vacuuming state.
+          }
+          if (entry.exists(e => e.state.equals(Constants.States.CREATING)
+            || e.state.equals(Constants.States.VACUUMING))) {
+            // Do not consider unrelated logs before creating or vacuuming state.
             return None
           }
         }
