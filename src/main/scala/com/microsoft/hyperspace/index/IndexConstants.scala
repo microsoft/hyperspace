@@ -102,6 +102,8 @@ object IndexConstants {
   private[hyperspace] val LINEAGE_PROPERTY = "lineage"
   // Indicate whether the source file format is parquet.
   private[hyperspace] val HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY = "hasParquetAsSourceFormat"
+  // Indicate Hyperspace version.
+  private[hyperspace] val HYPERSPACE_VERSION_PROPERTY: String = "hyperspaceVersion"
   // Indicate index log version.
   private[hyperspace] val INDEX_LOG_VERSION = "indexLogVersion"
 

@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.execution.datasources.BucketingUtils
@@ -148,8 +147,8 @@ class OptimizeAction(
           properties = Hyperspace
             .getContext(spark)
             .sourceProviderManager
+            .getRelationMetadata(previousIndexLogEntry.relations.head)
             .enrichIndexProperties(
-              previousIndexLogEntry.relations.head,
               prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
 
     if (filesToIgnore.nonEmpty) {

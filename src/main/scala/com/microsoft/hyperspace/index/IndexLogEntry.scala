@@ -29,9 +29,9 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.util.{PathUtils, SchemaUtils}
+import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -430,7 +430,12 @@ object SparkPlan {
 // IndexLogEntry-specific Source that uses SparkPlan as a plan.
 case class Source(plan: SparkPlan)
 
-// IndexLogEntry that captures index-related information.
+/**
+ * IndexLogEntry that captures index-related information.
+ * Don't use this method to create a new IndexLogEntry, unless you specify all hyperspace project
+ * default properties.
+ * Refer the create method of IndexLogEntry Object for further details.
+ */
 case class IndexLogEntry(
     name: String,
     derivedDataset: CoveringIndex,
@@ -518,6 +523,7 @@ case class IndexLogEntry(
         numBuckets.equals(that.numBuckets) &&
         content.root.equals(that.content.root) &&
         source.equals(that.source) &&
+        properties.equals(that.properties) &&
         state.equals(that.state)
     case _ => false
   }
@@ -610,6 +616,30 @@ object IndexLogEntry {
   val VERSION: String = "0.1"
 
   def schemaString(schema: StructType): String = schema.json
+
+  /**
+   * Use this method to create a new IndexLogEntry, which automatically includes
+   * all common default hyperspace project properties.
+   * TODO: force dev to use this method as this takes into account all
+   *  project properties that needed to be added by default. Currently, dev can also
+   *  create IndexLogEntry from case class.
+   *  https://github.com/microsoft/hyperspace/issues/370
+   *  Also add require for hyperspace project version when we introduce breaking change.
+   */
+  def create(
+      name: String,
+      derivedDataset: CoveringIndex,
+      content: Content,
+      source: Source,
+      properties: Map[String, String]): IndexLogEntry = {
+    IndexLogEntry(
+      name,
+      derivedDataset,
+      content,
+      source,
+      properties + ((IndexConstants.HYPERSPACE_VERSION_PROPERTY, BuildInfo.version))
+    )
+  }
 }
 
 /**
@@ -629,7 +659,7 @@ class FileIdTracker {
 
   def getMaxFileId: Long = maxId
 
-  def getFileToIdMap: HashMap[key, Long] = fileToIdMap
+  def getFileToIdMapping: Seq[(key, Long)] = fileToIdMap.toSeq
 
   def getFileId(path: String, size: Long, modifiedTime: Long): Option[Long] =
     fileToIdMap.get((path, size, modifiedTime))
