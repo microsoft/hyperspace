@@ -526,7 +526,7 @@ object JoinIndexBatch extends HyperspaceBatch with HyperspaceEventLogging {
         .getTagValue(relation.plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
         .getOrElse {
           relation.allFileInfos.foldLeft(0L) { (res, f) =>
-            if (leftCandidateIndex.sourceFileInfoSet.contains(f)) {
+            if (index.sourceFileInfoSet.contains(f)) {
               (res + f.size) // count, total bytes
             } else {
               res
