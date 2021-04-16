@@ -50,7 +50,7 @@ class CancelActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
   test("Cancel leads to DoesNotExist state from VACUUMING") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(TestLogEntry(VACUUMING)))
-    when(mockLogManager.getLatestStableLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
+    when(mockLogManager.getLatestStableLog()).thenReturn(None)
 
     val action = new CancelAction(mockLogManager)
     assert(action.finalState === DOESNOTEXIST)
