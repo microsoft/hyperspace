@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, BinaryOperator, ExprId, GetStructField, In, IsNotNull, Literal, NamedExpression, Not}
+import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, BinaryOperator, ExprId, GetStructField, In, IsNotNull, Literal, NamedExpression, Not}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project, Union}
 import org.apache.spark.sql.execution.datasources.InMemoryFileIndex
@@ -347,14 +347,21 @@ class NestedRuleHelper(spark: SparkSession) extends BaseRuleHelper(spark) {
     val projectedFields = project.projectList.map { exp =>
       val fieldName = extractNamesFromExpression(exp).toKeep.head
       val escapedFieldName = PlanUtils.prefixNestedField(fieldName)
+      val resolvedField = ResolverUtils.ResolvedColumn(escapedFieldName)
       val attr = extractAttributeRef(exp, fieldName)
       val fieldType = extractTypeFromExpression(exp, fieldName)
       // Try to find it in the project transformed child.
       getExprId(project.child, escapedFieldName) match {
         case Some(exprId) =>
-          attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
+          val newAttr = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
             exprId,
             attr.qualifier)
+          resolvedField.projectName match {
+            case Some(projectName) =>
+              Alias(newAttr, projectName)()
+            case None =>
+              newAttr
+          }
         case _ =>
           attr
       }

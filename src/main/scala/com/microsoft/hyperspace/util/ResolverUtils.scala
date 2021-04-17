@@ -226,7 +226,7 @@ object ResolverUtils {
     assert(!name.contains("`"))
 
     // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
-    lazy val normalizedName = {
+    lazy val normalizedName: String = {
       if (isNested) {
         s"$NESTED_FIELD_PREFIX$name"
       } else {
@@ -256,6 +256,20 @@ object ResolverUtils {
      * @return [[Column]] object create using the normalized name.
      */
     def toNormalizedColumn: Column = col(quote(normalizedName))
+
+    /**
+     * Returns the simple name that is required in the projection.
+     *
+     * Given a nested column `nested.nested.fieldA` when doing select over it the
+     * returned column name by Spark will be `fieldA`.
+     *
+     * @return The name for projection if it's a nested field, otherwise [[None]].
+     */
+    def projectName: Option[String] = if (isNested && name.contains(".")) {
+      Some(name.split("\\.").last)
+    } else {
+      None
+    }
 
     private def quote(name: String) = s"`$name`"
   }

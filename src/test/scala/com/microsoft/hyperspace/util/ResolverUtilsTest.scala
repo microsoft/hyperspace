@@ -148,6 +148,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     // `Column` object correctly.
     assert(col1.toColumn.toString === "`a.b.c`")
     assert(col1.toNormalizedColumn.toString === "`a.b.c`")
+    assert(col1.projectName.isEmpty)
 
     val col2 = ResolvedColumn("abc", isNested = false)
     assert(col2.name == "abc")
@@ -155,6 +156,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(col2 === ResolvedColumn(col2.normalizedName))
     assert(col2.toColumn.toString === "abc")
     assert(col2.toNormalizedColumn.toString === "abc")
+    assert(col2.projectName.isEmpty)
 
     val col3 = ResolvedColumn("a.b.c", isNested = true)
     assert(col3.name == "a.b.c")
@@ -162,6 +164,7 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
     assert(col3 === ResolvedColumn(col3.normalizedName))
     assert(col3.toColumn.toString === "a.b.c AS `__hs_nested.a.b.c`")
     assert(col3.toNormalizedColumn.toString === "`__hs_nested.a.b.c`")
+    assert(col3.projectName.contains("c"))
   }
 }
 
