@@ -35,7 +35,7 @@ import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsR
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
 
-object RuleUtils {
+class BaseRuleHelper(spark: SparkSession) {
 
   /**
    * Filter the given candidate indexes by matching signatures and index status.
@@ -44,13 +44,11 @@ object RuleUtils {
    * index source files and the input files of the given plan. If there are some common
    * files, the index is considered as a candidate.
    *
-   * @param spark Spark Session.
    * @param indexes List of available indexes.
    * @param relation Relation with which given indexes are compared.
    * @return Active indexes built for this plan.
    */
   def getCandidateIndexes(
-      spark: SparkSession,
       indexes: Seq[IndexLogEntry],
       relation: FileBasedRelation): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
@@ -131,7 +129,6 @@ object RuleUtils {
     }
 
     def prepareHybridScanCandidateSelection(
-        spark: SparkSession,
         plan: LogicalPlan,
         indexes: Seq[IndexLogEntry]): Unit = {
       assert(HyperspaceConf.hybridScanEnabled(spark))
@@ -153,23 +150,12 @@ object RuleUtils {
       // TODO: Duplicate listing files for the given relation as in
       //  [[transformPlanToUseHybridScan]]
       //  See https://github.com/microsoft/hyperspace/issues/160
-      prepareHybridScanCandidateSelection(spark, relation.plan, indexes)
+      prepareHybridScanCandidateSelection(relation.plan, indexes)
 
       indexes.filter(_.created).flatMap(getHybridScanCandidate)
     } else {
       indexes.filter(index => index.created && signatureValid(index))
     }
-  }
-
-  /**
-   * Check if an index was applied the given relation or not.
-   * This can be determined by an identifier in [[FileBasedRelation]]'s options.
-   *
-   * @param relation FileBasedRelation to check if an index is already applied.
-   * @return true if an index is applied to the given relation. Otherwise false.
-   */
-  def isIndexApplied(relation: FileBasedRelation): Boolean = {
-    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
 
   /**
@@ -183,7 +169,6 @@ object RuleUtils {
    * - We know for sure the index which can be used to transform the plan.
    * - The plan should be linear and include one supported relation.
    *
-   * @param spark Spark session.
    * @param index Index used in transformation of plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
@@ -191,13 +176,12 @@ object RuleUtils {
    * @return Transformed plan.
    */
   def transformPlanToUseIndex(
-      spark: SparkSession,
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
     // Check pre-requisite.
-    val relation = getRelation(spark, plan)
+    val relation = getRelation(plan)
     assert(relation.isDefined)
 
     // If there is no change in source data files, the index can be applied by
@@ -212,9 +196,9 @@ object RuleUtils {
     lazy val isSourceUpdated = index.hasSourceUpdate
 
     val transformed = if (hybridScanRequired || isSourceUpdated) {
-      transformPlanToUseHybridScan(spark, index, plan, useBucketSpec, useBucketUnionForAppended)
+      transformPlanToUseHybridScan(index, plan, useBucketSpec, useBucketUnionForAppended)
     } else {
-      transformPlanToUseIndexOnlyScan(spark, index, plan, useBucketSpec)
+      transformPlanToUseIndexOnlyScan(index, plan, useBucketSpec)
     }
     assert(!transformed.equals(plan))
     transformed
@@ -227,7 +211,7 @@ object RuleUtils {
    * @return If the plan is linear and the relation node is supported, the [[FileBasedRelation]]
    *         object that wraps the relation node. Otherwise None.
    */
-  def getRelation(spark: SparkSession, plan: LogicalPlan): Option[FileBasedRelation] = {
+  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     val leaves = plan.collectLeaves()
     if (leaves.size == 1 && provider.isSupportedRelation(leaves.head)) {
@@ -244,14 +228,12 @@ object RuleUtils {
    *
    * NOTE: This method currently only supports transformation of nodes with supported relations.
    *
-   * @param spark Spark session.
    * @param index Index used in transformation of plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
    * @return Transformed logical plan that leverages an index.
    */
-  private def transformPlanToUseIndexOnlyScan(
-      spark: SparkSession,
+  protected[rules] def transformPlanToUseIndexOnlyScan(
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
@@ -290,15 +272,13 @@ object RuleUtils {
    * eligible and we reconstruct new plans for the appended files so as to merge with
    * bucketed index data correctly.
    *
-   * @param spark Spark session.
    * @param index Index used in transformation of plan.
    * @param plan Current logical plan.
    * @param useBucketSpec Option whether to use BucketSpec for reading index data.
    * @param useBucketUnionForAppended Option whether to use BucketUnion to merge appended data.
    * @return Transformed logical plan that leverages an index and merges appended data.
    */
-  private def transformPlanToUseHybridScan(
-      spark: SparkSession,
+  protected[rules] def transformPlanToUseHybridScan(
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean,
@@ -416,7 +396,7 @@ object RuleUtils {
       // For more details, see https://github.com/microsoft/hyperspace/issues/150.
 
       val planForAppended =
-        transformPlanToReadAppendedFiles(spark, index, plan, unhandledAppendedFiles)
+        transformPlanToReadAppendedFiles(index, plan, unhandledAppendedFiles)
       if (useBucketUnionForAppended && useBucketSpec) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
@@ -446,14 +426,12 @@ object RuleUtils {
    * The result will be merged with the plan which is reading index data
    * by using [[BucketUnion]] or [[Union]].
    *
-   * @param spark Spark session.
    * @param index Index used in transformation of plan.
    * @param originalPlan Original plan.
    * @param filesAppended Appended files to the source relation.
    * @return Transformed linear logical plan for appended files.
    */
-  private def transformPlanToReadAppendedFiles(
-      spark: SparkSession,
+  protected[rules] def transformPlanToReadAppendedFiles(
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
@@ -565,5 +543,19 @@ object RuleUtils {
     }
     assert(shuffleInjected)
     shuffled
+  }
+}
+
+object BaseRuleHelper extends Serializable {
+
+  /**
+   * Check if an index was applied the given relation or not.
+   * This can be determined by an identifier in [[FileBasedRelation]]'s options.
+   *
+   * @param relation FileBasedRelation to check if an index is already applied.
+   * @return true if an index is applied to the given relation. Otherwise false.
+   */
+  def isIndexApplied(relation: FileBasedRelation): Boolean = {
+    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
 }
