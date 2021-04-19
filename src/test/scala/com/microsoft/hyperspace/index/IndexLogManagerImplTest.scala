@@ -178,13 +178,21 @@ class IndexLogManagerImplTest
       fs,
       new Path(path, s"$HYPERSPACE_LOG/10"),
       JsonUtils.toJson(getEntry("VACUUMING")))
+
+    {
+      val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+      assert(actual.isEmpty)
+    }
+
     FileUtils.createFile(
       fs,
       new Path(path, s"$HYPERSPACE_LOG/12"),
       JsonUtils.toJson(getEntry("CREATING")))
 
-    val actual = new IndexLogManagerImpl(path).getLatestStableLog()
-    assert(actual.isEmpty)
+    {
+      val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+      assert(actual.isEmpty)
+    }
   }
 
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {
