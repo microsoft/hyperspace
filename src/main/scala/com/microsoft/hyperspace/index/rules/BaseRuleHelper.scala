@@ -32,7 +32,7 @@ import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
-import com.microsoft.hyperspace.index.sources.FileBasedRelation
+import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedSourceProviderManager}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 class BaseRuleHelper(spark: SparkSession) {
@@ -181,7 +181,7 @@ class BaseRuleHelper(spark: SparkSession) {
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
     // Check pre-requisite.
-    val relation = getRelation(plan)
+    val relation = RuleUtils.getRelation(plan)
     assert(relation.isDefined)
 
     // If there is no change in source data files, the index can be applied by
@@ -205,20 +205,31 @@ class BaseRuleHelper(spark: SparkSession) {
   }
 
   /**
-   * Extract the relation node if the given logical plan is linear.
+   * Returns the updated output attributes given a relation and schema.
    *
-   * @param plan Logical plan to extract a relation node from.
-   * @return If the plan is linear and the relation node is supported, the [[FileBasedRelation]]
-   *         object that wraps the relation node. Otherwise None.
+   * @param relation The [[FileBasedRelation]] to extract from.
+   * @param schema The given schema to compare with.
+   * @return A collection of [[AttributeReference]] that will be plan's output.
    */
-  def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
-    val provider = Hyperspace.getContext(spark).sourceProviderManager
-    val leaves = plan.collectLeaves()
-    if (leaves.size == 1 && provider.isSupportedRelation(leaves.head)) {
-      Some(provider.getRelation(leaves.head))
-    } else {
-      None
-    }
+  protected[rules] def getUpdatedOutput(
+      relation: FileBasedRelation,
+      schema: StructType): Seq[AttributeReference] = {
+    relation.plan.output
+      .filter(attr => schema.fieldNames.contains(attr.name))
+      .map(_.asInstanceOf[AttributeReference])
+  }
+
+  /**
+   * Returns the output schema given a relation and an index.
+   *
+   * @param relation The [[FileBasedRelation]] to extract from.
+   * @param index Index used in transformation of plan.
+   * @return
+   */
+  protected[rules] def getFsRelationSchema(
+      relation: FileBasedRelation,
+      index: IndexLogEntry): StructType = {
+    StructType(index.schema.filter(relation.plan.schema.contains(_)))
   }
 
   /**
@@ -472,6 +483,38 @@ class BaseRuleHelper(spark: SparkSession) {
   }
 
   /**
+   * The method transforms the relation part of a plan to support indexes.
+   *
+   * @param index Index used in transformation of plan.
+   * @param provider The source provider.
+   * @param plan Original plan.
+   * @param useBucketSpec Option whether to use BucketSpec for reading index data.
+   * @return A transformed [[LogicalRelation]].
+   */
+  private[rules] def transformRelation(
+      index: IndexLogEntry,
+      provider: FileBasedSourceProviderManager,
+      plan: LogicalPlan,
+      useBucketSpec: Boolean): LogicalRelation = {
+    val relation = provider.getRelation(plan)
+    val location = index.withCachedTag(IndexLogEntryTags.INMEMORYFILEINDEX_INDEX_ONLY) {
+      new InMemoryFileIndex(spark, index.content.files, Map(), None)
+    }
+
+    val indexFsRelation = new IndexHadoopFsRelation(
+      location,
+      new StructType(),
+      getFsRelationSchema(relation, index),
+      if (useBucketSpec) Some(index.bucketSpec) else None,
+      new ParquetFileFormat,
+      Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
+
+    val updatedOutput = getUpdatedOutput(relation, indexFsRelation.schema)
+
+    relation.createLogicalRelation(indexFsRelation, updatedOutput)
+  }
+
+  /**
    * Transform the plan to perform on-the-fly Shuffle the data based on bucketSpec.
    * Note that this extractor depends on [[LogicalRelation]] with [[HadoopFsRelation]] because
    * the given plan is the result of [[transformPlanToReadAppendedFiles]], which converts
@@ -543,19 +586,5 @@ class BaseRuleHelper(spark: SparkSession) {
     }
     assert(shuffleInjected)
     shuffled
-  }
-}
-
-object BaseRuleHelper extends Serializable {
-
-  /**
-   * Check if an index was applied the given relation or not.
-   * This can be determined by an identifier in [[FileBasedRelation]]'s options.
-   *
-   * @param relation FileBasedRelation to check if an index is already applied.
-   * @return true if an index is applied to the given relation. Otherwise false.
-   */
-  def isIndexApplied(relation: FileBasedRelation): Boolean = {
-    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
   }
 }

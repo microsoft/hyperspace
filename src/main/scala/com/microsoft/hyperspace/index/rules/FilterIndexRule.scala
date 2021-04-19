@@ -107,8 +107,7 @@ object FilterIndexRule
       outputColumns: Seq[String],
       filterColumns: Seq[String],
       plan: LogicalPlan): Seq[IndexLogEntry] = {
-    val ruleHelper = new BaseRuleHelper(spark)
-    ruleHelper.getRelation(filter) match {
+    RuleUtils.getRelation(filter) match {
       case Some(r) =>
         val indexManager = Hyperspace
           .getContext(spark)
@@ -145,7 +144,7 @@ object FilterIndexRule
             // Get candidate via file-level metadata validation. This is performed after pruning
             // by column schema, as this might be expensive when there are numerous files in the
             // relation or many indexes to be checked.
-            ruleHelper.getCandidateIndexes(candidateIndexes, r)
+            new BaseRuleHelper(spark).getCandidateIndexes(candidateIndexes, r)
 
           case _ =>
             Seq.empty
@@ -191,7 +190,7 @@ object ExtractFilterNode {
 
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
     case project @ Project(_, filter @ Filter(condition: Expression, ExtractRelation(relation)))
-        if !BaseRuleHelper.isIndexApplied(relation) =>
+        if !RuleUtils.isIndexApplied(relation) =>
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
@@ -202,7 +201,7 @@ object ExtractFilterNode {
       Some(project, filter, projectColumnNames, filterColumnNames)
 
     case filter @ Filter(condition: Expression, ExtractRelation(relation))
-        if !BaseRuleHelper.isIndexApplied(relation) =>
+        if !RuleUtils.isIndexApplied(relation) =>
       val relationColumnsName = relation.plan.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
