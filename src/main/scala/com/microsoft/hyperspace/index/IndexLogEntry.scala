@@ -31,6 +31,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.Content.recFilesApply
 import com.microsoft.hyperspace.util.PathUtils
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
@@ -45,26 +46,16 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
   @JsonIgnore
   lazy val files: Seq[Path] = {
     // Recursively find files from directory tree.
-    rec(new Path(root.name), root, (f, prefix) => new Path(prefix, f.name))
+    recFilesApply(new Path(root.name), root, (f, prefix) => new Path(prefix, f.name))
   }
 
   @JsonIgnore
   lazy val fileInfos: Set[FileInfo] = {
-    rec(
+    recFilesApply(
       new Path(root.name),
       root,
       (f, prefix) =>
         FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
-  }
-
-  private def rec[T](
-      prefixPath: Path,
-      directory: Directory,
-      func: (FileInfo, Path) => T): Seq[T] = {
-    val files = directory.files.map(f => func(f, prefixPath))
-    files ++ directory.subDirs.flatMap { dir =>
-      rec(new Path(prefixPath, dir.name), dir, func)
-    }
   }
 }
 
@@ -110,6 +101,43 @@ object Content {
     } else {
       None
     }
+  }
+
+  /**
+   * Apply `func` to each file in directory recursively.
+   *
+   * @param prefixPath Root prefix
+   * @param directory Root directory
+   * @param func Function which would apply to current prefix and file
+   * @tparam T
+   * @return Result list of applying function to all files
+   */
+  def recFilesApply[T](
+                        prefixPath: Path,
+                        directory: Directory,
+                        func: (FileInfo, Path) => T): Seq[T] = {
+    @tailrec
+    def recAcc[A](
+                   dirMap: List[(Path, Seq[Directory])],
+                   func: (FileInfo, Path) => A,
+                   acc: Seq[A] = Seq.empty): Seq[A] = {
+      dirMap match {
+        case Nil => acc
+        case (curPrefixPath, curDirs) :: otherDirs =>
+          val curAcc = for {
+            dir <- curDirs
+            file <- dir.files
+          } yield func(file, new Path(curPrefixPath, dir.name))
+
+          val newLevels = curDirs
+            .filter(_.subDirs.nonEmpty)
+            .map(dir => (new Path(curPrefixPath, dir.name), dir.subDirs))
+
+          recAcc(otherDirs ++ newLevels, func, curAcc ++ acc)
+      }
+    }
+
+    recAcc(List(prefixPath -> Seq(directory)), func)
   }
 }
 
