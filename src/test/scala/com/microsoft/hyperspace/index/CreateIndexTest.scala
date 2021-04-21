@@ -17,14 +17,17 @@
 package com.microsoft.hyperspace.index
 
 import scala.collection.mutable.WrappedArray
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.SQLHelper
-
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.util.FileUtils
+import org.apache.commons.codec.binary.Base64
+import org.apache.commons.io.output.ByteArrayOutputStream
+import org.apache.spark.util.sketch.BloomFilter
+
+import java.io.ByteArrayInputStream
 
 class CreateIndexTest extends HyperspaceSuite with SQLHelper {
   override val systemPath = new Path("src/test/resources/indexLocation")
@@ -75,6 +78,59 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
 
   after {
     FileUtils.delete(systemPath)
+  }
+
+  test("Sho How Bloom Works") {
+    // How BF are created
+    val mbfS = spark.read.parquet(marvelDataPath).select("Affiliation")
+      .stat.bloomFilter("Affiliation", 100, 0.03)
+
+    val dbfS = spark.read.parquet(dcDataPath).select("Affiliation")
+      .stat.bloomFilter("Affiliation", 100, 0.03)
+
+    // All BF are stored locally and read again
+    val mbfByteStream = new ByteArrayOutputStream()
+    mbfS.writeTo(mbfByteStream)
+
+    val dbfByteStream = new ByteArrayOutputStream()
+    dbfS.writeTo(dbfByteStream)
+    val bloomDF = spark.createDataFrame(
+      Seq(
+        ("marvel", Base64.encodeBase64String(mbfByteStream.toByteArray)),
+        ("dc", Base64.encodeBase64String(dbfByteStream.toByteArray))
+      )
+    ).toDF("FileName", "Data")
+    bloomDF.write.parquet(new Path(comicDataDir, "bf.parquet").toString)
+
+    // BF read
+    val bloomDFR = spark.read.parquet(new Path(comicDataDir, "bf.parquet").toString)
+
+    // BF used to check for filters
+//    bloomDFR.filter().select("filename")
+    bloomDFR.filter("FileName = 'marvel'").select("Data").collect()
+      .foreach {
+        row => {
+          val mbf = BloomFilter.readFrom(new ByteArrayInputStream(
+            Base64.decodeBase64(row.getString(0))))
+          assert(mbf.mightContain("XMen"))
+          assert(mbf.mightContainString("Avengers"))
+          assert(!mbf.mightContainString("Suicide Squad"))
+          assert(!mbf.mightContainString("Justice League"))
+          assert(!mbf.mightContainString("Suicide"))
+        }
+      }
+    bloomDFR.filter("FileName = 'dc'").select("Data").collect()
+      .foreach{
+        row => {
+            val dbf = BloomFilter.readFrom(new ByteArrayInputStream(
+              Base64.decodeBase64(row.getString(0))))
+            assert(!dbf.mightContainString("XMen"))
+            assert(!dbf.mightContainString("Avengers"))
+            assert(dbf.mightContainString("Suicide Squad"))
+            assert(dbf.mightContainString("Justice League"))
+            assert(!dbf.mightContainString("Justice"))
+          }
+        }
   }
 
   test("Creating one covering index.") {

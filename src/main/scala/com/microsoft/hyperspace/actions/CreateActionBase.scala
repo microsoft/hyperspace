@@ -151,29 +151,25 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
     // TODO Begin has this op as relation is created there
     // TODO Maybe use lineage to make file smaller
     val relations = getRelation(spark, df).createRelationMetadata(fileIdTracker)
-    val bloomFilterUDF = udf((path: String) => {
-      val bfByteStream = new ByteArrayOutputStream()
-      val localBF = spark.read.schema(df.schema)
-        .format(relations.fileFormat)
-        .options(relations.options)
-        .load(path)
-        .select(resolvedIndexedColumn.head)
-        .stat
-        .bloomFilter(resolvedIndexedColumn.head, indexConfig.expectedNumItems, resolvedNumBits)
-      localBF.writeTo(bfByteStream)
-      bfByteStream.close()
-      bfByteStream.toByteArray.map(_.toChar).mkString
-    })
-
-    val bloomFilterDF = spark.createDataFrame(
-      relations.rootPaths.map(p => Tuple1(p))
-    ).toDF("FileName")
-    val createBloomFilterData = spark.udf.register("createBloomFilter", bloomFilterUDF)
-    val bloomFilterResult = bloomFilterDF.withColumn(
-      "Data",
-      createBloomFilterData(col("FileName"))
+    val bloomData = relations.rootPaths.par.map(
+      path => {
+        val bfByteStream = new ByteArrayOutputStream()
+        val localBF = spark.read.schema(df.schema)
+          .format(relations.fileFormat)
+          .options(relations.options)
+          .load(path)
+          .select(resolvedIndexedColumn.head)
+          .stat
+          .bloomFilter(resolvedIndexedColumn.head, indexConfig.expectedNumItems, resolvedNumBits)
+        localBF.writeTo(bfByteStream)
+        bfByteStream.close()
+        (path, bfByteStream.toByteArray.map(_.toChar).mkString)
+      }
     )
-    bloomFilterResult.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
+    val bloomDF = spark.createDataFrame(
+      bloomData.seq
+    ).toDF("FileName", "Data")
+    bloomDF.write.parquet(new Path(indexDataPath, "bf.parquet").toString)
   }
 
   protected def write(spark: SparkSession, df: DataFrame, indexConfig: IndexConfig): Unit = {

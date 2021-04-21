@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.rules
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, EqualNullSafe, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
@@ -26,10 +26,16 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.HyperSpaceIndex.BloomFilterIndex
 import com.microsoft.hyperspace.index.{IndexDataManagerFactoryImpl, IndexLogEntry, PathResolver}
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.rules.JoinIndexRule.extractConditions
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+import com.sun.xml.internal.messaging.saaj.util.ByteInputStream
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.functions.udf
+import org.apache.spark.util.sketch.BloomFilter
+
+import java.io.ByteArrayInputStream
 
 /**
  * FilterIndex rule looks for opportunities in a logical plan to replace
@@ -62,19 +68,20 @@ object FilterIndexRule
               // unnecessary shuffle for appended data to apply BucketUnion for merging data.
 
               val files = index.derivedDataset match {
-                case _: BloomFilterIndex =>
-                  // Register udf to use bf, TODO also somehow find index log entry path
-                  val hadoopConf = spark.sessionState.newHadoopConf()
-                  val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
-                    .getIndexPath(index.name)
-                  val indexManager = IndexDataManagerFactoryImpl.create(indexPath, hadoopConf)
-                  val id = indexManager.getLatestVersionId()
-                  if (id.isDefined) {
-                    val bfPath = new Path(indexManager.getPath(id.get), "bf.parquet")
-                    val bfDF = spark.read.parquet(bfPath.toString)
-                    filter.condition.foldable
+                case bfi: BloomFilterIndex =>
+                  // Register udf to use bf, TODO also somehow find index log entry path.
+                  /*
+                  val bfPath = new Path(index.content.files.filter(_.toString.contains("bf.parquet")).head)
+                  val bfDF = spark.read.parquet(bfPath.toString)
+                  val expression = extractConditions(filter.condition)
+                  if (expression.isDefined) {
+                    udf((bfData: String) => {
+                      val bf = BloomFilter.readFrom(new ByteArrayInputStream(bfData.getBytes()))
+                      bf.mightContain("")
+                    })
                   }
                   None
+                  */
               }
 
               val transformedPlan =
@@ -103,6 +110,19 @@ object FilterIndexRule
             originalPlan
         }
     }
+  }
+
+  private def extractConditions(condition: Expression): Option[Expression] = condition match {
+    case EqualTo(_: AttributeReference, _: AttributeReference) => Some(condition)
+    case EqualNullSafe(_: AttributeReference, _: AttributeReference) => None
+    case And(left, right) =>
+      val leaf = extractConditions(left)
+      if (leaf.isDefined) {
+        leaf
+      } else {
+        extractConditions(right)
+      }
+    case _ => throw new IllegalStateException("Unsupported condition found")
   }
 
   /**

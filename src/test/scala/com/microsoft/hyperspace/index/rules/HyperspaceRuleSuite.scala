@@ -106,7 +106,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
 
-        val indexFiles = getIndexDataFilesPaths(name).map { path =>
+        val indexFiles = getBloomDataFilePath(name).map { path =>
           new FileStatus(10, false, 1, 10, 10, path)
         }
 
@@ -133,8 +133,8 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
     }
   }
 
-  def getBloomDataFilePath(indexName: String): Option[Path] = {
-    Some(
+  def getBloomDataFilePath(indexName: String): Seq[Path] = {
+    Seq(
       new Path (
         new Path (
           new Path (systemPath, indexName),
