@@ -54,7 +54,12 @@ object FilterIndexRanker {
         } else {
           // TODO: Add ranking algorithm to sort candidates.
           //  See https://github.com/microsoft/hyperspace/issues/52
-          Some(candidates.head)
+
+          // Pick the index with minimum size. If indexes with same size are found, pick the
+          // one with lexicographically smaller name. This is required for deterministic selection
+          // of indexes.
+          Some(candidates.minBy(index =>
+            (index.getTagValue(plan, IndexLogEntryTags.INDEX_SIZE_IN_BYTES), index.name)))
         }
     }
   }

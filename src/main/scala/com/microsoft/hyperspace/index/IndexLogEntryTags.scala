@@ -27,6 +27,9 @@ object IndexLogEntryTags {
   val COMMON_SOURCE_SIZE_IN_BYTES: IndexLogEntryTag[Long] =
     IndexLogEntryTag[Long]("commonSourceSizeInBytes")
 
+  // INDEX_SIZE_IN_BYTES stores size of index source files.
+  val INDEX_SIZE_IN_BYTES: IndexLogEntryTag[Long] = IndexLogEntryTag[Long]("indexSizeInBytes")
+
   // SIGNATURE_MATCHED indicates if the plan has the same signature value with the index or not.
   val SIGNATURE_MATCHED: IndexLogEntryTag[Boolean] =
     IndexLogEntryTag[Boolean]("signatureMatched")
