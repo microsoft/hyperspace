@@ -26,10 +26,10 @@ import com.microsoft.hyperspace.index.IndexLogEntry
  */
 trait HyperspaceRule extends ActiveSparkSession {
   /**
-   * Sequence of conditions to apply indexes. Each check contains some conditions and
-   * exclude candidate indexes based on the conditions. The order of the sequence does matter.
+   * Sequence of conditions to apply indexes. Each filter contains conditions and
+   * filter out candidate indexes based on the conditions. The order of the sequence does matter.
    */
-  val planChecks: Seq[HyperspacePlanCheck]
+  val planFilters: Seq[PlanFilter]
 
   /**
    * Transform the plan to use the selected indexes.
@@ -56,8 +56,8 @@ trait HyperspaceRule extends ActiveSparkSession {
       return (plan, 0)
     }
 
-    val candidateIndexes = planChecks.foldLeft(indexes) { (pti, check) =>
-      check(plan, pti)
+    val candidateIndexes = planFilters.foldLeft(indexes) { (pti, filter) =>
+      filter(plan, pti)
     }
 
     if (candidateIndexes.nonEmpty) {
@@ -71,8 +71,8 @@ trait HyperspaceRule extends ActiveSparkSession {
 /**
  * No-op rule for traversal.
  */
-object NoOpHSRule extends HyperspaceRule {
-  override val planChecks = Nil
+object NoOpRule extends HyperspaceRule {
+  override val planFilters = Nil
 
   override def applyIndex(
       plan: LogicalPlan,

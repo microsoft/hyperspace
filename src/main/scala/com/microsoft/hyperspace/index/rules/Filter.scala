@@ -21,24 +21,40 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
 
-trait HyperspaceCheck {
+trait Filter {
   /**
-   * @return Failure reason if an index is excluded in the check.
+   * @return Failure reason for filtered out indexes.
    */
   def reason: String
 }
 
 /**
- * HyperspaceCheck used in CandidateIndexCollector.
+ * Filter used in CandidateIndexCollector.
  */
-trait HyperspaceSourceCheck extends HyperspaceCheck with ActiveSparkSession {
+trait SourceFilter extends Filter with ActiveSparkSession {
+
+  /**
+   * Filter out candidate indexes for the given source plan.
+   *
+   * @param plan Source plan
+   * @param indexes Candidate indexes
+   * @return Indexes which meet conditions of Filter
+   */
   def apply(plan: LogicalPlan, indexes: Seq[IndexLogEntry]): Seq[IndexLogEntry]
 }
 
 /**
- * HyperspaceCheck used in each HyperspaceRule.
+ * Filter used in HyperspaceRule.
  */
-trait HyperspacePlanCheck extends HyperspaceCheck with ActiveSparkSession {
+trait PlanFilter extends Filter with ActiveSparkSession {
+
+  /**
+   * Filter out candidate indexes for the given query plan.
+   *
+   * @param plan Query plan.
+   * @param indexes Map of source plan to candidate indexes.
+   * @return Map of source plan to indexes which meet conditions of Filter.
+   */
   def apply(
       plan: LogicalPlan,
       indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): Map[LogicalPlan, Seq[IndexLogEntry]]
