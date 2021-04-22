@@ -466,6 +466,11 @@ case class IndexLogEntry(
     sourceFileInfoSet.foldLeft(0L)(_ + _.size)
   }
 
+  @JsonIgnore
+  lazy val indexFilesSizeInBytes: Long = {
+    content.fileInfos.foldLeft(0L)(_ + _.size)
+  }
+
   def sourceUpdate: Option[Update] = {
     relations.head.data.properties.update
   }
