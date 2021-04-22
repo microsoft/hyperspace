@@ -46,7 +46,7 @@ class FilterIndexRankerTest extends HyperspaceRuleSuite {
   val t2c2 = AttributeReference("t2c2", StringType)()
 
   test("rank() should return the index with smallest size by default.") {
-    // Index with only 1 file of size 10
+    // Index with only 1 file of size 20
     val ind1 = createIndexLogEntry(
       "ind1",
       Seq(t1c1),
@@ -55,7 +55,7 @@ class FilterIndexRankerTest extends HyperspaceRuleSuite {
       writeLog = false,
       filenames = Seq("f1.parquet", "f2.parquet"))
 
-    // Index with only 2 files of total size 20
+    // Index with only 2 files of total size 10
     val ind2 = createIndexLogEntry(
       "ind2",
       Seq(t1c1),

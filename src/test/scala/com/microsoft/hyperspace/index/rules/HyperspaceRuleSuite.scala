@@ -31,6 +31,7 @@ import com.microsoft.hyperspace.index.Hdfs.Properties
 import com.microsoft.hyperspace.util.PathUtils
 
 trait HyperspaceRuleSuite extends HyperspaceSuite {
+  private val defaultFileNames = Seq("f1.parquet", "f2.parquet")
   def createIndexLogEntry(
       name: String,
       indexCols: Seq[AttributeReference],
@@ -39,7 +40,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
       numBuckets: Int = 10,
       inputFiles: Seq[FileInfo] = Seq(),
       writeLog: Boolean = true,
-      filenames: Seq[String] = Seq("f1.parquet", "f2.parquet")): IndexLogEntry = {
+      filenames: Seq[String] = defaultFileNames): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
@@ -86,7 +87,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
 
   def getIndexDataFilesPaths(
       indexName: String,
-      filenames: Seq[String] = Seq("f1.parquet", "f2.parquet")): Seq[Path] =
+      filenames: Seq[String] = defaultFileNames): Seq[Path] =
     filenames.map { f =>
       new Path(
         new Path(
