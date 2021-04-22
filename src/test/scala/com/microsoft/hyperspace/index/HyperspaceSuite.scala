@@ -18,12 +18,13 @@ package com.microsoft.hyperspace.index
 
 import java.io.File
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.{Hyperspace, SparkInvolvedSuite}
-import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
   // This is the system path that PathResolver uses to get the root of the indexes.
