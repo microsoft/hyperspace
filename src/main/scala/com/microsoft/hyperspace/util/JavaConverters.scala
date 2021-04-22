@@ -16,15 +16,19 @@
 
 package com.microsoft.hyperspace.util
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.Join
-import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
+import java.util.Optional
 
-object SparkUtils {
+object JavaConverters {
 
-  def toRddWithNewExecutionId(session: SparkSession, qe: QueryExecution): Unit = {
-    SQLExecution.withNewExecutionId(session, qe)(qe.toRdd)
+  def optionalAsScalaOption[T](o: Optional[T]): Option[T] = {
+    if (o.isPresent) Some(o.get) else None
   }
 
-  val JoinWithoutHint = Join
+  implicit def optionalAsScalaOptionConverter[T](o: Optional[T]): AsScala[Option[T]] = {
+    new AsScala(optionalAsScalaOption(o))
+  }
+
+  class AsScala[T](op: => T) {
+    def asScala: T = op
+  }
 }

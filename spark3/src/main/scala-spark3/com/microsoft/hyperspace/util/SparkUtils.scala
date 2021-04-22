@@ -16,29 +16,16 @@
 
 package com.microsoft.hyperspace.util
 
-import scala.collection.JavaConverters._
-
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Join, JoinHint, LogicalPlan}
 import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
-import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 object SparkUtils {
 
   def toRddWithNewExecutionId(session: SparkSession, qe: QueryExecution): Unit = {
     SQLExecution.withNewExecutionId(qe)(qe.toRdd)
-  }
-
-  type DataSourceV2RelationOptions = CaseInsensitiveStringMap
-
-  def asMap(options: DataSourceV2RelationOptions): Map[String, String] = {
-    options.asCaseSensitiveMap.asScala.toMap
-  }
-
-  def getCaseInsensitive(options: DataSourceV2RelationOptions, key: String): Option[String] = {
-    Option(options.get(key))
   }
 
   object JoinWithoutHint {

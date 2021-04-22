@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index.sources.iceberg
 
+import scala.collection.JavaConverters._
+
 import org.apache.iceberg.Table
 import org.apache.iceberg.catalog.TableIdentifier
 import org.apache.iceberg.hadoop.HadoopTables
@@ -24,7 +26,9 @@ import org.apache.iceberg.spark.source.IcebergSource
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.apache.spark.sql.sources.v2.DataSourceOptions
 
+import com.microsoft.hyperspace.util.JavaConverters._
 import com.microsoft.hyperspace.util.SparkUtils
 
 object IcebergUtils {
@@ -36,13 +40,11 @@ object IcebergUtils {
 
   def loadIcebergTable(spark: SparkSession, plan: LogicalPlan): (Table, Option[Long]) = {
     val conf = spark.sessionState.newHadoopConf()
-    val options = plan.asInstanceOf[DataSourceV2Relation].options
-    val path = SparkUtils
-      .getCaseInsensitive(options, "path")
-      .getOrElse {
-        throw new IllegalArgumentException("Cannot open table: path is not set")
-      }
-    val snapshotId = options.get("snapshot-id").map(_.toLong)
+    val options = new DataSourceOptions(plan.asInstanceOf[DataSourceV2Relation].options.asJava)
+    val path = options.get("path").asScala.getOrElse {
+      throw new IllegalArgumentException("Cannot open table: path is not set")
+    }
+    val snapshotId = options.get("snapshot-id").asScala.map(_.toLong)
     if (path.contains("/")) {
       val tables = new HadoopTables(conf)
       (tables.load(path), snapshotId)
