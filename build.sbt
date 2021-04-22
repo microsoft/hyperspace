@@ -16,9 +16,6 @@
 
 import Dependencies._
 
-lazy val spark24 = Version(2, 4, 2)
-lazy val spark30 = Version(3, 0, 1)
-
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
 
@@ -48,7 +45,7 @@ lazy val spark2 = (project in file("spark2"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     commonSettings,
-    sparkVersion := spark24,
+    sparkVersion := Version(2, 4, 2),
     crossScalaVersions := List(scala212, scala211),
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))
@@ -57,7 +54,7 @@ lazy val spark3 = (project in file("spark3"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     commonSettings,
-    sparkVersion := spark30,
+    sparkVersion := Version(3, 0, 1),
     crossScalaVersions := List(scala212), // Spark 3 doesn't support Scala 2.11
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))
