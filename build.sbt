@@ -208,3 +208,8 @@ ThisBuild / releaseProcess := Seq[ReleaseStep](
   publishArtifacts,
   setNextVersion,
   commitNextVersion)
+
+/**
+ * Others
+ */
+bspEnabled := false
