@@ -27,6 +27,9 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
 
+/**
+ * Collect candidate indexes for each relation.
+ */
 object CandidateIndexCollector extends ActiveSparkSession {
   // TODO: ColumnSchemaCheck :: FileSignatureCheck :: Nil
   val sourceChecks: Seq[HyperspaceSourceCheck] = Nil
@@ -55,10 +58,14 @@ object CandidateIndexCollector extends ActiveSparkSession {
   }
 }
 
+/**
+ * Apply Hyperspace indexes based on the score of each index application.
+ */
 class ScoreBasedIndexApplication {
-  val batches = NoOpBatch :: Nil // TODO: FilterIndexBatch :: JoinIndexBatch :: Nil
+  // TODO: FilterIndexHSRule :: JoinIndexHSRule :: Nil
+  val hyperspaceRules = NoOpHSRule :: Nil
 
-  // Map for memoization
+  // Map for memoization.
   val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
 
   def recApply(
@@ -81,6 +88,9 @@ class ScoreBasedIndexApplication {
   }
 }
 
+/**
+ * Transform the given plan to use Hyperspace indexes.
+ */
 object HyperspaceOneRule
     extends Rule[LogicalPlan]
     with Logging

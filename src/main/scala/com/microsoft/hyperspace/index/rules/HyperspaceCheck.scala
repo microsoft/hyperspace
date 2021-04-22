@@ -22,13 +22,22 @@ import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
 
 trait HyperspaceCheck {
+  /**
+   * @return Failure reason if an index is excluded in the check.
+   */
   def reason: String
 }
 
+/**
+ * HyperspaceCheck used in CandidateIndexCollector.
+ */
 trait HyperspaceSourceCheck extends HyperspaceCheck with ActiveSparkSession {
   def apply(plan: LogicalPlan, indexes: Seq[IndexLogEntry]): Seq[IndexLogEntry]
 }
 
+/**
+ * HyperspaceCheck used in each HyperspaceRule.
+ */
 trait HyperspacePlanCheck extends HyperspaceCheck with ActiveSparkSession {
   def apply(
       plan: LogicalPlan,

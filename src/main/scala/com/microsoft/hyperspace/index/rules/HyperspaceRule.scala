@@ -21,11 +21,32 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
 
-trait HyperspaceBatch extends ActiveSparkSession {
+/**
+ * Interface of exclusive type of indexes.
+ */
+trait HyperspaceRule extends ActiveSparkSession {
+  /**
+   * Sequence of conditions to apply indexes. Each check contains some conditions and
+   * exclude candidate indexes based on the conditions. The order of the sequence does matter.
+   */
   val planChecks: Seq[HyperspacePlanCheck]
 
+  /**
+   * Transform the plan to use the selected indexes.
+   *
+   * @param plan Original query plan.
+   * @param indexes Selected indexes.
+   * @return Transformed plan to use the selected indexes.
+   */
   def applyIndex(plan: LogicalPlan, indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): LogicalPlan
 
+  /**
+   * Calculate the score of the index application.
+   *
+   * @param plan Original query plan.
+   * @param indexes Selected indexes.
+   * @return Score of selected indexes.
+   */
   def score(plan: LogicalPlan, indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): Int
 
   final def apply(
@@ -47,7 +68,10 @@ trait HyperspaceBatch extends ActiveSparkSession {
   }
 }
 
-object NoOpBatch extends HyperspaceBatch {
+/**
+ * No-op rule for traversal.
+ */
+object NoOpHSRule extends HyperspaceRule {
   override val planChecks = Nil
 
   override def applyIndex(
