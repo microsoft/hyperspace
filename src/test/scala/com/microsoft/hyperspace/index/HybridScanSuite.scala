@@ -396,32 +396,37 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         val query = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
         query2.join(query, "clicks")
       }
-      val baseQuery = joinQuery()
-      val basePlan = baseQuery.queryExecution.optimizedPlan
 
-      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-        withSQLConf(
-          SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
-          IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-          val join = joinQuery()
-          checkAnswer(join, baseQuery)
-          assert(basePlan.equals(join.queryExecution.optimizedPlan))
-        }
+      // Dynamic pruning creates a dynamic filter, with different ids every time
+      // thus making basePlan.equals(join) fail
+      withSQLConf("spark.sql.optimizer.dynamicPartitionPruning.enabled" -> "false") {
+        val baseQuery = joinQuery()
+        val basePlan = baseQuery.queryExecution.optimizedPlan
 
-        withSQLConf(TestConfig.HybridScanEnabled: _*) {
-          val join = joinQuery()
-          val planWithHybridScan = join.queryExecution.optimizedPlan
-          assert(!basePlan.equals(planWithHybridScan))
-          checkJoinIndexHybridScan(
-            planWithHybridScan,
-            leftIndexName,
-            leftAppended,
-            leftDeleted,
-            rightIndexName,
-            rightAppended,
-            rightDeleted,
-            Seq(">= 2000", "<= 4000"))
-          checkAnswer(join, baseQuery)
+        withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+          withSQLConf(
+            SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
+            IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val join = joinQuery()
+            checkAnswer(join, baseQuery)
+            assert(basePlan.equals(join.queryExecution.optimizedPlan))
+          }
+
+          withSQLConf(TestConfig.HybridScanEnabled: _*) {
+            val join = joinQuery()
+            val planWithHybridScan = join.queryExecution.optimizedPlan
+            assert(!basePlan.equals(planWithHybridScan))
+            checkJoinIndexHybridScan(
+              planWithHybridScan,
+              leftIndexName,
+              leftAppended,
+              leftDeleted,
+              rightIndexName,
+              rightAppended,
+              rightDeleted,
+              Seq(">= 2000", "<= 4000"))
+            checkAnswer(join, baseQuery)
+          }
         }
       }
     }
@@ -598,29 +603,31 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         query.join(query2, "clicks")
       }
 
-      val baseQuery = joinQuery()
-      val basePlan = baseQuery.queryExecution.optimizedPlan
+      withSQLConf("spark.sql.optimizer.dynamicPartitionPruning.enabled" -> "false") {
+        val baseQuery = joinQuery()
+        val basePlan = baseQuery.queryExecution.optimizedPlan
 
-      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-          val join = joinQuery()
-          assert(basePlan.equals(join.queryExecution.optimizedPlan))
-        }
+        withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val join = joinQuery()
+            assert(basePlan.equals(join.queryExecution.optimizedPlan))
+          }
 
-        withSQLConf(TestConfig.HybridScanEnabled: _*) {
-          val join = joinQuery()
-          val planWithHybridScan = join.queryExecution.optimizedPlan
-          assert(!basePlan.equals(planWithHybridScan))
-          checkJoinIndexHybridScan(
-            planWithHybridScan,
-            leftIndexName,
-            leftAppended,
-            leftDeleted,
-            rightIndexName,
-            rightAppended,
-            rightDeleted,
-            Seq(" >= 2000", " <= 4000"))
-          checkAnswer(join, baseQuery)
+          withSQLConf(TestConfig.HybridScanEnabled: _*) {
+            val join = joinQuery()
+            val planWithHybridScan = join.queryExecution.optimizedPlan
+            assert(!basePlan.equals(planWithHybridScan))
+            checkJoinIndexHybridScan(
+              planWithHybridScan,
+              leftIndexName,
+              leftAppended,
+              leftDeleted,
+              rightIndexName,
+              rightAppended,
+              rightDeleted,
+              Seq(" >= 2000", " <= 4000"))
+            checkAnswer(join, baseQuery)
+          }
         }
       }
     }
@@ -696,32 +703,35 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
         query.join(query2, "clicks")
       }
-      val baseQuery = joinQuery()
-      val basePlan = baseQuery.queryExecution.optimizedPlan
 
-      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
-          val join = joinQuery()
-          assert(basePlan.equals(join.queryExecution.optimizedPlan))
-        }
+      withSQLConf("spark.sql.optimizer.dynamicPartitionPruning.enabled" -> "false") {
+        val baseQuery = joinQuery()
+        val basePlan = baseQuery.queryExecution.optimizedPlan
 
-        withSQLConf(
-          TestConfig.HybridScanEnabled :+
-            "spark.sql.optimizer.inSetConversionThreshold" -> "1": _*) {
-          // Changed inSetConversionThreshould to check InSet optimization.
-          val join = joinQuery()
-          val planWithHybridScan = join.queryExecution.optimizedPlan
-          assert(!basePlan.equals(planWithHybridScan))
-          checkJoinIndexHybridScan(
-            planWithHybridScan,
-            leftIndexName,
-            leftAppended,
-            leftDeleted,
-            rightIndexName,
-            rightAppended,
-            rightDeleted,
-            Seq(" >= 2000)", " <= 4000)"))
-          checkAnswer(baseQuery, join)
+        withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
+            val join = joinQuery()
+            assert(basePlan.equals(join.queryExecution.optimizedPlan))
+          }
+
+          withSQLConf(
+            TestConfig.HybridScanEnabled :+
+              "spark.sql.optimizer.inSetConversionThreshold" -> "1": _*) {
+            // Changed inSetConversionThreshould to check InSet optimization.
+            val join = joinQuery()
+            val planWithHybridScan = join.queryExecution.optimizedPlan
+            assert(!basePlan.equals(planWithHybridScan))
+            checkJoinIndexHybridScan(
+              planWithHybridScan,
+              leftIndexName,
+              leftAppended,
+              leftDeleted,
+              rightIndexName,
+              rightAppended,
+              rightDeleted,
+              Seq(" >= 2000)", " <= 4000)"))
+            checkAnswer(baseQuery, join)
+          }
         }
       }
     }
