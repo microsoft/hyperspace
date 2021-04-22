@@ -25,6 +25,7 @@ import com.microsoft.hyperspace.index.IndexLogEntry
  * Interface of exclusive type of indexes.
  */
 trait HyperspaceRule extends ActiveSparkSession {
+
   /**
    * Sequence of conditions to apply indexes. Each filter contains conditions and
    * filter out candidate indexes based on the conditions. The order of the sequence does matter.

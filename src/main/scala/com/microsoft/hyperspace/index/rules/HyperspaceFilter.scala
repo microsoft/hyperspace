@@ -21,7 +21,8 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
 
-trait Filter {
+trait HyperspaceFilter {
+
   /**
    * @return Failure reason for filtered out indexes.
    */
@@ -31,7 +32,7 @@ trait Filter {
 /**
  * Filter used in CandidateIndexCollector.
  */
-trait SourceFilter extends Filter with ActiveSparkSession {
+trait SourceFilter extends HyperspaceFilter with ActiveSparkSession {
 
   /**
    * Filter out candidate indexes for the given source plan.
@@ -46,7 +47,7 @@ trait SourceFilter extends Filter with ActiveSparkSession {
 /**
  * Filter used in HyperspaceRule.
  */
-trait PlanFilter extends Filter with ActiveSparkSession {
+trait PlanFilter extends HyperspaceFilter with ActiveSparkSession {
 
   /**
    * Filter out candidate indexes for the given query plan.

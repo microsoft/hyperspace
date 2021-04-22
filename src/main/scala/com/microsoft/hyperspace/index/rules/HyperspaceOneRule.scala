@@ -48,12 +48,12 @@ object CandidateIndexCollector extends ActiveSparkSession {
       plan: LogicalPlan,
       allIndexes: Seq[IndexLogEntry]): Map[LogicalPlan, Seq[IndexLogEntry]] = {
     val planToIndexes = initializePlanToIndexes(plan, allIndexes)
-    planToIndexes.flatMap { case (node, candidateIndexes) =>
-      Some(node, sourceFilters.foldLeft(candidateIndexes) { (indexes, filter) =>
-        val res = filter(node, indexes)
-        res
-      })
-        .filterNot(_._2.isEmpty)
+    planToIndexes.flatMap {
+      case (node, candidateIndexes) =>
+        Some(node, sourceFilters.foldLeft(candidateIndexes) { (indexes, filter) =>
+          val res = filter(node, indexes)
+          res
+        }).filterNot(_._2.isEmpty)
     }
   }
 }
@@ -72,9 +72,7 @@ class ScoreBasedIndexApplication {
       plan: LogicalPlan,
       indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): (LogicalPlan, Int) = {
     // If pre-calculated value exists, return it.
-    scoreMap.get(plan).foreach(res =>
-      return res
-    )
+    scoreMap.get(plan).foreach(res => return res)
 
     val optResult = (plan, 0)
     // TODO apply indexes recursively.
@@ -109,9 +107,9 @@ object HyperspaceOneRule
         val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
         val res = new ScoreBasedIndexApplication().apply(plan, candidateIndexes)
         res
-      }
-      catch { case _: Exception =>
-        plan
+      } catch {
+        case _: Exception =>
+          plan
       }
     }
   }
