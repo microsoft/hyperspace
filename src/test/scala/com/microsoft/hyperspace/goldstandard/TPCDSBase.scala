@@ -5,7 +5,6 @@
  *
  * The below license was copied from: https://github.com/FasterXML/jackson-module-scala/blob/2.10/src/main/resources/META-INF/LICENSE
  */
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -38,7 +37,7 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
 
   // The TPCDS queries below are based on v1.4.
   // TODO: Fix bulid pipeline for q49 and reenable q49.
-  val tpcdsQueries = Seq("q1")
+  val tpcdsQueries = Seq("q0")
 
   private val tableColumns = Map(
     "store_sales" ->
@@ -554,17 +553,35 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
        """.stripMargin)
   }
 
+  private val originalCBCEnabled = conf.cboEnabled
+  private val originalJoinReorderEnabled = conf.joinReorderEnabled
+
   override def beforeAll(): Unit = {
     super.beforeAll()
+    if (injectStats) {
+      // Sets configurations for enabling the optimization rules that
+      // exploit data statistics.
+      conf.setConf(SQLConf.CBO_ENABLED, true)
+      conf.setConf(SQLConf.JOIN_REORDER_ENABLED, true)
+    }
     tableNames.foreach { tableName =>
       createTable(spark, tableName)
+      if (injectStats) {
+        // To simulate plan generation on actual TPC-DS data, injects data stats here
+        spark.sessionState.catalog.alterTableStats(
+          TableIdentifier(tableName), Some(TPCDSTableStats.sf100TableStats(tableName)))
+      }
     }
   }
 
   override def afterAll(): Unit = {
+    conf.setConf(SQLConf.CBO_ENABLED, originalCBCEnabled)
+    conf.setConf(SQLConf.JOIN_REORDER_ENABLED, originalJoinReorderEnabled)
     tableNames.foreach { tableName =>
       spark.sessionState.catalog.dropTable(TableIdentifier(tableName), true, true)
     }
     super.afterAll()
   }
+
+  protected def injectStats: Boolean = true
 }
