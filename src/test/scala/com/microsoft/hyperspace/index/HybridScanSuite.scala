@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, EqualTo, In, InSet, Literal, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExec}
+import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, ProjectExec, UnionExec}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
@@ -284,7 +284,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         case p @ BucketUnionExec(children, bucketSpec) =>
           assert(children.size === 2)
           // children.head is always the index plan.
-          assert(children.head.isInstanceOf[ProjectExec])
+          assert(children.head.isInstanceOf[ProjectExec] || children.head.isInstanceOf[FilterExec])
           assert(children.last.isInstanceOf[ShuffleExchangeExec])
           assert(bucketSpec.numBuckets === 200)
           p

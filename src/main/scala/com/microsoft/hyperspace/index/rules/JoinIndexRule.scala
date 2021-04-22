@@ -237,8 +237,8 @@ object JoinIndexRule
       condition: Expression): Boolean = {
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
-    val lBaseAttrs = l.plan.output.map(_.canonicalized)
-    val rBaseAttrs = r.plan.output.map(_.canonicalized)
+    val lBaseAttrs = l.output.map(_.canonicalized)
+    val rBaseAttrs = r.output.map(_.canonicalized)
 
     def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
       (lBaseAttrs.contains(c1) && rBaseAttrs.contains(c2)) ||
@@ -296,8 +296,8 @@ object JoinIndexRule
     //   been already checked in `isApplicable`.
     val leftRelation = RuleUtils.getRelation(spark, left).get
     val rightRelation = RuleUtils.getRelation(spark, right).get
-    val lBaseAttrs = leftRelation.plan.output.map(_.name)
-    val rBaseAttrs = rightRelation.plan.output.map(_.name)
+    val lBaseAttrs = leftRelation.output.map(_.name)
+    val rBaseAttrs = rightRelation.output.map(_.name)
 
     // Map of left resolved columns with their corresponding right resolved
     // columns from condition.

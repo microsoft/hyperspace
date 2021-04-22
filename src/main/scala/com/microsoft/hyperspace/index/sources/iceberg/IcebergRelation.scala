@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.iceberg.{FileScanTask, Schema, Table}
 import org.apache.iceberg.spark.SparkSchemaUtil
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
@@ -40,6 +40,15 @@ class IcebergRelation(
     snapshotId: Option[Long],
     override val plan: LogicalPlan)
     extends FileBasedRelation {
+
+  override def schema: StructType = SparkSchemaUtil.convert(table.schema)
+
+  override def output: Seq[Attribute] = {
+    plan.output ++
+      table.schema.columns.asScala
+        .filterNot(col => plan.output.exists(attr => col.name == attr.name))
+        .map(col => AttributeReference(col.name, SparkSchemaUtil.convert(col.`type`))())
+  }
 
   /**
    * Computes the signature of the current relation.

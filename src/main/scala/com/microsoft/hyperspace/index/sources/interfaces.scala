@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.sources
 
 import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.types.StructType
@@ -46,6 +46,16 @@ trait FileBasedRelation extends SourceRelation {
    * The logical plan that this FileBasedRelation wraps.
    */
   def plan: LogicalPlan
+
+  /**
+   * The schema of the relation.
+   */
+  def schema: StructType = plan.schema
+
+  /**
+   * The output of the relation.
+   */
+  def output: Seq[Attribute] = plan.output
 
   /**
    * Options of the current relation.
