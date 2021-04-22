@@ -166,6 +166,35 @@ class IndexLogManagerImplTest
     assert(actualActiveVersions.equals(Seq(3, 1)))
   }
 
+  test("testGetLatestStableLog shouldn't return irrelevant previous log.") {
+    val path = new Path(testRoot, UUID.randomUUID().toString)
+    val fs = path.getFileSystem(new Configuration)
+
+    FileUtils.createFile(
+      fs,
+      new Path(path, s"$HYPERSPACE_LOG/8"),
+      JsonUtils.toJson(getEntry("ACTIVE")))
+    FileUtils.createFile(
+      fs,
+      new Path(path, s"$HYPERSPACE_LOG/10"),
+      JsonUtils.toJson(getEntry("VACUUMING")))
+
+    {
+      val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+      assert(actual.isEmpty)
+    }
+
+    FileUtils.createFile(
+      fs,
+      new Path(path, s"$HYPERSPACE_LOG/12"),
+      JsonUtils.toJson(getEntry("CREATING")))
+
+    {
+      val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+      assert(actual.isEmpty)
+    }
+  }
+
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
