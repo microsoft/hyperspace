@@ -26,7 +26,7 @@ import org.apache.spark.util.hyperspace.Utils
 
 object IcebergUtils {
 
-  // In Spark 3, V2ScanRelationPushdown can convert DataSourceV2Relation into
+  // In Spark 3, the V2ScanRelationPushdown rule can convert DataSourceV2Relation into
   // DataSourceV2ScanRelation.
   def isIcebergRelation(plan: LogicalPlan): Boolean = plan match {
     case DataSourceV2Relation(_: SparkTable, _, _, _, _) => true
@@ -49,7 +49,9 @@ object IcebergUtils {
 
   // Temporary hack for Spark 3.0.
   // There is no way to retrieve the snapshot id from DataSourceV2ScanRelation in Spark 3.0.
-  // We need to get it from the private field of SparkBatchQueryScan which is not public too.
+  // We need to get it from the private field of SparkBatchQueryScan which is also not public.
+  // This hack won't be needed for Spark 3.1, as DataSourceV2ScanRelation will include
+  // DataSourceV2Relation and we can access the options.
   private lazy val snapshotIdField = {
     val f = Utils
       .classForName("org.apache.iceberg.spark.source.SparkBatchQueryScan")
