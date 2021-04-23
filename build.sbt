@@ -15,16 +15,12 @@
  */
 
 import Dependencies._
+import Path.relativeTo
 
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
 
 scalaVersion := scala212
-
-assembly / assemblyMergeStrategy := {
-  case PathList("run-tests.py") => MergeStrategy.first
-  case x => (assembly / assemblyMergeStrategy).value(x)
-}
 
 ThisBuild / scalacOptions ++= Seq("-target:jvm-1.8")
 
@@ -82,6 +78,7 @@ lazy val commonSettings = Seq(
   moduleName := name.value + s"_spark${sparkVersion.value.short}",
   libraryDependencies ++= deps(sparkVersion.value),
 
+  // Pass project-specific base directory to the tests
   Test / testOptions += Tests.Argument(s"-DbaseDirectory=${baseDirectory.value.getPath}"),
 
   // Scalastyle
@@ -89,7 +86,16 @@ lazy val commonSettings = Seq(
   compileScalastyle := (Compile / scalastyle).toTask("").value,
   Compile / compile := ((Compile / compile) dependsOn compileScalastyle).value,
   testScalastyle := (Test / scalastyle).toTask("").value,
-  Test / test := ((Test / test) dependsOn testScalastyle).value)
+  Test / test := ((Test / test) dependsOn testScalastyle).value,
+
+  // Package Python files
+  (Compile / packageBin / mappings) := (Compile / packageBin / mappings).value ++ listPythonFiles.value,
+  listPythonFiles := {
+    val pythonBase = (ThisBuild / baseDirectory).value / "python"
+    pythonBase ** "*.py" pair relativeTo(pythonBase)
+  })
+
+lazy val listPythonFiles = taskKey[Seq[(File, String)]]("listPythonFiles")
 
 /**
  * ScalaStyle configurations
