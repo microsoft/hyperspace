@@ -17,21 +17,17 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.5.0/sbt-1.5.0.tgz"
-        displayName: 'Download sbt 1.5.0'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt//bin/sbt ++2.11.12 "project spark2" clean
+      - script: sbt ++2.11.12 "project spark2" clean
         displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" update
+      - script: sbt ++2.11.12 "project spark2" update
         displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" compile
+      - script: sbt ++2.11.12 "project spark2" compile
         displayName: 'Running $sbt compile'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" test
+      - script: sbt ++2.11.12 "project spark2" test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" package
+        - script: sbt ++2.11.12 "project spark2" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -50,21 +46,17 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.5.0/sbt-1.5.0.tgz"
-        displayName: 'Download sbt 1.5.0'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark2" clean
+      - script: sbt ++2.12.8 "project spark2" clean
         displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark2" update
+      - script: sbt ++2.12.8 "project spark2" update
         displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark2" compile
+      - script: sbt ++2.12.8 "project spark2" compile
         displayName: 'Running $sbt compile'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark2" test
+      - script: sbt ++2.12.8 "project spark2" test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark2" package
+        - script: sbt ++2.12.8 "project spark2" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -83,21 +75,17 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.5.0/sbt-1.5.0.tgz"
-        displayName: 'Download sbt 1.5.0'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark3" clean
+      - script: sbt ++2.12.8 "project spark3" clean
         displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark3" update
+      - script: sbt ++2.12.8 "project spark3" update
         displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark3" compile
+      - script: sbt ++2.12.8 "project spark3" compile
         displayName: 'Running $sbt compile'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark3" test
+      - script: sbt ++2.12.8 "project spark3" test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: /tmp/sbt/bin/sbt ++2.12.8 "project spark3" package
+        - script: sbt ++2.12.8 "project spark3" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -127,15 +115,11 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.5.0/sbt-1.5.0.tgz"
-        displayName: 'Download sbt 1.5.0'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" clean
+      - script: sbt ++2.11.12 "project spark2" clean
         displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" update
+      - script: sbt ++2.11.12 "project spark2" update
         displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 "project spark2" compile
+      - script: sbt ++2.11.12 "project spark2" compile
         displayName: 'Running $sbt compile'
       - task: Bash@3
         inputs:
