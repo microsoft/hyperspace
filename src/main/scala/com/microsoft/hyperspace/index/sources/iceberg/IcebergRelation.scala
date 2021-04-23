@@ -145,6 +145,10 @@ class IcebergRelation(
 
   /**
    * Options of the current relation.
+   *
+   * In Spark 3, DataSourceV2Relation can be converted into DataSourceV2ScanRelation
+   * and we cannot access the options. This should be okay, as the only values we were
+   * using were "path" and "snapshot-id", which can be retrieved with other means.
    */
   override def options: Map[String, String] = Map[String, String]()
 
