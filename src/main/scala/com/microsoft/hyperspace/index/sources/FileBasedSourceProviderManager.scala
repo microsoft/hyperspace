@@ -19,12 +19,13 @@ package com.microsoft.hyperspace.index.sources
 import scala.util.{Success, Try}
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.util.hyperspace.Utils
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.index.Relation
-import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
+import com.microsoft.hyperspace.index.{IndexLogEntry, Relation}
+import com.microsoft.hyperspace.index.rules.PlanUtils._
+import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf, ResolverUtils}
 
 /**
  * [[FileBasedSourceProviderManager]] is responsible for loading source providers which implements

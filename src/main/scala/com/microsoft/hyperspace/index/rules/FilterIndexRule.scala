@@ -17,8 +17,8 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.analysis.CleanupAliases
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.analysis.{CleanupAliases, Resolver, UnresolvedAttribute}
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 
@@ -26,6 +26,7 @@ import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.rules.PlanUtils._
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
@@ -53,7 +54,7 @@ object FilterIndexRule
       case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns) =>
         try {
           val candidateIndexes =
-            findCoveringIndexes(filter, outputColumns, filterColumns)
+            findCoveringIndexes(filter, outputColumns, filterColumns, plan)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
               // As FilterIndexRule is not intended to support bucketed scan, we set
@@ -94,12 +95,14 @@ object FilterIndexRule
    * @param filter Filter node in the subplan that is being optimized.
    * @param outputColumns List of output columns in subplan.
    * @param filterColumns List of columns in filter predicate.
+   * @param plan The Logical Plan that contains information about the field.
    * @return List of available candidate indexes on fsRelation for the given columns.
    */
   private def findCoveringIndexes(
       filter: Filter,
       outputColumns: Seq[String],
-      filterColumns: Seq[String]): Seq[IndexLogEntry] = {
+      filterColumns: Seq[String],
+      plan: LogicalPlan): Seq[IndexLogEntry] = {
     RuleUtils.getRelation(spark, filter) match {
       case Some(r) =>
         val indexManager = Hyperspace
@@ -111,20 +114,41 @@ object FilterIndexRule
         //  See https://github.com/microsoft/hyperspace/issues/65
         val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-        val candidateIndexes = allIndexes.filter { index =>
-          indexCoversPlan(
-            outputColumns,
-            filterColumns,
-            index.indexedColumns,
-            index.includedColumns)
+        def resolveWithChildren(fieldName: String, plan: LogicalPlan, resolver: Resolver) = {
+          plan.resolveChildren(UnresolvedAttribute.parseAttributeName(fieldName), resolver)
         }
 
-        // Get candidate via file-level metadata validation. This is performed after pruning
-        // by column schema, as this might be expensive when there are numerous files in the
-        // relation or many indexes to be checked.
-        RuleUtils.getCandidateIndexes(spark, candidateIndexes, r)
+        val resolvedOutputColumnsOpt = ResolverUtils.resolve(
+          spark,
+          outputColumns,
+          plan,
+          resolveWithChildren,
+          throwIfNotInSchema = false)
+        val resolvedFilterColumnsOpt = ResolverUtils.resolve(
+          spark,
+          filterColumns,
+          plan,
+          resolveWithChildren,
+          throwIfNotInSchema = false)
 
-      case None => Nil // There is zero or more than one supported relations in Filter's sub-plan.
+        (resolvedOutputColumnsOpt, resolvedFilterColumnsOpt) match {
+          case (Some(resolvedOutputColumns), Some(resolvedFilterColumns)) =>
+            val candidateIndexes = allIndexes.filter { index =>
+              indexCoversPlan(
+                resolvedOutputColumns.map(_.normalizedName),
+                resolvedFilterColumns.map(_.normalizedName),
+                index.indexedColumns,
+                index.includedColumns)
+            }
+
+            // Get candidate via file-level metadata validation. This is performed after pruning
+            // by column schema, as this might be expensive when there are numerous files in the
+            // relation or many indexes to be checked.
+            RuleUtils.getCandidateIndexes(spark, candidateIndexes, r)
+
+          case _ => Nil
+        }
+      case _ => Nil // There is zero or more than one supported relations in Filter's sub-plan.
     }
   }
 
@@ -136,7 +160,6 @@ object FilterIndexRule
    * @param filterColumns List of columns in filter predicate.
    * @param indexedColumns List of indexed columns (e.g. from an index being checked)
    * @param includedColumns List of included columns (e.g. from an index being checked)
-   * @param fileFormat FileFormat for input relation in original logical plan.
    * @return 'true' if
    *         1. Index fully covers output and filter columns, and
    *         2. Filter predicate contains first column in index's 'indexed' columns.
@@ -165,12 +188,35 @@ object ExtractFilterNode {
   def unapply(plan: LogicalPlan): Option[returnType] = plan match {
     case project @ Project(_, filter @ Filter(condition: Expression, ExtractRelation(relation)))
         if !RuleUtils.isIndexApplied(relation) =>
+      /**
+       * Due to the fact that there is a different way to get their full nested access path,
+       * we need to go through project columns and filter solumns to extract the columns
+       * that are required in the query to be part of the index in order to properly work.
+       *
+       * For example, given the following simple plan:
+       * {{{
+       *   Project [id#100, name#101, nested#102.nst.field2]
+       *   +- Filter (isnotnull(nested#102) && (nested#102.nst.field1 = wa1))
+       *      +- Relation[id#100,name#101,nested#102] parquet
+       * }}}
+       *
+       * It should be transformed to
+       * {{{
+       *   Project [id#1, name#2, __hs_nested.nested.nst.field2#3]
+       *   +- Filter (isnotnull(__hs_nested.nested.nst.field1#0) &&
+       *             (__hs_nested.nested.nst.field1#0 = wa1))
+       *      +- Relation[__hs_nested.nested.nst.field1#0,id#1,name#2,
+       *                  __hs_nested.nested.nst.field2#3]
+       *         Hyperspace(Type: CI, Name: idx_nested, LogVersion: 1)
+       *
+       * }}}
+       */
       val projectColumnNames = CleanupAliases(project)
         .asInstanceOf[Project]
         .projectList
-        .map(_.references.map(_.asInstanceOf[AttributeReference].name))
+        .map(i => extractNamesFromExpression(i).toKeep)
         .flatMap(_.toSeq)
-      val filterColumnNames = condition.references.map(_.name).toSeq
+      val filterColumnNames = extractNamesFromExpression(condition).toKeep.toSeq
 
       Some(project, filter, projectColumnNames, filterColumnNames)
 
