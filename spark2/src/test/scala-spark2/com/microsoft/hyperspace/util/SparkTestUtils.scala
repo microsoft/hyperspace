@@ -27,9 +27,9 @@ object SparkTestUtils {
     }
   }
 
-  object ExplainCommandExtended {
+  object SimpleExplainCommand {
     def apply(logicalPlan: LogicalPlan): ExplainCommand = {
-      ExplainCommand(logicalPlan, extended = true)
+      ExplainCommand(logicalPlan, extended = false)
     }
   }
 }

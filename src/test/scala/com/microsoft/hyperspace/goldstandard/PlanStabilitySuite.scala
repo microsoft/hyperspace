@@ -39,7 +39,7 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.ExplainCommand
 import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
 
-import com.microsoft.hyperspace.util.SparkTestUtils.ExplainCommandExtended
+import com.microsoft.hyperspace.util.SparkTestUtils.SimpleExplainCommand
 
 // scalastyle:off filelinelengthchecker
 /**
@@ -257,7 +257,7 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
   }
 
   def explainString(queryExecution: QueryExecution): String = {
-    val explain = ExplainCommandExtended(queryExecution.logical)
+    val explain = SimpleExplainCommand(queryExecution.logical)
     spark.sessionState
       .executePlan(explain)
       .executedPlan

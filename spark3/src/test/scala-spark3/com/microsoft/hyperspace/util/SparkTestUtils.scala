@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.trees.TreeNode
-import org.apache.spark.sql.execution.ExtendedMode
+import org.apache.spark.sql.execution.SimpleMode
 import org.apache.spark.sql.execution.command.ExplainCommand
 
 object SparkTestUtils {
@@ -28,9 +28,9 @@ object SparkTestUtils {
     }
   }
 
-  object ExplainCommandExtended {
+  object SimpleExplainCommand {
     def apply(logicalPlan: LogicalPlan): ExplainCommand = {
-      ExplainCommand(logicalPlan, mode = ExtendedMode)
+      ExplainCommand(logicalPlan, SimpleMode)
     }
   }
 }
