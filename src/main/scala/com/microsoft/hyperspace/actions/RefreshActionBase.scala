@@ -77,12 +77,12 @@ private[actions] abstract class RefreshActionBase(
       .getRelationMetadata(relations.head)
     val latestRelation = relationMetadata.refresh()
     val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
-    var df = spark.read
+    var df = {
+      if (relationMetadata.canSupportUserSpecifiedSchema) spark.read.schema(dataSchema)
+      else spark.read
+    }
       .format(latestRelation.fileFormat)
       .options(latestRelation.options)
-    if (relationMetadata.supportsUserSpecifiedSchema) {
-      df = df.schema(dataSchema)
-    }
     // Due to the difference in how the "path" option is set: https://github.com/apache/spark/
     // blob/ef1441b56c5cab02335d8d2e4ff95cf7e9c9b9ca/sql/core/src/main/scala/org/apache/spark/
     // sql/DataFrameReader.scala#L197
