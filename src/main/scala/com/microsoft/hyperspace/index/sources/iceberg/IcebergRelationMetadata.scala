@@ -36,5 +36,5 @@ class IcebergRelationMetadata(metadata: Relation) extends FileBasedRelationMetad
     properties
   }
 
-  override def supportsUserSpecifiedSchema: Boolean = false
+  override def canSupportUserSpecifiedSchema: Boolean = false
 }

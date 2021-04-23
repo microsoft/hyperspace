@@ -266,5 +266,5 @@ trait FileBasedRelationMetadata extends SourceRelationMetadata {
   /**
    * Returns true if the source supports user specified schema, false otherwise.
    */
-  def supportsUserSpecifiedSchema: Boolean
+  def canSupportUserSpecifiedSchema: Boolean
 }

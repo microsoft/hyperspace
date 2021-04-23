@@ -37,5 +37,5 @@ class DefaultFileBasedRelationMetadata(metadata: Relation) extends FileBasedRela
     properties
   }
 
-  override def supportsUserSpecifiedSchema: Boolean = true
+  override def canSupportUserSpecifiedSchema: Boolean = true
 }

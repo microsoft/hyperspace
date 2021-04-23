@@ -54,5 +54,5 @@ class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMet
     properties ++ deltaVerHistory
   }
 
-  override def supportsUserSpecifiedSchema: Boolean = false
+  override def canSupportUserSpecifiedSchema: Boolean = false
 }
