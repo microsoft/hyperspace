@@ -34,6 +34,7 @@ trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
     super.beforeAll()
     FileUtils.delete(systemPath)
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
+    spark.conf.set(IndexConstants.INDEX_DIR_NAME, "")
     clearCache()
   }
 

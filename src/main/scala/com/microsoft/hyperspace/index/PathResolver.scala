@@ -37,7 +37,7 @@ private[hyperspace] class PathResolver(conf: SQLConf, hadoopConf: Configuration)
    * @return resolved index path
    */
   def getIndexPath(name: String): Path = {
-    val root = systemPath
+    val root = indexLocationDir
     val fs = root.getFileSystem(hadoopConf)
     if (fs.exists(root)) {
       // Note that fs.exists() is case-sensitive in some platforms and case-insensitive
@@ -58,14 +58,21 @@ private[hyperspace] class PathResolver(conf: SQLConf, hadoopConf: Configuration)
   }
 
   /**
-   * Get the Hyperspace index system path.
+   * Get the Hyperspace index location dir path.
    *
-   * @return Hyperspace index system path.
+   * @return Hyperspace index location dir path.
    */
-  def systemPath: Path = {
-    val defaultIndexesPath =
-      new Path(conf.getConfString("spark.sql.warehouse.dir"), "indexes")
-    new Path(conf.getConfString(IndexConstants.INDEX_SYSTEM_PATH, defaultIndexesPath.toString))
+  def indexLocationDir: Path = {
+    val indexDirName =
+      conf.getConfString(IndexConstants.INDEX_DIR_NAME, IndexConstants.INDEX_DIR_NAME_DEFAULT)
+    val indexSystemPath = conf.getConfString(
+      IndexConstants.INDEX_SYSTEM_PATH,
+      conf.getConfString("spark.sql.warehouse.dir"))
+    if (indexDirName.isEmpty) {
+      new Path(indexSystemPath)
+    } else {
+      new Path(indexSystemPath, indexDirName)
+    }
   }
 }
 
