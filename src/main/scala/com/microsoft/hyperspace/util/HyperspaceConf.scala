@@ -68,6 +68,14 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  def prunedBucketRatioToAutoEnableBucketRead(spark: SparkSession): Double = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_FILTER_RULE_AUTO_BUCKETING_THRESHOLD,
+        IndexConstants.INDEX_FILTER_RULE_AUTO_BUCKETING_THRESHOLD_DEFAULT)
+      .toDouble
+  }
+
   def numBucketsForIndex(spark: SparkSession): Int = {
     getConfStringWithMultipleKeys(
       spark,

@@ -485,7 +485,8 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append("Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]"))
       .append(", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")
-      .append("ReadSchema: struct<Col2:int,Col1:string>" + displayMode.highlightTag.close)
+      .append("ReadSchema: struct<Col2:int,Col1:string>, SelectedBucketsCount: 1 out of 200")
+      .append(displayMode.highlightTag.close)
       .append(displayMode.newLine)
       .append(displayMode.newLine)
       .append("=============================================================")
