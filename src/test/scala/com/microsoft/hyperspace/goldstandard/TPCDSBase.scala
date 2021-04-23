@@ -38,7 +38,7 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
 
   // The TPCDS queries below are based on v1.4.
   // TODO: Fix bulid pipeline for q49 and reenable q49.
-  val tpcdsQueries = Seq("q1")
+  val tpcdsQueries = Seq("q0")
 
   private val tableColumns = Map(
     "store_sales" ->
