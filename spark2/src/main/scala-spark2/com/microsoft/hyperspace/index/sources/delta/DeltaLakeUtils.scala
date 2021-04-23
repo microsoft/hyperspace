@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.sources.delta
 import org.apache.spark.sql.delta.actions.AddFile
 import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 
-object DeltaUtils {
+object DeltaLakeUtils {
   def getFiles(location: TahoeLogFileIndex): Seq[AddFile] = {
     location
       .getSnapshot(stalenessAcceptable = false)

@@ -47,7 +47,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
    */
   lazy override val allFiles: Seq[FileStatus] = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-      DeltaUtils
+      DeltaLakeUtils
         .getFiles(location)
         .map { f =>
           toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
@@ -72,7 +72,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   override def createRelationMetadata(fileIdTracker: FileIdTracker): Relation = {
     plan.relation match {
       case HadoopFsRelation(location: TahoeLogFileIndex, _, dataSchema, _, _, options) =>
-        val files = DeltaUtils
+        val files = DeltaLakeUtils
           .getFiles(location)
           .map { f =>
             toFileStatus(f.size, f.modificationTime, new Path(location.path, f.path))
