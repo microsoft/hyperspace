@@ -378,7 +378,7 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
         .append(defaultDisplayMode.newLine)
         .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
         .append(defaultDisplayMode.newLine)
-        .append(s"<----:     +- *(1) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+        .append(s"<----:     +- *(1) FileScan Hyperspace(Type: HP, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
           truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
           ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
         .append(defaultDisplayMode.newLine)
@@ -386,7 +386,7 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
         .append(defaultDisplayMode.newLine)
         .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
         .append(defaultDisplayMode.newLine)
-        .append(s"      <----+- *(2) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
+        .append(s"      <----+- *(2) FileScan Hyperspace(Type: HP, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
           truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
           ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
         .append(defaultDisplayMode.newLine)
@@ -441,7 +441,7 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
         .append(defaultDisplayMode.newLine)
         .append("|                                         *DataSourceV2Scan|                  2|                 0|        -2|")
         .append(defaultDisplayMode.newLine)
-        .append("|*Scan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
+        .append("|*Scan Hyperspace(Type: HP, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
         .append(defaultDisplayMode.newLine)
         .append("|                                                     *Sort|                  2|                 0|        -2|")
         .append(defaultDisplayMode.newLine)

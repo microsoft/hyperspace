@@ -45,7 +45,7 @@ object HyperSpaceIndex {
 
     override def kind: String = "hashPartitionIndex"
 
-    override def kindAbbr: String = "HPI"
+    override def kindAbbr: String = "HP"
   }
 
   case class BloomFilterIndex(
@@ -54,7 +54,7 @@ object HyperSpaceIndex {
 
     override def kind: String = "bloomFilterIndex"
 
-    override def kindAbbr: String = "BFI"
+    override def kindAbbr: String = "BF"
   }
 
   object Properties {
