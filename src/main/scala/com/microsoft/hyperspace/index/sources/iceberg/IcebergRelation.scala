@@ -41,6 +41,15 @@ class IcebergRelation(
     override val plan: LogicalPlan)
     extends FileBasedRelation {
 
+  /**
+   * The schema of the underlying table.
+   *
+   * In Spark 3.0, V2ScanRelationPushDown replaces DataSourceV2Relation with
+   * DataSourceV2ScanRelation, with a changed schema only containing projected
+   * columns. The colums might not include the partition columns, so we need to
+   * use the schema of the table and construct output from it to make it work
+   * with partition-aware hybrid scan.
+   */
   override def schema: StructType = SparkSchemaUtil.convert(table.schema)
 
   override def output: Seq[Attribute] = {
