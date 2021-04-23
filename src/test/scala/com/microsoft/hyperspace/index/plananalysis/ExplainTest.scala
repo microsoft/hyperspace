@@ -90,7 +90,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"<----:     +- *(1) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+      .append(s"<----:     +- *(1) FileScan Hyperspace(Type: HPI, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
@@ -98,7 +98,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"      <----+- *(2) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
+      .append(s"      <----+- *(2) FileScan Hyperspace(Type: HPI, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
@@ -157,7 +157,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("|                                           *ReusedExchange|                  1|                 0|        -1|")
       .append(defaultDisplayMode.newLine)
-      .append("|*Scan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
+      .append("|*Scan Hyperspace(Type: HPI, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
       .append(defaultDisplayMode.newLine)
       .append("|                                             *Scan parquet|                  1|                 0|        -1|")
       .append(defaultDisplayMode.newLine)
@@ -210,7 +210,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("   :        +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
       .append(displayMode.newLine)
-      .append("   <----:           +- *(1) FileScan Hyperspace(Type: CI, Name: filterIndex, LogVersion: 1) [Col2#136,Col1#135]")
+      .append("   <----:           +- *(1) FileScan Hyperspace(Type: HPI, Name: filterIndex, LogVersion: 1) [Col2#136,Col1#135]")
       .append(" Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
@@ -226,7 +226,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(displayMode.newLine)
       .append("               +- *(1) Filter (isnotnull(Col2#136) && (Col2#136 = 1))")
       .append(displayMode.newLine)
-      .append("                  <----+- *(1) FileScan Hyperspace(Type: CI, Name: filterIndex, LogVersion: 1) [Col2#136,Col1#135] " +
+      .append("                  <----+- *(1) FileScan Hyperspace(Type: HPI, Name: filterIndex, LogVersion: 1) [Col2#136,Col1#135] " +
         "Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ")
@@ -366,7 +366,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"<----:     +- *(1) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
+      .append(s"<----:     +- *(1) FileScan Hyperspace(Type: HPI, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
@@ -374,7 +374,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
       .append(defaultDisplayMode.newLine)
-      .append(s"      <----+- *(2) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
+      .append(s"      <----+- *(2) FileScan Hyperspace(Type: HPI, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
         ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
       .append(defaultDisplayMode.newLine)
@@ -433,7 +433,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append(defaultDisplayMode.newLine)
       .append("|                                           *ReusedExchange|                  1|                 0|        -1|")
       .append(defaultDisplayMode.newLine)
-      .append("|*Scan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
+      .append("|*Scan Hyperspace(Type: HPI, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
       .append(defaultDisplayMode.newLine)
       .append("|                                             *Scan parquet|                  1|                 0|        -1|")
       .append(defaultDisplayMode.newLine)
@@ -481,7 +481,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
       .append("+- Filter (isnotnull(Col2#) && (Col2# = 2))")
       .append(displayMode.newLine)
       .append("   " + displayMode.highlightTag.open)
-      .append("+- FileScan Hyperspace(Type: CI, Name: filterIndex, LogVersion: 1) [Col2#,Col1#] ")
+      .append("+- FileScan Hyperspace(Type: HPI, Name: filterIndex, LogVersion: 1) [Col2#,Col1#] ")
       .append("Batched: true, Format: Parquet, Location: " +
         truncate(s"InMemoryFileIndex[${getIndexFilesPath("filterIndex")}]"))
       .append(", PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ")

@@ -94,7 +94,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
          |      "numBuckets" : 200,
          |      "properties" : {}
          |    },
-         |    "kind" : "CoveringIndex"
+         |    "kind" : "hashPartitionIndex"
          |  },
          |  "content" : {
          |    "root" : {

@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import com.fasterxml.jackson.annotation.{JsonIgnore, JsonSubTypes, JsonTypeInfo, JsonValue}
+import com.fasterxml.jackson.annotation.{JsonIgnore, JsonIgnoreProperties, JsonSubTypes, JsonTypeInfo, JsonValue}
 import com.fasterxml.jackson.annotation.JsonSubTypes.Type
 
 object HyperSpaceIndex {
@@ -24,7 +24,8 @@ object HyperSpaceIndex {
   @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     include = JsonTypeInfo.As.PROPERTY,
-    property = "kind"
+    property = "kind",
+    defaultImpl = classOf[HashPartitionIndex]
   )
   @JsonSubTypes(Array(
     new Type(value = classOf[HashPartitionIndex], name = "hashPartitionIndex"),
@@ -35,33 +36,39 @@ object HyperSpaceIndex {
 
     def kindAbbr: String
 
-    def properties: Properties.ExposeProperties
+    def properties: Properties.Properties
   }
 
   case class HashPartitionIndex(
-                                 hashPartitionProperties: Properties.HashPartition
+                                 properties: Properties.HashPartition
                           ) extends IndexType {
 
     override def kind: String = "hashPartitionIndex"
 
     override def kindAbbr: String = "HPI"
-
-    override def properties: Properties.ExposeProperties = hashPartitionProperties
   }
 
   case class BloomFilterIndex(
-                               bloomProperties: Properties.BloomFilter
+                               properties: Properties.BloomFilter
                              ) extends IndexType {
 
     override def kind: String = "bloomFilterIndex"
 
     override def kindAbbr: String = "BFI"
-
-    override def properties: Properties.ExposeProperties = bloomProperties
   }
 
   object Properties {
-    trait ExposeProperties {
+    @JsonTypeInfo(
+      use = JsonTypeInfo.Id.NAME,
+      include = JsonTypeInfo.As.EXISTING_PROPERTY,
+      property = "kind",
+      defaultImpl = classOf[HashPartition]
+    )
+    @JsonSubTypes(Array(
+      new Type(value = classOf[HashPartition], name = "hashPartitionIndex"),
+      new Type(value = classOf[BloomFilter], name = "bloomFilterIndex")
+    ))
+    trait Properties {
       def columns: CommonProperties.Columns
 
       def schemaString: String
@@ -76,10 +83,10 @@ object HyperSpaceIndex {
     case class HashPartition(columns: CommonProperties.Columns,
                         schemaString: String,
                         numBuckets: Int,
-                        properties: Map[String, String]) extends ExposeProperties
+                        properties: Map[String, String]) extends Properties
 
     case class BloomFilter(columns: CommonProperties.Columns,
                            schemaString: String,
-                           properties: Map[String, String]) extends ExposeProperties
+                           properties: Map[String, String]) extends Properties
   }
 }

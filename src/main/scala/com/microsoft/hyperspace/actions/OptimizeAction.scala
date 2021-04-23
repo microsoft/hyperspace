@@ -145,7 +145,7 @@ class OptimizeAction(
       previousIndexLogEntry.derivedDataset match {
         case hashPartitionIndex: HyperSpaceIndex.HashPartitionIndex =>
           hashPartitionIndex.copy(
-            hashPartitionProperties =
+            properties =
               hashPartitionIndex.properties.asInstanceOf[HyperSpaceIndex.Properties.HashPartition]
                 .copy(
                   properties = Hyperspace
