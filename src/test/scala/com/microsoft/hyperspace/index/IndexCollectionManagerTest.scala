@@ -48,9 +48,9 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
           val entry = IndexLogEntry(
             indexPath.toString,
-            CoveringIndex(
-              CoveringIndex.Properties(
-                CoveringIndex.Properties
+            HyperSpaceIndex.HashPartitionIndex(
+              HyperSpaceIndex.Properties.HashPartition(
+                HyperSpaceIndex.Properties.CommonProperties
                   .Columns(Seq("RGUID"), Seq("Date")),
                 "",
                 10,
@@ -101,9 +101,9 @@ class IndexCollectionManagerTest extends SparkFunSuite with SparkInvolvedSuite {
 
       val entry = IndexLogEntry(
         str,
-        CoveringIndex(
-          CoveringIndex.Properties(
-            CoveringIndex.Properties
+        HyperSpaceIndex.HashPartitionIndex(
+          HyperSpaceIndex.Properties.HashPartition(
+            HyperSpaceIndex.Properties.CommonProperties
               .Columns(Seq("RGUID"), Seq("Date")),
             "",
             10,

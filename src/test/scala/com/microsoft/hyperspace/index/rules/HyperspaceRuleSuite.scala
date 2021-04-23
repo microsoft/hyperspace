@@ -63,9 +63,9 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
 
         val indexLogEntry = IndexLogEntry.create(
           name,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
+          HyperSpaceIndex.HashPartitionIndex(
+            HyperSpaceIndex.Properties.HashPartition(
+              HyperSpaceIndex.Properties.CommonProperties
                 .Columns(indexCols.map(_.name), includedCols.map(_.name)),
               IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
               numBuckets,

@@ -344,22 +344,6 @@ object FileInfo {
   }
 }
 
-// IndexLogEntry-specific CoveringIndex that represents derived dataset.
-case class CoveringIndex(properties: CoveringIndex.Properties) {
-  val kind = "CoveringIndex"
-  val kindAbbr = "CI"
-}
-object CoveringIndex {
-  case class Properties(columns: Properties.Columns,
-    schemaString: String,
-    numBuckets: Int,
-    properties: Map[String, String])
-
-  object Properties {
-    case class Columns(indexed: Seq[String], included: Seq[String])
-  }
-}
-
 // IndexLogEntry-specific Signature that stores the signature provider and value.
 case class Signature(provider: String, value: String)
 
@@ -438,7 +422,7 @@ case class Source(plan: SparkPlan)
  */
 case class IndexLogEntry(
     name: String,
-    derivedDataset: CoveringIndex,
+    derivedDataset: HyperSpaceIndex.IndexType,
     content: Content,
     source: Source,
     properties: Map[String, String])
@@ -533,7 +517,12 @@ case class IndexLogEntry(
     case _ => false
   }
 
-  def numBuckets: Int = derivedDataset.properties.numBuckets
+  def numBuckets: Int = {
+    derivedDataset.properties match {
+      case HyperSpaceIndex.Properties.HashPartition(_, _, buckets, _) => buckets
+      case _ => -1
+    }
+  }
 
   def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
 
@@ -633,7 +622,7 @@ object IndexLogEntry {
    */
   def create(
       name: String,
-      derivedDataset: CoveringIndex,
+      derivedDataset: HyperSpaceIndex.IndexType,
       content: Content,
       source: Source,
       properties: Map[String, String]): IndexLogEntry = {

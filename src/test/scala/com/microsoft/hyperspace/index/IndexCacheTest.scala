@@ -52,9 +52,9 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
 
     val entry = IndexLogEntry(
       "index1",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
+      HyperSpaceIndex.HashPartitionIndex(
+        HyperSpaceIndex.Properties.HashPartition(
+          HyperSpaceIndex.Properties.CommonProperties
             .Columns(Seq("RGUID"), Seq("Date")),
           IndexLogEntry.schemaString(schema),
           10,

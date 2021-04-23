@@ -787,9 +787,9 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
 
         val entry = IndexLogEntry.create(
           indexConfig.indexName,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
+          HyperSpaceIndex.HashPartitionIndex(
+            HyperSpaceIndex.Properties.HashPartition(
+              HyperSpaceIndex.Properties.CommonProperties
                 .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
               IndexLogEntry.schemaString(schema),
               IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,

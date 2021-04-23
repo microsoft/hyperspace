@@ -82,9 +82,9 @@ class RefreshActionTest extends SparkFunSuite with SparkInvolvedSuite {
 
     val entry = IndexLogEntry(
       "index1",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
+      HyperSpaceIndex.HashPartitionIndex(
+        HyperSpaceIndex.Properties.HashPartition(
+          HyperSpaceIndex.Properties.CommonProperties
             .Columns(Seq("clicks"), Seq()),
           "schema",
           10,

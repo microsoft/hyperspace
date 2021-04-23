@@ -224,9 +224,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
     val expected = IndexLogEntry.create(
       "indexName",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
+      HyperSpaceIndex.HashPartitionIndex(
+        HyperSpaceIndex.Properties.HashPartition(
+          HyperSpaceIndex.Properties.CommonProperties
             .Columns(Seq("col1"), Seq("col2", "col3")),
           schema.json,
           200,

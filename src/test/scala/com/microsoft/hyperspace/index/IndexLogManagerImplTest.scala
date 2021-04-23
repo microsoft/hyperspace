@@ -34,9 +34,10 @@ class IndexLogManagerImplTest
   val testRoot = "src/test/resources/indexLogManagerTests"
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",
-    CoveringIndex(
-      CoveringIndex.Properties(
-        CoveringIndex.Properties.Columns(Seq("id"), Seq("name", "school")),
+    HyperSpaceIndex.HashPartitionIndex(
+      HyperSpaceIndex.Properties.HashPartition(
+        HyperSpaceIndex.Properties.CommonProperties
+          .Columns(Seq("id"), Seq("name", "school")),
         "id INT name STRING school STRING",
         100,
         Map())),

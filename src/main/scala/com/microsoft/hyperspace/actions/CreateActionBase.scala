@@ -80,7 +80,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
           LogicalPlanFingerprint(
             LogicalPlanFingerprint.Properties(Seq(Signature(signatureProvider.name, s)))))
 
-        val coveringIndexProperties =
+        val hashPartitionIndexProperties =
           Hyperspace
             .getContext(spark)
             .sourceProviderManager
@@ -91,15 +91,15 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
 
         IndexLogEntry.create(
           indexConfig.indexName,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
+          HyperSpaceIndex.HashPartitionIndex(
+            HyperSpaceIndex.Properties.HashPartition(
+              HyperSpaceIndex.Properties.CommonProperties
                 .Columns(
                   resolvedIndexedColumns.map(_.normalizedName),
                   resolvedIncludedColumns.map(_.normalizedName)),
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets,
-              coveringIndexProperties)),
+              hashPartitionIndexProperties)),
           Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
           Source(SparkPlan(sourcePlanProperties)),
           Map())
