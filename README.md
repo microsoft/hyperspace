@@ -21,6 +21,16 @@ provided by the bot. You will only need to do this once across all repos using o
 
 Please review our [contribution guide](CONTRIBUTING.md).
 
+### Development on Windows
+
+This repository contains symbolic links which don't work properly on Windows. To build this project on Windows, you can use our provided Git aliases to replace symbolic links with junctions.
+
+```sh
+$ git config --local include.path ../dev/.gitconfig
+$ git replace-symlinks # replace symlinks with junctions
+$ git restore-symlinks # restore symlinks
+```
+
 ## Inspiration and Special Thanks
 
 This project would not have been possible without the outstanding work from the following communities:
