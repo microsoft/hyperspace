@@ -113,14 +113,14 @@ object Content {
    * @return Result list of applying function to all files
    */
   def recFilesApply[T](
-                        prefixPath: Path,
-                        directory: Directory,
-                        func: (FileInfo, Path) => T): Seq[T] = {
+      prefixPath: Path,
+      directory: Directory,
+      func: (FileInfo, Path) => T): Seq[T] = {
     @tailrec
     def recAcc[A](
-                   dirMap: List[(Path, Seq[Directory])],
-                   func: (FileInfo, Path) => A,
-                   acc: Seq[A] = Seq.empty): Seq[A] = {
+        dirMap: List[(Path, Seq[Directory])],
+        func: (FileInfo, Path) => A,
+        acc: Seq[A] = Seq.empty): Seq[A] = {
       dirMap match {
         case Nil => acc
         case (curPrefixPath, curDirs) :: otherDirs =>
@@ -258,7 +258,7 @@ object Directory {
    * @param files List of leaf files.
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    *                      Note: If a new leaf file is discovered, the input fileIdTracker gets
-    *                     updated by adding it to the files it is tracking.
+   *                      updated by adding it to the files it is tracking.
    * @return Content object with Directory tree from leaf files.
    */
   def fromLeafFiles(
