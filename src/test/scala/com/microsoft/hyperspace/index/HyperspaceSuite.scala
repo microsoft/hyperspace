@@ -16,12 +16,15 @@
 
 package com.microsoft.hyperspace.index
 
+import java.io.File
+import java.nio.charset.StandardCharsets
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.util.hyperspace.Utils
 import org.scalatest.{BeforeAndAfterAllConfigMap, ConfigMap}
 
-import com.microsoft.hyperspace.{Hyperspace, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{BuildInfo, Hyperspace, SparkInvolvedSuite}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 trait HyperspaceSuite
@@ -36,7 +39,7 @@ trait HyperspaceSuite
   // so we should pass the base directory as an argument.
   var baseDirectory: Path = _
 
-  // Returns a path staring from the base directory.
+  // Returns a path starting from the base directory.
   def inTestResourcesDir(path: String): String =
     new Path(baseDirectory, s"src/test/resources/$path").toString
 
@@ -127,5 +130,12 @@ trait HyperspaceSuite
     val pathStr = new Path(path.toString).toString
     try f(pathStr)
     finally Utils.deleteRecursively(path)
+  }
+
+  def getExpectedResult(name: String): String = {
+    val Array(major, minor, patch) = BuildInfo.sparkVersion.split('.').map(_.toInt)
+    org.apache.commons.io.FileUtils.readFileToString(
+      new File(inTestResourcesDir(s"expected/spark-$major.$minor"), name),
+      StandardCharsets.UTF_8)
   }
 }
