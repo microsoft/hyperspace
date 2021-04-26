@@ -112,7 +112,7 @@ object Content {
    * @tparam T
    * @return Result list of applying function to all files
    */
-  def recFilesApply[T](
+  private[hyperspace] def recFilesApply[T](
       prefixPath: Path,
       directory: Directory,
       func: (FileInfo, Path) => T): Seq[T] = {
