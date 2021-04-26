@@ -51,9 +51,8 @@ object CandidateIndexCollector extends ActiveSparkSession {
     planToIndexes.flatMap {
       case (node, candidateIndexes) =>
         Some(node, sourceFilters.foldLeft(candidateIndexes) { (indexes, filter) =>
-          val res = filter(node, indexes)
-          res
-        }).filterNot(_._2.isEmpty)
+          filter(node, indexes)
+        }).filter(_._2.nonEmpty)
     }
   }
 }
@@ -63,12 +62,12 @@ object CandidateIndexCollector extends ActiveSparkSession {
  */
 class ScoreBasedIndexApplication {
   // TODO: FilterIndexRule :: JoinIndexRule :: Nil
-  val rules = NoOpRule :: Nil
+  private val rules = NoOpRule :: Nil
 
   // Map for memoization.
-  val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
+  private val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
 
-  def recApply(
+  private def recApply(
       plan: LogicalPlan,
       indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): (LogicalPlan, Int) = {
     // If pre-calculated value exists, return it.
@@ -105,10 +104,10 @@ object HyperspaceOneRule
     } else {
       try {
         val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
-        val res = new ScoreBasedIndexApplication().apply(plan, candidateIndexes)
-        res
+        new ScoreBasedIndexApplication().apply(plan, candidateIndexes)
       } catch {
-        case _: Exception =>
+        case e: Exception =>
+          logWarning("Cannot apply hyperspace indexes: " + e.getMessage)
           plan
       }
     }
