@@ -46,6 +46,7 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
       "spark.hyperspace.index.sources.fileBasedBuilders",
       "com.microsoft.hyperspace.index.sources.iceberg.IcebergFileBasedSourceBuilder," +
         "com.microsoft.hyperspace.index.sources.default.DefaultFileBasedSourceBuilder")
+    spark.conf.set("spark.sql.legacy.bucketedTableScan.outputOrdering", true) // For Spark 3.0
     hyperspace = new Hyperspace(spark)
   }
 
@@ -356,109 +357,14 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
       val indexConfig = IndexConfig("joinIndex", Seq("Col1"), Seq("Col2"))
       hyperspace.createIndex(iceDf, indexConfig)
 
-      val defaultDisplayMode = new PlainTextMode(getHighlightConf("", ""))
-
-      // Constructing expected output for given query from explain API
-      val expectedOutput = new StringBuilder
       val joinIndexFilePath = getIndexFilesPath("joinIndex")
       val joinIndexPath = getIndexRootPath("joinIndex")
 
-      // The format of the explain output looks as follows:
-      // scalastyle:off filelinelengthchecker
-      expectedOutput
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("Plan with indexes:")
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("SortMergeJoin [Col1#11], [Col1#21], Inner")
-        .append(defaultDisplayMode.newLine)
-        .append("<----:- *(1) Project [Col1#11, Col2#12]---->")
-        .append(defaultDisplayMode.newLine)
-        .append("<----:  +- *(1) Filter isnotnull(Col1#11)---->")
-        .append(defaultDisplayMode.newLine)
-        .append(s"<----:     +- *(1) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#11,Col2#12] Batched: true, Format: Parquet, Location: " +
-          truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
-          ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
-        .append(defaultDisplayMode.newLine)
-        .append("<----+- *(2) Project [Col1#21, Col2#22]---->")
-        .append(defaultDisplayMode.newLine)
-        .append("   <----+- *(2) Filter isnotnull(Col1#21)---->")
-        .append(defaultDisplayMode.newLine)
-        .append(s"      <----+- *(2) FileScan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1) [Col1#21,Col2#22] Batched: true, Format: Parquet, Location: " +
-          truncate(s"InMemoryFileIndex[$joinIndexFilePath]") +
-          ", PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string,Col2:int>, SelectedBucketsCount: 200 out of 200---->")
-        .append(defaultDisplayMode.newLine)
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("Plan without indexes:")
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("SortMergeJoin [Col1#11], [Col1#21], Inner")
-        .append(defaultDisplayMode.newLine)
-        .append("<----:- *(1) Sort [Col1#11 ASC NULLS FIRST], false, 0---->")
-        .append(defaultDisplayMode.newLine)
-        .append("<----:  +- *(1) Project [Col1#1, Col2#2]---->")
-        .append(defaultDisplayMode.newLine)
-        .append("<----:     +- *(1) Filter isnotnull(Col1#1)---->")
-        .append(defaultDisplayMode.newLine)
-        .append("<----:        +- *(1) ScanV2 iceberg[Col1#, Col2#] (Filters: [isnotnull(Col1#)], Options: " +
-          truncate(s"[path=$dataPath,paths=[]]") + ")---->")
-        .append(defaultDisplayMode.newLine)
-        .append("<----+- *(2) Sort [Col1#21 ASC NULLS FIRST], false, 0---->")
-        .append(defaultDisplayMode.newLine)
-        .append("   <----+- *(2) Project [Col1#, Col2#]---->")
-        .append(defaultDisplayMode.newLine)
-        .append("      <----+- *(2) Filter isnotnull(Col1#)---->")
-        .append(defaultDisplayMode.newLine)
-        .append("         <----+- *(2) ScanV2 iceberg[Col1#, Col2#] (Filters: [isnotnull(Col1#)], Options: " +
-          truncate(s"[path=$dataPath,paths=[]]") + ")---->")
-        .append(defaultDisplayMode.newLine)
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("Indexes used:")
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append(s"joinIndex:$joinIndexPath")
-        .append(defaultDisplayMode.newLine)
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("Physical operator stats:")
-        .append(defaultDisplayMode.newLine)
-        .append("=============================================================")
-        .append(defaultDisplayMode.newLine)
-        .append("+----------------------------------------------------------+-------------------+------------------+----------+")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                         Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|")
-        .append(defaultDisplayMode.newLine)
-        .append("+----------------------------------------------------------+-------------------+------------------+----------+")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                         *DataSourceV2Scan|                  2|                 0|        -2|")
-        .append(defaultDisplayMode.newLine)
-        .append("|*Scan Hyperspace(Type: CI, Name: joinIndex, LogVersion: 1)|                  0|                 2|         2|")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                                     *Sort|                  2|                 0|        -2|")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                                    Filter|                  2|                 2|         0|")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                              InputAdapter|                  2|                 2|         0|")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                                   Project|                  2|                 2|         0|")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                             SortMergeJoin|                  1|                 1|         0|")
-        .append(defaultDisplayMode.newLine)
-        .append("|                                         WholeStageCodegen|                  3|                 3|         0|")
-        .append(defaultDisplayMode.newLine)
-        .append("+----------------------------------------------------------+-------------------+------------------+----------+")
-        .append(defaultDisplayMode.newLine)
-        .append(defaultDisplayMode.newLine)
-      // scalastyle:on filelinelengthchecker
+      val expectedOutput = getExpectedResult("selfJoin_Iceberg.txt")
+        .replace("$joinIndexLocation", truncate(s"InMemoryFileIndex[$joinIndexFilePath]"))
+        .replace("$joinIndexPath", joinIndexPath.toString)
+        .replace("$icebergOptions", truncate(s"[path=$dataPath,paths=[]]"))
+        .replace("$icebergPath", dataPath)
 
       val selfJoinDf = iceDf.join(iceDf, iceDf("Col1") === iceDf("Col1"))
       verifyExplainOutput(selfJoinDf, expectedOutput.toString(), verbose = true) { df =>
