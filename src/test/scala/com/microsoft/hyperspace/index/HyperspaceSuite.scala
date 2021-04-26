@@ -35,14 +35,6 @@ trait HyperspaceSuite
   // Needed to resolve conflicts between BeforeAndAfterAll and BeforeAndAfterAllConfigMap
   override val invokeBeforeAllAndAfterAllEvenIfNoTestsAreExpected = false
 
-  // The default working directory is unstable for multi-project build,
-  // so we should pass the base directory as an argument.
-  var baseDirectory: Path = _
-
-  // Returns a path starting from the base directory.
-  def inTestResourcesDir(path: String): String =
-    new Path(baseDirectory, s"src/test/resources/$path").toString
-
   // Temporary directory
   lazy val tempDir: Path = new Path(Utils.createTempDir().getAbsolutePath)
 
@@ -57,7 +49,6 @@ trait HyperspaceSuite
 
   override def beforeAll(cm: ConfigMap): Unit = {
     super.beforeAll()
-    baseDirectory = new Path(cm.getRequired[String]("baseDirectory"))
     FileUtils.delete(tempDir)
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)
     clearCache()
@@ -135,7 +126,7 @@ trait HyperspaceSuite
   def getExpectedResult(name: String): String = {
     val Array(major, minor, patch) = BuildInfo.sparkVersion.split('.').map(_.toInt)
     org.apache.commons.io.FileUtils.readFileToString(
-      new File(inTestResourcesDir(s"expected/spark-$major.$minor"), name),
+      new File(s"src/test/resources/expected/spark-$major.$minor", name),
       StandardCharsets.UTF_8)
   }
 }

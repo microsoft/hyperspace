@@ -38,6 +38,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val sparkSession = spark
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
     spark.conf.set("spark.sql.legacy.bucketedTableScan.outputOrdering", true) // For Spark 3.0
+
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
     fileSystem.delete(new Path(sampleParquetDataLocation), true)

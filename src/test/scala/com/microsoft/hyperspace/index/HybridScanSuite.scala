@@ -701,7 +701,6 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         val query2 = df2.filter(df2("clicks") <= 4000).select(df2("clicks"), df2("Date"))
         query.join(query2, "clicks")
       }
-
       val baseQuery = joinQuery()
       val basePlan = baseQuery.queryExecution.optimizedPlan
 

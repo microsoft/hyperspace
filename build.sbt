@@ -78,9 +78,6 @@ lazy val commonSettings = Seq(
   moduleName := name.value + s"_spark${sparkVersion.value.short}",
   libraryDependencies ++= deps(sparkVersion.value),
 
-  // Pass project-specific base directory to the tests
-  Test / testOptions += Tests.Argument(s"-DbaseDirectory=${baseDirectory.value.getPath}"),
-
   // Scalastyle
   scalastyleConfig := (ThisBuild / scalastyleConfig).value,
   compileScalastyle := (Compile / scalastyle).toTask("").value,
