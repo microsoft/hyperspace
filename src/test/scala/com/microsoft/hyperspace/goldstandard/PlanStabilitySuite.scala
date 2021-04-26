@@ -39,6 +39,7 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.ExplainCommand
 import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
 
+import com.microsoft.hyperspace.BuildInfo
 import com.microsoft.hyperspace.util.SparkTestUtils.SimpleExplainCommand
 
 // scalastyle:off filelinelengthchecker
@@ -271,8 +272,10 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
  * Spark Only Suite.
  */
 class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
-  override val goldenFilePath: String =
-    new File(baseResourcePath, "spark-2.4/approved-plans-v1_4").getAbsolutePath
+  override val goldenFilePath: String = {
+    val Array(major, minor, patch) = BuildInfo.sparkVersion.split('.').map(_.toInt)
+    new File(baseResourcePath, s"spark-$major.$minor/approved-plans-v1_4").getAbsolutePath
+  }
 
   // Enable cross join because some queries fail during query optimization phase.
   withSQLConf("spark.sql.crossJoin.enabled" -> "true") {
