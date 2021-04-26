@@ -137,7 +137,7 @@ object Content {
       }
     }
 
-    recAcc(List(prefixPath -> Seq(directory)), func)
+    recAcc(List((prefixPath, Seq(directory))), func)
   }
 }
 
