@@ -1,7 +1,7 @@
 // scalastyle:off
 
 /**
- * This trait was built upon: https://github.com/apache/spark/blob/v3.1.1/sql/core/src/test/scala/org/apache/spark/sql/TPCDSBase.scala.
+ * This trait was built upon: https://github.com/apache/spark/blob/v3.1.1/sql/core/src/test/scala//org/apache/spark/sql/TPCDSTableStats.scala.
  *
  * The below license was copied from: https://github.com/FasterXML/jackson-module-scala/blob/2.10/src/main/resources/META-INF/LICENSE
  */
