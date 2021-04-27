@@ -14,7 +14,14 @@
  * limitations under the License.
  */
 
-case class Version(major: Int, minor: Int, patch: Int) {
-  override def toString: String = s"$major.$minor.$patch"
+case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Version] {
+
   def short: String = s"$major.$minor"
+
+  override def toString: String = s"$major.$minor.$patch"
+
+  override def compare(that: Version): Int = {
+    import scala.math.Ordered.orderingToOrdered
+    (major, minor, patch) compare (that.major, that.minor, that.patch)
+  }
 }

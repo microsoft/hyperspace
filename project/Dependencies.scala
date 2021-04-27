@@ -20,27 +20,23 @@ object Dependencies {
   def deps(sparkVersion: Version) = {
     val sv = sparkVersion.toString
     Seq(
-      "org.apache.spark" %% "spark-sql" % sv % "provided" withSources (),
-      "org.apache.spark" %% "spark-core" % sv % "provided" withSources (),
       "org.apache.spark" %% "spark-catalyst" % sv % "provided" withSources (),
+      "org.apache.spark" %% "spark-core" % sv % "provided" withSources (),
+      "org.apache.spark" %% "spark-sql" % sv % "provided" withSources (),
       // Test dependencies
       "org.scalatest" %% "scalatest" % "3.0.5" % "test",
       "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
       "org.apache.spark" %% "spark-catalyst" % sv % "test" classifier "tests",
       "org.apache.spark" %% "spark-core" % sv % "test" classifier "tests",
       "org.apache.spark" %% "spark-sql" % sv % "test" classifier "tests") ++
-      (sparkVersion match {
-        case Version(2, _, _) =>
-          Seq(
-            "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
-            "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources ())
-        case Version(3, _, _) =>
-          Seq(
-            "io.delta" %% "delta-core" % "0.8.0" % "provided" withSources (),
-            "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.1" % "provided" withSources (),
-            "org.apache.hive" % "hive-metastore" % "2.3.8" % "test")
-        case _ =>
-          throw new Exception("Only Spark 2 or 3 is supported")
-      })
+      (if (sparkVersion < Version(3, 0, 0))
+         Seq(
+           "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
+           "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources ())
+       else
+         Seq(
+           "io.delta" %% "delta-core" % "0.8.0" % "provided" withSources (),
+           "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.1" % "provided" withSources (),
+           "org.apache.hive" % "hive-metastore" % "2.3.8" % "test"))
   }
 }
