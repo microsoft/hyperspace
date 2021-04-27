@@ -119,14 +119,7 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / Test / fork := true
 
-ThisBuild / Test / javaOptions ++= Seq(
-  "-Dspark.ui.enabled=false",
-  "-Dspark.ui.showConsoleProgress=false",
-  "-Dspark.databricks.delta.snapshotPartitions=2",
-  "-Dspark.sql.shuffle.partitions=5",
-  "-Ddelta.log.cacheSize=3",
-  "-Dspark.sql.sources.parallelPartitionDiscovery.parallelism=5",
-  "-Xmx1024m")
+ThisBuild / Test / javaOptions += "-Xmx1024m"
 
 /**
  * Release configurations
