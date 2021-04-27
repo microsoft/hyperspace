@@ -115,11 +115,11 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 "project spark2" clean
+      - script: sbt ++2.11.12 "project spark2_4" clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.11.12 "project spark2" update
+      - script: sbt ++2.11.12 "project spark2_4" update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.11.12 "project spark2" compile
+      - script: sbt ++2.11.12 "project spark2_4" compile
         displayName: 'Running $sbt compile'
       - task: Bash@3
         inputs:
