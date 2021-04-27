@@ -26,10 +26,10 @@ ThisBuild / scalacOptions ++= Seq("-target:jvm-1.8")
 
 ThisBuild / javaOptions += "-Xmx1024m"
 
-// The root project is a virtual project aggregating the spark2 and spark3 projects.
+// The root project is a virtual project aggregating the other projects.
 // It cannot compile, as necessary utility code is only in those projects.
 lazy val root = (project in file("."))
-  .aggregate(spark2, spark3)
+  .aggregate(spark2_4, spark3_0)
   .settings(
     compile / skip := true,
     publish / skip := true,
@@ -37,7 +37,7 @@ lazy val root = (project in file("."))
     Keys.`packageBin` := { new File("") } // skip packageBin
   )
 
-lazy val spark2 = (project in file("spark2"))
+lazy val spark2_4 = (project in file("spark2.4"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     commonSettings,
@@ -46,7 +46,7 @@ lazy val spark2 = (project in file("spark2"))
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))
 
-lazy val spark3 = (project in file("spark3"))
+lazy val spark3_0 = (project in file("spark3.0"))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     commonSettings,

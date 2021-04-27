@@ -6,7 +6,7 @@ trigger:
       - master
 
 jobs:
-  - job: Build_Spark2_2_11
+  - job: Build_Spark2_4_2_11
     displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.11'
     pool:
       vmImage: 'ubuntu-18.04'
@@ -17,17 +17,17 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 "project spark2" clean
+      - script: sbt ++2.11.12 "project spark2_4" clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.11.12 "project spark2" update
+      - script: sbt ++2.11.12 "project spark2_4" update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.11.12 "project spark2" compile
+      - script: sbt ++2.11.12 "project spark2_4" compile
         displayName: 'Running $sbt compile'
-      - script: sbt ++2.11.12 "project spark2" test
+      - script: sbt ++2.11.12 "project spark2_4" test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.11.12 "project spark2" package
+        - script: sbt ++2.11.12 "project spark2_4" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -41,22 +41,22 @@ jobs:
             artifactName: 'hyperspace-core_spark2.4'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
 
-  - job: Build_Spark2_2_12
+  - job: Build_Spark2_4_2_12
     displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.12'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark2" clean
+      - script: sbt ++2.12.8 "project spark2_4" clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.12.8 "project spark2" update
+      - script: sbt ++2.12.8 "project spark2_4" update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.12.8 "project spark2" compile
+      - script: sbt ++2.12.8 "project spark2_4" compile
         displayName: 'Running $sbt compile'
-      - script: sbt ++2.12.8 "project spark2" test
+      - script: sbt ++2.12.8 "project spark2_4" test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 "project spark2" package
+        - script: sbt ++2.12.8 "project spark2_4" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
@@ -70,22 +70,22 @@ jobs:
             artifactName: 'hyperspace-core_spark2.4'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
 
-  - job: Build_Spark3_2_12
+  - job: Build_Spark3_0_2_12
     displayName: 'Build sources and run unit tests for Spark 3.0 / Scala 2.12'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark3" clean
+      - script: sbt ++2.12.8 "project spark3_0" clean
         displayName: 'Running $sbt clean'
-      - script: sbt ++2.12.8 "project spark3" update
+      - script: sbt ++2.12.8 "project spark3_0" update
         displayName: 'Running $sbt update'
-      - script: sbt ++2.12.8 "project spark3" compile
+      - script: sbt ++2.12.8 "project spark3_0" compile
         displayName: 'Running $sbt compile'
-      - script: sbt ++2.12.8 "project spark3" test
+      - script: sbt ++2.12.8 "project spark3_0" test
         displayName: 'Running $sbt test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 "project spark3" package
+        - script: sbt ++2.12.8 "project spark3_0" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
