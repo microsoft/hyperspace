@@ -31,6 +31,10 @@ $ git replace-symlinks # replace symlinks with junctions
 $ git restore-symlinks # restore symlinks
 ```
 
+### Using IntelliJ
+
+You can use the built-in sbt shell in IntelliJ without any problems. However, the built-in "Build Project" command may not work. To fix the issue, go to Project Structure -> Project Settings -> Modules, remove the "root" module, and mark `src/main/scala` as Sources for the "spark2" and "spark3" modules.
+
 ## Inspiration and Special Thanks
 
 This project would not have been possible without the outstanding work from the following communities:
