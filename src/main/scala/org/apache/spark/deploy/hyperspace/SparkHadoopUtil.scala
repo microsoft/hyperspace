@@ -18,7 +18,7 @@ package org.apache.spark.deploy.hyperspace
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-// SparkHadoopUtil became package-private in Spark 3
+// SparkHadoopUtil became package-private in Spark 3.
 object SparkHadoopUtil {
   def globPathIfNecessary(fs: FileSystem, pattern: Path): Seq[Path] =
     org.apache.spark.deploy.SparkHadoopUtil.get.globPathIfNecessary(fs, pattern)

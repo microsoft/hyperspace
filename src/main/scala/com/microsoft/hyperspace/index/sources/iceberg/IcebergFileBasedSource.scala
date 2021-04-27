@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedRelat
  * This source can support relations that meet the following criteria:
  *   - The relation is with [[DataSourceV2Relation]] or [[DataSourceV2ScanRelation]]
  *   - The source of [[DataSourceV2Relation]] is an [[IcebergSource]],
- *     or the table is an Iceberg table
+ *     or the table is an Iceberg table.
  */
 class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
 
