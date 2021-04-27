@@ -28,6 +28,7 @@ import org.apache.spark.sql.hyperspace.utils.logicalPlanToDataFrame
 
 import com.microsoft.hyperspace.{HyperspaceException, Implicits}
 import com.microsoft.hyperspace.index.IndexConstants
+import com.microsoft.hyperspace.shim.ExtractFileSourceScanExecRelation
 
 /**
  * Provides helper methods for explain API.
@@ -138,14 +139,8 @@ object PlanAnalyzer {
   private def getPaths(sparkPlan: SparkPlan): Seq[String] = {
     val usedPaths = new ListBuffer[String]
     sparkPlan.foreach {
-      case FileSourceScanExec(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _,
-          _,
-          _,
-          _) =>
+      case ExtractFileSourceScanExecRelation(
+          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _)) =>
         usedPaths += location.rootPaths.head.getParent.toString
       case other =>
         other.subqueries.foreach { subQuery =>

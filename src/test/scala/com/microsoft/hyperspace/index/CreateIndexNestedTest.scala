@@ -135,12 +135,14 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   }
 
   test("Index creation fails since the dataframe has a join node.") {
-    val dfJoin = nonPartitionedDataDF
-      .join(nonPartitionedDataDF, nonPartitionedDataDF("Query") === nonPartitionedDataDF("Query"))
+    val dfA = nonPartitionedDataDF.as("A")
+    val dfB = nonPartitionedDataDF.as("B")
+    val dfJoin = dfA
+      .join(dfB, dfA("Query") === dfB("Query"))
       .select(
-        nonPartitionedDataDF("RGUID"),
-        nonPartitionedDataDF("Query"),
-        nonPartitionedDataDF("nested.leaf.cnt"))
+        dfA("RGUID"),
+        dfA("Query"),
+        dfA("nested.leaf.cnt"))
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfJoin, indexConfig1)
     }

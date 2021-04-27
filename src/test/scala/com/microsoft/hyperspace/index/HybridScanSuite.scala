@@ -30,6 +30,7 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.index.execution.BucketUnionExec
 import com.microsoft.hyperspace.index.plans.logical.BucketUnion
+import com.microsoft.hyperspace.shim.{ExtractFileSourceScanExecFilters, ExtractUnionChildren, RepartitionByExpressionWithOptionalNumPartitions}
 import com.microsoft.hyperspace.util.FileUtils
 
 trait HybridScanSuite extends QueryTest with HyperspaceSuite {
@@ -178,7 +179,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
       val execPlan = spark.sessionState.executePlan(plan).executedPlan
       val execNodes = execPlan collect {
-        case p @ FileSourceScanExec(_, _, _, _, _, dataFilters, _) =>
+        case p @ ExtractFileSourceScanExecFilters(_, dataFilters) =>
           // Check deleted files.
           assert(deletedFiles.forall(dataFilters.toString.contains))
           p
@@ -213,10 +214,10 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
             bucketSpec.bucketColumnNames.head === "clicks")
 
         val childNodes = children.collect {
-          case r @ RepartitionByExpression(
+          case r @ RepartitionByExpressionWithOptionalNumPartitions(
                 attrs,
                 Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
-                numBucket) =>
+                Some(numBucket)) =>
             assert(attrs.size === 1)
             assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
 
@@ -250,10 +251,10 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
             bucketSpec.bucketColumnNames.head === "clicks")
 
         val childNodes = children.collect {
-          case r @ RepartitionByExpression(
+          case r @ RepartitionByExpressionWithOptionalNumPartitions(
                 attrs,
                 Project(_, Filter(_, LogicalRelation(fsRelation: HadoopFsRelation, _, _, _))),
-                numBucket) =>
+                Some(numBucket)) =>
             assert(attrs.size === 1)
             assert(attrs.head.asInstanceOf[Attribute].name.contains("clicks"))
 
@@ -293,7 +294,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           assert(children.last.isInstanceOf[ShuffleExchangeExec])
           assert(bucketSpec.numBuckets === 200)
           p
-        case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
+        case p @ ExtractFileSourceScanExecFilters(partitionFilters, dataFilters) =>
           // Check filter pushed down properly.
           if (partitionFilters.nonEmpty) {
             assert(filterConditions.forall(partitionFilters.toString.contains))
@@ -325,7 +326,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
     if (expectedAppendedFiles.nonEmpty) {
       val nodes = plan.collect {
-        case u @ Union(children) =>
+        case u @ ExtractUnionChildren(children) =>
           val indexChild = children.head
           indexChild collect {
             case LogicalRelation(fsRelation: HadoopFsRelation, _, _, _) =>
@@ -355,7 +356,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
             assert(children.head.isInstanceOf[ProjectExec]) // index data
             assert(children.last.isInstanceOf[ProjectExec]) // appended data
             p
-          case p @ FileSourceScanExec(_, _, _, partitionFilters, _, dataFilters, _) =>
+          case p @ ExtractFileSourceScanExecFilters(partitionFilters, dataFilters) =>
             // Check filter pushed down properly.
             if (partitionFilters.nonEmpty) {
               assert(filterConditions.forall(partitionFilters.toString.contains))
@@ -404,7 +405,13 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       val baseQuery = joinQuery()
       val basePlan = baseQuery.queryExecution.optimizedPlan
 
-      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1") {
+      // RemoveRedundantProjects rule causes HybridScanForIcebergTest to fail
+      // in Spark 3.1. Either a bug of Spark 3.1, or Iceberg needs to be
+      // updated. Either way, it will take some time to be fixed, so let's
+      // temporarily disable the rule here.
+      withSQLConf(
+        "spark.sql.autoBroadcastJoinThreshold" -> "-1",
+        "spark.sql.execution.removeRedundantProjects" -> "false") {
         withSQLConf(
           SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
           IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "false") {
