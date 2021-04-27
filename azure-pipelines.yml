@@ -17,14 +17,8 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 "project spark2_4" clean
-        displayName: 'Running $sbt clean'
-      - script: sbt ++2.11.12 "project spark2_4" update
-        displayName: 'Running $sbt update'
-      - script: sbt ++2.11.12 "project spark2_4" compile
-        displayName: 'Running $sbt compile'
-      - script: sbt ++2.11.12 "project spark2_4" test
-        displayName: 'Running $sbt test'
+      - script: sbt ++2.11.12 "project spark2_4" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
         - script: sbt ++2.11.12 "project spark2_4" package
@@ -46,14 +40,8 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark2_4" clean
-        displayName: 'Running $sbt clean'
-      - script: sbt ++2.12.8 "project spark2_4" update
-        displayName: 'Running $sbt update'
-      - script: sbt ++2.12.8 "project spark2_4" compile
-        displayName: 'Running $sbt compile'
-      - script: sbt ++2.12.8 "project spark2_4" test
-        displayName: 'Running $sbt test'
+      - script: sbt ++2.12.8 "project spark2_4" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
         - script: sbt ++2.12.8 "project spark2_4" package
@@ -75,14 +63,8 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark3_0" clean
-        displayName: 'Running $sbt clean'
-      - script: sbt ++2.12.8 "project spark3_0" update
-        displayName: 'Running $sbt update'
-      - script: sbt ++2.12.8 "project spark3_0" compile
-        displayName: 'Running $sbt compile'
-      - script: sbt ++2.12.8 "project spark3_0" test
-        displayName: 'Running $sbt test'
+      - script: sbt ++2.12.8 "project spark3_0" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
         - script: sbt ++2.12.8 "project spark3_0" package
@@ -115,12 +97,8 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 "project spark2_4" clean
-        displayName: 'Running $sbt clean'
-      - script: sbt ++2.11.12 "project spark2_4" update
-        displayName: 'Running $sbt update'
-      - script: sbt ++2.11.12 "project spark2_4" compile
-        displayName: 'Running $sbt compile'
+      - script: sbt ++2.11.12 "project spark2_4" clean update compile
+        displayName: 'Running $sbt clean & update & compile'
       - task: Bash@3
         inputs:
           filePath: 'script/download_spark.sh'
