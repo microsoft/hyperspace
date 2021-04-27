@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.util
+package com.microsoft.hyperspace.shim
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.Join
-import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
+import org.apache.spark.sql.execution.{QueryExecution, SQLExecution => RealSQLExecution}
 
-object SparkShims {
-
-  def toRddWithNewExecutionId(session: SparkSession, qe: QueryExecution): Unit = {
-    SQLExecution.withNewExecutionId(session, qe)(qe.toRdd)
+object SQLExecution {
+  def withNewExecutionId[T](session: SparkSession, qe: QueryExecution)(body: => T): T = {
+    RealSQLExecution.withNewExecutionId(qe)(body)
   }
-
-  val JoinWithoutHint = Join
 }

@@ -14,32 +14,23 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.util
+package com.microsoft.hyperspace.shim
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Join, JoinHint, LogicalPlan}
-import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
 
-object SparkShims {
-
-  def toRddWithNewExecutionId(session: SparkSession, qe: QueryExecution): Unit = {
-    SQLExecution.withNewExecutionId(qe)(qe.toRdd)
+object JoinWithoutHint {
+  def apply(
+      left: LogicalPlan,
+      right: LogicalPlan,
+      joinType: JoinType,
+      condition: Option[Expression]): Join = {
+    Join(left, right, joinType, condition, JoinHint.NONE)
   }
 
-  object JoinWithoutHint {
-    def apply(
-        left: LogicalPlan,
-        right: LogicalPlan,
-        joinType: JoinType,
-        condition: Option[Expression]): Join = {
-      Join(left, right, joinType, condition, JoinHint.NONE)
-    }
-
-    def unapply(join: Join): Option[(LogicalPlan, LogicalPlan, JoinType, Option[Expression])] = {
-      Some((join.left, join.right, join.joinType, join.condition))
-        .filter(_ => join.hint == JoinHint.NONE)
-    }
+  def unapply(join: Join): Option[(LogicalPlan, LogicalPlan, JoinType, Option[Expression])] = {
+    Some((join.left, join.right, join.joinType, join.condition))
+      .filter(_ => join.hint == JoinHint.NONE)
   }
 }

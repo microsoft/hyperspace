@@ -26,7 +26,7 @@ import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
-import com.microsoft.hyperspace.util.SparkShims.JoinWithoutHint
+import com.microsoft.hyperspace.shim.JoinWithoutHint
 
 class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength1 = 100

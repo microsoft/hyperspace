@@ -25,8 +25,8 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.shim.{JoinWithoutHint => Join}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils, SparkTestShims}
-import com.microsoft.hyperspace.util.SparkShims.{JoinWithoutHint => Join}
 
 class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
   override val indexLocationDirName = "joinIndexRuleTest"
