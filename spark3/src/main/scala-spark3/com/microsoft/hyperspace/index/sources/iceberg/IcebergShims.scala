@@ -24,7 +24,7 @@ import org.apache.spark.sql.connector.read.Scan
 import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Relation, DataSourceV2ScanRelation}
 import org.apache.spark.util.hyperspace.Utils
 
-object IcebergUtils {
+object IcebergShims {
 
   // In Spark 3, the V2ScanRelationPushdown rule can convert DataSourceV2Relation into
   // DataSourceV2ScanRelation.

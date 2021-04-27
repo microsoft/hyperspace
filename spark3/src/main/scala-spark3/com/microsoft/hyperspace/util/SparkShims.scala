@@ -17,14 +17,29 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.Join
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.logical.{Join, JoinHint, LogicalPlan}
 import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
 
-object SparkUtils {
+object SparkShims {
 
   def toRddWithNewExecutionId(session: SparkSession, qe: QueryExecution): Unit = {
-    SQLExecution.withNewExecutionId(session, qe)(qe.toRdd)
+    SQLExecution.withNewExecutionId(qe)(qe.toRdd)
   }
 
-  val JoinWithoutHint = Join
+  object JoinWithoutHint {
+    def apply(
+        left: LogicalPlan,
+        right: LogicalPlan,
+        joinType: JoinType,
+        condition: Option[Expression]): Join = {
+      Join(left, right, joinType, condition, JoinHint.NONE)
+    }
+
+    def unapply(join: Join): Option[(LogicalPlan, LogicalPlan, JoinType, Option[Expression])] = {
+      Some((join.left, join.right, join.joinType, join.condition))
+        .filter(_ => join.hint == JoinHint.NONE)
+    }
+  }
 }

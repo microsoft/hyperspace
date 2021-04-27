@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.sources.delta
+package com.microsoft.hyperspace.util
 
-import org.apache.spark.sql.delta.actions.AddFile
-import org.apache.spark.sql.delta.files.TahoeLogFileIndex
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.plans.logical.Join
+import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
 
-object DeltaLakeUtils {
-  def getFiles(location: TahoeLogFileIndex): Seq[AddFile] = {
-    location.getSnapshot
-      .filesForScan(projection = Nil, location.partitionFilters)
-      .files
+object SparkShims {
+
+  def toRddWithNewExecutionId(session: SparkSession, qe: QueryExecution): Unit = {
+    SQLExecution.withNewExecutionId(session, qe)(qe.toRdd)
   }
+
+  val JoinWithoutHint = Join
 }

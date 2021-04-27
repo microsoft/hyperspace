@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.datasources.DataSource
 
-import com.microsoft.hyperspace.util.SparkUtils
+import com.microsoft.hyperspace.util.SparkShims
 
 object DataFrameWriterExtensions {
 
@@ -77,7 +77,7 @@ object DataFrameWriterExtensions {
     private def runCommand(session: SparkSession)(command: LogicalPlan): Unit = {
       val qe = session.sessionState.executePlan(command)
       // Call `QueryExecution.toRDD` to trigger the execution of commands.
-      SparkUtils.toRddWithNewExecutionId(session, qe)
+      SparkShims.toRddWithNewExecutionId(session, qe)
     }
   }
 }

@@ -40,7 +40,7 @@ import org.apache.spark.sql.execution.command.ExplainCommand
 import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
 
 import com.microsoft.hyperspace.BuildInfo
-import com.microsoft.hyperspace.util.SparkTestUtils.SimpleExplainCommand
+import com.microsoft.hyperspace.util.SparkTestShims.SimpleExplainCommand
 
 // scalastyle:off filelinelengthchecker
 /**

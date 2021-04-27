@@ -32,7 +32,7 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils._
-import com.microsoft.hyperspace.util.SparkUtils.JoinWithoutHint
+import com.microsoft.hyperspace.util.SparkShims.JoinWithoutHint
 
 /**
  * Rule to optimize a join between two indexed dataframes.

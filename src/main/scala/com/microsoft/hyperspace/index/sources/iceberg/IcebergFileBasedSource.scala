@@ -42,7 +42,7 @@ class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @return Some(true) if the given plan is a supported relation, otherwise None.
    */
   override def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = {
-    Some(IcebergUtils.isIcebergRelation(plan)).filter(_ == true)
+    Some(IcebergShims.isIcebergRelation(plan)).filter(_ == true)
   }
 
   /**
@@ -54,7 +54,7 @@ class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedS
    */
   override def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
     if (isSupportedRelation(plan).contains(true)) {
-      val (table, snapshotId) = IcebergUtils.loadIcebergTable(spark, plan)
+      val (table, snapshotId) = IcebergShims.loadIcebergTable(spark, plan)
       Some(new IcebergRelation(spark, table, snapshotId, plan))
     } else {
       None

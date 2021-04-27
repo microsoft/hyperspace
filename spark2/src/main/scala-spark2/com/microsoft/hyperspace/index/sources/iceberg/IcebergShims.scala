@@ -29,9 +29,8 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.sources.v2.DataSourceOptions
 
 import com.microsoft.hyperspace.util.JavaConverters._
-import com.microsoft.hyperspace.util.SparkUtils
 
-object IcebergUtils {
+object IcebergShims {
 
   def isIcebergRelation(plan: LogicalPlan): Boolean = plan match {
     case DataSourceV2Relation(_: IcebergSource, _, _, _, _) => true

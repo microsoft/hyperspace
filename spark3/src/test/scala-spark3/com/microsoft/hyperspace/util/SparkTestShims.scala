@@ -14,16 +14,23 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.sources.delta
+package com.microsoft.hyperspace.util
 
-import org.apache.spark.sql.delta.actions.AddFile
-import org.apache.spark.sql.delta.files.TahoeLogFileIndex
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.trees.TreeNode
+import org.apache.spark.sql.execution.SimpleMode
+import org.apache.spark.sql.execution.command.ExplainCommand
 
-object DeltaLakeUtils {
-  def getFiles(location: TahoeLogFileIndex): Seq[AddFile] = {
-    location
-      .getSnapshot(stalenessAcceptable = false)
-      .filesForScan(projection = Nil, location.partitionFilters, keepStats = false)
-      .files
+object SparkTestShims {
+  object Implicits {
+    implicit class TreeNodeExt(node: TreeNode[_]) {
+      def simpleStringFull: String = node.simpleString(Int.MaxValue)
+    }
+  }
+
+  object SimpleExplainCommand {
+    def apply(logicalPlan: LogicalPlan): ExplainCommand = {
+      ExplainCommand(logicalPlan, SimpleMode)
+    }
   }
 }

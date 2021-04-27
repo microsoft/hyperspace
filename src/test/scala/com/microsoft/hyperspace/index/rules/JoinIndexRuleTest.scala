@@ -25,8 +25,8 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils, SparkTestUtils}
-import com.microsoft.hyperspace.util.SparkUtils.{JoinWithoutHint => Join}
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils, SparkTestShims}
+import com.microsoft.hyperspace.util.SparkShims.{JoinWithoutHint => Join}
 
 class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
   override val indexLocationDirName = "joinIndexRuleTest"
@@ -428,7 +428,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val updatedNodeCount = plan2.treeString.split("\n").length
 
     if (originalNodeCount == updatedNodeCount) {
-      import SparkTestUtils.Implicits._
+      import SparkTestShims.Implicits._
       (0 until originalNodeCount).forall { i =>
         plan1(i) match {
           // for LogicalRelation, we just check if the updated also has LogicalRelation. If the

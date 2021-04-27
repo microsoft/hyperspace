@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
-import com.microsoft.hyperspace.util.SparkUtils.JoinWithoutHint
+import com.microsoft.hyperspace.util.SparkShims.JoinWithoutHint
 
 class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   override val indexLocationDirName = "ruleUtilsTest"

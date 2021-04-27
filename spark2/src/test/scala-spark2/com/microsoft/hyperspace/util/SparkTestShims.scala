@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.trees.TreeNode
 import org.apache.spark.sql.execution.command.ExplainCommand
 
-object SparkTestUtils {
+object SparkTestShims {
   object Implicits {
     implicit class TreeNodeExt(node: TreeNode[_]) {
       def simpleStringFull: String = node.simpleString
