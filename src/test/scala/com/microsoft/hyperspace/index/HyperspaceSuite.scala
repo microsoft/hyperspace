@@ -124,9 +124,8 @@ trait HyperspaceSuite
   }
 
   def getExpectedResult(name: String): String = {
-    val Array(major, minor, patch) = BuildInfo.sparkVersion.split('.').map(_.toInt)
     org.apache.commons.io.FileUtils.readFileToString(
-      new File(s"src/test/resources/expected/spark-$major.$minor", name),
+      new File(s"src/test/resources/expected/spark-${BuildInfo.sparkShortVersion}", name),
       StandardCharsets.UTF_8)
   }
 }

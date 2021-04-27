@@ -273,14 +273,14 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
  */
 class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
   override val goldenFilePath: String = {
-    val Array(major, minor, patch) = BuildInfo.sparkVersion.split('.').map(_.toInt)
-    new File(baseResourcePath, s"spark-$major.$minor/approved-plans-v1_4").getAbsolutePath
+    new File(baseResourcePath, s"spark-${BuildInfo.sparkShortVersion}/approved-plans-v1_4").getAbsolutePath
   }
 
   // Enable cross join because some queries fail during query optimization phase.
   withSQLConf("spark.sql.crossJoin.enabled" -> "true") {
     tpcdsQueries.foreach { q =>
       test(s"check simplified (tpcds-v1.4/$q)") {
+        assume(BuildInfo.sparkShortVersion == "2.4") // TODO: support Spark 3.0
         testQuery("tpcds/queries", q)
       }
     }

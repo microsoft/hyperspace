@@ -71,7 +71,13 @@ lazy val addSparkVersionSpecificSourceDirectories = unmanagedSourceDirectories +
 
 lazy val commonSettings = Seq(
   // The following creates target/scala-2.*/src_managed/main/sbt-buildinfo/BuildInfo.scala.
-  buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, sparkVersion),
+  buildInfoKeys := Seq[BuildInfoKey](
+    name,
+    version,
+    scalaVersion,
+    sbtVersion,
+    sparkVersion,
+    "sparkShortVersion" -> sparkVersion.value.short),
   buildInfoPackage := "com.microsoft.hyperspace",
 
   name := "hyperspace-core",
