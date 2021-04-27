@@ -37,10 +37,7 @@ object IcebergShims {
   def loadIcebergTable(spark: SparkSession, plan: LogicalPlan): (Table, Option[Long]) =
     plan match {
       case r @ DataSourceV2Relation(table: SparkTable, _, _, _, _) =>
-        val snapshotId =
-          if (r.options.containsKey("snapshot-id")) Some(r.options.get("snapshot-id").toLong)
-          else None
-        (table.table, snapshotId)
+        (table.table, Option(r.options.get("snapshot-id")).map(_.toLong))
       case r @ DataSourceV2ScanRelation(table: SparkTable, _, _) =>
         (table.table, getSnapshotId(r.scan))
       case _ =>
