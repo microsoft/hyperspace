@@ -36,4 +36,6 @@ class DefaultFileBasedRelationMetadata(metadata: Relation) extends FileBasedRela
   override def enrichIndexProperties(properties: Map[String, String]): Map[String, String] = {
     properties
   }
+
+  override def canSupportUserSpecifiedSchema: Boolean = true
 }

@@ -27,7 +27,7 @@ import com.microsoft.hyperspace.util.FileUtils
 // Hybrid Scan tests for non partitioned source data. Test cases of HybridScanSuite are also
 // executed with non partitioned source data.
 class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
-  override val systemPath = new Path("src/test/resources/hybridScanTest")
+  override val indexLocationDirName = "hybridScanTest"
 
   override def beforeAll(): Unit = {
     super.beforeAll()

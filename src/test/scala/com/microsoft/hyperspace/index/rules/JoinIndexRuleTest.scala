@@ -25,10 +25,11 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.shim.{JoinWithoutHint => Join}
+import com.microsoft.hyperspace.util.{FileUtils, PathUtils, SparkTestShims}
 
 class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/joinIndexRuleTest")
+  override val indexLocationDirName = "joinIndexRuleTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -427,6 +428,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val updatedNodeCount = plan2.treeString.split("\n").length
 
     if (originalNodeCount == updatedNodeCount) {
+      import SparkTestShims.Implicits._
       (0 until originalNodeCount).forall { i =>
         plan1(i) match {
           // for LogicalRelation, we just check if the updated also has LogicalRelation. If the
@@ -434,7 +436,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
           case _: LogicalRelation => plan2(i).isInstanceOf[LogicalRelation]
 
           // for other node types, we compare exact matching between original and updated plans
-          case node => node.simpleString.equals(plan2(i).simpleString)
+          case node => node.simpleStringFull.equals(plan2(i).simpleStringFull)
         }
       }
     } else {

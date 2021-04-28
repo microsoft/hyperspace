@@ -23,10 +23,8 @@ import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig}
 import com.microsoft.hyperspace.util.FileUtils
 
 class HyperspaceTest extends HyperspaceSuite {
-  override val systemPath = new Path("src/test/resources/indexLocation")
-
   private val sampleData = SampleData.testData
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
+  private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private var df: DataFrame = _

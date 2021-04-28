@@ -34,7 +34,7 @@ import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.util.PathUtils
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
-  override val systemPath = new Path("src/test/resources/deltaLakeIntegrationTest")
+  override val indexLocationDirName = "deltaLakeIntegrationTest"
 
   private val sampleData = SampleData.testData
   private var hyperspace: Hyperspace = _

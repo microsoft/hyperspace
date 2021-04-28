@@ -27,11 +27,8 @@ import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
-class IndexLogManagerImplTest
-    extends SparkFunSuite
-    with SparkInvolvedSuite
-    with BeforeAndAfterAll {
-  val testRoot = "src/test/resources/indexLogManagerTests"
+class IndexLogManagerImplTest extends HyperspaceSuite {
+  val testRoot = inTempDir("indexLogManagerTests")
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",
     CoveringIndex(
