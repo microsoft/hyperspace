@@ -33,7 +33,13 @@ $ git restore-symlinks # restore symlinks
 
 ### Using IntelliJ
 
-You can use the built-in sbt shell in IntelliJ without any problems. However, the built-in "Build Project" command may not work. To fix the issue, go to Project Structure -> Project Settings -> Modules, remove the "root" module, and mark `src/main/scala` as Sources for the "spark2_4" and "spark3_0" modules, as well as `src/main/scala-spark2` and `src/main/scala-spark3` directories for corresponding modules.
+You can use the built-in sbt shell in IntelliJ without any problems. However, the built-in "Build Project" command may not work. To fix the issue, go to Project Structure -> Project Settings -> Modules and follow these steps:
+
+- Mark `src/main/scala` and `src/main/scala-spark2` as "Sources" and `src/test/scala` and `src/test/scala-spark2` as "Tests" for the `spark2_4` module
+- Mark `src/main/scala` and `src/main/scala-spark3` as "Sources" and `src/test/scala` and `src/test/scala-spark3` as "Tests" for the `spark3_0` module
+- Remove the `root` and `hyperspace-sources` modules
+
+Additionally, you might have to run `sbt buildInfo` if you encounter an error like `object BuildInfo is not a member of package com.microsoft.hyperspace` for the first build.
 
 ## Inspiration and Special Thanks
 
