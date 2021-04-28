@@ -31,6 +31,7 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_QUICK
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
+import com.microsoft.hyperspace.index.sources.delta.DeltaLakeRelation
 import com.microsoft.hyperspace.util.PathUtils
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
@@ -452,6 +453,27 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
           // For delta table version 9, candidate log version is 11.
           checkExpectedIndexUsed(indexName, path, Some(9, tsMap(9)), 11)
         }
+      }
+    }
+  }
+
+  test("DeltaLakeRelation.closestIndex should handle indexes without delta versions.") {
+    withTempPathAsString { path =>
+      import spark.implicits._
+      val df = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      df.write.format("delta").save(path)
+      val parquetDf = spark.read.parquet(path)
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        hyperspace.createIndex(parquetDf, IndexConfig("testIndex", Seq("Date"), Seq("clicks")))
+      }
+      withSQLConf(TestConfig.HybridScanEnabled: _*) {
+        val deltaDf = spark.read.format("delta").load(path)
+        val rel = new DeltaLakeRelation(
+          spark,
+          deltaDf.queryExecution.optimizedPlan.asInstanceOf[LogicalRelation])
+
+        val entry = latestIndexLogEntry(systemPath, "testIndex")
+        assert(rel.closestIndex(entry).equals(entry))
       }
     }
   }
