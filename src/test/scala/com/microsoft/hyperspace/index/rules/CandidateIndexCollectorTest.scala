@@ -17,20 +17,19 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
-import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
+import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
+import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
-import com.microsoft.hyperspace.shim.{JoinWithoutHint, RepartitionByExpressionWithOptionalNumPartitions}
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
+import com.microsoft.hyperspace.util.FileUtils
 
-class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
-  override val indexLocationDirName = "ruleUtilsTest"
+class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
+  override val indexLocationDirName = "candidateIndexCollectorTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -91,33 +90,23 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
     val indexManager = IndexCollectionManager(spark)
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val t1Relation = RuleUtils.getRelation(spark, t1ProjectNode).get
-    val t2Relation = RuleUtils.getRelation(spark, t2ProjectNode).get
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1Relation).length === 3)
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2Relation).length === 2)
+    val t1Result = CandidateIndexCollector(t1ProjectNode, allIndexes)
+    val t2Result = CandidateIndexCollector(t2ProjectNode, allIndexes)
 
-    // Delete an index for t1ProjectNode
+    CandidateIndexCollector(t1ProjectNode, allIndexes)
+
+    assert(t1Result.head._2.length === 3)
+    assert(t2Result.head._2.length === 2)
+
+    // Delete an index for t1ProjectNode.
     indexManager.delete("t1i1")
     val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1Relation).length === 2)
+    val t1Result2 = CandidateIndexCollector(t1ProjectNode, allIndexes2)
+    assert(t1Result2.head._2.length === 2)
   }
 
-  test("Verify get logical relation for single logical relation node plan.") {
-    validateLogicalRelation(t1ScanNode, t1ScanNode)
-  }
-
-  test("Verify get logical relation for multi-node linear plan.") {
-    validateLogicalRelation(t1ProjectNode, t1ScanNode)
-  }
-
-  test("Verify get logical relation for non-linear plan.") {
-    val joinNode = JoinWithoutHint(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
-    val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
-    assert(r.isEmpty)
-  }
-
-  test("Verify getCandidateIndex for hybrid scan") {
+  test("Verify CandidateIndexCollector for hybrid scan.") {
     withTempPath { tempPath =>
       val indexManager = IndexCollectionManager(spark)
       val df = spark.range(1, 5).toDF("id")
@@ -149,13 +138,12 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
             IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
               (if (hybridScanDeleteEnabled) "0.99" else "0")) {
-            val relation = RuleUtils.getRelation(spark, plan).get
-            val indexes = RuleUtils
-              .getCandidateIndexes(spark, allIndexes, relation)
+            val indexes = CandidateIndexCollector(plan, allIndexes).headOption.map(_._2)
             if (expectedCandidateIndexes.nonEmpty) {
-              assert(indexes.length === expectedCandidateIndexes.length)
-              assert(indexes.map(_.name).toSet.equals(expectedCandidateIndexes.toSet))
-              indexes.foreach { index =>
+              assert(indexes.isDefined)
+              assert(indexes.get.length === expectedCandidateIndexes.length)
+              assert(indexes.get.map(_.name).toSet.equals(expectedCandidateIndexes.toSet))
+              indexes.get.foreach { index =>
                 assert(
                   index.getTagValue(plan, IndexLogEntryTags.HYBRIDSCAN_REQUIRED)
                     === expectedHybridScanTag)
@@ -278,14 +266,14 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
           indexManager.create(readDf, IndexConfig("index1", Seq("id")))
         }
 
-        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+        val allIndexes = Seq(latestIndexLogEntry(systemPath, "index1"))
         df.limit(5).write.mode("append").parquet(dataPath)
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
         val relation = RuleUtils.getRelation(spark, optimizedPlan).get
 
         withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
-            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            val indexes = CandidateIndexCollector(optimizedPlan, allIndexes).head._2
             assert(
               indexes.head
                 .getTagValue(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
@@ -297,7 +285,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
           }
 
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.2") {
-            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            val indexes = CandidateIndexCollector(optimizedPlan, allIndexes).headOption.map(_._2)
             assert(indexes.isEmpty)
             assert(
               !allIndexes.head
@@ -311,76 +299,5 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
         }
       }
     }
-  }
-
-  test("Verify the location of injected shuffle for Hybrid Scan.") {
-    withTempPath { tempPath =>
-      val dataPath = tempPath.getAbsolutePath
-      import spark.implicits._
-      Seq((1, "name1", 12), (2, "name2", 10))
-        .toDF("id", "name", "age")
-        .write
-        .mode("overwrite")
-        .parquet(dataPath)
-
-      val df = spark.read.parquet(dataPath)
-      val query = df.filter(df("id") >= 3).select("id", "name")
-      val bucketSpec = BucketSpec(100, Seq("id"), Seq())
-      val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
-        bucketSpec,
-        query.queryExecution.optimizedPlan)
-
-      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
-      // should be transformed to:
-      //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
-      assert(shuffled.collect {
-        case RepartitionByExpressionWithOptionalNumPartitions(
-              attrs,
-              p: Project,
-              Some(numBuckets)) =>
-          assert(numBuckets == 100)
-          assert(attrs.size == 1)
-          assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
-          assert(
-            p.projectList.exists(_.name.equals("id")) && p.projectList.exists(
-              _.name.equals("name")))
-          true
-      }.length == 1)
-
-      // Check if the shuffle node should be injected where all bucket columns
-      // are available as its input.
-      // For example,
-      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
-      // should be transformed:
-      //   Project ("id", "name") -> Shuffle ("age") -> Filter ("id") -> Relation
-      // , NOT:
-      //   Shuffle ("age") -> Project("id", "name") -> Filter ("id") -> Relation
-      // since Project doesn't include "age" column; Shuffle will be RoundRobinPartitioning
-
-      val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
-      val query2 = df.filter(df("id") <= 3).select("id", "name")
-      val shuffled2 =
-        RuleUtils.transformPlanToShuffleUsingBucketSpec(
-          bucketSpec2,
-          query2.queryExecution.optimizedPlan)
-      assert(shuffled2.collect {
-        case Project(
-              _,
-              RepartitionByExpressionWithOptionalNumPartitions(
-                attrs,
-                _: Filter,
-                Some(numBuckets))) =>
-          assert(numBuckets == 100)
-          assert(attrs.size == 1)
-          assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
-          true
-      }.length == 1)
-    }
-  }
-
-  private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
-    val r = RuleUtils.getRelation(spark, plan)
-    assert(r.isDefined)
-    assert(r.get.plan.equals(expected))
   }
 }

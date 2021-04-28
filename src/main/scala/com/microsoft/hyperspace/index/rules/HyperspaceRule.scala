@@ -37,7 +37,7 @@ trait HyperspaceRule extends ActiveSparkSession {
    * Index ranker to select the best index among applicable indexes
    * after applying [[filtersOnQueryPlan]]s.
    */
-  val indexRanker: RankerIndexFilter
+  val indexRanker: IndexRankFilter
 
   /**
    * Transform the plan to use the selected indexes.
