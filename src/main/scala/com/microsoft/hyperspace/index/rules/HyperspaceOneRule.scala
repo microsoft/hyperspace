@@ -32,9 +32,9 @@ import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
  */
 object CandidateIndexCollector extends ActiveSparkSession {
   // TODO: ColumnSchemaFilter :: FileSignatureFilter :: Nil
-  val sourceFilters: Seq[SourceFilter] = Nil
+  private val sourceFilters: Seq[SourceFilter] = Nil
 
-  def initializePlanToIndexes(
+  private def initializePlanToIndexes(
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry]): Map[LogicalPlan, Seq[IndexLogEntry]] = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
