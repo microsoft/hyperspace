@@ -156,18 +156,22 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
       index.derivedDataset.properties.properties
         .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
 
-    // Versions are processed in a reverse order to keep the higher index log version
-    // in case different index log versions refer to the same delta lake version.
-    // For example, "1:1,2:2,3:2" will become Seq((1, 1), (3, 2)).
-    versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (acc, versionStr) =>
-      val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
-      if (acc.nonEmpty && acc.head._2 == deltaTableVersion) {
-        // Omit if the delta lake version is the same. In this case, we only take the higher
-        // index log version as it's from index optimizations.
-        acc
-      } else {
-        (indexLogVersion, deltaTableVersion) +: acc
+    if (versions.nonEmpty) {
+      // Versions are processed in a reverse order to keep the higher index log version
+      // in case different index log versions refer to the same delta lake version.
+      // For example, "1:1,2:2,3:2" will become Seq((1, 1), (3, 2)).
+      versions.split(",").reverseIterator.foldLeft(Seq[(Int, Int)]()) { (acc, versionStr) =>
+        val Array(indexLogVersion, deltaTableVersion) = versionStr.split(":").map(_.toInt)
+        if (acc.nonEmpty && acc.head._2 == deltaTableVersion) {
+          // Omit if the delta lake version is the same. In this case, we only take the higher
+          // index log version as it's from index optimizations.
+          acc
+        } else {
+          (indexLogVersion, deltaTableVersion) +: acc
+        }
       }
+    } else {
+      Seq()
     }
   }
 
@@ -191,7 +195,10 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     }
 
     // Seq of (index log version, delta lake table version)
-    val versionsHistory = deltaLakeVersionHistory(index)
+    val versionHistory = deltaLakeVersionHistory(index)
+    if (versionHistory.isEmpty) {
+      return index
+    }
 
     lazy val indexManager = Hyperspace.getContext(spark).indexCollectionManager
     def getIndexLogEntry(logVersion: Int): IndexLogEntry = {
@@ -203,7 +210,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
 
     val activeLogVersions =
       indexManager.getIndexVersions(index.name, Seq(Constants.States.ACTIVE))
-    val versions = versionsHistory.filter {
+    val versions = versionHistory.filter {
       case (indexLogVersion, _) => activeLogVersions.contains(indexLogVersion)
     }
 
