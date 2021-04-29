@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.rules.HyperspaceOneRule.PlanToIndexesMap
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
 
 /**
@@ -32,11 +33,11 @@ import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
  */
 object CandidateIndexCollector extends ActiveSparkSession {
   // TODO: ColumnSchemaFilter :: FileSignatureFilter :: Nil
-  private val sourceFilters: Seq[SourceFilter] = Nil
+  private val sourceFilters: Seq[IndexFilterOnSourcePlan] = Nil
 
   private def initializePlanToIndexes(
       plan: LogicalPlan,
-      indexes: Seq[IndexLogEntry]): Map[LogicalPlan, Seq[IndexLogEntry]] = {
+      indexes: Seq[IndexLogEntry]): PlanToIndexesMap = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     plan.collect {
       case l: LeafNode if provider.isSupportedRelation(l) =>
@@ -44,9 +45,7 @@ object CandidateIndexCollector extends ActiveSparkSession {
     }.toMap
   }
 
-  def apply(
-      plan: LogicalPlan,
-      allIndexes: Seq[IndexLogEntry]): Map[LogicalPlan, Seq[IndexLogEntry]] = {
+  def apply(plan: LogicalPlan, allIndexes: Seq[IndexLogEntry]): PlanToIndexesMap = {
     val planToIndexes = initializePlanToIndexes(plan, allIndexes)
     planToIndexes.flatMap {
       case (node, candidateIndexes) =>
@@ -64,12 +63,11 @@ class ScoreBasedIndexApplication {
   // TODO: FilterIndexRule :: JoinIndexRule :: Nil
   private val rules = NoOpRule :: Nil
 
-  // Map for memoization.
+  // Map for memoization. The key is the logical plan before applying [[HyperspaceRule]]s
+  // and its value is a pair of best transformed plan and its score.
   private val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
 
-  private def recApply(
-      plan: LogicalPlan,
-      indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): (LogicalPlan, Int) = {
+  private def recApply(plan: LogicalPlan, indexes: PlanToIndexesMap): (LogicalPlan, Int) = {
     // If pre-calculated value exists, return it.
     scoreMap.get(plan).foreach(res => return res)
 
@@ -80,7 +78,7 @@ class ScoreBasedIndexApplication {
     optResult
   }
 
-  def apply(plan: LogicalPlan, indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): LogicalPlan = {
+  def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): LogicalPlan = {
     recApply(plan, indexes)._1
   }
 }
@@ -93,6 +91,8 @@ object HyperspaceOneRule
     with Logging
     with HyperspaceEventLogging
     with ActiveSparkSession {
+
+  type PlanToIndexesMap = Map[LogicalPlan, Seq[IndexLogEntry]]
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
     val indexManager = Hyperspace

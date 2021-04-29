@@ -20,8 +20,9 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.rules.HyperspaceOneRule.PlanToIndexesMap
 
-trait HyperspaceFilter {
+trait IndexFilter {
 
   /**
    * @return Failure reason for filtered out indexes.
@@ -30,9 +31,9 @@ trait HyperspaceFilter {
 }
 
 /**
- * Filter used in CandidateIndexCollector.
+ * IndexFilter used in CandidateIndexCollector.
  */
-trait SourceFilter extends HyperspaceFilter with ActiveSparkSession {
+trait IndexFilterOnSourcePlan extends IndexFilter with ActiveSparkSession {
 
   /**
    * Filter out candidate indexes for the given source plan.
@@ -45,9 +46,9 @@ trait SourceFilter extends HyperspaceFilter with ActiveSparkSession {
 }
 
 /**
- * Filter used in HyperspaceRule.
+ * IndexFilter used in HyperspaceRule.
  */
-trait PlanFilter extends HyperspaceFilter with ActiveSparkSession {
+trait IndexFilterOnQueryPlan extends IndexFilter with ActiveSparkSession {
 
   /**
    * Filter out candidate indexes for the given query plan.
@@ -56,7 +57,5 @@ trait PlanFilter extends HyperspaceFilter with ActiveSparkSession {
    * @param indexes Map of source plan to candidate indexes.
    * @return Map of source plan to indexes which meet conditions of Filter.
    */
-  def apply(
-      plan: LogicalPlan,
-      indexes: Map[LogicalPlan, Seq[IndexLogEntry]]): Map[LogicalPlan, Seq[IndexLogEntry]]
+  def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToIndexesMap
 }
