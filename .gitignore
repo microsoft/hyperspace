@@ -42,3 +42,7 @@ build.log
 
 # macOS related files
 .DS_Store
+
+# for IntelliJ
+/spark2.4/src/*
+/spark3.0/src/*
