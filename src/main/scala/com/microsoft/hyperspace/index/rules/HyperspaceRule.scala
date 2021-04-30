@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
+import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rules.HyperspaceOneRule.PlanToIndexesMap
 
 /**
@@ -41,7 +42,7 @@ trait HyperspaceRule extends ActiveSparkSession {
    * @param indexes Selected indexes.
    * @return Transformed plan to use the selected indexes.
    */
-  def applyIndex(plan: LogicalPlan, indexes: PlanToIndexesMap): LogicalPlan
+  def applyIndex(plan: LogicalPlan, indexes: Map[LogicalPlan, IndexLogEntry]): LogicalPlan
 
   /**
    * Calculate the score of the selected indexes.
@@ -50,16 +51,21 @@ trait HyperspaceRule extends ActiveSparkSession {
    * @param indexes Selected indexes.
    * @return Score of selected indexes.
    */
-  def score(plan: LogicalPlan, indexes: PlanToIndexesMap): Int
+  def score(plan: LogicalPlan, indexes: Map[LogicalPlan, IndexLogEntry]): Int
 
   final def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): (LogicalPlan, Int) = {
     if (indexes.isEmpty) {
       return (plan, 0)
     }
 
-    val selectedIndexes = filtersOnQueryPlan.foldLeft(indexes) { (pti, filter) =>
-      filter(plan, pti)
-    }
+    val selectedIndexes = filtersOnQueryPlan
+      .foldLeft(indexes) { (pti, filter) =>
+        filter(plan, pti)
+      }
+      .map { planToIndexes =>
+        assert(planToIndexes._2.length == 1)
+        (plan, planToIndexes._2.head)
+      }
 
     if (selectedIndexes.nonEmpty) {
       (applyIndex(plan, selectedIndexes), score(plan, selectedIndexes))
@@ -75,7 +81,9 @@ trait HyperspaceRule extends ActiveSparkSession {
 object NoOpRule extends HyperspaceRule {
   override val filtersOnQueryPlan = Nil
 
-  override def applyIndex(plan: LogicalPlan, indexes: PlanToIndexesMap): LogicalPlan = plan
+  override def applyIndex(
+      plan: LogicalPlan,
+      indexes: Map[LogicalPlan, IndexLogEntry]): LogicalPlan = plan
 
-  override def score(plan: LogicalPlan, indexes: PlanToIndexesMap): Int = 0
+  override def score(plan: LogicalPlan, indexes: Map[LogicalPlan, IndexLogEntry]): Int = 0
 }
