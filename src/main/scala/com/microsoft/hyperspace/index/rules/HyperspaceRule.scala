@@ -62,9 +62,11 @@ trait HyperspaceRule extends ActiveSparkSession {
       .foldLeft(indexes) { (pti, filter) =>
         filter(plan, pti)
       }
-      .map { planToIndexes =>
-        assert(planToIndexes._2.length == 1)
-        (plan, planToIndexes._2.head)
+      .map { kv =>
+        // After applying filtersOnQueryPlan, each candidate relation should have
+        // one candidate index.
+        assert(kv._2.length == 1)
+        (kv._1, kv._2.head)
       }
 
     if (selectedIndexes.nonEmpty) {
