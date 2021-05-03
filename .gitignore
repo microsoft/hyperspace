@@ -46,3 +46,4 @@ build.log
 # for IntelliJ
 /spark2.4/src/*
 /spark3.0/src/*
+/spark3.1/src/*
