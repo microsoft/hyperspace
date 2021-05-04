@@ -33,7 +33,7 @@ trait IndexFilter {
 /**
  * IndexFilter used in CandidateIndexCollector.
  */
-trait IndexFilterOnSourcePlan extends IndexFilter with ActiveSparkSession {
+trait SourcePlanIndexFilter extends IndexFilter with ActiveSparkSession {
 
   /**
    * Filter out candidate indexes for the given source plan.
@@ -48,7 +48,7 @@ trait IndexFilterOnSourcePlan extends IndexFilter with ActiveSparkSession {
 /**
  * IndexFilter used in HyperspaceRule.
  */
-trait IndexFilterOnQueryPlan extends IndexFilter with ActiveSparkSession {
+trait QueryPlanIndexFilter extends IndexFilter with ActiveSparkSession {
 
   /**
    * Filter out candidate indexes for the given query plan.

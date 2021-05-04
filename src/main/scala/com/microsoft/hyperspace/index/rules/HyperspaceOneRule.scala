@@ -33,7 +33,7 @@ import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
  */
 object CandidateIndexCollector extends ActiveSparkSession {
   // TODO: ColumnSchemaFilter :: FileSignatureFilter :: Nil
-  private val sourceFilters: Seq[IndexFilterOnSourcePlan] = Nil
+  private val sourceFilters: Seq[SourcePlanIndexFilter] = Nil
 
   private def initializePlanToIndexes(
       plan: LogicalPlan,

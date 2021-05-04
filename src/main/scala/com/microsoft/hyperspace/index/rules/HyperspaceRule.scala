@@ -32,7 +32,7 @@ trait HyperspaceRule extends ActiveSparkSession {
    * filter out candidate indexes based on the conditions. The order of the sequence does matter
    * because they are applied in order with the assumption that previous filter conditions met.
    */
-  val filtersOnQueryPlan: Seq[IndexFilterOnQueryPlan]
+  val filtersOnQueryPlan: Seq[QueryPlanIndexFilter]
 
   /**
    * Transform the plan to use the selected indexes after applying [[filtersOnQueryPlan]].
