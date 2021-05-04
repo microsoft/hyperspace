@@ -20,15 +20,17 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 
 import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilderFactory}
 
 object RuleTestHelper {
-  class TestSignatureProvider extends LogicalPlanSignatureProvider {
-    def signature(plan: LogicalPlan): Option[String] =
+  class TestSignatureProvider(fbf: FingerprintBuilderFactory)
+      extends LogicalPlanSignatureProvider {
+    def signature(plan: LogicalPlan): Option[Fingerprint] =
       plan
         .collectFirst {
           case LogicalRelation(HadoopFsRelation(location, _, _, _, _, _), _, _, _) =>
             location.hashCode()
         }
-        .map(_.toString)
+        .map(fbf.create.add(_).build())
   }
 }

@@ -28,6 +28,7 @@ import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedS
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 class RefreshActionTest extends HyperspaceSuite {
   private val sampleParquetDataLocation = inTempDir("sampleparquet")
@@ -78,7 +79,8 @@ class RefreshActionTest extends HyperspaceSuite {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
+        LogicalPlanFingerprint.Properties(
+          Seq(Signature("signatureProvider", Fingerprint("abcd"))))))
 
     val entry = IndexLogEntry(
       "index1",

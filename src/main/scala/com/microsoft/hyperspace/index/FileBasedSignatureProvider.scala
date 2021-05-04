@@ -19,15 +19,20 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 
 import com.microsoft.hyperspace.Hyperspace
-import com.microsoft.hyperspace.util.HashingUtils
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilder, FingerprintBuilderFactory}
 
 /**
  * [[FileBasedSignatureProvider]] provides the logical plan signature based on files in the
  * relation. File metadata, eg. size, modification time and path, of each file in the
  * relation will be used to generate the signature.
+ *
+ * Note that while the order of files in a single relation does not affect the signature,
+ * the order of relations in the plan do affect the signature calculation.
+ *
  * If the given logical plan does not have any supported relations, no signature is provided.
  */
-class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
+class FileBasedSignatureProvider(fbf: FingerprintBuilderFactory)
+    extends LogicalPlanSignatureProvider {
 
   /**
    * Generate the signature of logical plan.
@@ -35,28 +40,18 @@ class FileBasedSignatureProvider extends LogicalPlanSignatureProvider {
    * @param logicalPlan logical plan of data frame.
    * @return signature, if the logical plan has supported relations; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String] = {
-    fingerprintVisitor(logicalPlan).map(HashingUtils.md5Hex)
-  }
-
-  /**
-   * Visit logical plan and collect info needed for fingerprint.
-   *
-   * @param logicalPlan logical plan of data frame.
-   * @return fingerprint, if the logical plan has supported relations; Otherwise None.
-   */
-  private def fingerprintVisitor(logicalPlan: LogicalPlan): Option[String] = {
+  def signature(logicalPlan: LogicalPlan): Option[Fingerprint] = {
     val provider = Hyperspace.getContext.sourceProviderManager
-    var fingerprint = ""
+    val fb: FingerprintBuilder = fbf.create
+    var updated = false
     logicalPlan.foreachUp {
       case l: LeafNode if provider.isSupportedRelation(l) =>
-        fingerprint ++= provider.getRelation(l).signature
+        provider.getRelation(l).signature(fb).foreach { f =>
+          fb.add(f)
+          updated = true
+        }
       case _ =>
     }
-
-    fingerprint match {
-      case "" => None
-      case _ => Some(fingerprint)
-    }
+    if (updated) Some(fb.build()) else None
   }
 }

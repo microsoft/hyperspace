@@ -27,6 +27,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexLogEntry, Relation}
 import com.microsoft.hyperspace.index.sources.default.DefaultFileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilder}
 
 /**
  * Implementation for file-based relation used by [[DeltaLakeFileBasedSource]]
@@ -36,10 +37,12 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
 
   /**
    * Computes the signature of the current relation.
+   *
+   * @param fb [[FingerprintBuilder]] used for building fingerprints
    */
-  override def signature: String = plan.relation match {
+  override def signature(fb: FingerprintBuilder): Option[Fingerprint] = plan.relation match {
     case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-      location.tableVersion + location.path.toString
+      Some(fb.add(location.tableVersion).add(location.path.toString).build())
   }
 
   /**

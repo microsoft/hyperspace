@@ -32,6 +32,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 // IndexLogEntry-specific fingerprint to be temporarily used where fingerprint is not defined.
 case class NoOpFingerprint() {
@@ -361,7 +362,7 @@ object CoveringIndex {
 }
 
 // IndexLogEntry-specific Signature that stores the signature provider and value.
-case class Signature(provider: String, value: String)
+case class Signature(provider: String, value: Fingerprint)
 
 // IndexLogEntry-specific LogicalPlanFingerprint to store fingerprint of logical plan.
 case class LogicalPlanFingerprint(properties: LogicalPlanFingerprint.Properties) {

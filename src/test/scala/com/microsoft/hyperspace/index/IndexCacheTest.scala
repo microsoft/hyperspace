@@ -25,6 +25,7 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.FileUtils
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 class IndexCacheTest extends HyperspaceSuite {
   val sampleParquetDataLocation = inTempDir("sampleparquet")
@@ -45,7 +46,8 @@ class IndexCacheTest extends HyperspaceSuite {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
+        LogicalPlanFingerprint.Properties(
+          Seq(Signature("signatureProvider", Fingerprint("abcd"))))))
 
     val entry = IndexLogEntry(
       "index1",

@@ -18,14 +18,16 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-import com.microsoft.hyperspace.util.HashingUtils
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilder, FingerprintBuilderFactory}
 
 /**
  * [[PlanSignatureProvider]] provides signature for a logical plan based on
  * the type of operators in it.
  * A plan needs to have at least one operator so its signature can be generated.
+ *
+ * @param fbf [[FingerprintBuilderFactory]] used for building fingerprints
  */
-class PlanSignatureProvider extends LogicalPlanSignatureProvider {
+class PlanSignatureProvider(fbf: FingerprintBuilderFactory) extends LogicalPlanSignatureProvider {
 
   /**
    * Generate the signature of logical plan.
@@ -33,12 +35,9 @@ class PlanSignatureProvider extends LogicalPlanSignatureProvider {
    * @param logicalPlan logical plan.
    * @return signature if there is at least one operator in the plan; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String] = {
-    var signature = ""
-    logicalPlan.foreachUp(p => signature = HashingUtils.md5Hex(signature + p.nodeName))
-    signature match {
-      case "" => None
-      case _ => Some(signature)
-    }
+  def signature(logicalPlan: LogicalPlan): Option[Fingerprint] = {
+    val fb: FingerprintBuilder = fbf.create
+    logicalPlan.foreachUp(node => fb.add(node.nodeName))
+    Some(fb.build())
   }
 }

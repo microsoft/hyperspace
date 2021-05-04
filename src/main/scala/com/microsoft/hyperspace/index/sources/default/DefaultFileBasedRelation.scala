@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, Relation}
 import com.microsoft.hyperspace.index.IndexConstants.GLOBBING_PATTERN_KEY
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.util.HashingUtils
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilder}
 
 /**
  * Implementation for file-based relation used by [[DefaultFileBasedSource]]
@@ -41,14 +41,15 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
 
   /**
    * Computes the signature of the current relation.
+   *
+   * @param fb [[FingerprintBuilder]] used for building fingerprints
    */
-  override def signature: String = plan.relation match {
+  override def signature(fb: FingerprintBuilder): Option[Fingerprint] = plan.relation match {
     case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-      val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
-        (acc: String, f: FileStatus) =>
-          HashingUtils.md5Hex(acc + fingerprint(f))
-      }
-      result
+      val initialFingerprint = fb.build()
+      var fingerprint = initialFingerprint
+      filesFromIndex(location).foreach(fingerprint ^= createFingerprint(_, fb))
+      Some(fingerprint).filter(_ != initialFingerprint)
   }
 
   /**
@@ -179,9 +180,11 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
     }
   }
 
-  private def fingerprint(fileStatus: FileStatus): String = {
-    fileStatus.getLen.toString + fileStatus.getModificationTime.toString +
-      fileStatus.getPath.toString
+  private def createFingerprint(fileStatus: FileStatus, fb: FingerprintBuilder): Fingerprint = {
+    fb.add(fileStatus.getLen)
+      .add(fileStatus.getModificationTime)
+      .add(fileStatus.getPath.toString)
+      .build()
   }
 
   private def filesFromIndex(index: PartitioningAwareFileIndex): Seq[FileStatus] = {
