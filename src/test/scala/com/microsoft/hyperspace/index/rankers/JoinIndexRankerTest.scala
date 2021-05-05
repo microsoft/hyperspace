@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
 import com.microsoft.hyperspace.util.FileUtils
 
 class JoinIndexRankerTest extends HyperspaceRuleSuite with SQLHelper {
-  override val systemPath = new Path("src/test/resources/JoinRankerTest")
+  override val indexLocationDirName = "JoinRankerTest"
   var leftPlan: LogicalPlan = _
   var rightPlan: LogicalPlan = _
 

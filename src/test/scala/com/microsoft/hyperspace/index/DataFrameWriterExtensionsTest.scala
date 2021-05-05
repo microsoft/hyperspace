@@ -32,11 +32,11 @@ import com.microsoft.hyperspace.{SampleData, SparkInvolvedSuite}
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.FileUtils
 
-class DataFrameWriterExtensionsTest extends SparkFunSuite with SparkInvolvedSuite {
+class DataFrameWriterExtensionsTest extends HyperspaceSuite {
 
   private val sampleData = SampleData.testData
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  private val sampleDataBucketedLocation = "src/test/resources/sampleparquet-withBuckets"
+  private val sampleParquetDataLocation = inTempDir("sampleparquet")
+  private val sampleDataBucketedLocation = inTempDir("sampleparquet-withBuckets")
 
   private var df: DataFrame = _
 

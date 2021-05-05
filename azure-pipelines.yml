@@ -6,8 +6,8 @@ trigger:
       - master
 
 jobs:
-  - job: Build_2_11
-    displayName: 'Build sources and run unit tests for Scala 2.11'
+  - job: Build_Spark2_4_2_11
+    displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.11'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
@@ -17,69 +17,69 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      # Use sbt 1.4.9. The default sbt launcher in ubuntu-18.04 20210405 image is
-      # 1.5.0, but the version has an issue to compile with 0.13.18.
-      # See: https://github.com/sbt/sbt/issues/6447
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.4.9/sbt-1.4.9.tgz"
-        displayName: 'Download sbt 1.4.9'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt//bin/sbt ++2.11.12 clean
-        displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 update
-        displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 compile
-        displayName: 'Running $sbt compile'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 test
-        displayName: 'Running $sbt test'
+      - script: sbt ++2.11.12 "project spark2_4" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: /tmp/sbt/bin/sbt ++2.11.12 package
+        - script: sbt ++2.11.12 "project spark2_4" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
             sourceFolder: '$(Build.SourcesDirectory)/target/'
             contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Hyperspace artifacts'
           inputs:
-            artifactName: 'hyperspace-core'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+            artifactName: 'hyperspace-core_spark2.4'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
 
-  - job: Build_2_12
-    displayName: 'Build sources and run unit tests for Scala 2.12'
+  - job: Build_Spark2_4_2_12
+    displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.12'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.4.9/sbt-1.4.9.tgz"
-        displayName: 'Download sbt 1.4.9'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 clean
-        displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 update
-        displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 compile
-        displayName: 'Running $sbt compile'
-      - script: /tmp/sbt/bin/sbt ++2.12.8 test
-        displayName: 'Running $sbt test'
+      - script: sbt ++2.12.8 "project spark2_4" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
       - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: /tmp/sbt/bin/sbt ++2.12.8 package
+        - script: sbt ++2.12.8 "project spark2_4" package
           displayName: 'Running $sbt package'
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
             sourceFolder: '$(Build.SourcesDirectory)/target/'
             contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Hyperspace artifacts'
           inputs:
-            artifactName: 'hyperspace-core'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core/'
+            artifactName: 'hyperspace-core_spark2.4'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
+
+  - job: Build_Spark3_0_2_12
+    displayName: 'Build sources and run unit tests for Spark 3.0 / Scala 2.12'
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
+      - script: sbt ++2.12.8 "project spark3_0" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
+      # If not a pull request, publish artifacts.
+      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+        - script: sbt ++2.12.8 "project spark3_0" package
+          displayName: 'Running $sbt package'
+        - task: CopyFiles@2
+          displayName: 'Copy hyperspace-core JAR'
+          inputs:
+            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            contents: '**/*.jar'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.0/'
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish Hyperspace artifacts'
+          inputs:
+            artifactName: 'hyperspace-core_spark3.0'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.0/'
 
   - job: PythonTest
     displayName: 'Run Python tests'
@@ -97,16 +97,8 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
-      - script: wget -O /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v1.4.9/sbt-1.4.9.tgz"
-        displayName: 'Download sbt 1.4.9'
-      - script: tar zxf /tmp/sbt.tgz -C /tmp/
-        displayName: 'Extract sbt'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 clean
-        displayName: 'Running $sbt clean'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 update
-        displayName: 'Running $sbt update'
-      - script: /tmp/sbt/bin/sbt ++2.11.12 compile
-        displayName: 'Running $sbt compile'
+      - script: sbt ++2.11.12 "project spark2_4" clean update compile
+        displayName: 'Running $sbt clean & update & compile'
       - task: Bash@3
         inputs:
           filePath: 'script/download_spark.sh'

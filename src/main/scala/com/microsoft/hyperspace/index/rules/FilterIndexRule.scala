@@ -176,7 +176,7 @@ object ExtractFilterNode {
 
     case filter @ Filter(condition: Expression, ExtractRelation(relation))
         if !RuleUtils.isIndexApplied(relation) =>
-      val relationColumnsName = relation.plan.output.map(_.name)
+      val relationColumnsName = relation.output.map(_.name)
       val filterColumnNames = condition.references.map(_.name).toSeq
 
       Some(filter, filter, relationColumnsName, filterColumnNames)

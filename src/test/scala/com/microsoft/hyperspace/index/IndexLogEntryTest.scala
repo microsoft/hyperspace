@@ -32,7 +32,7 @@ import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
-class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter {
+class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
   var testDir: file.Path = _
   var f1: file.Path = _
   var f2: file.Path = _
@@ -44,9 +44,9 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   var fileIdTracker: FileIdTracker = _
 
   override def beforeAll(): Unit = {
-    val testDirPath = Paths.get("src/test/resources/testDir")
+    val testDirPath = Paths.get(inTempDir("testDir"))
     if (Files.exists(testDirPath)) {
-      FileUtils.deleteDirectory(new File("src/test/resources/testDir"))
+      FileUtils.deleteDirectory(new File(inTempDir("testDir")))
     }
 
     testDir = Files.createDirectories(testDirPath)

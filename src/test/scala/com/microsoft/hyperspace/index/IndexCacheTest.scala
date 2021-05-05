@@ -26,18 +26,15 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, Sp
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.FileUtils
 
-class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
-  val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  val indexSystemPath = "src/test/resources/indexLocation"
+class IndexCacheTest extends HyperspaceSuite {
+  val sampleParquetDataLocation = inTempDir("sampleparquet")
   val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
 
   before {
-    FileUtils.delete(new Path(indexSystemPath))
     FileUtils.delete(new Path(sampleParquetDataLocation))
   }
 
   override def afterAll(): Unit = {
-    FileUtils.delete(new Path(indexSystemPath))
     FileUtils.delete(new Path(sampleParquetDataLocation))
     super.afterAll()
   }
@@ -132,7 +129,6 @@ class IndexCacheTest extends SparkFunSuite with SparkInvolvedSuite {
     dfFromSample.write.parquet(sampleParquetDataLocation)
 
     val df = spark.read.parquet(sampleParquetDataLocation)
-    spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, indexSystemPath)
 
     val hyperspace = new Hyperspace(spark)
     hyperspace.createIndex(df, indexConfig1)

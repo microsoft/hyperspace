@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, EqualTo, In, InSet, Literal, Not}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, RepartitionByExpression, Union}
-import org.apache.spark.sql.execution.{FileSourceScanExec, ProjectExec, UnionExec}
+import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, ProjectExec, UnionExec}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.internal.SQLConf
@@ -33,7 +33,7 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
 import com.microsoft.hyperspace.util.FileUtils
 
 trait HybridScanSuite extends QueryTest with HyperspaceSuite {
-  override val systemPath = new Path("src/test/resources/hybridScanTest")
+  override val indexLocationDirName = "hybridScanTest"
 
   val sampleData = SampleData.testData
   var hyperspace: Hyperspace = _
@@ -85,6 +85,11 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
   before {
     spark.conf.set(IndexConstants.INDEX_LINEAGE_ENABLED, "true")
+
+    // Dynamic pruning creates a dynamic filter, with different ids every time
+    // thus making basePlan.equals(join) fail
+    spark.conf.set("spark.sql.optimizer.dynamicPartitionPruning.enabled", "false")
+
     spark.enableHyperspace()
   }
 
@@ -284,7 +289,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         case p @ BucketUnionExec(children, bucketSpec) =>
           assert(children.size === 2)
           // children.head is always the index plan.
-          assert(children.head.isInstanceOf[ProjectExec])
+          assert(children.head.isInstanceOf[ProjectExec] || children.head.isInstanceOf[FilterExec])
           assert(children.last.isInstanceOf[ShuffleExchangeExec])
           assert(bucketSpec.numBuckets === 200)
           p

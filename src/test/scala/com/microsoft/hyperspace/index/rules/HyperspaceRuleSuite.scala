@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index.rules
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -27,9 +28,10 @@ import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Hdfs.Properties
+import com.microsoft.hyperspace.util.PathUtils
 
 trait HyperspaceRuleSuite extends HyperspaceSuite {
-  private val filenames = Seq("f1.parquet", "f2.parquet")
+  private val defaultFileNames = Seq("f1.parquet", "f2.parquet")
   def createIndexLogEntry(
       name: String,
       indexCols: Seq[AttributeReference],
@@ -37,7 +39,8 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
       plan: LogicalPlan,
       numBuckets: Int = 10,
       inputFiles: Seq[FileInfo] = Seq(),
-      writeLog: Boolean = true): IndexLogEntry = {
+      writeLog: Boolean = true,
+      filenames: Seq[String] = defaultFileNames): IndexLogEntry = {
     val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
@@ -54,7 +57,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
           null,
           LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
 
-        val indexFiles = getIndexDataFilesPaths(name).map { path =>
+        val indexFiles = getIndexDataFilesPaths(name, filenames).map { path =>
           new FileStatus(10, false, 1, 10, 10, path)
         }
 
@@ -82,11 +85,13 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
     }
   }
 
-  def getIndexDataFilesPaths(indexName: String): Seq[Path] =
+  def getIndexDataFilesPaths(
+      indexName: String,
+      filenames: Seq[String] = defaultFileNames): Seq[Path] =
     filenames.map { f =>
       new Path(
         new Path(
-          new Path(systemPath, indexName),
+          getIndexRootPath(indexName),
           s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0"),
         f)
     }
@@ -99,7 +104,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
       spark)
 
   def getIndexRootPath(indexName: String): Path =
-    new Path(systemPath, indexName)
+    PathUtils.makeAbsolute(new Path(systemPath, indexName), new Configuration)
 
   def setCommonSourceSizeInBytesTag(
       index: IndexLogEntry,

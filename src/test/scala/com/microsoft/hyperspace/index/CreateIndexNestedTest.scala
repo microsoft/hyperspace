@@ -29,10 +29,9 @@ import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
-  override val systemPath = new Path("src/test/resources/indexLocation")
-  private val testDir = "src/test/resources/createIndexTests/"
-  private val nonPartitionedDataPath = testDir + "samplenestedparquet"
-  private val partitionedDataPath = testDir + "samplenestedpartitionedparquet"
+  private val testDir = inTempDir("createIndexTests")
+  private val nonPartitionedDataPath = testDir + "/samplenestedparquet"
+  private val partitionedDataPath = testDir + "/samplenestedpartitionedparquet"
   private val partitionKeys = Seq("Date", "Query")
   private val indexConfig1 =
     IndexConfig("index1", Seq("nested.leaf.id"), Seq("Date", "nested.leaf.cnt"))

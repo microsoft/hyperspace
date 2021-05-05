@@ -21,8 +21,9 @@ import scala.collection.immutable.HashMap
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.SQLExecution
 import org.apache.spark.sql.execution.datasources.DataSource
+
+import com.microsoft.hyperspace.shim.SQLExecution
 
 object DataFrameWriterExtensions {
 
