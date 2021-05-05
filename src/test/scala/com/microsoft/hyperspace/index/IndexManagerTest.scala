@@ -32,8 +32,7 @@ import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTest extends HyperspaceSuite with SQLHelper {
-  private val sampleParquetDataLocation = "src/test/resources/sampleparquet"
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  private def sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
   private lazy val hyperspace: Hyperspace = new Hyperspace(spark)
@@ -342,7 +341,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
     // 3. Call optimize. Check the metadata. It should not contain small index files created
     // during refresh operations.
     withTempPathAsString { testPath =>
-      withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "900") {
+      withSQLConf(OPTIMIZE_FILE_SIZE_THRESHOLD -> "910") {
         val indexConfig = IndexConfig("index", Seq("RGUID"), Seq("imprs"))
         import spark.implicits._
         val smallData = SampleData.testData

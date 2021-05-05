@@ -27,11 +27,8 @@ import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
-class IndexLogManagerImplTest
-    extends SparkFunSuite
-    with SparkInvolvedSuite
-    with BeforeAndAfterAll {
-  val testRoot = "src/test/resources/indexLogManagerTests"
+class IndexLogManagerImplTest extends HyperspaceSuite {
+  val testRoot = inTempDir("indexLogManagerTests")
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",
     CoveringIndex(
@@ -164,6 +161,35 @@ class IndexLogManagerImplTest
     assert(actual.equals(expected))
     val actualActiveVersions = new IndexLogManagerImpl(path).getIndexVersions(Seq("ACTIVE"))
     assert(actualActiveVersions.equals(Seq(3, 1)))
+  }
+
+  test("testGetLatestStableLog shouldn't return irrelevant previous log.") {
+    val path = new Path(testRoot, UUID.randomUUID().toString)
+    val fs = path.getFileSystem(new Configuration)
+
+    FileUtils.createFile(
+      fs,
+      new Path(path, s"$HYPERSPACE_LOG/8"),
+      JsonUtils.toJson(getEntry("ACTIVE")))
+    FileUtils.createFile(
+      fs,
+      new Path(path, s"$HYPERSPACE_LOG/10"),
+      JsonUtils.toJson(getEntry("VACUUMING")))
+
+    {
+      val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+      assert(actual.isEmpty)
+    }
+
+    FileUtils.createFile(
+      fs,
+      new Path(path, s"$HYPERSPACE_LOG/12"),
+      JsonUtils.toJson(getEntry("CREATING")))
+
+    {
+      val actual = new IndexLogManagerImpl(path).getLatestStableLog()
+      assert(actual.isEmpty)
+    }
   }
 
   test("testUpdateLatestStableLog passes if latestStable.json can be created") {

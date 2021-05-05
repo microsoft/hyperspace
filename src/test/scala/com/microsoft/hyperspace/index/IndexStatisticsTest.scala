@@ -25,9 +25,9 @@ import com.microsoft.hyperspace.TestUtils.logManager
 import com.microsoft.hyperspace.util.FileUtils
 
 class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
-  override val systemPath = new Path("src/test/resources/indexStatsTest")
+  override val indexLocationDirName = "indexStatsTest"
   private val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
-  private val dataPath = "src/test/resources/data/sampleparquet"
+  private val dataPath = inTempDir("sampleparquet")
   private val indexConfig = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private var dataDF: DataFrame = _
   private var hyperspace: Hyperspace = _

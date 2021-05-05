@@ -33,10 +33,9 @@ import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
-  private val testDir = "src/test/resources/e2eTests/"
-  private val nonPartitionedDataPath = testDir + "sampleparquet"
-  private val partitionedDataPath = testDir + "samplepartitionedparquet"
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/indexLocation")
+  private val testDir = inTempDir("e2eTests")
+  private val nonPartitionedDataPath = testDir + "/sampleparquet"
+  private val partitionedDataPath = testDir + "/samplepartitionedparquet"
   private val fileSystem = new Path(nonPartitionedDataPath).getFileSystem(new Configuration)
   private var hyperspace: Hyperspace = _
 

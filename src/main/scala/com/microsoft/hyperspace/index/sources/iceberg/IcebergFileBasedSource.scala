@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index.sources.iceberg
 
-import org.apache.iceberg.spark.source.IcebergSource
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
@@ -28,8 +27,9 @@ import com.microsoft.hyperspace.index.sources.{FileBasedRelation, FileBasedRelat
  * Iceberg file-based source provider.
  *
  * This source can support relations that meet the following criteria:
- *   - The relation is with [[DataSourceV2Relation]]
- *   - The source of [[DataSourceV2Relation]] is an [[IcebergSource]]
+ *   - The relation is with [[DataSourceV2Relation]] or [[DataSourceV2ScanRelation]]
+ *   - The source of [[DataSourceV2Relation]] is an [[IcebergSource]],
+ *     or the table is an Iceberg table.
  */
 class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
 
@@ -41,10 +41,8 @@ class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @param plan Logical plan to check if it's supported.
    * @return Some(true) if the given plan is a supported relation, otherwise None.
    */
-  override def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
-    case _ @DataSourceV2Relation(_: IcebergSource, _, _, _, _) =>
-      Some(true)
-    case _ => None
+  override def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = {
+    Some(IcebergShims.isIcebergRelation(plan)).filter(_ == true)
   }
 
   /**
@@ -56,7 +54,8 @@ class IcebergFileBasedSource(private val spark: SparkSession) extends FileBasedS
    */
   override def getRelation(plan: LogicalPlan): Option[FileBasedRelation] = {
     if (isSupportedRelation(plan).contains(true)) {
-      Some(new IcebergRelation(spark, plan.asInstanceOf[DataSourceV2Relation]))
+      val (table, snapshotId) = IcebergShims.loadIcebergTable(spark, plan)
+      Some(new IcebergRelation(spark, table, snapshotId, plan))
     } else {
       None
     }

@@ -26,10 +26,11 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
+import com.microsoft.hyperspace.shim.JoinWithoutHint
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
+  override val indexLocationDirName = "ruleUtilsTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()
@@ -111,7 +112,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   }
 
   test("Verify get logical relation for non-linear plan.") {
-    val joinNode = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
+    val joinNode = JoinWithoutHint(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
     val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
   }

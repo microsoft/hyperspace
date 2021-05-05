@@ -39,6 +39,9 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.ExplainCommand
 import org.apache.spark.sql.execution.exchange.{Exchange, ReusedExchangeExec}
 
+import com.microsoft.hyperspace.BuildInfo
+import com.microsoft.hyperspace.util.SparkTestShims.SimpleExplainCommand
+
 // scalastyle:off filelinelengthchecker
 /**
  * Check that TPC-DS SparkPlans don't change.
@@ -100,7 +103,7 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
   private def isApproved(dir: File, actualSimplifiedPlan: String): Boolean = {
     val file = new File(dir, "simplified.txt")
     val expected = FileUtils.readFileToString(file, StandardCharsets.UTF_8)
-    expected == actualSimplifiedPlan
+    expected.replaceAll("[\\r\\n]+", "") == actualSimplifiedPlan.replaceAll("[\\r\\n]+", "")
   }
 
   /**
@@ -255,7 +258,7 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
   }
 
   def explainString(queryExecution: QueryExecution): String = {
-    val explain = ExplainCommand(queryExecution.logical, extended = false)
+    val explain = SimpleExplainCommand(queryExecution.logical)
     spark.sessionState
       .executePlan(explain)
       .executedPlan
@@ -269,13 +272,15 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
  * Spark Only Suite.
  */
 class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
-  override val goldenFilePath: String =
-    new File(baseResourcePath, "spark-2.4/approved-plans-v1_4").getAbsolutePath
+  override val goldenFilePath: String = {
+    new File(baseResourcePath, s"spark-${BuildInfo.sparkShortVersion}/approved-plans-v1_4").getAbsolutePath
+  }
 
   // Enable cross join because some queries fail during query optimization phase.
   withSQLConf("spark.sql.crossJoin.enabled" -> "true") {
     tpcdsQueries.foreach { q =>
       test(s"check simplified (tpcds-v1.4/$q)") {
+        assume(BuildInfo.sparkShortVersion == "2.4") // TODO: support Spark 3.0
         testQuery("tpcds/queries", q)
       }
     }

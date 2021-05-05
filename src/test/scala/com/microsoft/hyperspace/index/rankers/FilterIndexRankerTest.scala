@@ -22,12 +22,12 @@ import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
+import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
 import com.microsoft.hyperspace.util.FileUtils
 
 class FilterIndexRankerTest extends HyperspaceRuleSuite {
-  override val systemPath = new Path("src/test/resources/FilterRankerTest")
+  override val indexLocationDirName = "FilterRankerTest"
   var tempPlan: LogicalPlan = _
 
   override def beforeAll(): Unit = {
@@ -45,16 +45,36 @@ class FilterIndexRankerTest extends HyperspaceRuleSuite {
   val t2c1 = AttributeReference("t2c1", IntegerType)()
   val t2c2 = AttributeReference("t2c2", StringType)()
 
-  test("rank() should return the head of the list by default.") {
-    val ind1 = createIndexLogEntry("ind1", Seq(t1c1), Seq(t1c2), tempPlan, writeLog = false)
-    setCommonSourceSizeInBytesTag(ind1, tempPlan, Nil)
-    val ind2 = createIndexLogEntry("ind2", Seq(t1c1), Seq(t1c2), tempPlan, writeLog = false)
-    setCommonSourceSizeInBytesTag(ind2, tempPlan, Nil)
-    val ind3 = createIndexLogEntry("ind3", Seq(t2c1), Seq(t2c2), tempPlan, writeLog = false)
-    setCommonSourceSizeInBytesTag(ind3, tempPlan, Nil)
+  test("rank() should return the index with smallest size by default.") {
+    // Index with only 1 file of size 20
+    val ind1 = createIndexLogEntry(
+      "ind1",
+      Seq(t1c1),
+      Seq(t1c2),
+      tempPlan,
+      writeLog = false,
+      filenames = Seq("f1.parquet", "f2.parquet"))
+
+    // Index with only 2 files of total size 10
+    val ind2 = createIndexLogEntry(
+      "ind2",
+      Seq(t1c1),
+      Seq(t1c2),
+      tempPlan,
+      writeLog = false,
+      filenames = Seq("f1.parquet"))
+
+    // Index with only 3 files of total size 30
+    val ind3 = createIndexLogEntry(
+      "ind3",
+      Seq(t2c1),
+      Seq(t2c2),
+      tempPlan,
+      writeLog = false,
+      filenames = Seq("f1.parquet", "f2.parquet", "f3.parquet"))
 
     val indexes = Seq(ind1, ind2, ind3)
-    assert(FilterIndexRanker.rank(spark, tempPlan, indexes).get.equals(ind1))
+    assert(FilterIndexRanker.rank(spark, tempPlan, indexes).get.equals(ind2))
   }
 
   test(

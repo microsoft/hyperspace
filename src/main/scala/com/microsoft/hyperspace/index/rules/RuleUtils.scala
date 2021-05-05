@@ -271,12 +271,12 @@ object RuleUtils {
         val indexFsRelation = new IndexHadoopFsRelation(
           location,
           new StructType(),
-          StructType(index.schema.filter(relation.plan.schema.contains(_))),
+          StructType(index.schema.filter(relation.schema.contains(_))),
           if (useBucketSpec) Some(index.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput = relation.plan.output
+        val updatedOutput = relation.output
           .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
           .map(_.asInstanceOf[AttributeReference])
         relation.createLogicalRelation(indexFsRelation, updatedOutput)
@@ -369,7 +369,7 @@ object RuleUtils {
         // rows from the deleted files.
         val newSchema = StructType(
           index.schema.filter(s =>
-            relation.plan.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
+            relation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
         def fileIndex: InMemoryFileIndex = {
@@ -390,7 +390,7 @@ object RuleUtils {
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
-        val updatedOutput = relation.plan.output
+        val updatedOutput = relation.output
           .filter(attr => indexFsRelation.schema.fieldNames.contains(attr.name))
           .map(_.asInstanceOf[AttributeReference])
 
@@ -477,9 +477,9 @@ object RuleUtils {
         // Set the same output schema with the index plan to merge them using BucketUnion.
         // Include partition columns for data loading.
         val partitionColumns = relation.partitionSchema.map(_.name)
-        val updatedSchema = StructType(relation.plan.schema.filter(col =>
+        val updatedSchema = StructType(relation.schema.filter(col =>
           index.schema.contains(col) || relation.partitionSchema.contains(col)))
-        val updatedOutput = relation.plan.output
+        val updatedOutput = relation.output
           .filter(attr =>
             index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
           .map(_.asInstanceOf[AttributeReference])

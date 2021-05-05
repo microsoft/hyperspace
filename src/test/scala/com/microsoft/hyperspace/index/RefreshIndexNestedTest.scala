@@ -32,10 +32,9 @@ import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
  * Unit E2E test cases for RefreshIndex.
  */
 class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
-  override val systemPath = new Path("src/test/resources/indexLocation")
-  private val testDir = "src/test/resources/RefreshIndexDeleteTests/"
-  private val nonPartitionedDataPath = testDir + "nonpartitioned"
-  private val partitionedDataPath = testDir + "partitioned"
+  private val testDir = inTempDir("RefreshIndexDeleteTests")
+  private val nonPartitionedDataPath = testDir + "/nonpartitioned"
+  private val partitionedDataPath = testDir + "/partitioned"
   private val indexConfig = IndexConfig("index1", Seq("nested.leaf.id"), Seq("nested.leaf.cnt"))
   private var hyperspace: Hyperspace = _
 
