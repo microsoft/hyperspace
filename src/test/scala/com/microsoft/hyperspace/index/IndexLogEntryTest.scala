@@ -261,7 +261,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
 
     def theFunction: (FileInfo, Path) => Path = (f, prefix) => new Path(prefix, f.name)
 
-    val res = Content.recFilesApply(new Path("file:/"), directory, theFunction)
+    val res = Content.applyToFilesRecursively(new Path("file:/"), directory, theFunction)
 
     val expected =
       Seq("file:/f0", "file:/a/f1", "file:/a/f2", "file:/a/b/f3", "file:/a/b/f4")
@@ -275,7 +275,7 @@ class IndexLogEntryTest extends SparkFunSuite with SQLHelper with BeforeAndAfter
   test("Content.recFilesApply returns empty list for directories without files.") {
     val directory = Directory("file:/")
 
-    val res = Content.recFilesApply(
+    val res = Content.applyToFilesRecursively(
       new Path("file:/"),
       directory,
       (f, prefix) => new Path(prefix, f.name))
