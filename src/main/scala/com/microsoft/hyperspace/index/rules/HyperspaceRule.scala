@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.HyperspaceOneRule.PlanToIndexesMap
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
 
 /**
  * Interface of exclusive type of indexes.

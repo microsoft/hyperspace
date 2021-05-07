@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.HyperspaceOneRule.PlanToIndexesMap
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
 
 /**
@@ -86,7 +86,7 @@ class ScoreBasedIndexApplication {
 /**
  * Transform the given plan to use Hyperspace indexes.
  */
-object HyperspaceOneRule
+object ApplyHyperspace
     extends Rule[LogicalPlan]
     with Logging
     with HyperspaceEventLogging
