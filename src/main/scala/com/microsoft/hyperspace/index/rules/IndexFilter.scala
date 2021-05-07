@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToCandidateIndexesMap, PlanToSelectedIndexMap}
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 
 trait IndexFilter {
 
@@ -59,7 +59,7 @@ trait QueryPlanIndexFilter extends IndexFilter with ActiveSparkSession {
    */
   def apply(
       plan: LogicalPlan,
-      candidateIndexes: PlanToCandidateIndexesMap): PlanToCandidateIndexesMap
+      candidateIndexes: PlanToIndexesMap): PlanToIndexesMap
 }
 
 /**
@@ -76,5 +76,5 @@ trait RankerIndexFilter extends IndexFilter with ActiveSparkSession {
    */
   def apply(
       plan: LogicalPlan,
-      applicableIndexes: PlanToCandidateIndexesMap): PlanToSelectedIndexMap
+      applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap
 }

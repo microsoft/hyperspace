@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
-import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToCandidateIndexesMap, PlanToSelectedIndexMap}
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 
 /**
  * Interface of exclusive type of indexes.
@@ -60,7 +60,7 @@ trait HyperspaceRule extends ActiveSparkSession {
 
   final def apply(
       plan: LogicalPlan,
-      candidateIndexes: PlanToCandidateIndexesMap): (LogicalPlan, Int) = {
+      candidateIndexes: PlanToIndexesMap): (LogicalPlan, Int) = {
     if (candidateIndexes.isEmpty) {
       return (plan, 0)
     }
@@ -87,7 +87,7 @@ object NoOpRule extends HyperspaceRule {
   object FilterAll extends QueryPlanIndexFilter {
     override def apply(
         plan: LogicalPlan,
-        candidateIndexes: PlanToCandidateIndexesMap): PlanToCandidateIndexesMap = Map.empty
+        candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = Map.empty
     override def reason: String = "NoOpRule"
   }
 
