@@ -74,9 +74,7 @@ class ScoreBasedIndexPlanOptimizer {
   // and its value is a pair of best transformed plan and its score.
   private val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
 
-  private def recApply(
-      plan: LogicalPlan,
-      indexes: PlanToIndexesMap): (LogicalPlan, Int) = {
+  private def recApply(plan: LogicalPlan, indexes: PlanToIndexesMap): (LogicalPlan, Int) = {
     // If pre-calculated value exists, return it.
     scoreMap.get(plan).foreach(res => return res)
 

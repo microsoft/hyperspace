@@ -58,9 +58,7 @@ trait HyperspaceRule extends ActiveSparkSession {
    */
   def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int
 
-  final def apply(
-      plan: LogicalPlan,
-      candidateIndexes: PlanToIndexesMap): (LogicalPlan, Int) = {
+  final def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): (LogicalPlan, Int) = {
     if (candidateIndexes.isEmpty) {
       return (plan, 0)
     }
@@ -85,9 +83,8 @@ trait HyperspaceRule extends ActiveSparkSession {
 object NoOpRule extends HyperspaceRule {
 
   object FilterAll extends QueryPlanIndexFilter {
-    override def apply(
-        plan: LogicalPlan,
-        candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = Map.empty
+    override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap =
+      Map.empty
     override def reason: String = "NoOpRule"
   }
 

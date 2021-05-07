@@ -57,9 +57,7 @@ trait QueryPlanIndexFilter extends IndexFilter with ActiveSparkSession {
    * @param candidateIndexes Map of source plan to candidate indexes
    * @return Map of source plan to applicable indexes which meet conditions of Filter
    */
-  def apply(
-      plan: LogicalPlan,
-      candidateIndexes: PlanToIndexesMap): PlanToIndexesMap
+  def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap
 }
 
 /**
@@ -74,7 +72,5 @@ trait RankerIndexFilter extends IndexFilter with ActiveSparkSession {
    * @param applicableIndexes Map of source plan to applicable indexes
    * @return Map of source plan to selected index
    */
-  def apply(
-      plan: LogicalPlan,
-      applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap
+  def apply(plan: LogicalPlan, applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap
 }
