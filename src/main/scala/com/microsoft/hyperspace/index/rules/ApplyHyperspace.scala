@@ -91,11 +91,11 @@ class ScoreBasedIndexPlanOptimizer {
    * Transform the given query plan to use selected indexes based on score.
    *
    * @param plan Original query plan
-   * @param indexes Map of source plan to candidate indexes
+   * @param candidateIndexes Map of source plan to candidate indexes
    * @return Transformed plan using selected indexes based on score
    */
-  def apply(plan: LogicalPlan, indexes: PlanToCandidateIndexesMap): LogicalPlan = {
-    recApply(plan, indexes)._1
+  def apply(plan: LogicalPlan, candidateIndexes: PlanToCandidateIndexesMap): LogicalPlan = {
+    recApply(plan, candidateIndexes)._1
   }
 }
 

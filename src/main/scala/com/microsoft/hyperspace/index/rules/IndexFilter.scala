@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToCandidateIndexesMap
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToCandidateIndexesMap, PlanToSelectedIndexMap}
 
 trait IndexFilter {
 
@@ -53,9 +53,28 @@ trait QueryPlanIndexFilter extends IndexFilter with ActiveSparkSession {
   /**
    * Filter out candidate indexes for the given query plan.
    *
-   * @param plan Query plan.
-   * @param indexes Map of source plan to candidate indexes.
-   * @return Map of source plan to indexes which meet conditions of Filter.
+   * @param plan Query plan
+   * @param candidateIndexes Map of source plan to candidate indexes
+   * @return Map of source plan to applicable indexes which meet conditions of Filter
    */
-  def apply(plan: LogicalPlan, indexes: PlanToCandidateIndexesMap): PlanToCandidateIndexesMap
+  def apply(
+      plan: LogicalPlan,
+      candidateIndexes: PlanToCandidateIndexesMap): PlanToCandidateIndexesMap
+}
+
+/**
+ * IndexFilter used in ranking applicable indexes.
+ */
+trait RankerIndexFilter extends IndexFilter with ActiveSparkSession {
+
+  /**
+   * Rank best index for the given query plan.
+   *
+   * @param plan Query plan
+   * @param applicableIndexes Map of source plan to applicable indexes
+   * @return Map of source plan to selected index
+   */
+  def apply(
+      plan: LogicalPlan,
+      applicableIndexes: PlanToCandidateIndexesMap): PlanToSelectedIndexMap
 }

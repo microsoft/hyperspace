@@ -19,7 +19,6 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
-import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToCandidateIndexesMap, PlanToSelectedIndexMap}
 
 /**
@@ -35,7 +34,13 @@ trait HyperspaceRule extends ActiveSparkSession {
   val filtersOnQueryPlan: Seq[QueryPlanIndexFilter]
 
   /**
-   * Transform the plan to use the selected indexes after applying [[filtersOnQueryPlan]].
+   * Index ranker to select the best index among applicable indexes
+   * after applying [[filtersOnQueryPlan]]s.
+   */
+  val indexRanker: RankerIndexFilter
+
+  /**
+   * Transform the plan to use the selected indexes.
    * All selected indexes should be able to be applied to the plan.
    *
    * @param plan Original query plan.
@@ -53,23 +58,20 @@ trait HyperspaceRule extends ActiveSparkSession {
    */
   def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int
 
-  final def apply(plan: LogicalPlan, indexes: PlanToCandidateIndexesMap): (LogicalPlan, Int) = {
-    if (indexes.isEmpty) {
+  final def apply(
+      plan: LogicalPlan,
+      candidateIndexes: PlanToCandidateIndexesMap): (LogicalPlan, Int) = {
+    if (candidateIndexes.isEmpty) {
       return (plan, 0)
     }
 
-    val selectedIndexes = filtersOnQueryPlan
-      .foldLeft(indexes) { (pti, filter) =>
+    val applicableIndexes = filtersOnQueryPlan
+      .foldLeft(candidateIndexes) { (pti, filter) =>
         filter(plan, pti)
       }
-      .map { kv =>
-        // After applying filtersOnQueryPlan, each candidate relation should have
-        // one candidate index.
-        assert(kv._2.length == 1)
-        (kv._1, kv._2.head)
-      }
 
-    if (selectedIndexes.nonEmpty) {
+    if (applicableIndexes.nonEmpty) {
+      val selectedIndexes = indexRanker(applicableIndexes)
       (applyIndex(plan, selectedIndexes), score(plan, selectedIndexes))
     } else {
       (plan, 0)
@@ -81,7 +83,18 @@ trait HyperspaceRule extends ActiveSparkSession {
  * No-op rule for traversal.
  */
 object NoOpRule extends HyperspaceRule {
-  override val filtersOnQueryPlan = Nil
+
+  object FilterAll extends QueryPlanIndexFilter {
+    override def apply(
+        plan: LogicalPlan,
+        candidateIndexes: PlanToCandidateIndexesMap): PlanToCandidateIndexesMap = Map.empty
+    override def reason: String = "NoOpRule"
+  }
+
+  override val filtersOnQueryPlan = FilterAll :: Nil
+
+  // As there's no applicable index after [[FilterAll]], indexRanker is not reachable.
+  override val indexRanker = null
 
   override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = plan
 
