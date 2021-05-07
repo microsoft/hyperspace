@@ -71,7 +71,7 @@ trait HyperspaceRule extends ActiveSparkSession {
       }
 
     if (applicableIndexes.nonEmpty) {
-      val selectedIndexes = indexRanker(applicableIndexes)
+      val selectedIndexes = indexRanker(plan, applicableIndexes)
       (applyIndex(plan, selectedIndexes), score(plan, selectedIndexes))
     } else {
       (plan, 0)
