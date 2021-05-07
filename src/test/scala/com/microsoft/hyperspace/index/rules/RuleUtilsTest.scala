@@ -17,7 +17,8 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
@@ -151,7 +152,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
               (if (hybridScanDeleteEnabled) "0.99" else "0")) {
             val ruleHelper = new BaseRuleHelper(spark)
-            val relation = ruleHelper.getRelation(plan).get
+            val relation = RuleUtils.getRelation(plan).get
             val indexes = ruleHelper
               .getCandidateIndexes(allIndexes, relation)
             if (expectedCandidateIndexes.nonEmpty) {
@@ -284,7 +285,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
         df.limit(5).write.mode("append").parquet(dataPath)
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
         val ruleHelper = new BaseRuleHelper(spark)
-        val relation = ruleHelper.getRelation(optimizedPlan).get
+        val relation = RuleUtils.getRelation(optimizedPlan).get
 
         withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {

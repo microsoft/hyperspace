@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, Inde
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class BaseRuleHelperTest extends HyperspaceRuleSuite with SQLHelper {
-  override val systemPath = PathUtils.makeAbsolute("src/test/resources/ruleUtilsTest")
+  override val indexLocationDirName = "ruleUtilsTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
   val t1c2 = AttributeReference("t1c2", StringType)()

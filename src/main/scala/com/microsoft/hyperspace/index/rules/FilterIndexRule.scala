@@ -118,37 +118,36 @@ object FilterIndexRule
         //  See https://github.com/microsoft/hyperspace/issues/65
         val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-        val resolvedOutputColumnsOpt = ResolverUtils.resolve(
+        val resolvedOutputColumns = ResolverUtils.resolve(
           spark,
           outputColumns,
           plan,
           ResolverUtils.resolveWithChildren,
           throwIfNotInSchema = false)
-        val resolvedFilterColumnsOpt = ResolverUtils.resolve(
+            .map(_.map(_.normalizedName))
+            .getOrElse(outputColumns)
+        val resolvedFilterColumns = ResolverUtils.resolve(
           spark,
           filterColumns,
           plan,
           ResolverUtils.resolveWithChildren,
           throwIfNotInSchema = false)
+            .map(_.map(_.normalizedName))
+            .getOrElse(filterColumns)
 
-        (resolvedOutputColumnsOpt, resolvedFilterColumnsOpt) match {
-          case (Some(resolvedOutputColumns), Some(resolvedFilterColumns)) =>
-            val candidateIndexes = allIndexes.filter { index =>
-              indexCoversPlan(
-                resolvedOutputColumns.map(_.normalizedName),
-                resolvedFilterColumns.map(_.normalizedName),
-                index.indexedColumns,
-                index.includedColumns)
-            }
-
-            // Get candidate via file-level metadata validation. This is performed after pruning
-            // by column schema, as this might be expensive when there are numerous files in the
-            // relation or many indexes to be checked.
-            new BaseRuleHelper(spark).getCandidateIndexes(candidateIndexes, r)
-
-          case _ =>
-            Seq.empty
+        val candidateIndexes = allIndexes.filter { index =>
+          indexCoversPlan(
+            resolvedOutputColumns,
+            resolvedFilterColumns,
+            index.indexedColumns,
+            index.includedColumns)
         }
+
+        // Get candidate via file-level metadata validation. This is performed after pruning
+        // by column schema, as this might be expensive when there are numerous files in the
+        // relation or many indexes to be checked.
+        new BaseRuleHelper(spark).getCandidateIndexes(candidateIndexes, r)
+
       case _ =>
         // There is zero or more than one supported relations in Filter's sub-plan.
         Seq.empty

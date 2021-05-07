@@ -80,13 +80,14 @@ object PlanUtils {
    * @return A field name `.` (dot) separated if nested.
    */
   def getChildNameFromStruct(field: GetStructField): String = {
+    val name = field.name.getOrElse(field.childSchema(field.ordinal).name)
     field.child match {
       case f: GetStructField =>
-        s"${getChildNameFromStruct(f)}.${field.name.get}"
+        s"${getChildNameFromStruct(f)}.$name"
       case a: AttributeReference =>
-        s"${a.name}.${field.name.get}"
+        s"${a.name}.$name"
       case _ =>
-        s"${field.name.get}"
+        name
     }
   }
 
