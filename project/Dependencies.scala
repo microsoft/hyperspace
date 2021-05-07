@@ -24,11 +24,14 @@ object Dependencies {
       "org.apache.spark" %% "spark-core" % sv % "provided" withSources (),
       "org.apache.spark" %% "spark-sql" % sv % "provided" withSources (),
       // Test dependencies
-      "org.scalatest" %% "scalatest" % "3.0.5" % "test",
       "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
       "org.apache.spark" %% "spark-catalyst" % sv % "test" classifier "tests",
       "org.apache.spark" %% "spark-core" % sv % "test" classifier "tests",
       "org.apache.spark" %% "spark-sql" % sv % "test" classifier "tests") ++
+      (if (sparkVersion < Version(3, 1, 0))
+         Seq("org.scalatest" %% "scalatest" % "3.0.5" % "test")
+       else
+         Seq("org.scalatest" %% "scalatest" % "3.2.7" % "test")) ++
       (if (sparkVersion < Version(3, 0, 0))
          Seq(
            "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
