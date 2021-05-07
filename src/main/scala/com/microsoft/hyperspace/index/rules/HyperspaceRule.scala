@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToCandidateIndexesMap, PlanToSelectedIndexMap}
 
 /**
  * Interface of exclusive type of indexes.
@@ -28,9 +28,9 @@ import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
 trait HyperspaceRule extends ActiveSparkSession {
 
   /**
-   * Sequence of conditions to apply indexes. Each filter contains conditions and
-   * filter out candidate indexes based on the conditions. The order of the sequence does matter
-   * because they are applied in order with the assumption that previous filter conditions met.
+   * Sequence of conditions to apply indexes to the plan. Each filter contains conditions and
+   * filters out candidate indexes based on the conditions. The order of the sequence does matter
+   * because they are applied in order with the assumption that previous filter conditions were met.
    */
   val filtersOnQueryPlan: Seq[QueryPlanIndexFilter]
 
@@ -42,7 +42,7 @@ trait HyperspaceRule extends ActiveSparkSession {
    * @param indexes Selected indexes.
    * @return Transformed plan to use the selected indexes.
    */
-  def applyIndex(plan: LogicalPlan, indexes: Map[LogicalPlan, IndexLogEntry]): LogicalPlan
+  def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan
 
   /**
    * Calculate the score of the selected indexes.
@@ -51,9 +51,9 @@ trait HyperspaceRule extends ActiveSparkSession {
    * @param indexes Selected indexes.
    * @return Score of selected indexes.
    */
-  def score(plan: LogicalPlan, indexes: Map[LogicalPlan, IndexLogEntry]): Int
+  def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int
 
-  final def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): (LogicalPlan, Int) = {
+  final def apply(plan: LogicalPlan, indexes: PlanToCandidateIndexesMap): (LogicalPlan, Int) = {
     if (indexes.isEmpty) {
       return (plan, 0)
     }
@@ -83,9 +83,7 @@ trait HyperspaceRule extends ActiveSparkSession {
 object NoOpRule extends HyperspaceRule {
   override val filtersOnQueryPlan = Nil
 
-  override def applyIndex(
-      plan: LogicalPlan,
-      indexes: Map[LogicalPlan, IndexLogEntry]): LogicalPlan = plan
+  override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = plan
 
-  override def score(plan: LogicalPlan, indexes: Map[LogicalPlan, IndexLogEntry]): Int = 0
+  override def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int = 0
 }

@@ -25,11 +25,11 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToCandidateIndexesMap
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
 
 /**
- * Collect candidate indexes for each relation.
+ * Collect candidate indexes for each source plan.
  */
 object CandidateIndexCollector extends ActiveSparkSession {
   // TODO: ColumnSchemaFilter :: FileSignatureFilter :: Nil
@@ -37,7 +37,7 @@ object CandidateIndexCollector extends ActiveSparkSession {
 
   private def initializePlanToIndexes(
       plan: LogicalPlan,
-      indexes: Seq[IndexLogEntry]): PlanToIndexesMap = {
+      indexes: Seq[IndexLogEntry]): PlanToCandidateIndexesMap = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     plan.collect {
       case l: LeafNode if provider.isSupportedRelation(l) =>
@@ -45,11 +45,18 @@ object CandidateIndexCollector extends ActiveSparkSession {
     }.toMap
   }
 
-  def apply(plan: LogicalPlan, allIndexes: Seq[IndexLogEntry]): PlanToIndexesMap = {
+  /**
+   * Extract candidate indexes for each source plan in the given query plan.
+   *
+   * @param plan Original query plan
+   * @param allIndexes All indexes
+   * @return Map of source plan to candidate indexes
+   */
+  def apply(plan: LogicalPlan, allIndexes: Seq[IndexLogEntry]): PlanToCandidateIndexesMap = {
     val planToIndexes = initializePlanToIndexes(plan, allIndexes)
     planToIndexes.flatMap {
-      case (node, candidateIndexes) =>
-        Some(node, sourceFilters.foldLeft(candidateIndexes) { (indexes, filter) =>
+      case (node, allIndexes) =>
+        Some(node, sourceFilters.foldLeft(allIndexes) { (indexes, filter) =>
           filter(node, indexes)
         }).filter(_._2.nonEmpty)
     }
@@ -59,15 +66,17 @@ object CandidateIndexCollector extends ActiveSparkSession {
 /**
  * Apply Hyperspace indexes based on the score of each index application.
  */
-class ScoreBasedIndexApplication {
+class ScoreBasedIndexPlanOptimizer {
   // TODO: FilterIndexRule :: JoinIndexRule :: Nil
-  private val rules = NoOpRule :: Nil
+  private val rules: Seq[HyperspaceRule] = NoOpRule :: Nil
 
   // Map for memoization. The key is the logical plan before applying [[HyperspaceRule]]s
   // and its value is a pair of best transformed plan and its score.
   private val scoreMap: mutable.HashMap[LogicalPlan, (LogicalPlan, Int)] = mutable.HashMap()
 
-  private def recApply(plan: LogicalPlan, indexes: PlanToIndexesMap): (LogicalPlan, Int) = {
+  private def recApply(
+      plan: LogicalPlan,
+      indexes: PlanToCandidateIndexesMap): (LogicalPlan, Int) = {
     // If pre-calculated value exists, return it.
     scoreMap.get(plan).foreach(res => return res)
 
@@ -78,7 +87,14 @@ class ScoreBasedIndexApplication {
     optResult
   }
 
-  def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): LogicalPlan = {
+  /**
+   * Transform the given query plan to use selected indexes based on score.
+   *
+   * @param plan Original query plan
+   * @param indexes Map of source plan to candidate indexes
+   * @return Transformed plan using selected indexes based on score
+   */
+  def apply(plan: LogicalPlan, indexes: PlanToCandidateIndexesMap): LogicalPlan = {
     recApply(plan, indexes)._1
   }
 }
@@ -92,7 +108,8 @@ object ApplyHyperspace
     with HyperspaceEventLogging
     with ActiveSparkSession {
 
-  type PlanToIndexesMap = Map[LogicalPlan, Seq[IndexLogEntry]]
+  type PlanToCandidateIndexesMap = Map[LogicalPlan, Seq[IndexLogEntry]]
+  type PlanToSelectedIndexMap = Map[LogicalPlan, IndexLogEntry]
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
     val indexManager = Hyperspace
@@ -104,10 +121,10 @@ object ApplyHyperspace
     } else {
       try {
         val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
-        new ScoreBasedIndexApplication().apply(plan, candidateIndexes)
+        new ScoreBasedIndexPlanOptimizer().apply(plan, candidateIndexes)
       } catch {
         case e: Exception =>
-          logWarning("Cannot apply hyperspace indexes: " + e.getMessage)
+          logWarning("Cannot apply Hyperspace indexes: " + e.getMessage)
           plan
       }
     }
