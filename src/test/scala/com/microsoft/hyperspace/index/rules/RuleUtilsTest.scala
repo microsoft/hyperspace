@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
-import com.microsoft.hyperspace.shim.JoinWithoutHint
+import com.microsoft.hyperspace.shim.{JoinWithoutHint, RepartitionByExpressionWithOptionalNumPartitions}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
@@ -335,7 +335,10 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
       // should be transformed to:
       //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
       assert(shuffled.collect {
-        case RepartitionByExpression(attrs, p: Project, numBuckets) =>
+        case RepartitionByExpressionWithOptionalNumPartitions(
+              attrs,
+              p: Project,
+              Some(numBuckets)) =>
           assert(numBuckets == 100)
           assert(attrs.size == 1)
           assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
@@ -362,7 +365,12 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
           bucketSpec2,
           query2.queryExecution.optimizedPlan)
       assert(shuffled2.collect {
-        case Project(_, RepartitionByExpression(attrs, _: Filter, numBuckets)) =>
+        case Project(
+              _,
+              RepartitionByExpressionWithOptionalNumPartitions(
+                attrs,
+                _: Filter,
+                Some(numBuckets))) =>
           assert(numBuckets == 100)
           assert(attrs.size == 1)
           assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))

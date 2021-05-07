@@ -150,31 +150,35 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
         .write
         .parquet(path2)
 
-      Seq(
-        (spark.read.format("parquet").load(path1), Seq(path1), 2),
-        (spark.read.format("parquet").load(path1, path2), Seq(path1, path2), 5),
-        (spark.read.parquet(path1), Seq(path1), 2),
-        (spark.read.parquet(path1, path2), Seq(path1, path2), 5),
-        (spark.read.parquet(path1, path1, path1), Seq(path1, path1, path1), 6),
-        (spark.read.format("parquet").option("path", path1).load(path1), Seq(path1), 2),
-        (spark.read.format("parquet").option("path", path1).load(path2), Seq(path2), 3),
-        (spark.read.option("path", path1).parquet(path1), Seq(path1, path1), 4),
-        (spark.read.option("path", path1).parquet(path2), Seq(path1, path2), 5),
-        (
-          spark.read.format("parquet").option("path", path1).load(path1, path2),
-          Seq(path1, path1, path2),
-          7),
-        (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
-        .foreach {
-          case (df, expectedPaths, expectedCount) =>
-            val relation = CreateActionBaseWrapper.getSourceRelations(df).head
-            def normalize(path: String): String = {
-              new Path(path).toUri.getPath
-            }
-            assert(relation.rootPaths.map(normalize) == expectedPaths.map(normalize))
-            assert(df.count == expectedCount)
-            assert(!relation.options.isDefinedAt("path"))
-        }
+      // For Spark 3.1 - pathOptionBehavior must be enabled manually
+      // for inconsistent use of option("path") and load(paths...)
+      withSQLConf("spark.sql.legacy.pathOptionBehavior.enabled" -> "true") {
+        Seq(
+          (spark.read.format("parquet").load(path1), Seq(path1), 2),
+          (spark.read.format("parquet").load(path1, path2), Seq(path1, path2), 5),
+          (spark.read.parquet(path1), Seq(path1), 2),
+          (spark.read.parquet(path1, path2), Seq(path1, path2), 5),
+          (spark.read.parquet(path1, path1, path1), Seq(path1, path1, path1), 6),
+          (spark.read.format("parquet").option("path", path1).load(path1), Seq(path1), 2),
+          (spark.read.format("parquet").option("path", path1).load(path2), Seq(path2), 3),
+          (spark.read.option("path", path1).parquet(path1), Seq(path1, path1), 4),
+          (spark.read.option("path", path1).parquet(path2), Seq(path1, path2), 5),
+          (
+            spark.read.format("parquet").option("path", path1).load(path1, path2),
+            Seq(path1, path1, path2),
+            7),
+          (spark.read.option("path", path1).parquet(path1, path2), Seq(path1, path1, path2), 7))
+          .foreach {
+            case (df, expectedPaths, expectedCount) =>
+              val relation = CreateActionBaseWrapper.getSourceRelations(df).head
+              def normalize(path: String): String = {
+                new Path(path).toUri.getPath
+              }
+              assert(relation.rootPaths.map(normalize) == expectedPaths.map(normalize))
+              assert(df.count == expectedCount)
+              assert(!relation.options.isDefinedAt("path"))
+          }
+      }
     }
   }
 }

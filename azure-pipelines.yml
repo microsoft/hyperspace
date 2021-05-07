@@ -81,6 +81,29 @@ jobs:
             artifactName: 'hyperspace-core_spark3.0'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.0/'
 
+  - job: Build_Spark3_1_2_12
+    displayName: 'Build sources and run unit tests for Spark 3.1 / Scala 2.12'
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
+      - script: sbt ++2.12.8 "project spark3_1" clean update compile test
+        displayName: 'Running $sbt clean & update & compile & test'
+      # If not a pull request, publish artifacts.
+      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
+        - script: sbt ++2.12.8 "project spark3_1" package
+          displayName: 'Running $sbt package'
+        - task: CopyFiles@2
+          displayName: 'Copy hyperspace-core JAR'
+          inputs:
+            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            contents: '**/*.jar'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.1/'
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish Hyperspace artifacts'
+          inputs:
+            artifactName: 'hyperspace-core_spark3.1'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.1/'
+
   - job: PythonTest
     displayName: 'Run Python tests'
     pool:
