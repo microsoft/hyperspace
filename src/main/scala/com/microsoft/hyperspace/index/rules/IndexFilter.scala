@@ -102,6 +102,21 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
  * Check if an index can leverage source data of the given source plan.
  */
 object FileSignatureFilter extends SourcePlanIndexFilter {
+
+  /**
+   * Filter the given indexes by matching signatures.
+   *
+   * If Hybrid Scan is enabled, it compares the file metadata directly, and does not
+   * match signatures. By doing that, we could perform file-level comparison between
+   * index data files and the input files of the given plan. If appended files and
+   * deleted files are less than threshold configs, the index is not filtered out.
+   * Also, HYBRIDSCAN_REQUIRED tag is set as true if there is any of appended or deleted files,
+   * for the plan transformation function in application step.
+   *
+   * @param plan Source plan
+   * @param indexes Indexes
+   * @return Indexes which meet conditions of Filter
+   */
   override def apply(plan: LogicalPlan, indexes: Seq[IndexLogEntry]): Seq[IndexLogEntry] = {
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
