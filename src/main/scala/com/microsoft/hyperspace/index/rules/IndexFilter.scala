@@ -94,16 +94,16 @@ trait IndexRankFilter extends IndexFilter with ActiveSparkSession {
 }
 
 /**
- * Check if an index contains all output columns of the given source plan.
+ * Check if the given source plan contains all index columns.
  */
 object ColumnSchemaFilter extends SourcePlanIndexFilter {
   override def apply(plan: LogicalPlan, indexes: Seq[IndexLogEntry]): Seq[IndexLogEntry] = {
     val relationColumnNames = plan.output.map(_.name)
+
     indexes.filter { index =>
-      // implicit val reasonTagKey = (plan, index)
       withReasonStringTag(
-        s"Column Schema doesn't match. " +
-          s"Required columns: [${relationColumnNames.mkString(", ")}], " +
+        s"Column Schema does not match. " +
+          s"Relation columns: [${relationColumnNames.mkString(", ")}], " +
           s"Index columns: [${index.indexedColumns ++ index.includedColumns.mkString(", ")}]") {
         ResolverUtils
           .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnNames)
@@ -200,7 +200,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
     //  See https://github.com/microsoft/hyperspace/issues/158
 
     val entry = relation.closestIndex(index)
-    // Tag to original index log entry to check the reason string with the latest entry.
+    // Tag to original index log entry to check the reason string with the given log entry.
     implicit val reasonTagKey = (relation.plan, index)
 
     val isHybridScanCandidate =
@@ -222,25 +222,25 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
           withReasonStringTag("Lineage column does not exist.")(entry.hasLineageColumn)
         lazy val hasCommonFilesCond = withReasonStringTag("No common files.")(commonCnt > 0)
         lazy val appendThresholdCond = withReasonStringTag(
-          s"appended bytes ratio ($appendedBytesRatio) is larger than " +
+          s"Appended bytes ratio ($appendedBytesRatio) is larger than " +
             s"threshold config ${HyperspaceConf.hybridScanAppendedRatioThreshold(spark)}") {
           appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
         }
         lazy val deleteThresholdCond = withReasonStringTag(
-          s"deleted bytes ratio ($deletedBytesRatio) is larger than " +
+          s"Deleted bytes ratio ($deletedBytesRatio) is larger than " +
             s"threshold config ${HyperspaceConf.hybridScanDeletedRatioThreshold(spark)}") {
-          appendedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
+          deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
         }
-
-        val isAppendAndDeleteCandidate = hasLineageColumnCond &&
-          hasCommonFilesCond && appendThresholdCond && deleteThresholdCond
 
         // For append-only Hybrid Scan, deleted files are not allowed.
         val deletedCnt = entry.sourceFileInfoSet.size - commonCnt
-        lazy val isAppendOnlyCandidate = deletedCnt == 0 && hasCommonFilesCond &&
-          appendThresholdCond
 
-        val isCandidate = isAppendAndDeleteCandidate || isAppendOnlyCandidate
+        val isCandidate = if (deletedCnt == 0) {
+          hasCommonFilesCond && appendThresholdCond
+        } else {
+          hasLineageColumnCond && hasCommonFilesCond && appendThresholdCond && deleteThresholdCond
+        }
+
         if (isCandidate) {
           entry.setTagValue(
             relation.plan,
