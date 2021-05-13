@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 trait IndexFilter {
 
-  def setReasonString(condition: Boolean, reasonString: => String)(
+  protected def setReasonTag(condition: Boolean, reasonString: => String)(
       implicit keyPair: (LogicalPlan, IndexLogEntry)): Unit = {
     if (!condition && ApplyHyperspace.whyNotEnabled) {
       val (plan, index) = keyPair
@@ -40,10 +40,10 @@ trait IndexFilter {
     }
   }
 
-  def withReasonStringTag(reasonString: => String)(f: => Boolean)(
+  protected def withReasonTag(reasonString: => String)(f: => Boolean)(
       implicit keyPair: (LogicalPlan, IndexLogEntry)): Boolean = {
     val ret = f
-    setReasonString(ret, reasonString)(keyPair)
+    setReasonTag(ret, reasonString)(keyPair)
     ret
   }
 }
@@ -101,7 +101,7 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
     val relationColumnNames = plan.output.map(_.name)
 
     indexes.filter { index =>
-      withReasonStringTag(
+      withReasonTag(
         s"Column Schema does not match. " +
           s"Relation columns: [${relationColumnNames.mkString(", ")}], " +
           s"Index columns: [${index.indexedColumns ++ index.includedColumns.mkString(", ")}]") {
@@ -146,7 +146,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
       // Map of a signature provider to a signature generated for the given plan.
       val signatureMap = mutable.Map[String, Option[String]]()
       indexes.filter { index =>
-        withReasonStringTag(s"Index signature does not match. Try Hybrid Scan or refreshIndex.") {
+        withReasonTag(s"Index signature does not match. Try Hybrid Scan or refreshIndex.") {
           signatureValid(relation, index, signatureMap)
         }(plan, index)
       }
@@ -219,14 +219,14 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
         val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
 
         lazy val hasLineageColumnCond =
-          withReasonStringTag("Lineage column does not exist.")(entry.hasLineageColumn)
-        lazy val hasCommonFilesCond = withReasonStringTag("No common files.")(commonCnt > 0)
-        lazy val appendThresholdCond = withReasonStringTag(
+          withReasonTag("Lineage column does not exist.")(entry.hasLineageColumn)
+        lazy val hasCommonFilesCond = withReasonTag("No common files.")(commonCnt > 0)
+        lazy val appendThresholdCond = withReasonTag(
           s"Appended bytes ratio ($appendedBytesRatio) is larger than " +
             s"threshold config ${HyperspaceConf.hybridScanAppendedRatioThreshold(spark)}") {
           appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
         }
-        lazy val deleteThresholdCond = withReasonStringTag(
+        lazy val deleteThresholdCond = withReasonTag(
           s"Deleted bytes ratio ($deletedBytesRatio) is larger than " +
             s"threshold config ${HyperspaceConf.hybridScanDeletedRatioThreshold(spark)}") {
           deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
