@@ -28,11 +28,11 @@ import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, P
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
-trait IndexFilter {
+trait IndexFilter extends ActiveSparkSession {
 
   protected def setReasonTag(condition: Boolean, reasonString: => String)(
       implicit keyPair: (LogicalPlan, IndexLogEntry)): Unit = {
-    if (!condition && ApplyHyperspace.whyNotEnabled) {
+    if (!condition && Hyperspace.getContext(spark).whyNotEnabled) {
       val (plan, index) = keyPair
       val prevReason =
         index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).map(_ + "; ").getOrElse("")
@@ -51,7 +51,7 @@ trait IndexFilter {
 /**
  * IndexFilter used in CandidateIndexCollector.
  */
-trait SourcePlanIndexFilter extends IndexFilter with ActiveSparkSession {
+trait SourcePlanIndexFilter extends IndexFilter {
 
   /**
    * Filter out indexes for the given source plan.
@@ -66,7 +66,7 @@ trait SourcePlanIndexFilter extends IndexFilter with ActiveSparkSession {
 /**
  * IndexFilter used in HyperspaceRule.
  */
-trait QueryPlanIndexFilter extends IndexFilter with ActiveSparkSession {
+trait QueryPlanIndexFilter extends IndexFilter {
 
   /**
    * Filter out candidate indexes for the given query plan.
@@ -81,7 +81,7 @@ trait QueryPlanIndexFilter extends IndexFilter with ActiveSparkSession {
 /**
  * IndexFilter used in ranking applicable indexes.
  */
-trait IndexRankFilter extends IndexFilter with ActiveSparkSession {
+trait IndexRankFilter extends IndexFilter {
 
   /**
    * Rank best index for the given query plan.

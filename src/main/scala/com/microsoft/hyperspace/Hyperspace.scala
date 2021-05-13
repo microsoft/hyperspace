@@ -193,4 +193,6 @@ private[hyperspace] class HyperspaceContext(val spark: SparkSession) {
   val indexCollectionManager: IndexManager = CachingIndexCollectionManager(spark)
 
   val sourceProviderManager = new FileBasedSourceProviderManager(spark)
+
+  var whyNotEnabled = false
 }
