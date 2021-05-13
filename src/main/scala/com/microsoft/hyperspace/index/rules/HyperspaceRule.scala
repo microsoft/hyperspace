@@ -85,7 +85,6 @@ object NoOpRule extends HyperspaceRule {
   object FilterAll extends QueryPlanIndexFilter {
     override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap =
       Map.empty
-    override def reason: String = "NoOpRule"
   }
 
   override val filtersOnQueryPlan = FilterAll :: Nil

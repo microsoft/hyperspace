@@ -22,19 +22,13 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.index.{IndexConstants, IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
-trait IndexFilter {
-
-  /**
-   * @return Failure reason for filtered out indexes.
-   */
-  def reason: String
-}
+trait IndexFilter {}
 
 /**
  * IndexFilter used in CandidateIndexCollector.
@@ -92,9 +86,6 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
         .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnsNames)
         .isDefined
     }
-  }
-  override def reason: String = {
-    "Column schema does not match."
   }
 }
 
@@ -232,14 +223,5 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
     } else {
       None
     }
-  }
-
-  override def reason: String = {
-    "Underlying data is changed. Hybrid Scan Configs: \n" +
-      s"${IndexConstants.INDEX_HYBRID_SCAN_ENABLED}: ${HyperspaceConf.hybridScanEnabled(spark)}, " +
-      s"${IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD}: " +
-      s"${HyperspaceConf.hybridScanAppendedRatioThreshold(spark)}, " +
-      s"${IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD}: " +
-      s"${HyperspaceConf.hybridScanDeletedRatioThreshold(spark)}"
   }
 }
