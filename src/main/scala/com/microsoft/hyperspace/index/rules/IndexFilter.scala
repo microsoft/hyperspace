@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index.rules
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
@@ -137,7 +136,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
     val hybridScanEnabled = HyperspaceConf.hybridScanEnabled(spark)
     if (hybridScanEnabled) {
       val relation = provider.getRelation(plan)
-      prepareHybridScanCandidateSelection(spark, relation.plan, indexes)
+      prepareHybridScanCandidateSelection(relation.plan, indexes)
       indexes.flatMap { index =>
         getHybridScanCandidate(relation, index)
       }
@@ -174,7 +173,6 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
   }
 
   private def prepareHybridScanCandidateSelection(
-      spark: SparkSession,
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry]): Unit = {
     assert(HyperspaceConf.hybridScanEnabled(spark))
