@@ -53,4 +53,8 @@ object IndexLogEntryTags {
   // for Hybrid Scan.
   val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
   IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
+
+  // WHYNOT_REASON stores reason string for disqualification.
+  val WHYNOT_REASON: IndexLogEntryTag[String] =
+    IndexLogEntryTag[String]("whyNotReason")
 }

@@ -127,4 +127,7 @@ object ApplyHyperspace
       }
     }
   }
+
+  // TODO Move to another class
+  var whyNotEnabled = false
 }
