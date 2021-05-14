@@ -34,7 +34,7 @@ trait IndexFilter extends ActiveSparkSession {
     val (plan, index) = keyPair
     if (!condition && index.getTagValue(IndexLogEntryTags.WHYNOT_ENABLED).getOrElse(false)) {
       val prevReason =
-        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).getOrElse(Seq.empty)
+        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).getOrElse(Nil)
       index.setTagValue(plan, IndexLogEntryTags.WHYNOT_REASON, prevReason :+ reasonString)
     }
   }
@@ -90,6 +90,17 @@ trait IndexRankFilter extends IndexFilter {
    * @return Map of source plan to selected index
    */
   def apply(plan: LogicalPlan, applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap
+
+  protected def setRankReasonTag(
+      plan: LogicalPlan,
+      indexes: Seq[IndexLogEntry],
+      selectedIndex: IndexLogEntry): Unit = {
+    indexes.foreach { index =>
+      setReasonTag(
+        selectedIndex.name.equals(index.name),
+        s"Another candidate index is applied: ${selectedIndex.name}")(plan, index)
+    }
+  }
 }
 
 /**
