@@ -26,10 +26,33 @@ import com.microsoft.hyperspace.util.ResolverUtils
 object PlanUtils {
 
   /**
-   * The method extract field names from a Spark Catalyst [[Expression]].
+   * The method extract field names from a Spark Catalyst [[Expression]] and
+   * returns them in the [[ExtractedNames]] form so we could know which field names
+   * to keep and which to remove.
+   *
+   * Given a plan like this:
+   * {{{
+   *   Project [Date#89, nested#94.leaf.cnt AS cnt#336, nested#94.leaf.id AS id#337]
+   *   +- Filter ((isnotnull(nested#94) && (nested#94.leaf.cnt > 10)) &&
+   *              (nested#94.leaf.id = leaf_id9))
+   *      +- Relation[Date#89,RGUID#90,Query#91,imprs#92,clicks#93,nested#94] parquet
+   * }}}
+   *
+   * We need to extract the field names that needs to be transformed and which
+   * should be removed. For example the `isnotnull` is not longer needed because:
+   * - The nested field name is not part of the index.
+   * - The `isnotnull` construct checks for a nested field to not be null because
+   *   trying to access the leaves when it's null would end up in exceptions.
+   * - The values stored in the index are not nested, they are flat.
+   *
+   * Executing this on the filter above will result in:
+   * {{{
+   *   ExtractedNames(Set(nested.leaf.cnt, nested.leaf.id), Set(nested))
+   * }}}
    *
    * @param exp The Spark Catalyst expression from which to extract names.
-   * @return A set of distinct field names.
+   * @return An [[ExtractedNames]] object containing the extracted field names
+   *         to keep and the ones to remove.
    */
   def extractNamesFromExpression(exp: Expression): ExtractedNames = {
 
@@ -51,6 +74,8 @@ object PlanUtils {
           extractNames(u.child, prevExpStrTypes :+ "isNotNull")
         case u: UnaryExpression =>
           extractNames(u.child, prevExpStrTypes :+ "unary")
+        case e: Expression =>
+          e.children.flatMap(i => extractNames(i, prevExpStrTypes :+ s"${e.nodeName}")).toSet
         case _ =>
           Set.empty[(String, Seq[String])]
       }
@@ -121,16 +146,16 @@ object PlanUtils {
    *
    * @param parent The parent Spark Catalyst [[Expression]] into which to replace.
    * @param needle The Spark Catalyst [[Expression]] needle to search for.
-   * @param repl The replacement Spark Catalyst [[Expression]].
+   * @param replacement The replacement Spark Catalyst [[Expression]].
    * @return A new Spark Catalyst [[Expression]].
    */
-  def replaceInSearchQuery(
+  def replaceExpression(
       parent: Expression,
       needle: Expression,
-      repl: Expression): Expression = {
+      replacement: Expression): Expression = {
     parent.mapChildren { c =>
       if (c == needle) {
-        repl
+        replacement
       } else {
         c
       }

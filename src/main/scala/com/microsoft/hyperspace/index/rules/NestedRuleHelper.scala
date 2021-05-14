@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, BinaryOperator, ExprId, GetStructField, IsNotNull, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, AttributeReference, BinaryOperator, Expression, ExprId, GetStructField, IsNotNull, NamedExpression, UnaryExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.types.StructType
 
@@ -104,16 +104,28 @@ class NestedRuleHelper(spark: SparkSession) extends BaseRuleHelper(spark) {
    *
    * The filter part should become:
    * {{{
-   *   Filter ((__hs_nested.nested.leaf.cnt#335 > 10) &&
-   *           (__hs_nested.nested#.leaf.id#336 = leaf_id9))
+   *   Filter (isnotnull(__hs_nested.nested.leaf.cnt#335) &&
+   *           isnotnull(__hs_nested.nested.leaf.id#335) &&
+   *           __hs_nested.nested.leaf.cnt#335 > 10) &&
+   *           __hs_nested.nested#.leaf.id#336 = leaf_id9))
    * }}}
    *
    * @param filter The filter that needs to be transformed.
    * @return The transformed filter with support for nested indexed fields.
    */
   protected[rules] def transformFilter(filter: Filter): Filter = {
+
+    def transformGetStructField(g: GetStructField, n: String, e: ExprId) = {
+      val fieldType = extractTypeFromExpression(g, n)
+      val attr = extractAttributeRef(g, n)
+      attr.copy(PlanUtils.prefixNestedField(n), fieldType, attr.nullable, attr.metadata)(
+        e, attr.qualifier)
+    }
+
     val names = extractNamesFromExpression(filter.condition)
-    val transformedCondition = filter.condition.transformDown {
+
+    // remove IsNotNull operators on root of a nested field
+    val cleanedCondition = filter.condition.transformDown {
       case bo @ BinaryOperator(IsNotNull(AttributeReference(name, _, _, _)), other) =>
         if (names.toDiscard.contains(name)) {
           other
@@ -126,17 +138,19 @@ class NestedRuleHelper(spark: SparkSession) extends BaseRuleHelper(spark) {
         } else {
           bo
         }
+    }
+    var transformedAttributes = Seq.empty[AttributeReference]
+    // modify nodes from GetStructField to Attribute access
+    val transformedCondition = cleanedCondition.transformDown {
       case g: GetStructField =>
         val n = getChildNameFromStruct(g)
         if (names.toKeep.contains(n)) {
           val escapedFieldName = PlanUtils.prefixNestedField(n)
           getExprId(filter, escapedFieldName) match {
             case Some(exprId) =>
-              val fieldType = extractTypeFromExpression(g, n)
-              val attr = extractAttributeRef(g, n)
-              attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
-                exprId,
-                attr.qualifier)
+              val attr = transformGetStructField(g, n, exprId)
+              transformedAttributes = transformedAttributes :+ attr
+              attr
             case _ =>
               g
           }
@@ -146,7 +160,11 @@ class NestedRuleHelper(spark: SparkSession) extends BaseRuleHelper(spark) {
       case o =>
         o
     }
-    filter.copy(condition = transformedCondition)
+    // and IsNotNull guardrails for all indexed columns
+    val guardedCondition = transformedAttributes.foldRight(transformedCondition) { (attr, cond) =>
+      And(IsNotNull(attr), cond)
+    }
+    filter.copy(condition = guardedCondition)
   }
 
   /**
@@ -186,14 +204,19 @@ class NestedRuleHelper(spark: SparkSession) extends BaseRuleHelper(spark) {
           val newAttr = attr.copy(escapedFieldName, fieldType, attr.nullable, attr.metadata)(
             exprId,
             attr.qualifier)
-          resolvedField.projectName match {
-            case Some(projectName) =>
-              Alias(newAttr, projectName)()
-            case None =>
-              newAttr
+          exp match {
+            case Alias(_, aliasName) =>
+              Alias(newAttr, aliasName)()
+            case _ =>
+              resolvedField.projectName match {
+                case Some(projectedName) =>
+                  Alias(newAttr, projectedName)()
+                case _ =>
+                  newAttr
+              }
           }
         case _ =>
-          attr
+          exp
       }
     }
     project.copy(projectList = projectedFields)

@@ -85,6 +85,63 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
     }
   }
 
+  def createIndexLogEntryFromStringsAndSchemas(
+      name: String,
+      indexCols: Seq[String],
+      includedCols: Seq[String],
+      indexColsSchema: Seq[StructField],
+      includedColsSchema: Seq[StructField],
+      plan: LogicalPlan,
+      numBuckets: Int = 10,
+      inputFiles: Seq[FileInfo] = Seq(),
+      writeLog: Boolean = true,
+      filenames: Seq[String] = defaultFileNames): IndexLogEntry = {
+    val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
+
+    LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
+      case Some(s) =>
+        val sourcePlanProperties = SparkPlan.Properties(
+          Seq(
+            Relation(
+              Seq("dummy"),
+              Hdfs(Properties(Content(Directory("/", files = inputFiles)))),
+              "schema",
+              "format",
+              Map())),
+          null,
+          null,
+          LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature(signClass, s)))))
+
+        val indexFiles = getIndexDataFilesPaths(name, filenames).map { path =>
+          new FileStatus(10, false, 1, 10, 10, path)
+        }
+
+        val indexLogEntry = IndexLogEntry.create(
+          name,
+          CoveringIndex(
+            CoveringIndex.Properties(
+              CoveringIndex.Properties
+                  .Columns(indexCols, includedCols),
+              IndexLogEntry.schemaString(
+                StructType(indexColsSchema ++ includedColsSchema)
+              ),
+              numBuckets,
+              Map())),
+          Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
+          Source(SparkPlan(sourcePlanProperties)),
+          Map())
+
+        val logManager = new IndexLogManagerImpl(getIndexRootPath(name))
+        indexLogEntry.state = Constants.States.ACTIVE
+        if (writeLog) {
+          assert(logManager.writeLog(0, indexLogEntry))
+        }
+        indexLogEntry
+
+      case None => throw HyperspaceException("Invalid plan for index dataFrame.")
+    }
+  }
+
   def getIndexDataFilesPaths(
       indexName: String,
       filenames: Seq[String] = defaultFileNames): Seq[Path] =

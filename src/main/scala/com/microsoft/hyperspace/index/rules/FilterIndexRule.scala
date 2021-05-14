@@ -57,7 +57,7 @@ object FilterIndexRule
             findCoveringIndexes(filter, outputColumns, filterColumns, plan)
           FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
             case Some(index) =>
-              // Detect which whether the index contains nested fields.
+              // Detect whether the index contains nested fields.
               val indexHasNestedColumns = (index.indexedColumns ++ index.includedColumns)
                 .exists(ResolverUtils.ResolvedColumn(_).isNested)
               val ruleHelper = if (indexHasNestedColumns) {

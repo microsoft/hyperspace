@@ -117,8 +117,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test(
-    "E2E test for filter query on nested columns") {
+  test("E2E test for filter query on nested columns") {
     val loc = testDir + "samplenestedparquet"
     val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks", "nested")
     SampleNestedData.save(spark, loc, dataColumns)
