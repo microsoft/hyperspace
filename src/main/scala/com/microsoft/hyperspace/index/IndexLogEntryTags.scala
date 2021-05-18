@@ -54,7 +54,11 @@ object IndexLogEntryTags {
   val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
   IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
 
-  // WHYNOT_REASON stores reason string for disqualification.
-  val WHYNOT_REASON: IndexLogEntryTag[String] =
-    IndexLogEntryTag[String]("whyNotReason")
+  // WHYNOT_REASON stores reason strings for disqualification.
+  val WHYNOT_REASON: IndexLogEntryTag[Seq[String]] =
+    IndexLogEntryTag[Seq[String]]("whyNotReasons")
+
+  // WHYNOT_ENABLED indicates whether whyNotAPI is enabled or not.
+  val WHYNOT_ENABLED: IndexLogEntryTag[Boolean] =
+    IndexLogEntryTag[Boolean]("whyNotEnabled")
 }

@@ -303,155 +303,151 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
   }
 
   test("Verify reason string tag is set properly.") {
-    try {
-      Hyperspace.getContext(spark).whyNotEnabled = true
-      withTempPath { tempPath =>
-        val indexManager = IndexCollectionManager(spark)
-        import spark.implicits._
-        val df = ('a' to 'z').map(c => (Char.char2int(c), c.toString)).toDF("id", "name")
-        val dataPath = tempPath.getAbsolutePath
-        df.write.parquet(dataPath)
-        df.write.parquet(s"${dataPath}_")
-        val df2 = ('a' to 'z').map(c => (Char.char2int(c), c.toString)).toDF("id", "name2")
-        df2.write.parquet(s"${dataPath}__")
+    withTempPath { tempPath =>
+      val indexManager = IndexCollectionManager(spark)
+      import spark.implicits._
+      val df = ('a' to 'z').map(c => (Char.char2int(c), c.toString)).toDF("id", "name")
+      val dataPath = tempPath.getAbsolutePath
+      df.write.parquet(dataPath)
+      df.write.parquet(s"${dataPath}_")
+      val df2 = ('a' to 'z').map(c => (Char.char2int(c), c.toString)).toDF("id", "name2")
+      df2.write.parquet(s"${dataPath}__")
 
-        val indexList =
-          Seq("index_ok", "index_noLineage", "index_differentColumn", "index_noCommonFiles")
+      val indexList =
+        Seq("index_ok", "index_noLineage", "index_differentColumn", "index_noCommonFiles")
 
-        withIndex(indexList: _*) {
-          val readDf = spark.read.parquet(dataPath)
-          val readDf2 = spark.read.parquet(s"${dataPath}_")
-          val readDf3 = spark.read.parquet(s"${dataPath}__")
-          indexManager.create(readDf, IndexConfig("index_noLineage", Seq("id", "name")))
-          withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
-            indexManager.create(
-              readDf3,
-              IndexConfig("index_differentColumn", Seq("id"), Seq("name2")))
-            indexManager.create(readDf, IndexConfig("index_ok", Seq("id", "name")))
-            indexManager.create(readDf2, IndexConfig("index_noCommonFiles", Seq("id", "name")))
+      withIndex(indexList: _*) {
+        val readDf = spark.read.parquet(dataPath)
+        val readDf2 = spark.read.parquet(s"${dataPath}_")
+        val readDf3 = spark.read.parquet(s"${dataPath}__")
+        indexManager.create(readDf, IndexConfig("index_noLineage", Seq("id", "name")))
+        withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+          indexManager.create(
+            readDf3,
+            IndexConfig("index_differentColumn", Seq("id"), Seq("name2")))
+          indexManager.create(readDf, IndexConfig("index_ok", Seq("id", "name")))
+          indexManager.create(readDf2, IndexConfig("index_noCommonFiles", Seq("id", "name")))
+        }
+
+        val allIndexes = indexList.map(indexName => latestIndexLogEntry(systemPath, indexName))
+        allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
+
+        val plan1 =
+          spark.read.parquet(dataPath).select("id", "name").queryExecution.optimizedPlan
+        val indexes = CandidateIndexCollector(plan1, allIndexes).head._2
+
+        val filtered = indexes.map(_.name)
+        assert(filtered.length == 2)
+        assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
+
+        allIndexes.foreach { entry =>
+          val msg = entry.getTagValue(plan1, IndexLogEntryTags.WHYNOT_REASON)
+          if (filtered.contains(entry.name)) {
+            assert(msg.isEmpty)
+          } else {
+            assert(msg.isDefined)
+            entry.name match {
+              case "index_differentColumn" =>
+                assert(msg.get.exists(_.contains("Column Schema does not match")))
+              case "index_noCommonFiles" =>
+                assert(msg.get.exists(_.contains("Index signature does not match")))
+            }
           }
 
-          val allIndexes = indexList.map(indexName => latestIndexLogEntry(systemPath, indexName))
+          // Unset for next test though it will use a different plan.
+          entry.unsetTagValue(plan1, IndexLogEntryTags.WHYNOT_REASON)
+        }
 
-          val plan1 =
-            spark.read.parquet(dataPath).select("id", "name").queryExecution.optimizedPlan
-          val indexes = CandidateIndexCollector(plan1, allIndexes).head._2
+        // Hybrid Scan candidate test
+        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
+          df.limit(20).write.mode("append").parquet(dataPath)
+          val plan2 = spark.read.parquet(dataPath).queryExecution.optimizedPlan
 
-          val filtered = indexes.map(_.name)
-          assert(filtered.length == 2)
-          assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
+          val indexes = CandidateIndexCollector(plan2, allIndexes)
+          assert(indexes.isEmpty)
 
           allIndexes.foreach { entry =>
-            val msg = entry.getTagValue(plan1, IndexLogEntryTags.WHYNOT_REASON)
-            if (filtered.contains(entry.name)) {
-              assert(msg.isEmpty)
-            } else {
-              assert(msg.isDefined)
-              entry.name match {
-                case "index_differentColumn" =>
-                  assert(msg.get.contains("Column Schema does not match"))
-                case "index_noCommonFiles" =>
-                  assert(msg.get.contains("Index signature does not match"))
-              }
+            val msg = entry.getTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+            assert(msg.isDefined)
+            entry.name match {
+              case "index_differentColumn" =>
+                assert(msg.get.exists(_.contains("Column Schema does not match")))
+              case "index_noCommonFiles" =>
+                assert(msg.get.exists(_.contains("No common files.")))
+              case _ =>
+                assert(msg.get.exists(_.contains("Appended bytes ratio")))
             }
 
-            // Unset for next test though it will use a different plan.
-            entry.unsetTagValue(plan1, IndexLogEntryTags.WHYNOT_REASON)
+            // Unset for next test.
+            entry.unsetTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
           }
 
-          // Hybrid Scan candidate test
-          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
-            df.limit(20).write.mode("append").parquet(dataPath)
-            val plan2 = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+          withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
+            {
+              val indexes = CandidateIndexCollector(plan2, allIndexes).head._2
+              val filtered = indexes.map(_.name)
+              assert(filtered.length == 2)
+              assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
 
-            val indexes = CandidateIndexCollector(plan2, allIndexes)
-            assert(indexes.isEmpty)
+              allIndexes.foreach { entry =>
+                val msg = entry.getTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+                if (filtered.contains(entry.name)) {
+                  assert(msg.isEmpty)
+                } else {
+                  assert(msg.isDefined)
+                  entry.name match {
+                    case "index_differentColumn" =>
+                      assert(msg.get.exists(_.contains("Column Schema does not match")))
+                    case "index_noCommonFiles" =>
+                      assert(msg.get.exists(_.contains("No common files.")))
+                  }
+                }
 
-            allIndexes.foreach { entry =>
-              val msg = entry.getTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
-              assert(msg.isDefined)
-              entry.name match {
-                case "index_differentColumn" =>
-                  assert(msg.get.contains("Column Schema does not match"))
-                case "index_noCommonFiles" =>
-                  assert(msg.get.contains("No common files."))
-                case _ =>
-                  assert(msg.get.contains("Appended bytes ratio"))
+                // Unset for next test.
+                entry.unsetTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
               }
-
-              // Unset for next test.
-              entry.unsetTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
             }
 
-            withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
+            // Delete threshold test
+            {
+              val deleteFileList = readDf.inputFiles.tail
+              deleteFileList.foreach { f =>
+                FileUtils.delete(new Path(f))
+              }
+              val plan3 = spark.read.parquet(dataPath).queryExecution.optimizedPlan
+
               {
-                val indexes = CandidateIndexCollector(plan2, allIndexes).head._2
-                val filtered = indexes.map(_.name)
-                assert(filtered.length == 2)
-                assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
+                val indexes = CandidateIndexCollector(plan3, allIndexes)
+                assert(indexes.isEmpty)
 
                 allIndexes.foreach { entry =>
-                  val msg = entry.getTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
-                  if (filtered.contains(entry.name)) {
-                    assert(msg.isEmpty)
-                  } else {
-                    assert(msg.isDefined)
-                    entry.name match {
-                      case "index_differentColumn" =>
-                        assert(msg.get.contains("Column Schema does not match"))
-                      case "index_noCommonFiles" =>
-                        assert(msg.get.contains("No common files."))
-                    }
+                  val msg = entry.getTagValue(plan3, IndexLogEntryTags.WHYNOT_REASON)
+                  assert(msg.isDefined)
+                  entry.name match {
+                    case "index_differentColumn" =>
+                      assert(msg.get.exists(_.contains("Column Schema does not match")))
+                    case "index_noCommonFiles" =>
+                      assert(msg.get.exists(_.contains("No common files.")))
+                    case "index_noLineage" =>
+                      assert(msg.get.exists(_.contains("Lineage column does not exist.")))
+                    case "index_ok" =>
+                      assert(msg.get.exists(_.contains("Deleted bytes ratio")))
                   }
 
-                  // Unset for next test.
-                  entry.unsetTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+                  entry.unsetTagValue(plan3, IndexLogEntryTags.WHYNOT_REASON)
                 }
               }
 
-              // Delete threshold test
-              {
-                val deleteFileList = readDf.inputFiles.tail
-                deleteFileList.foreach { f =>
-                  FileUtils.delete(new Path(f))
-                }
-                val plan3 = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-
-                {
-                  val indexes = CandidateIndexCollector(plan3, allIndexes)
-                  assert(indexes.isEmpty)
-
-                  allIndexes.foreach { entry =>
-                    val msg = entry.getTagValue(plan3, IndexLogEntryTags.WHYNOT_REASON)
-                    assert(msg.isDefined)
-                    entry.name match {
-                      case "index_differentColumn" =>
-                        assert(msg.get.contains("Column Schema does not match"))
-                      case "index_noCommonFiles" =>
-                        assert(msg.get.contains("No common files."))
-                      case "index_noLineage" =>
-                        assert(msg.get.contains("Lineage column does not exist."))
-                      case "index_ok" =>
-                        assert(msg.get.contains("Deleted bytes ratio"))
-                    }
-
-                    entry.unsetTagValue(plan3, IndexLogEntryTags.WHYNOT_REASON)
-                  }
-                }
-
-                withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99") {
-                  val indexes = CandidateIndexCollector(plan3, allIndexes).head._2
-                  val filtered = indexes.map(_.name)
-                  assert(filtered.length == 1)
-                  assert(filtered.toSet.equals(Set("index_ok")))
-                }
+              withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99") {
+                val indexes = CandidateIndexCollector(plan3, allIndexes).head._2
+                val filtered = indexes.map(_.name)
+                assert(filtered.length == 1)
+                assert(filtered.toSet.equals(Set("index_ok")))
               }
             }
           }
         }
       }
-    } finally {
-      Hyperspace.getContext(spark).whyNotEnabled = false
     }
   }
 }

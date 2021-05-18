@@ -31,11 +31,11 @@ trait IndexFilter extends ActiveSparkSession {
 
   protected def setReasonTag(condition: Boolean, reasonString: => String)(
       implicit keyPair: (LogicalPlan, IndexLogEntry)): Unit = {
-    if (!condition && Hyperspace.getContext(spark).whyNotEnabled) {
-      val (plan, index) = keyPair
+    val (plan, index) = keyPair
+    if (!condition && index.getTagValue(IndexLogEntryTags.WHYNOT_ENABLED).getOrElse(false)) {
       val prevReason =
-        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).map(_ + "; ").getOrElse("")
-      index.setTagValue(plan, IndexLogEntryTags.WHYNOT_REASON, prevReason + reasonString)
+        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).getOrElse(Seq.empty)
+      index.setTagValue(plan, IndexLogEntryTags.WHYNOT_REASON, prevReason :+ reasonString)
     }
   }
 
@@ -103,7 +103,7 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
       withReasonTag(
         s"Column Schema does not match. " +
           s"Relation columns: [${relationColumnNames.mkString(", ")}], " +
-          s"Index columns: [${index.indexedColumns ++ index.includedColumns.mkString(", ")}]") {
+          s"Index columns: [${(index.indexedColumns ++ index.includedColumns).mkString(", ")}]") {
         ResolverUtils
           .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnNames)
           .isDefined
