@@ -270,7 +270,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
         val allIndexes = Seq(latestIndexLogEntry(systemPath, "index1"))
         df.limit(5).write.mode("append").parquet(dataPath)
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        val relation = RuleUtils.getRelation(spark, optimizedPlan).get
+        val relation = RuleUtils.getRelation(optimizedPlan).get
 
         withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
