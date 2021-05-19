@@ -119,8 +119,8 @@ object FilterRankFilter extends IndexRankFilter {
  * filter predicate.
  */
 object FilterIndexRule_disabled extends HyperspaceRule {
-  override val filtersOnQueryPlan
-    : Seq[QueryPlanIndexFilter] = FilterPlanNodeFilter :: FilterColumnFilter :: Nil
+  override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
+    FilterPlanNodeFilter :: FilterColumnFilter :: Nil
 
   override val indexRanker: IndexRankFilter = FilterRankFilter
 
@@ -153,14 +153,15 @@ object FilterIndexRule_disabled extends HyperspaceRule {
       .getOrElse {
         relation.allFileInfos.foldLeft(0L) { (res, f) =>
           if (candidateIndex.sourceFileInfoSet.contains(f)) {
-            (res + f.size) // count, total bytes
+            res + f.size // count, total bytes
           } else {
             res
           }
         }
       }
 
-    // TODO enhance scoring
-    (50 * (commonBytes * 1.0f / relation.allFileSizeInBytes)).round
+    // TODO: Enhance scoring function.
+    //   See https://github.com/microsoft/hyperspace/issues/444
+    (50 * (commonBytes.toFloat / relation.allFileSizeInBytes)).round
   }
 }
