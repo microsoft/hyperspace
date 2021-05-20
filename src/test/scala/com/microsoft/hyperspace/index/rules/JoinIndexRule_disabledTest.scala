@@ -24,11 +24,12 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.shim.{JoinWithoutHint => Join}
-import com.microsoft.hyperspace.util.{FileUtils, PathUtils, SparkTestShims}
+import com.microsoft.hyperspace.util.{FileUtils, SparkTestShims}
 
-class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
+class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
   override val indexLocationDirName = "joinIndexRuleTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -102,80 +103,163 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     clearCache()
   }
 
-  test("Join rule works if indexes exist and configs are set correctly") {
+  def applyJoinIndexRuleHelper(
+      plan: LogicalPlan,
+      allIndexes: Seq[IndexLogEntry] = Nil): (LogicalPlan, Int) = {
+    val indexes = if (allIndexes.isEmpty) {
+      IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    } else {
+      allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
+      allIndexes
+    }
+    val candidateIndexes = CandidateIndexCollector(plan, indexes)
+    disabled.JoinIndexRule.apply(plan, candidateIndexes)
+  }
+
+  test("Join rule works if indexes exist and configs are set correctly.") {
     val joinCondition = EqualTo(t1c1, t2c1)
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule works if indexes exist for case insensitive index and query") {
+  test("Join rule works if indexes exist for case insensitive index and query.") {
     val t1c1Caps = t1c1.withName("T1C1")
 
     val joinCondition = EqualTo(t1c1Caps, t2c1)
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule does not update plan if index location is not set") {
+  test("Join rule does not update plan if index location is not set.") {
     withSQLConf(IndexConstants.INDEX_SYSTEM_PATH -> "") {
       val joinCondition = EqualTo(t1c1, t2c1)
       val originalPlan =
         Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-      val updatedPlan = JoinIndexRule(originalPlan)
-      assert(updatedPlan.equals(originalPlan))
+
+      try {
+        applyJoinIndexRuleHelper(originalPlan)
+        assert(false, "An exception should be thrown.")
+      } catch {
+        case e: Throwable =>
+          assert(e.getMessage.contains("Can not create a Path from an empty string"))
+      }
     }
   }
 
-  test("Join rule does not update plan if join condition does not exist") {
+  test("Join rule does not update plan if join condition does not exist.") {
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      assert(msg.isDefined)
+      assert(msg.get.exists(_.contains("Not eligible Join - no join condition.")))
+    }
   }
 
-  test("Join rule does not update plan if join condition is not equality") {
+  test("Join rule does not update plan if join condition is not equality.") {
     val joinCondition = GreaterThan(t1c1, t2c1)
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      assert(msg.isDefined)
+      assert(
+        msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+    }
   }
 
-  test("Join rule does not update plan if join condition contains Or") {
+  test("Join rule does not update plan if join condition contains Or.") {
     val joinCondition = Or(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      assert(msg.isDefined)
+      assert(
+        msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+    }
   }
 
-  test("Join rule does not update plan if join condition contains Literals") {
+  test("Join rule does not update plan if join condition contains Literals.") {
     val joinCondition = EqualTo(t1c2, Literal(10, IntegerType))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      assert(msg.isDefined)
+      assert(
+        msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+    }
   }
 
-  test("Join rule does not update plan if index doesn't exist for either table") {
+  test("Join rule does not update plan if index doesn't exist for either table.") {
     val t1FilterNode = Filter(IsNotNull(t1c2), t1ScanNode)
     val t2FilterNode = Filter(IsNotNull(t2c2), t2ScanNode)
 
     val t1ProjectNode = Project(Seq(t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c2, t2c3), t2FilterNode)
 
-    // Index exists with t1c2 as indexed columns but not for t2c2. Plan should not update
+    // Index exists with t1c2 as indexed columns but not for t2c2. Plan should not be updated.
     val joinCondition = EqualTo(t1c2, t2c2)
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
+
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      assert(msg.isDefined)
+
+      index.name match {
+        case "t1i1" =>
+          assert(
+            msg.get.toSet.equals(
+              Set(
+                "All join condition column should be the indexed columns. " +
+                  "Join columns: [t1c2], Indexed columns: [t1c1]",
+                "No available indexes for right subplan.")))
+        case "t1i2" =>
+          assert(
+            msg.get.toSet.equals(Set(
+              "All join condition column should be the indexed columns. " +
+                "Join columns: [t1c2], Indexed columns: [t1c1,t1c2]",
+              "No available indexes for right subplan.")))
+        case "t1i3" =>
+          assert(msg.get.toSet.equals(Set("No available indexes for right subplan.")))
+        case "t2i1" =>
+          assert(
+            msg.get.toSet.equals(
+              Set(
+                "All join condition column should be the indexed columns. " +
+                  "Join columns: [t2c2], Indexed columns: [t2c1]",
+                "No available indexes for right subplan.")))
+        case "t2i2" =>
+          assert(
+            msg.get.toSet.equals(Set(
+              "All join condition column should be the indexed columns. " +
+                "Join columns: [t2c2], Indexed columns: [t2c1,t2c2]",
+              "No available indexes for right subplan.")))
+      }
+    }
   }
 
-  test("Join rule does not update plan if index doesn't satisfy included columns from any side") {
+  test("Join rule does not update plan if index doesn't satisfy included columns from any side.") {
     val t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
     val t2FilterNode = Filter(IsNotNull(t2c1), t2ScanNode)
 
@@ -186,11 +270,35 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     // The plan requires t1c4 and t4c4 columns for projection. These columns are not part of any
     // index. Since no index satisfies the requirement, the plan should not change.
 
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
+
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      assert(msg.isDefined)
+
+      index.name match {
+        case "t1i1" =>
+          assert(
+            msg.get.toSet.equals(
+              Set(
+                "Index does not contain all required columns. " +
+                  "Required columns: [t1c1,t1c4], Index columns: [t1c1,t1c3]",
+                "No available indexes for left subplan.")))
+        case "t2i1" =>
+          assert(
+            msg.get.toSet.equals(
+              Set(
+                "Index does not contain all required columns. " +
+                  "Required columns: [t2c1,t2c4], Index columns: [t2c1,t2c3]",
+                "No available indexes for left subplan.")))
+        case _ =>
+      }
+    }
   }
 
-  test("Join rule correctly handles implicit output columns") {
+  test("Join rule correctly handles implicit output columns.") {
     val t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
     val t2FilterNode = Filter(IsNotNull(t2c1), t2ScanNode)
     val joinCondition = EqualTo(t1c1, t2c1)
@@ -203,7 +311,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
 
     {
       // Test: should not update plan if no index exist to cover all implicit columns
-      val updatedPlan = JoinIndexRule(originalPlan)
+      val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
       assert(updatedPlan.equals(originalPlan))
     }
 
@@ -217,7 +326,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       // clear cache so the new indexes gets added to it
       clearCache()
 
-      val updatedPlan = JoinIndexRule(originalPlan)
+      val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
       assert(!updatedPlan.equals(originalPlan))
 
       val indexPaths =
@@ -230,19 +340,19 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     }
   }
 
-  test("Join rule does not update plan if join condition contains aliased column names") {
+  test("Join rule does not update plan if join condition contains aliased column names.") {
     val t1c1Alias = Alias(t1c1, "t1c1Alias")()
     val t1ProjectNode = Project(Seq(t1c1Alias, t1c3), t1FilterNode)
 
     val joinCondition = EqualTo(t1c1Alias.toAttribute, t2c1)
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
   test(
     "Join rule does not update plan if join condition contains columns from " +
-      "non-LogicalRelation leaf nodes") {
+      "non-LogicalRelation leaf nodes.") {
     // Creating a LocalRelation for join
     val localCol1 = AttributeReference("lc1", IntegerType)()
     val localCol2 = AttributeReference("lc2", StringType)()
@@ -257,11 +367,11 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val originalPlan =
       Join(t1ProjectNode, localProjectNode, JoinType("inner"), Some(joinCondition))
 
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
-  test("Join rule updates plan for composite query (AND based Equi-Join)") {
+  test("Join rule updates plan for composite query (AND based Equi-Join).") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
@@ -270,14 +380,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     // WHERE t1c1 = t2c1 and t1c2 = t2c2
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule updates plan for composite query with order of predicates changed") {
+  test("Join rule updates plan for composite query with order of predicates changed.") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
@@ -287,14 +397,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     // if any usable index can be found irrespective of order of predicates
     val joinCondition = And(EqualTo(t1c2, t2c2), EqualTo(t1c1, t2c1))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule updates plan for composite query with swapped attributes") {
+  test("Join rule updates plan for composite query with swapped attributes.") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
@@ -303,14 +413,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     // WHERE t1c1 = t2c1 and t2c2 = t1c2 >> Swapped order of query columns
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t2c2, t1c2))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule doesn't update plan if columns don't have one-to-one mapping") {
+  test("Join rule doesn't update plan if columns don't have one-to-one mapping.") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
@@ -321,7 +431,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1, t2c2))
       val originalPlan =
         Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-      val updatedPlan = JoinIndexRule(originalPlan)
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
       assert(updatedPlan.equals(originalPlan))
     }
     {
@@ -331,14 +441,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c1))
       val originalPlan =
         Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-      val updatedPlan = JoinIndexRule(originalPlan)
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
       assert(updatedPlan.equals(originalPlan))
     }
   }
 
   test(
     "Join rule updates plan if columns have one-to-one mapping with repeated " +
-      "case-insensitive predicates") {
+      "case-insensitive predicates.") {
     val t1ProjectNode = Project(Seq(t1c1, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c3), t2FilterNode)
 
@@ -347,14 +457,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
 
     val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1Caps, t2c1Caps))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule updates plan for composite query for repeated predicates") {
+  test("Join rule updates plan for composite query for repeated predicates.") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
@@ -363,14 +473,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     // WHERE t1c1 = t2c1 and t1c1 = t2c2 and t1c1 = t2c1 >> one predicate repeated twice
     val joinCondition = And(And(EqualTo(t1c1, t2c1), EqualTo(t1c2, t2c2)), EqualTo(t1c1, t2c1))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i2"), getIndexDataFilesPaths("t2i2")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
   }
 
-  test("Join rule doesn't update plan if columns don't belong to either side of join node") {
+  test("Join rule doesn't update plan if columns don't belong to either side of join node.") {
     val t1ProjectNode = Project(Seq(t1c1, t1c2, t1c3), t1FilterNode)
     val t2ProjectNode = Project(Seq(t2c1, t2c2, t2c3), t2FilterNode)
 
@@ -379,13 +489,13 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     // WHERE t1c1 = t1c2 and t1c1 = t2c2  >> two columns of t1 compared against each other
     val joinCondition = And(EqualTo(t1c1, t1c2), EqualTo(t1c2, t2c2))
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(updatedPlan.equals(originalPlan))
   }
 
   test(
     "Join rule updates plan if condition attributes contain 'qualifier' " +
-      "but base table attributes don't") {
+      "but base table attributes don't.") {
 
     // Attributes same as the base data source, qualified with table names (e.g. from a table name
     // from the catalog)
@@ -394,7 +504,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
 
     val joinCondition = EqualTo(t1c1Qualified, t2c1Qualified)
     val originalPlan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    val updatedPlan = JoinIndexRule(originalPlan)
+    val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
     assert(!updatedPlan.equals(originalPlan))
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
@@ -404,12 +514,21 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
   test("Join rule is not applied for modified plan.") {
     val joinCondition = EqualTo(t1c1, t2c1)
     val plan = Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-    assert(!JoinIndexRule(plan).equals(plan))
+
+    {
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(plan)
+      assert(!updatedPlan.equals(plan))
+    }
 
     // Mark the relation that the rule is applied and verify the plan does not change.
     val newPlan = plan transform {
       case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
         r.copy(relation = h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
+    }
+
+    {
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(newPlan)
+      assert(!updatedPlan.equals(plan))
     }
     assert(JoinIndexRule(newPlan).equals(newPlan))
   }

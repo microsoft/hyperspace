@@ -48,8 +48,8 @@ trait IndexFilter extends ActiveSparkSession {
   }
 
   /**
-   * Append a given reason string to WHYNOT_REASON tag of the index
-   * if the result of the given function is false.
+   * Append the reason string to WHYNOT_REASON tag for the given index
+   * if the result of the function is false.
    *
    * @param reasonString Informational message in case condition is false.
    * @param f Function for a condition
@@ -61,6 +61,31 @@ trait IndexFilter extends ActiveSparkSession {
     val ret = f
     setReasonTag(ret, reasonString)(keyPair)
     ret
+  }
+
+  /**
+   * Append the reason string to WHYNOT_REASON tag for the given list of indexes
+   * if the result of the function is false.
+   *
+   * @param reasonString Informational message in case condition is false.
+   * @param f Function for a condition
+   * @param keyPair A pair of plan and index list to tag
+   * @return Result of the given function
+   */
+  protected def withReasonTagAll(reasonString: => String)(f: => Boolean)(
+      implicit keyPair: (LogicalPlan, Seq[IndexLogEntry])): Boolean = {
+    val ret = f
+    keyPair._2.foreach { index =>
+      setReasonTag(ret, reasonString)(keyPair._1, index)
+    }
+    ret
+  }
+
+  protected def setReasonTagAll(reasonString: => String)(
+      implicit keyPair: (LogicalPlan, Seq[IndexLogEntry])): Unit = {
+    keyPair._2.foreach { index =>
+      setReasonTag(false, reasonString)(keyPair._1, index)
+    }
   }
 }
 
@@ -234,7 +259,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
 
     val entry = relation.closestIndex(index)
     // Tag to original index log entry to check the reason string with the given log entry.
-    implicit val reasonTagKey = (relation.plan, index)
+    implicit val reasonTagKeyPair = (relation.plan, index)
 
     val isHybridScanCandidate =
       entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {

@@ -119,7 +119,7 @@ class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
     allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
     val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(transformedPlan.equals(originalPlan), "Plan should not transform.")
-    allIndexes.map { index =>
+    allIndexes.foreach { index =>
       val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
       index.name match {
         case `indexName1` =>
@@ -155,7 +155,7 @@ class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
     val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName2)
-    allIndexes.map { index =>
+    allIndexes.foreach { index =>
       val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
       index.name match {
         case `indexName1` =>

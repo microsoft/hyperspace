@@ -163,7 +163,7 @@ object FilterIndexRule extends HyperspaceRule {
       }
 
     // TODO: Enhance scoring function.
-    //   See https://github.com/microsoft/hyperspace/issues/444
+    //  See https://github.com/microsoft/hyperspace/issues/444
     (50 * (commonBytes.toFloat / relation.allFileSizeInBytes)).round
   }
 }
