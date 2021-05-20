@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index.rules.disabled
 
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
@@ -22,8 +22,10 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project
 
 import com.microsoft.hyperspace.index.IndexLogEntryTags
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
+
 
 object FilterPlanNodeFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToIndexesMap = {
@@ -81,7 +83,7 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
     val candidateIndexes =
       indexes.head._2.filter { index =>
         val ddColumns = index.derivedDataset.properties.columns
-        withReasonTag("The first indexed column should be in filter columns.") {
+        withReasonTag("The first indexed column should be in filter condition columns.") {
           ResolverUtils.resolve(spark, ddColumns.indexed.head, filterColumnNames).isDefined
         }(plan, index) &&
         withReasonTag(
@@ -107,7 +109,7 @@ object FilterRankFilter extends IndexRankFilter {
       Map.empty
     } else {
       val selected = FilterIndexRanker.rank(spark, plan, indexes.head._2).get
-      setRankReasonTag(indexes.head._1, indexes.head._2, selected)
+      setRankReasonTag(plan, indexes.head._2, selected)
       Map(indexes.head._1 -> selected)
     }
   }
@@ -118,7 +120,7 @@ object FilterRankFilter extends IndexRankFilter {
  * a relation with an available hash partitioned index according to columns in
  * filter predicate.
  */
-object FilterIndexRule_disabled extends HyperspaceRule {
+object FilterIndexRule extends HyperspaceRule {
   override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
     FilterPlanNodeFilter :: FilterColumnFilter :: Nil
 
