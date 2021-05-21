@@ -49,7 +49,7 @@ trait IndexFilter extends ActiveSparkSession {
 
   /**
    * Append the reason string to WHYNOT_REASON tag for the given index
-   * if the result of the function is false.
+   * if the result of the function is false and WHYNOT_ENABLED tag is set to the index.
    *
    * @param reasonString Informational message in case condition is false.
    * @param f Function for a condition
@@ -65,7 +65,7 @@ trait IndexFilter extends ActiveSparkSession {
 
   /**
    * Append the reason string to WHYNOT_REASON tag for the given list of indexes
-   * if the result of the function is false.
+   * if the result of the function is false and WHYNOT_ENABLED tag is set to the index.
    *
    * @param reasonString Informational message in case condition is false.
    * @param f Function for a condition
@@ -81,6 +81,14 @@ trait IndexFilter extends ActiveSparkSession {
     ret
   }
 
+  /**
+   * Append the reason string to WHYNOT_REASON tag for the given list of indexes
+   * if WHYNOT_ENABLED tag is set to the indexes.
+   *
+   * @param reasonString Informational message in case condition is false.
+   * @param keyPair A pair of plan and index list to tag
+   * @return Result of the given function
+   */
   protected def setReasonTagAll(reasonString: => String)(
       implicit keyPair: (LogicalPlan, Seq[IndexLogEntry])): Unit = {
     keyPair._2.foreach { index =>

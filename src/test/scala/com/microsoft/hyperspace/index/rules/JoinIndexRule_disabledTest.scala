@@ -431,8 +431,17 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
       val joinCondition = And(EqualTo(t1c1, t2c1), EqualTo(t1c1, t2c2))
       val originalPlan =
         Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
-      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
+      val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
       assert(updatedPlan.equals(originalPlan))
+      allIndexes.foreach { index =>
+        val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+        assert(msg.isDefined)
+        assert(msg.get.toSet.equals(Set(
+          "Each join condition column should come from relations directly and attributes " +
+            "from left plan must exclusively have one-to-one mapping with attributes from " +
+            "right plan. E.g. join(A = B and A = D) is not eligible.")))
+      }
     }
     {
       // SELECT t1c1, t1c2, t1c3, t2c1, t2c2, t2c3
