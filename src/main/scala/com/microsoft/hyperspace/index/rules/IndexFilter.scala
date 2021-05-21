@@ -29,16 +29,33 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 trait IndexFilter extends ActiveSparkSession {
 
+  /**
+   * Append a given reason string to WHYNOT_REASON tag of the index if the condition is false and
+   * WHYNOT_ENABLED tag is set to the index.
+   *
+   * @param condition Flag for reason string
+   * @param reasonString Informational message in case condition is false.
+   * @param keyPair A pair of plan and index to tag
+   */
   protected def setReasonTag(condition: Boolean, reasonString: => String)(
       implicit keyPair: (LogicalPlan, IndexLogEntry)): Unit = {
     val (plan, index) = keyPair
     if (!condition && index.getTagValue(IndexLogEntryTags.WHYNOT_ENABLED).getOrElse(false)) {
       val prevReason =
-        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).getOrElse(Seq.empty)
+        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).getOrElse(Nil)
       index.setTagValue(plan, IndexLogEntryTags.WHYNOT_REASON, prevReason :+ reasonString)
     }
   }
 
+  /**
+   * Append a given reason string to WHYNOT_REASON tag of the index
+   * if the result of the given function is false.
+   *
+   * @param reasonString Informational message in case condition is false.
+   * @param f Function for a condition
+   * @param keyPair A pair of plan and index to tag
+   * @return Result of the given function
+   */
   protected def withReasonTag(reasonString: => String)(f: => Boolean)(
       implicit keyPair: (LogicalPlan, IndexLogEntry)): Boolean = {
     val ret = f
@@ -90,6 +107,24 @@ trait IndexRankFilter extends IndexFilter {
    * @return Map of source plan to selected index
    */
   def apply(plan: LogicalPlan, applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap
+
+  /**
+   * Set WHYNOT_REASON tag for unselected indexes.
+   *
+   * @param plan Plan to tag
+   * @param indexes Indexes to tag
+   * @param selectedIndex Selected index
+   */
+  protected def setRankReasonTag(
+      plan: LogicalPlan,
+      indexes: Seq[IndexLogEntry],
+      selectedIndex: IndexLogEntry): Unit = {
+    indexes.foreach { index =>
+      setReasonTag(
+        selectedIndex.name.equals(index.name),
+        s"Another candidate index is applied: ${selectedIndex.name}")(plan, index)
+    }
+  }
 }
 
 /**
