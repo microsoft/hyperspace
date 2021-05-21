@@ -21,6 +21,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
 import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
 class Hyperspace(spark: SparkSession) {
@@ -40,7 +41,9 @@ class Hyperspace(spark: SparkSession) {
    * @param indexConfig the configuration of index to be created.
    */
   def createIndex(df: DataFrame, indexConfig: IndexConfig): Unit = {
-    indexManager.create(df, indexConfig)
+    withHyperspaceRuleDisabled(spark) {
+      indexManager.create(df, indexConfig)
+    }
   }
 
   /**
@@ -87,7 +90,9 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
    */
   def refreshIndex(indexName: String, mode: String): Unit = {
-    indexManager.refresh(indexName, mode)
+    withHyperspaceRuleDisabled(spark) {
+      indexManager.refresh(indexName, mode)
+    }
   }
 
   /**
@@ -102,7 +107,7 @@ class Hyperspace(spark: SparkSession) {
    * @param indexName Name of the index to optimize.
    */
   def optimizeIndex(indexName: String): Unit = {
-    indexManager.optimize(indexName, OPTIMIZE_MODE_QUICK)
+    optimizeIndex(indexName, OPTIMIZE_MODE_QUICK)
   }
 
   /**
@@ -125,7 +130,9 @@ class Hyperspace(spark: SparkSession) {
    *             files, based on a threshold. "full" refers to recreation of index.
    */
   def optimizeIndex(indexName: String, mode: String): Unit = {
-    indexManager.optimize(indexName, mode)
+    withHyperspaceRuleDisabled(spark) {
+      indexManager.optimize(indexName, mode)
+    }
   }
 
   /**
@@ -162,6 +169,15 @@ class Hyperspace(spark: SparkSession) {
    */
   def index(indexName: String): DataFrame = {
     indexManager.index(indexName)
+  }
+
+  private def withHyperspaceRuleDisabled(spark: SparkSession)(f: => Unit): Unit = {
+    try {
+      ApplyHyperspace.disableForIndexMaintenance.set(true)
+      f
+    } finally {
+      ApplyHyperspace.disableForIndexMaintenance.set(false)
+    }
   }
 }
 

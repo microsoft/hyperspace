@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
+import com.microsoft.hyperspace.actions.Constants
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
@@ -28,8 +29,8 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, 
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
-import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector}
+import com.microsoft.hyperspace.index.rules.disabled.JoinIndexRule
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
@@ -70,7 +71,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   }
 
   test("verify enableHyperspace()/disableHyperspace() plug in/out optimization rules.") {
-    val expectedOptimizationRuleBatch = Seq(JoinIndexRule, FilterIndexRule)
+    val expectedOptimizationRuleBatch = Seq(ApplyHyperspace)
     val expectedOptimizationStrategy = Seq(BucketUnionStrategy)
 
     assert(
@@ -225,10 +226,14 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
 
   test("E2E test for join query with alias columns is not supported.") {
     def verifyNoChange(f: () => DataFrame): Unit = {
-      spark.disableHyperspace()
-      val originalPlan = f().queryExecution.optimizedPlan
-      val updatedPlan = JoinIndexRule(originalPlan)
-      assert(originalPlan.equals(updatedPlan))
+      spark.enableHyperspace()
+      val plan = f().queryExecution.optimizedPlan
+      val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+      val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
+      val (updatedPlan, score) =
+        JoinIndexRule.apply(f().queryExecution.optimizedPlan, candidateIndexes)
+      assert(updatedPlan.equals(plan))
+      assert(score == 0)
     }
 
     withView("t1", "t2") {

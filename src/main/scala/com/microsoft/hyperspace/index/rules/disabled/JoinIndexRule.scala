@@ -679,7 +679,7 @@ object JoinIndexRule extends HyperspaceRule with HyperspaceEventLogging {
         .getOrElse {
           relation.allFileInfos.foldLeft(0L) { (res, f) =>
             if (index.sourceFileInfoSet.contains(f)) {
-              (res + f.size) // count, total bytes
+              res + f.size // count, total bytes
             } else {
               res
             }

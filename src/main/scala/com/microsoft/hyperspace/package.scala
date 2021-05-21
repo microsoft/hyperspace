@@ -19,20 +19,9 @@ package com.microsoft
 import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
-import com.microsoft.hyperspace.index.rules.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace
 
 package object hyperspace {
-  // The order of Hyperspace index rules does matter here, because by our current design, once an
-  // index rule is applied to a base table, no further index rules can be applied to the same
-  // table again.
-  // For instance, let's say the Join rule gets applied first, then the original data source gets
-  // replaced by its index. Now we have a new logical plan with the index folder as the "new"
-  // data source. If the Filter rule gets applied on this, no change will happen because
-  // this "new" data source doesn't have any indexes.
-  // We therefore choose to put JoinIndexRule before FilterIndexRule to give join indexes
-  // higher priority, because join indexes typically result in higher performance improvement
-  // compared to filter indexes.
-  private val hyperspaceOptimizationRuleBatch = JoinIndexRule :: FilterIndexRule :: Nil
 
   /**
    * Hyperspace-specific implicit class on SparkSession.
@@ -47,7 +36,7 @@ package object hyperspace {
     def enableHyperspace(): SparkSession = {
       disableHyperspace
       sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
-        hyperspaceOptimizationRuleBatch
+        ApplyHyperspace :: Nil
       sparkSession.sessionState.experimentalMethods.extraStrategies ++=
         BucketUnionStrategy :: Nil
       sparkSession
@@ -61,7 +50,7 @@ package object hyperspace {
     def disableHyperspace(): SparkSession = {
       val experimentalMethods = sparkSession.sessionState.experimentalMethods
       experimentalMethods.extraOptimizations =
-        experimentalMethods.extraOptimizations.filterNot(hyperspaceOptimizationRuleBatch.contains)
+        experimentalMethods.extraOptimizations.filterNot(ApplyHyperspace.equals)
       experimentalMethods.extraStrategies =
         experimentalMethods.extraStrategies.filterNot(BucketUnionStrategy.equals)
       sparkSession
@@ -74,7 +63,7 @@ package object hyperspace {
      */
     def isHyperspaceEnabled(): Boolean = {
       val experimentalMethods = sparkSession.sessionState.experimentalMethods
-      hyperspaceOptimizationRuleBatch.forall(experimentalMethods.extraOptimizations.contains) &&
+      experimentalMethods.extraOptimizations.contains(ApplyHyperspace) &&
         experimentalMethods.extraStrategies.contains(BucketUnionStrategy)
     }
   }
