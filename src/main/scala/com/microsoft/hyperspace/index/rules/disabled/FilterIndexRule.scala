@@ -26,6 +26,11 @@ import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
+/**
+ * FilterPlanNodeFilter filters indexes out if
+ *   1) the given plan is not eligible filter plan node.
+ *   2) the source plan of index is not part of the filter plan.
+ */
 object FilterPlanNodeFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
     if (candidateIndexes.isEmpty) {
@@ -50,6 +55,11 @@ object FilterPlanNodeFilter extends QueryPlanIndexFilter {
   }
 }
 
+/**
+ * FilterColumnFilter filters indexes out if
+ *   1) an index doesn't have all required output columns.
+ *   2) filter condition doesn't have the first indexed column of the given index.
+ */
 object FilterColumnFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
     if (candidateIndexes.isEmpty || candidateIndexes.size != 1) {
@@ -93,8 +103,8 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
           plan,
           index,
           "Index does not contain required columns. Required columns: " +
-            s"[${filterColumnNames ++ projectColumnNames}], indexed & included columns: " +
-            s"[${ddColumns.indexed ++ ddColumns.included}]") {
+            s"[${(filterColumnNames ++ projectColumnNames).mkString(",")}], Indexed & " +
+            s"included columns: [${(ddColumns.indexed ++ ddColumns.included).mkString(",")}]") {
           ResolverUtils
             .resolve(
               spark,
@@ -108,6 +118,9 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
   }
 }
 
+/**
+ * IndexRankFilter selects the best applicable index.
+ */
 object FilterRankFilter extends IndexRankFilter {
   override def apply(
       plan: LogicalPlan,

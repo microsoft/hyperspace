@@ -124,7 +124,10 @@ class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
       index.name match {
         case `indexName1` =>
           assert(msg.isDefined)
-          assert(msg.get.exists(_.contains("Index does not contain required columns.")))
+          assert(
+            msg.get.exists(
+              _.equals("Index does not contain required columns. Required columns: " +
+                "[c3,c2,c3,c4], Indexed & included columns: [c3,c2,c1]")))
         case `indexName2` | `indexName3` =>
           assert(msg.isDefined)
           assert(

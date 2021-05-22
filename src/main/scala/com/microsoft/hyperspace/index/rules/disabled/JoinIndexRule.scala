@@ -34,6 +34,14 @@ import com.microsoft.hyperspace.shim.JoinWithoutHint
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils.resolve
 
+/**
+ * JoinPlanNodeFilter filters indexes if
+ *   1) the given plan is not eligible join plan.
+ *   1-1) Join does not have condition.
+ *   1-2) Left or Right child is not linear plan.
+ *   1-3) Join condition is not eligible - only Equi-joins and simple CNF form are supported.
+ *   2) the source plan of indexes is not part of the join (neither Left nor Right).
+ */
 object JoinPlanNodeFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
     if (candidateIndexes.isEmpty) {
@@ -140,6 +148,12 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
   }
 }
 
+/**
+ * JoinAttributeFilter filters indexes out if
+ *   1) each join condition column should com from relations directly
+ *   2) attributes from left plan must exclusively have one-to-one mapping with attribute
+ *       from attributes from right plan.
+ */
 object JoinAttributeFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
     if (candidateIndexes.isEmpty || candidateIndexes.size != 2) {
@@ -285,6 +299,11 @@ object JoinAttributeFilter extends QueryPlanIndexFilter {
     }
 }
 
+/**
+ * JoinColumnFilter filters indexes out if
+ *   1) an index does not contain all required columns
+ *   2) all join column should be the indexed columns of an index
+ */
 object JoinColumnFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
     if (candidateIndexes.isEmpty || candidateIndexes.size != 2) {
@@ -476,6 +495,9 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
   }
 }
 
+/**
+ * JoinRankFilter selected the best applicable pair of indexes for Left and Right plan.
+ */
 object JoinRankFilter extends IndexRankFilter {
   override def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
     if (indexes.isEmpty || indexes.size != 2) {
