@@ -109,7 +109,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     val indexes = if (allIndexes.isEmpty) {
       IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
     } else {
-      allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
+      allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
       allIndexes
     }
     val candidateIndexes = CandidateIndexCollector(plan, indexes)
@@ -160,7 +160,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(msg.isDefined)
       assert(msg.get.exists(_.contains("Not eligible Join - no join condition.")))
     }
@@ -173,7 +173,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(msg.isDefined)
       assert(
         msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
@@ -187,7 +187,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(msg.isDefined)
       assert(
         msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
@@ -201,7 +201,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(msg.isDefined)
       assert(
         msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
@@ -223,7 +223,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     assert(updatedPlan.equals(originalPlan))
 
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(msg.isDefined)
 
       index.name match {
@@ -275,7 +275,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
     assert(updatedPlan.equals(originalPlan))
 
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(msg.isDefined)
 
       index.name match {
@@ -435,7 +435,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
       val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
       assert(updatedPlan.equals(originalPlan))
       allIndexes.foreach { index =>
-        val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+        val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
         assert(msg.isDefined)
         assert(msg.get.toSet.equals(Set(
           "Each join condition column should come from relations directly and attributes " +

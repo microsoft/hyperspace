@@ -26,10 +26,9 @@ import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
-
 object FilterPlanNodeFilter extends QueryPlanIndexFilter {
-  override def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToIndexesMap = {
-    if (indexes.isEmpty) {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty) {
       return Map.empty
     }
 
@@ -41,10 +40,10 @@ object FilterPlanNodeFilter extends QueryPlanIndexFilter {
     plan match {
       case Project(_, Filter(_: Expression, ExtractRelation(relation)))
           if !RuleUtils.isIndexApplied(relation) =>
-        indexes.filterKeys(relation.plan.equals(_))
+        candidateIndexes.filterKeys(relation.plan.equals(_))
       case Filter(_: Expression, ExtractRelation(relation))
           if !RuleUtils.isIndexApplied(relation) =>
-        indexes.filterKeys(relation.plan.equals(_))
+        candidateIndexes.filterKeys(relation.plan.equals(_))
       case _ =>
         Map.empty
     }
@@ -52,8 +51,8 @@ object FilterPlanNodeFilter extends QueryPlanIndexFilter {
 }
 
 object FilterColumnFilter extends QueryPlanIndexFilter {
-  override def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToIndexesMap = {
-    if (indexes.isEmpty) {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty || candidateIndexes.size != 1) {
       return Map.empty
     }
 
@@ -80,37 +79,46 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
     // Filter candidate indexes if:
     //  1. Filter predicate's columns include the first 'indexed' column of the index.
     //  2. The index covers all columns from the filter predicate and output columns list.
-    val candidateIndexes =
-      indexes.head._2.filter { index =>
+    val (rel, indexes) = candidateIndexes.head
+    val filteredIndexes =
+      indexes.filter { index =>
         val ddColumns = index.derivedDataset.properties.columns
-        withReasonTag("The first indexed column should be in filter condition columns.") {
+        withFilterReasonTag(
+          plan,
+          index,
+          "The first indexed column should be in filter condition columns.") {
           ResolverUtils.resolve(spark, ddColumns.indexed.head, filterColumnNames).isDefined
-        }(plan, index) &&
-        withReasonTag(
+        } &&
+        withFilterReasonTag(
+          plan,
+          index,
           "Index does not contain required columns. Required columns: " +
             s"[${filterColumnNames ++ projectColumnNames}], indexed & included columns: " +
-            s"[${ddColumns.indexed ++ ddColumns.included}") {
+            s"[${ddColumns.indexed ++ ddColumns.included}]") {
           ResolverUtils
             .resolve(
               spark,
               filterColumnNames ++ projectColumnNames,
               ddColumns.indexed ++ ddColumns.included)
             .isDefined
-        }(plan, index)
+        }
       }
 
-    Map(indexes.head._1 -> candidateIndexes)
+    Map(rel -> filteredIndexes)
   }
 }
 
 object FilterRankFilter extends IndexRankFilter {
-  override def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
-    if (indexes.isEmpty || indexes.size != 1 || indexes.head._2.isEmpty) {
+  override def apply(
+      plan: LogicalPlan,
+      applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
+    if (applicableIndexes.isEmpty || applicableIndexes.size != 1
+        || applicableIndexes.head._2.isEmpty) {
       Map.empty
     } else {
-      val selected = FilterIndexRanker.rank(spark, plan, indexes.head._2).get
-      setRankReasonTag(plan, indexes.head._2, selected)
-      Map(indexes.head._1 -> selected)
+      val selected = FilterIndexRanker.rank(spark, plan, applicableIndexes.head._2).get
+      setFilterReasonTagForRank(plan, applicableIndexes.head._2, selected)
+      Map(applicableIndexes.head._1 -> selected)
     }
   }
 }

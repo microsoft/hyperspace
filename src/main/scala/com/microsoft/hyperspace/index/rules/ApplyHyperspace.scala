@@ -32,7 +32,8 @@ import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
  * Collect candidate indexes for each source plan.
  */
 object CandidateIndexCollector extends ActiveSparkSession {
-  private val sourceFilters = ColumnSchemaFilter :: FileSignatureFilter :: Nil
+  private val sourceFilters
+    : Seq[SourcePlanIndexFilter] = ColumnSchemaFilter :: FileSignatureFilter :: Nil
 
   private def initializePlanToIndexes(
       plan: LogicalPlan,
@@ -67,7 +68,7 @@ object CandidateIndexCollector extends ActiveSparkSession {
  */
 class ScoreBasedIndexPlanOptimizer {
   // TODO: FilterIndexRule :: JoinIndexRule :: Nil
-  private val rules = NoOpRule :: Nil
+  private val rules: Seq[HyperspaceRule] = NoOpRule :: Nil
 
   // Map for memoization. The key is the logical plan before applying [[HyperspaceRule]]s
   // and its value is a pair of best transformed plan and its score.
