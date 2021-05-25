@@ -330,7 +330,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
         }
 
         val allIndexes = indexList.map(indexName => latestIndexLogEntry(systemPath, indexName))
-        allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
+        allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
 
         val plan1 =
           spark.read.parquet(dataPath).select("id", "name").queryExecution.optimizedPlan
@@ -341,7 +341,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
         assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
 
         allIndexes.foreach { entry =>
-          val msg = entry.getTagValue(plan1, IndexLogEntryTags.WHYNOT_REASON)
+          val msg = entry.getTagValue(plan1, IndexLogEntryTags.FILTER_REASONS)
           if (filtered.contains(entry.name)) {
             assert(msg.isEmpty)
           } else {
@@ -355,7 +355,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
           }
 
           // Unset for next test though it will use a different plan.
-          entry.unsetTagValue(plan1, IndexLogEntryTags.WHYNOT_REASON)
+          entry.unsetTagValue(plan1, IndexLogEntryTags.FILTER_REASONS)
         }
 
         // Hybrid Scan candidate test
@@ -367,7 +367,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
           assert(indexes.isEmpty)
 
           allIndexes.foreach { entry =>
-            val msg = entry.getTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+            val msg = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
             assert(msg.isDefined)
             entry.name match {
               case "index_differentColumn" =>
@@ -379,7 +379,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
             }
 
             // Unset for next test.
-            entry.unsetTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+            entry.unsetTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
           }
 
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
@@ -390,7 +390,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
               assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
 
               allIndexes.foreach { entry =>
-                val msg = entry.getTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+                val msg = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
                 if (filtered.contains(entry.name)) {
                   assert(msg.isEmpty)
                 } else {
@@ -404,7 +404,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
                 }
 
                 // Unset for next test.
-                entry.unsetTagValue(plan2, IndexLogEntryTags.WHYNOT_REASON)
+                entry.unsetTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
               }
             }
 
@@ -421,7 +421,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
                 assert(indexes.isEmpty)
 
                 allIndexes.foreach { entry =>
-                  val msg = entry.getTagValue(plan3, IndexLogEntryTags.WHYNOT_REASON)
+                  val msg = entry.getTagValue(plan3, IndexLogEntryTags.FILTER_REASONS)
                   assert(msg.isDefined)
                   entry.name match {
                     case "index_differentColumn" =>
@@ -434,7 +434,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
                       assert(msg.get.exists(_.contains("Deleted bytes ratio")))
                   }
 
-                  entry.unsetTagValue(plan3, IndexLogEntryTags.WHYNOT_REASON)
+                  entry.unsetTagValue(plan3, IndexLogEntryTags.FILTER_REASONS)
                 }
               }
 

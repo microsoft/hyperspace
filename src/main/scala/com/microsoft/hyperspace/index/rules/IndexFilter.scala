@@ -30,37 +30,84 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 trait IndexFilter extends ActiveSparkSession {
 
   /**
-   * Append a given reason string to WHYNOT_REASON tag of the index if the condition is false and
-   * WHYNOT_ENABLED tag is set to the index.
+   * Append a given reason string to FILTER_REASONS tag of the index if the condition is false and
+   * FILTER_REASONS_ENABLED tag is set to the index.
    *
    * @param condition Flag for reason string
+   * @param plan Query plan to tag
+   * @param index Index to tag
    * @param reasonString Informational message in case condition is false.
-   * @param keyPair A pair of plan and index to tag
    */
-  protected def setReasonTag(condition: Boolean, reasonString: => String)(
-      implicit keyPair: (LogicalPlan, IndexLogEntry)): Unit = {
-    val (plan, index) = keyPair
-    if (!condition && index.getTagValue(IndexLogEntryTags.WHYNOT_ENABLED).getOrElse(false)) {
+  protected def setFilterReasonTag(
+      condition: Boolean,
+      plan: LogicalPlan,
+      index: IndexLogEntry,
+      reasonString: => String): Unit = {
+    if (!condition && index
+          .getTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED)
+          .getOrElse(false)) {
       val prevReason =
-        index.getTagValue(plan, IndexLogEntryTags.WHYNOT_REASON).getOrElse(Nil)
-      index.setTagValue(plan, IndexLogEntryTags.WHYNOT_REASON, prevReason :+ reasonString)
+        index.getTagValue(plan, IndexLogEntryTags.FILTER_REASONS).getOrElse(Nil)
+      index.setTagValue(plan, IndexLogEntryTags.FILTER_REASONS, prevReason :+ reasonString)
     }
   }
 
   /**
-   * Append a given reason string to WHYNOT_REASON tag of the index
-   * if the result of the given function is false.
+   * Append the reason string to FILTER_REASONS tag for the given index
+   * if the result of the function is false and FILTER_REASONS tag is set to the index.
    *
    * @param reasonString Informational message in case condition is false.
+   * @param plan Query plan to tag
+   * @param index Index to tag
    * @param f Function for a condition
-   * @param keyPair A pair of plan and index to tag
    * @return Result of the given function
    */
-  protected def withReasonTag(reasonString: => String)(f: => Boolean)(
-      implicit keyPair: (LogicalPlan, IndexLogEntry)): Boolean = {
+  protected def withFilterReasonTag(
+      plan: LogicalPlan,
+      index: IndexLogEntry,
+      reasonString: => String)(f: => Boolean): Boolean = {
     val ret = f
-    setReasonTag(ret, reasonString)(keyPair)
+    setFilterReasonTag(ret, plan, index, reasonString)
     ret
+  }
+
+  /**
+   * Append the reason string to FILTER_REASONS tag for the given list of indexes
+   * if the result of the function is false and FILTER_REASONS_ENABLED tag is set to the index.
+   *
+   * @param plan Query plan to tag
+   * @param indexes Indexes to tag
+   * @param reasonString Informational message in case condition is false.
+   * @param f Function for a condition
+   * @return Result of the given function
+   */
+  protected def withFilterReasonTag(
+      plan: LogicalPlan,
+      indexes: Seq[IndexLogEntry],
+      reasonString: => String)(f: => Boolean): Boolean = {
+    val ret = f
+    indexes.foreach { index =>
+      setFilterReasonTag(ret, plan, index, reasonString)
+    }
+    ret
+  }
+
+  /**
+   * Append the reason string to FILTER_REASONS tag for the given list of indexes
+   * if FILTER_REASONS_ENABLED tag is set to the indexes.
+   *
+   * @param reasonString Informational message in case condition is false.
+   * @param plan Query plan to tag
+   * @param indexes Indexes to tag
+   * @return Result of the given function
+   */
+  protected def setFilterReasonTag(
+      plan: LogicalPlan,
+      indexes: Seq[IndexLogEntry],
+      reasonString: => String): Unit = {
+    indexes.foreach { index =>
+      setFilterReasonTag(false, plan, index, reasonString)
+    }
   }
 }
 
@@ -109,20 +156,22 @@ trait IndexRankFilter extends IndexFilter {
   def apply(plan: LogicalPlan, applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap
 
   /**
-   * Set WHYNOT_REASON tag for unselected indexes.
+   * Set FILTER_REASONS tag for unselected indexes.
    *
    * @param plan Plan to tag
    * @param indexes Indexes to tag
    * @param selectedIndex Selected index
    */
-  protected def setRankReasonTag(
+  protected def setFilterReasonTagForRank(
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry],
       selectedIndex: IndexLogEntry): Unit = {
     indexes.foreach { index =>
-      setReasonTag(
+      setFilterReasonTag(
         selectedIndex.name.equals(index.name),
-        s"Another candidate index is applied: ${selectedIndex.name}")(plan, index)
+        plan,
+        index,
+        s"Another candidate index is applied: ${selectedIndex.name}")
     }
   }
 }
@@ -135,14 +184,16 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
     val relationColumnNames = plan.output.map(_.name)
 
     indexes.filter { index =>
-      withReasonTag(
-        s"Column Schema does not match. " +
+      withFilterReasonTag(
+        plan,
+        index,
+        "Column Schema does not match. " +
           s"Relation columns: [${relationColumnNames.mkString(", ")}], " +
           s"Index columns: [${(index.indexedColumns ++ index.includedColumns).mkString(", ")}]") {
         ResolverUtils
           .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnNames)
           .isDefined
-      }(plan, index)
+      }
     }
   }
 }
@@ -180,9 +231,12 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
       // Map of a signature provider to a signature generated for the given plan.
       val signatureMap = mutable.Map[String, Option[String]]()
       indexes.filter { index =>
-        withReasonTag(s"Index signature does not match. Try Hybrid Scan or refreshIndex.") {
+        withFilterReasonTag(
+          plan,
+          index,
+          s"Index signature does not match. Try Hybrid Scan or refreshIndex.") {
           signatureValid(relation, index, signatureMap)
-        }(plan, index)
+        }
       }
     }
   }
@@ -233,8 +287,6 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
     //  See https://github.com/microsoft/hyperspace/issues/158
 
     val entry = relation.closestIndex(index)
-    // Tag to original index log entry to check the reason string with the given log entry.
-    implicit val reasonTagKey = (relation.plan, index)
 
     val isHybridScanCandidate =
       entry.withCachedTag(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE) {
@@ -251,15 +303,22 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
         val appendedBytesRatio = 1 - commonBytes / relation.allFileSizeInBytes.toFloat
         val deletedBytesRatio = 1 - commonBytes / entry.sourceFilesSizeInBytes.toFloat
 
+        // Tag to original index log entry to check the reason string with the given log entry.
         lazy val hasLineageColumnCond =
-          withReasonTag("Lineage column does not exist.")(entry.hasLineageColumn)
-        lazy val hasCommonFilesCond = withReasonTag("No common files.")(commonCnt > 0)
-        lazy val appendThresholdCond = withReasonTag(
+          withFilterReasonTag(relation.plan, index, "Lineage column does not exist.")(
+            entry.hasLineageColumn)
+        lazy val hasCommonFilesCond =
+          withFilterReasonTag(relation.plan, index, "No common files.")(commonCnt > 0)
+        lazy val appendThresholdCond = withFilterReasonTag(
+          relation.plan,
+          index,
           s"Appended bytes ratio ($appendedBytesRatio) is larger than " +
             s"threshold config ${HyperspaceConf.hybridScanAppendedRatioThreshold(spark)}") {
           appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
         }
-        lazy val deleteThresholdCond = withReasonTag(
+        lazy val deleteThresholdCond = withFilterReasonTag(
+          relation.plan,
+          index,
           s"Deleted bytes ratio ($deletedBytesRatio) is larger than " +
             s"threshold config ${HyperspaceConf.hybridScanDeletedRatioThreshold(spark)}") {
           deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)

@@ -116,15 +116,18 @@ class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
 
     val originalPlan = Project(Seq(c2, c3, c4), filterNode) // c4 is not covered by index
     val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
+    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
     val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(transformedPlan.equals(originalPlan), "Plan should not transform.")
-    allIndexes.map { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       index.name match {
         case `indexName1` =>
           assert(msg.isDefined)
-          assert(msg.get.exists(_.contains("Index does not contain required columns.")))
+          assert(
+            msg.get.exists(
+              _.equals("Index does not contain required columns. Required columns: " +
+                "[c3,c2,c3,c4], Indexed & included columns: [c3,c2,c1]")))
         case `indexName2` | `indexName3` =>
           assert(msg.isDefined)
           assert(
@@ -151,12 +154,12 @@ class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
     val originalPlan = Filter(filterCondition, scanNode)
 
     val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.WHYNOT_ENABLED, true))
+    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
     val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName2)
-    allIndexes.map { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.WHYNOT_REASON)
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       index.name match {
         case `indexName1` =>
           assert(msg.isDefined)
