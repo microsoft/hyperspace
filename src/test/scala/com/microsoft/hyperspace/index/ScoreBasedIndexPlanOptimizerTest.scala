@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.rules.CandidateIndexCollector
-import com.microsoft.hyperspace.index.rules.disabled.JoinIndexRule
+import com.microsoft.hyperspace.index.rules.disabled.{FilterIndexRule, JoinIndexRule}
 
 class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
   private val testDir = inTempDir("scoreBasedIndexPlanOptimizerTest")
@@ -55,8 +55,9 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
     spark.disableHyperspace()
   }
 
-  test("Verify filter index pair with high score should be prior to " +
-    "join index pair with lower score.") {
+  test(
+    "Verify filter index pair with high score should be prior to " +
+      "join index pair with lower score.") {
     withTempPathAsString { testPath =>
       SampleData.save(spark, testPath, Seq("c1", "c2", "c3", "c4", "c5"))
 
@@ -94,8 +95,15 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
           val plan = query(leftDf, rightDf)().queryExecution.optimizedPlan
           val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
           val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
-          val (transformedPlan, score) = JoinIndexRule.apply(plan, candidateIndexes)
+          val (_, score) = JoinIndexRule.apply(plan, candidateIndexes)
           assert(score == 70)
+
+          val (leftChildPlan, leftChildScore) =
+            FilterIndexRule.apply(plan.children.head, candidateIndexes)
+          val (rightChildPlan, rightChildScore) =
+            FilterIndexRule.apply(plan.children.last, candidateIndexes)
+          assert(leftChildScore == 50)
+          assert(rightChildScore == 50)
 
           verifyIndexUsage(
             query(leftDf, rightDf),

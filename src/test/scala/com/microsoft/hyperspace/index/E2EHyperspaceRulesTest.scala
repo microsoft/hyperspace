@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import com.microsoft.hyperspace.actions.Constants
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
@@ -26,6 +25,7 @@ import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, 
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
+import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
@@ -230,8 +230,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       val plan = f().queryExecution.optimizedPlan
       val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
       val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
-      val (updatedPlan, score) =
-        JoinIndexRule.apply(f().queryExecution.optimizedPlan, candidateIndexes)
+      val (updatedPlan, score) = JoinIndexRule.apply(plan, candidateIndexes)
       assert(updatedPlan.equals(plan))
       assert(score == 0)
     }
