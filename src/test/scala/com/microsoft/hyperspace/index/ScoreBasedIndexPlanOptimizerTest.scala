@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, QueryTest, Row}
+import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 
@@ -71,6 +71,7 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
           val rightDfJoinIndexConfig = IndexConfig("rightDfJoinIndex", Seq("c3"), Seq("c5"))
           hyperspace.createIndex(rightDf, rightDfJoinIndexConfig)
 
+          // Append data to the same path.
           leftDf.write.mode("append").parquet(testPath)
         }
 
@@ -91,7 +92,7 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
 
         withSQLConf(TestConfig.HybridScanEnabled: _*) {
           // For join index pair, the score is 70 * 0.5(left) + 70 * 0.5(right) = 70
-          // because of the appended data. For filter index pair, score is 50 + 50 = 100
+          // because of the appended data. For filter index pair, the score is 50 + 50 = 100
           val plan = query(leftDf, rightDf)().queryExecution.optimizedPlan
           val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
           val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
@@ -103,7 +104,9 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
           val (rightChildPlan, rightChildScore) =
             FilterIndexRule.apply(plan.children.last, candidateIndexes)
           assert(leftChildScore == 50)
+          assert(!leftChildPlan.equals(plan.children.head))
           assert(rightChildScore == 50)
+          assert(!rightChildPlan.equals(plan.children.last))
 
           verifyIndexUsage(
             query(leftDf, rightDf),
@@ -115,10 +118,10 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
   }
 
   /**
-   * Verify that the query plan has the expected rootPaths.
+   * Verify that the query plan has the expected root paths.
    *
-   * @param optimizedPlan the optimized query plan.
-   * @param expectedPaths the expected paths in the query plan.
+   * @param optimizedPlan Query plan
+   * @param expectedPaths Expected root paths
    */
   private def verifyQueryPlanHasExpectedRootPaths(
       optimizedPlan: LogicalPlan,
@@ -129,8 +132,8 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
   /**
    * Get all rootPaths from a query plan.
    *
-   * @param optimizedPlan the optimized query plan.
-   * @return a sequence of [[Path]].
+   * @param optimizedPlan Query plan
+   * @return A sequence of [[Path]]
    */
   private def getAllRootPaths(optimizedPlan: LogicalPlan): Seq[Path] = {
     optimizedPlan.collect {

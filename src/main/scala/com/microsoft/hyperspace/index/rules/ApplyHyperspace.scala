@@ -130,8 +130,8 @@ object ApplyHyperspace
   type PlanToIndexesMap = Map[LogicalPlan, Seq[IndexLogEntry]]
   type PlanToSelectedIndexMap = Map[LogicalPlan, IndexLogEntry]
 
-  // During index creation, refresh and optimize, disable ApplyHyperspace rule to avoid
-  // unwanted plan transformation.
+  // Flag to disable ApplyHyperspace rule during index maintenance jobs such as createIndex,
+  // refreshIndex and optimizeIndex.
   private[hyperspace] val disableForIndexMaintenance = new ThreadLocal[Boolean]
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
