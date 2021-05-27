@@ -41,7 +41,7 @@ class Hyperspace(spark: SparkSession) {
    * @param indexConfig the configuration of index to be created.
    */
   def createIndex(df: DataFrame, indexConfig: IndexConfig): Unit = {
-    withHyperspaceRuleDisabled(spark) {
+    withHyperspaceRuleDisabled {
       indexManager.create(df, indexConfig)
     }
   }
@@ -90,7 +90,7 @@ class Hyperspace(spark: SparkSession) {
    * @param mode Refresh mode. Currently supported modes are `incremental` and `full`.
    */
   def refreshIndex(indexName: String, mode: String): Unit = {
-    withHyperspaceRuleDisabled(spark) {
+    withHyperspaceRuleDisabled {
       indexManager.refresh(indexName, mode)
     }
   }
@@ -130,7 +130,7 @@ class Hyperspace(spark: SparkSession) {
    *             files, based on a threshold. "full" refers to recreation of index.
    */
   def optimizeIndex(indexName: String, mode: String): Unit = {
-    withHyperspaceRuleDisabled(spark) {
+    withHyperspaceRuleDisabled {
       indexManager.optimize(indexName, mode)
     }
   }
@@ -171,7 +171,7 @@ class Hyperspace(spark: SparkSession) {
     indexManager.index(indexName)
   }
 
-  private def withHyperspaceRuleDisabled(spark: SparkSession)(f: => Unit): Unit = {
+  private def withHyperspaceRuleDisabled(f: => Unit): Unit = {
     try {
       ApplyHyperspace.disableForIndexMaintenance.set(true)
       f
