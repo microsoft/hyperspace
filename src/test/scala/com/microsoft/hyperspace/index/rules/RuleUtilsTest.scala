@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.shim.{JoinWithoutHint, RepartitionByExpressionWithOptionalNumPartitions}
@@ -91,16 +92,17 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
     val indexManager = IndexCollectionManager(spark)
     val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    val t1Relation = RuleUtils.getRelation(spark, t1ProjectNode).get
-    val t2Relation = RuleUtils.getRelation(spark, t2ProjectNode).get
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t1Relation).length === 3)
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes, t2Relation).length === 2)
+    val t1Relation = RuleUtils.getRelation(t1ProjectNode).get
+    val t2Relation = RuleUtils.getRelation(t2ProjectNode).get
+    val ruleHelper = new BaseRuleHelper(spark)
+    assert(ruleHelper.getCandidateIndexes(allIndexes, t1Relation).length === 3)
+    assert(ruleHelper.getCandidateIndexes(allIndexes, t2Relation).length === 2)
 
     // Delete an index for t1ProjectNode
     indexManager.delete("t1i1")
     val allIndexes2 = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
 
-    assert(RuleUtils.getCandidateIndexes(spark, allIndexes2, t1Relation).length === 2)
+    assert(ruleHelper.getCandidateIndexes(allIndexes2, t1Relation).length === 2)
   }
 
   test("Verify get logical relation for single logical relation node plan.") {
@@ -113,7 +115,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
 
   test("Verify get logical relation for non-linear plan.") {
     val joinNode = JoinWithoutHint(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
-    val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
+    val r = RuleUtils.getRelation(Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
   }
 
@@ -149,9 +151,10 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
             IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
             IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
               (if (hybridScanDeleteEnabled) "0.99" else "0")) {
-            val relation = RuleUtils.getRelation(spark, plan).get
-            val indexes = RuleUtils
-              .getCandidateIndexes(spark, allIndexes, relation)
+            val ruleHelper = new BaseRuleHelper(spark)
+            val relation = RuleUtils.getRelation(plan).get
+            val indexes = ruleHelper
+              .getCandidateIndexes(allIndexes, relation)
             if (expectedCandidateIndexes.nonEmpty) {
               assert(indexes.length === expectedCandidateIndexes.length)
               assert(indexes.map(_.name).toSet.equals(expectedCandidateIndexes.toSet))
@@ -281,11 +284,12 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
         val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
         df.limit(5).write.mode("append").parquet(dataPath)
         val optimizedPlan = spark.read.parquet(dataPath).queryExecution.optimizedPlan
-        val relation = RuleUtils.getRelation(spark, optimizedPlan).get
+        val ruleHelper = new BaseRuleHelper(spark)
+        val relation = RuleUtils.getRelation(optimizedPlan).get
 
         withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true") {
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99") {
-            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            val indexes = ruleHelper.getCandidateIndexes(allIndexes, relation)
             assert(
               indexes.head
                 .getTagValue(relation.plan, IndexLogEntryTags.IS_HYBRIDSCAN_CANDIDATE)
@@ -297,7 +301,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
           }
 
           withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.2") {
-            val indexes = RuleUtils.getCandidateIndexes(spark, allIndexes, relation)
+            val indexes = ruleHelper.getCandidateIndexes(allIndexes, relation)
             assert(indexes.isEmpty)
             assert(
               !allIndexes.head
@@ -326,7 +330,8 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
       val df = spark.read.parquet(dataPath)
       val query = df.filter(df("id") >= 3).select("id", "name")
       val bucketSpec = BucketSpec(100, Seq("id"), Seq())
-      val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
+      val ruleHelper = new BaseRuleHelper(spark)
+      val shuffled = ruleHelper.transformPlanToShuffleUsingBucketSpec(
         bucketSpec,
         query.queryExecution.optimizedPlan)
 
@@ -360,7 +365,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
       val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
       val query2 = df.filter(df("id") <= 3).select("id", "name")
       val shuffled2 =
-        RuleUtils.transformPlanToShuffleUsingBucketSpec(
+        ruleHelper.transformPlanToShuffleUsingBucketSpec(
           bucketSpec2,
           query2.queryExecution.optimizedPlan)
       assert(shuffled2.collect {
@@ -379,7 +384,7 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {
-    val r = RuleUtils.getRelation(spark, plan)
+    val r = RuleUtils.getRelation(plan)
     assert(r.isDefined)
     assert(r.get.plan.equals(expected))
   }

@@ -17,8 +17,8 @@
 package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.{Column, SparkSession}
-import org.apache.spark.sql.catalyst.analysis.Resolver
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Expression, ExtractValue, GetArrayStructFields, GetMapValue, GetStructField}
+import org.apache.spark.sql.catalyst.analysis.{Resolver, UnresolvedAttribute}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Expression, ExtractValue, GetArrayStructFields, GetMapValue, GetStructField, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, MapType, StructField, StructType}
@@ -30,76 +30,6 @@ import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn.NESTED_FIELD_P
  * [[ResolverUtils]] provides utility functions to resolve strings based on spark's resolver.
  */
 object ResolverUtils {
-
-  /**
-   * [[ResolvedColumn]] stores information when a column name is resolved against the
-   * analyzed plan and its schema.
-   *
-   * Outside unit tests, this object should not be created directly, but via the `resolve` function,
-   * or `ResolvedColumn.apply` with a normalized name.
-   *
-   * @param name The column name resolved from an analyzed plan.
-   * @param isNested Flag to denote if this column is nested or not.
-   */
-  private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
-    assert(!isNested || (name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX)))
-    // Quotes will be removed from `resolve` and nested columns with quotes (e.g., "a.`b.c`.d")
-    // are not supported.
-    assert(!name.contains("`"))
-
-    // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
-    lazy val normalizedName = {
-      if (isNested) {
-        s"$NESTED_FIELD_PREFIX$name"
-      } else {
-        name
-      }
-    }
-
-    /**
-     * Create a column using the resolved name. Top level column names are quoted, and
-     * nested column names are aliased with normalized names.
-     *
-     * @return [[Column]] object created using the resolved name.
-     */
-    def toColumn: Column = {
-      if (isNested) {
-        // No need to quote the string for "as" even if it contains dots.
-        col(name).as(normalizedName)
-      } else {
-        col(quote(name))
-      }
-    }
-
-    /**
-     * Create a column using the normalized name. Since the normalized name is already flattened
-     * with "dots", it is quoted.
-     *
-     * @return [[Column]] object create using the normalized name.
-     */
-    def toNormalizedColumn: Column = col(quote(normalizedName))
-
-    private def quote(name: String) = s"`$name`"
-  }
-
-  private[hyperspace] object ResolvedColumn {
-    private val NESTED_FIELD_PREFIX = "__hs_nested."
-
-    /**
-     * Given a normalized column name, create [[ResolvedColumn]] after handling the prefix
-     * for nested columns.
-     *
-     * @param normalizedColumnName Normalized column name.
-     * @return [[ResolvedColumn]] created from the given normalized column name.
-     */
-    def apply(normalizedColumnName: String): ResolvedColumn = {
-      if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
-        ResolvedColumn(normalizedColumnName.substring(NESTED_FIELD_PREFIX.length), isNested = true)
-      } else {
-        ResolvedColumn(normalizedColumnName, isNested = false)
-      }
-    }
-  }
 
   /**
    * Return available string if required string can be resolved with it, based on spark resolver.
@@ -162,21 +92,54 @@ object ResolverUtils {
   def resolve(
       spark: SparkSession,
       requiredStrings: Seq[String],
-      plan: LogicalPlan): Option[Seq[ResolvedColumn]] = {
+      plan: LogicalPlan,
+      resolverMethod: (String, LogicalPlan, Resolver) => Option[Expression] =
+        defaultResolverMethod,
+      throwIfNotInSchema: Boolean = true): Option[Seq[ResolvedColumn]] = {
     val schema = plan.schema
     val resolver = spark.sessionState.conf.resolver
     val resolved = requiredStrings.map { requiredField =>
-      plan
-        .resolveQuoted(requiredField, resolver)
+      resolverMethod(requiredField, plan, resolver)
         .map { expr =>
           val resolvedColNameParts = extractColumnName(expr)
           validateResolvedColumnName(requiredField, resolvedColNameParts)
-          val origColNameParts = getColumnNameFromSchema(schema, resolvedColNameParts, resolver)
+          val origColNameParts =
+            getColumnNameFromSchema(schema, resolvedColNameParts, resolver, throwIfNotInSchema)
           ResolvedColumn(origColNameParts.mkString("."), origColNameParts.length > 1)
         }
         .getOrElse { return None }
     }
     Some(resolved)
+  }
+
+  /**
+   * The default way of resolving field names.
+   *
+   * @param fieldName The field name to resolve.
+   * @param plan The Logical Plan that contains information about the field.
+   * @param resolver The resolver to use to resolve the field.
+   * @return A optional [[Expression]] that is the resolved field name.
+   */
+  protected[hyperspace] def defaultResolverMethod(
+      fieldName: String,
+      plan: LogicalPlan,
+      resolver: Resolver): Option[Expression] = {
+    plan.resolveQuoted(fieldName, resolver)
+  }
+
+  /**
+   * The resolve children way of resolving field names.
+   *
+   * @param fieldName The field name to resolve.
+   * @param plan The Logical Plan that contains information about the field.
+   * @param resolver The resolver to use to resolve the field.
+   * @return A optional [[Expression]] that is the resolved field name.
+   */
+  protected[hyperspace] def resolveWithChildren(
+      fieldName: String,
+      plan: LogicalPlan,
+      resolver: Resolver): Option[NamedExpression] = {
+    plan.resolveChildren(UnresolvedAttribute.parseAttributeName(fieldName), resolver)
   }
 
   // Extracts the parts of a nested field access path from an expression.
@@ -188,9 +151,11 @@ object ResolverUtils {
         extractColumnName(child) :+ name
       case _: GetArrayStructFields =>
         // TODO: Nested arrays will be supported later
+        // See https://github.com/microsoft/hyperspace/issues/372
         throw HyperspaceException("Array types are not supported.")
       case _: GetMapValue =>
         // TODO: Nested maps will be supported later
+        // See https://github.com/microsoft/hyperspace/issues/411
         throw HyperspaceException("Map types are not supported.")
       case Alias(nested: ExtractValue, _) =>
         extractColumnName(nested)
@@ -212,19 +177,121 @@ object ResolverUtils {
   private def getColumnNameFromSchema(
       schema: StructType,
       resolvedColNameParts: Seq[String],
-      resolver: Resolver): Seq[String] = resolvedColNameParts match {
+      resolver: Resolver,
+      throwIfNotInSchema: Boolean = true): Seq[String] = resolvedColNameParts match {
     case h :: tail =>
-      val field = schema.find(f => resolver(f.name, h)).get
-      field match {
-        case StructField(name, s: StructType, _, _) =>
-          name +: getColumnNameFromSchema(s, tail, resolver)
-        case StructField(_, _: ArrayType, _, _) =>
-          // TODO: Nested arrays will be supported later
-          throw HyperspaceException("Array types are not supported.")
-        case StructField(_, _: MapType, _, _) =>
-          // TODO: Nested maps will be supported later
-          throw HyperspaceException("Map types are not supported")
-        case f => Seq(f.name)
+      val fieldOpt = schema.find(f => resolver(f.name, h))
+      fieldOpt match {
+        case Some(field) =>
+          field match {
+            case StructField(name, s: StructType, _, _) =>
+              name +: getColumnNameFromSchema(s, tail, resolver)
+            case StructField(_, _: ArrayType, _, _) =>
+              // TODO: Nested arrays will be supported later
+              // See https://github.com/microsoft/hyperspace/issues/372
+              throw HyperspaceException("Array types are not supported.")
+            case StructField(_, _: MapType, _, _) =>
+              // TODO: Nested maps will be supported later
+              // See https://github.com/microsoft/hyperspace/issues/411
+              throw HyperspaceException("Map types are not supported")
+            case f => Seq(f.name)
+          }
+        case _ =>
+          if (throwIfNotInSchema) {
+            throw HyperspaceException(s"Hyperspace cannot not find $h in schema")
+          } else {
+            if (tail.nonEmpty) {
+              h +: getColumnNameFromSchema(schema, tail, resolver, throwIfNotInSchema)
+            } else {
+              Seq(h)
+            }
+          }
       }
+  }
+
+  /**
+   * [[ResolvedColumn]] stores information when a column name is resolved against the
+   * analyzed plan and its schema.
+   *
+   * Outside unit tests, this object should not be created directly, but via the `resolve` function,
+   * or `ResolvedColumn.apply` with a normalized name.
+   *
+   * @param name The column name resolved from an analyzed plan.
+   * @param isNested Flag to denote if this column is nested or not.
+   */
+  private[hyperspace] case class ResolvedColumn(name: String, isNested: Boolean) {
+    assert(!isNested || (name.contains(".") && !name.startsWith(NESTED_FIELD_PREFIX)))
+    // Quotes will be removed from `resolve` and nested columns with quotes (e.g., "a.`b.c`.d")
+    // are not supported.
+    assert(!name.contains("`"))
+
+    // For nested fields, the column name is prefixed with `NESTED_FIELD_PREFIX`.
+    lazy val normalizedName: String = {
+      if (isNested) {
+        s"$NESTED_FIELD_PREFIX$name"
+      } else {
+        name
+      }
+    }
+
+    /**
+     * Create a column using the resolved name. Top level column names are quoted, and
+     * nested column names are aliased with normalized names.
+     *
+     * @return [[Column]] object created using the resolved name.
+     */
+    def toColumn: Column = {
+      if (isNested) {
+        // No need to quote the string for "as" even if it contains dots.
+        col(name).as(normalizedName)
+      } else {
+        col(quote(name))
+      }
+    }
+
+    /**
+     * Create a column using the normalized name. Since the normalized name is already flattened
+     * with "dots", it is quoted.
+     *
+     * @return [[Column]] object create using the normalized name.
+     */
+    def toNormalizedColumn: Column = col(quote(normalizedName))
+
+    /**
+     * Returns the simple name that is required in the projection.
+     *
+     * Given a nested column `nested.nested.fieldA` when doing select over it the
+     * returned column name by Spark will be `fieldA`.
+     *
+     * @return The name for projection if it's a nested field, otherwise [[None]].
+     */
+    def projectName: Option[String] = if (isNested && name.contains(".")) {
+      Some(name.split("\\.").last)
+    } else {
+      None
+    }
+
+    private def quote(name: String) = s"`$name`"
+  }
+
+  private[hyperspace] object ResolvedColumn {
+    private val NESTED_FIELD_PREFIX = "__hs_nested."
+
+    /**
+     * Given a normalized column name, create [[ResolvedColumn]] after handling the prefix
+     * for nested columns.
+     *
+     * @param normalizedColumnName Normalized column name.
+     * @return [[ResolvedColumn]] created from the given normalized column name.
+     */
+    def apply(normalizedColumnName: String): ResolvedColumn = {
+      if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
+        ResolvedColumn(
+          normalizedColumnName.substring(NESTED_FIELD_PREFIX.length),
+          isNested = true)
+      } else {
+        ResolvedColumn(normalizedColumnName, isNested = false)
+      }
+    }
   }
 }

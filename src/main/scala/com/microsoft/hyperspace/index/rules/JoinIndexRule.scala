@@ -61,17 +61,16 @@ object JoinIndexRule
         getBestIndexPair(l, r, condition)
           .map {
             case (lIndex, rIndex) =>
+              val ruleHelper = new BaseRuleHelper(spark)
               val updatedPlan =
                 join
                   .copy(
-                    left = RuleUtils.transformPlanToUseIndex(
-                      spark,
+                    left = ruleHelper.transformPlanToUseIndex(
                       lIndex,
                       l,
                       useBucketSpec = true,
                       useBucketUnionForAppended = true),
-                    right = RuleUtils.transformPlanToUseIndex(
-                      spark,
+                    right = ruleHelper.transformPlanToUseIndex(
                       rIndex,
                       r,
                       useBucketSpec = true,
@@ -109,11 +108,11 @@ object JoinIndexRule
   private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
     // The given plan is eligible if it is supported and index has not been applied.
     def isEligible(optRel: Option[FileBasedRelation]): Boolean = {
-      optRel.map(!RuleUtils.isIndexApplied(_)).getOrElse(false)
+      optRel.exists(!RuleUtils.isIndexApplied(_))
     }
 
-    lazy val optLeftRel = RuleUtils.getRelation(spark, l)
-    lazy val optRightRel = RuleUtils.getRelation(spark, r)
+    lazy val optLeftRel = RuleUtils.getRelation(l)
+    lazy val optRightRel = RuleUtils.getRelation(r)
 
     isJoinConditionSupported(condition) &&
     isPlanLinear(l) && isPlanLinear(r) &&
@@ -284,7 +283,8 @@ object JoinIndexRule
       left: LogicalPlan,
       right: LogicalPlan,
       joinCondition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val indexManager = Hyperspace.getContext(spark).indexCollectionManager
+    val hyperspaceContext = Hyperspace.getContext(spark)
+    val indexManager = hyperspaceContext.indexCollectionManager
 
     // TODO: the following check only considers indexes in ACTIVE state for usage. Update
     //  the code to support indexes in transitioning states as well.
@@ -294,10 +294,10 @@ object JoinIndexRule
     // TODO: we can write an extractor that applies `isApplicable` so that we don't have to
     //   get relations twice. Note that `getRelation` should always succeed since this has
     //   been already checked in `isApplicable`.
-    val leftRelation = RuleUtils.getRelation(spark, left).get
-    val rightRelation = RuleUtils.getRelation(spark, right).get
-    val lBaseAttrs = leftRelation.output.map(_.name)
-    val rBaseAttrs = rightRelation.output.map(_.name)
+    val leftRelation = RuleUtils.getRelation(left).get
+    val rightRelation = RuleUtils.getRelation(right).get
+    val lBaseAttrs = leftRelation.plan.output.map(_.name)
+    val rBaseAttrs = rightRelation.plan.output.map(_.name)
 
     // Map of left resolved columns with their corresponding right resolved
     // columns from condition.
@@ -316,14 +316,15 @@ object JoinIndexRule
     val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
     val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
 
-    val leftRel = RuleUtils.getRelation(spark, left).get
-    val rightRel = RuleUtils.getRelation(spark, right).get
+    val leftRel = RuleUtils.getRelation(left).get
+    val rightRel = RuleUtils.getRelation(right).get
 
     // Get candidate via file-level metadata validation. This is performed after pruning
     // by column schema, as this might be expensive when there are numerous files in the
     // relation or many indexes to be checked.
-    val lIndexes = RuleUtils.getCandidateIndexes(spark, lUsable, leftRel)
-    val rIndexes = RuleUtils.getCandidateIndexes(spark, rUsable, rightRel)
+    val ruleHelper = new BaseRuleHelper(spark)
+    val lIndexes = ruleHelper.getCandidateIndexes(lUsable, leftRel)
+    val rIndexes = ruleHelper.getCandidateIndexes(rUsable, rightRel)
 
     val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
 
