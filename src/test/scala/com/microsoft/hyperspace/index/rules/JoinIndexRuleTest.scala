@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.shim.{JoinWithoutHint => Join}
 import com.microsoft.hyperspace.util.{FileUtils, SparkTestShims}
 
-class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
+class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
   override val indexLocationDirName = "joinIndexRuleTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -113,7 +113,7 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
       allIndexes
     }
     val candidateIndexes = CandidateIndexCollector(plan, indexes)
-    disabled.JoinIndexRule.apply(plan, candidateIndexes)
+    JoinIndexRule.apply(plan, candidateIndexes)
   }
 
   test("Join rule works if indexes exist and configs are set correctly.") {
@@ -437,10 +437,11 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
       allIndexes.foreach { index =>
         val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
         assert(msg.isDefined)
-        assert(msg.get.toSet.equals(Set(
-          "Each join condition column should come from relations directly and attributes " +
-            "from left plan must exclusively have one-to-one mapping with attributes from " +
-            "right plan. E.g. join(A = B and A = D) is not eligible.")))
+        assert(
+          msg.get.toSet.equals(
+            Set("Each join condition column should come from relations directly and attributes " +
+              "from left plan must exclusively have one-to-one mapping with attributes from " +
+              "right plan. E.g. join(A = B and A = D) is not eligible.")))
       }
     }
     {

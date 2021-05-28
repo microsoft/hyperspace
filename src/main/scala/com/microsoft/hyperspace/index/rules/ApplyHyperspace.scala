@@ -67,8 +67,7 @@ object CandidateIndexCollector extends ActiveSparkSession {
  * Apply Hyperspace indexes based on the score of each index application.
  */
 class ScoreBasedIndexPlanOptimizer {
-  private val rules
-    : Seq[HyperspaceRule] = disabled.FilterIndexRule :: disabled.JoinIndexRule :: NoOpRule :: Nil
+  private val rules: Seq[HyperspaceRule] = FilterIndexRule :: JoinIndexRule :: NoOpRule :: Nil
 
   // Map for memoization. The key is the logical plan before applying [[HyperspaceRule]]s
   // and its value is a pair of best transformed plan and its score.

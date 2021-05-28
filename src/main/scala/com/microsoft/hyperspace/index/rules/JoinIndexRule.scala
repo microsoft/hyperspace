@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules.disabled
+package com.microsoft.hyperspace.index.rules
 
 import scala.collection.mutable
 import scala.util.Try
@@ -26,9 +26,8 @@ import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
-import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
-import com.microsoft.hyperspace.index.rules.disabled.JoinAttributeFilter.extractConditions
+import com.microsoft.hyperspace.index.rules.JoinAttributeFilter.extractConditions
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.shim.JoinWithoutHint
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}

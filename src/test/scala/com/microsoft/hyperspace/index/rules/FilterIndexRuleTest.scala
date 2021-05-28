@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 
-class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
+class FilterIndexRuleTest extends HyperspaceRuleSuite {
   override val indexLocationDirName = "joinIndexTest"
   val indexName1 = "filterIxTestIndex1"
   val indexName2 = "filterIxTestIndex2"
@@ -71,7 +71,7 @@ class FilterIndexRule_disabledTest extends HyperspaceRuleSuite {
       plan: LogicalPlan,
       allIndexes: Seq[IndexLogEntry]): (LogicalPlan, Int) = {
     val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
-    disabled.FilterIndexRule.apply(plan, candidateIndexes)
+    FilterIndexRule.apply(plan, candidateIndexes)
   }
 
   test("Verify FilterIndex rule is applied correctly.") {

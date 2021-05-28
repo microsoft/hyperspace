@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFR
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector}
-import com.microsoft.hyperspace.index.rules.disabled.JoinIndexRule
+import com.microsoft.hyperspace.index.rules.JoinIndexRule
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
