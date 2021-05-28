@@ -25,6 +25,7 @@ import org.mockito.Mockito.{mock, when}
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 class IndexCollectionManagerTest extends HyperspaceSuite {
   private val testLogManagerFactory: IndexLogManagerFactory = new IndexLogManagerFactory {
@@ -43,7 +44,8 @@ class IndexCollectionManagerTest extends HyperspaceSuite {
             Seq(),
             null,
             null,
-            LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
+            LogicalPlanFingerprint(
+              LogicalPlanFingerprint.Properties(Seq(Signature("", Fingerprint(""))))))
 
           val entry = IndexLogEntry(
             indexPath.toString,
@@ -95,7 +97,8 @@ class IndexCollectionManagerTest extends HyperspaceSuite {
         Seq(),
         null,
         null,
-        LogicalPlanFingerprint(LogicalPlanFingerprint.Properties(Seq(Signature("", "")))))
+        LogicalPlanFingerprint(
+          LogicalPlanFingerprint.Properties(Seq(Signature("", Fingerprint(""))))))
 
       val entry = IndexLogEntry(
         str,

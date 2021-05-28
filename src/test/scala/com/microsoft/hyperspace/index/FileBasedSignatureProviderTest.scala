@@ -20,6 +20,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.SparkFunSuite
 
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, MD5FingerprintBuilderFactory}
 
 class FileBasedSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength = 100
@@ -29,6 +30,8 @@ class FileBasedSignatureProviderTest extends SparkFunSuite with SparkInvolvedSui
   private val fileLengthDelta = 10
   private val fileModificationTimeDelta = 10
   private val newFilePath = new Path("newPath")
+
+  private val fbf = new MD5FingerprintBuilderFactory
 
   test("Logical relations from a same file have the same signature.") {
     val signature1 =
@@ -98,7 +101,7 @@ class FileBasedSignatureProviderTest extends SparkFunSuite with SparkInvolvedSui
   }
 
   test("Create FileBasedSignatureProvider.") {
-    val fileBasedSignatureProvider = new FileBasedSignatureProvider
+    val fileBasedSignatureProvider = new FileBasedSignatureProvider(fbf)
     assert(
       LogicalPlanSignatureProvider
         .create(fileBasedSignatureProvider.name)
@@ -113,8 +116,8 @@ class FileBasedSignatureProviderTest extends SparkFunSuite with SparkInvolvedSui
   private def createFileStatus(length: Long, modificationTime: Long, path: Path): FileStatus =
     SignatureProviderTestUtils.createFileStatus(length, modificationTime, path)
 
-  private def createFileBasedSignature(files: Seq[FileStatus]): String =
-    new FileBasedSignatureProvider()
+  private def createFileBasedSignature(files: Seq[FileStatus]): Fingerprint =
+    new FileBasedSignatureProvider(fbf)
       .signature(SignatureProviderTestUtils.createLogicalRelation(spark, files)) match {
       case Some(s) => s
       case None => throw HyperspaceException("Invalid plan for signature generation.")

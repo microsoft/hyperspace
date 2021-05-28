@@ -30,6 +30,7 @@ import org.apache.spark.sql.types.StructType
 import com.microsoft.hyperspace.index.{Content, FileIdTracker, Hdfs, IndexConstants, Relation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilder}
 
 /**
  * Implementation for file-based relation used by [[IcebergFileBasedSource]]
@@ -61,9 +62,14 @@ class IcebergRelation(
 
   /**
    * Computes the signature of the current relation.
+   *
+   * @param fb [[FingerprintBuilder]] used for building fingerprints
    */
-  override def signature: String = {
-    snapshotId.getOrElse(table.currentSnapshot().snapshotId()).toString + table.location()
+  override def signature(fb: FingerprintBuilder): Option[Fingerprint] = {
+    Some(
+      fb.add(snapshotId.getOrElse(table.currentSnapshot().snapshotId()).toString)
+        .add(table.location)
+        .build())
   }
 
   /**

@@ -20,6 +20,7 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 class IndexTest extends SparkFunSuite {
   val indexConfig1 = IndexConfig("myIndex1", Array("id"), Seq("name"))
@@ -35,7 +36,8 @@ class IndexTest extends SparkFunSuite {
       null,
       null,
       LogicalPlanFingerprint(
-        LogicalPlanFingerprint.Properties(Seq(Signature("signatureProvider", "dfSignature")))))
+        LogicalPlanFingerprint.Properties(
+          Seq(Signature("signatureProvider", Fingerprint("abcd"))))))
 
     val entry = IndexLogEntry(
       config.indexName,

@@ -21,8 +21,12 @@ import scala.util.{Success, Try}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.util.hyperspace.Utils
 
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilderFactory, MD5FingerprintBuilderFactory}
+
 /**
  * This trait contains the interface that provides the signature of logical plan.
+ *
+ * The implementation must have a constructor taking [[FingerprintBuilderFactory]] as an argument.
  */
 trait LogicalPlanSignatureProvider {
 
@@ -36,15 +40,17 @@ trait LogicalPlanSignatureProvider {
    * @param logicalPlan logical plan.
    * @return signature if it can be computed w.r.t signature provider assumptions; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String]
+  def signature(logicalPlan: LogicalPlan): Option[Fingerprint]
 }
 
 /**
  * Factory object for LogicalPlanSignatureProvider.
  */
 object LogicalPlanSignatureProvider {
+  private val fbf: FingerprintBuilderFactory = new MD5FingerprintBuilderFactory
+
   // Creates a default signature provider.
-  def create(): LogicalPlanSignatureProvider = new IndexSignatureProvider
+  def create(): LogicalPlanSignatureProvider = new IndexSignatureProvider(fbf)
 
   /**
    * Creates a parameterized signature provider.
@@ -53,7 +59,11 @@ object LogicalPlanSignatureProvider {
    * @return signature provider.
    */
   def create(name: String): LogicalPlanSignatureProvider = {
-    Try(Utils.classForName(name).newInstance) match {
+    Try(
+      Utils
+        .classForName(name)
+        .getConstructor(classOf[FingerprintBuilderFactory])
+        .newInstance(fbf)) match {
       case Success(provider: LogicalPlanSignatureProvider) => provider
       case _ =>
         throw new IllegalArgumentException(

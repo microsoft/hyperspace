@@ -31,6 +31,7 @@ import org.scalatest.BeforeAndAfter
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
   var testDir: file.Path = _
@@ -167,7 +168,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
          |          "properties" : {
          |            "signatures" : [ {
          |              "provider" : "provider",
-         |              "value" : "signatureValue"
+         |              "value" : "abcd"
          |            } ]
          |          },
          |          "kind" : "LogicalPlan"
@@ -219,7 +220,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
       null,
       LogicalPlanFingerprint(
         LogicalPlanFingerprint
-          .Properties(Seq(Signature("provider", "signatureValue")))
+          .Properties(Seq(Signature("provider", Fingerprint("abcd"))))
       ))
 
     val expected = IndexLogEntry.create(

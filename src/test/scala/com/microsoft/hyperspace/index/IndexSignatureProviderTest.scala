@@ -27,6 +27,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 
 import com.microsoft.hyperspace.SparkInvolvedSuite
 import com.microsoft.hyperspace.shim.JoinWithoutHint
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, MD5FingerprintBuilderFactory}
 
 class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength1 = 100
@@ -36,6 +37,8 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
   private val fileLength2 = 250
   private val fileModificationTime2 = 35000
   private val filePath2 = new Path("originalLocation2")
+
+  private val fbf = new MD5FingerprintBuilderFactory
 
   test("Verify signature for a plan with same logical relation node.") {
     val r1 = createSimplePlan(fileLength1, fileModificationTime1, filePath1)
@@ -128,8 +131,8 @@ class IndexSignatureProviderTest extends SparkFunSuite with SparkInvolvedSuite {
     Aggregate(grpExpression, aggExpression, projectNode)
   }
 
-  private def createIndexSignature(logicalPlan: LogicalPlan): String =
-    new IndexSignatureProvider().signature(logicalPlan) match {
+  private def createIndexSignature(logicalPlan: LogicalPlan): Fingerprint =
+    new IndexSignatureProvider(fbf).signature(logicalPlan) match {
       case Some(s) => s
       case None => fail("Invalid plan for signature generation.")
     }

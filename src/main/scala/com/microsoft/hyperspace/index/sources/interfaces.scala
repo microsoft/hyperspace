@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, 
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.{FileIdTracker, FileInfo, IndexConstants, IndexLogEntry, Relation}
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilder}
 
 /**
  * ::Experimental::
@@ -67,8 +68,14 @@ trait FileBasedRelation extends SourceRelation {
    *
    * This API is used when the signature of source needs to be computed, e.g., creating an index,
    * computing query plan's signature, etc.
+   *
+   * If it is not possible to compute the signature (e.g. there are no files left),
+   * the implementation might return None.
+   *
+   * @param fb [[FingerprintBuilder]] used for building fingerprints.
+   *           Use it to compute the signature from discriminating properties of the relation.
    */
-  def signature: String
+  def signature(fb: FingerprintBuilder): Option[Fingerprint]
 
   /**
    * FileStatus list for all source files that the current relation references to.

@@ -29,6 +29,7 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Hdfs.Properties
 import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.fingerprint.MD5FingerprintBuilderFactory
 
 trait HyperspaceRuleSuite extends HyperspaceSuite {
   private val defaultFileNames = Seq("f1.parquet", "f2.parquet")
@@ -41,7 +42,8 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
       inputFiles: Seq[FileInfo] = Seq(),
       writeLog: Boolean = true,
       filenames: Seq[String] = defaultFileNames): IndexLogEntry = {
-    val signClass = new RuleTestHelper.TestSignatureProvider().getClass.getName
+    val fbf = new MD5FingerprintBuilderFactory
+    val signClass = new RuleTestHelper.TestSignatureProvider(fbf).getClass.getName
 
     LogicalPlanSignatureProvider.create(signClass).signature(plan) match {
       case Some(s) =>

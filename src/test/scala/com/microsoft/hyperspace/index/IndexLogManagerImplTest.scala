@@ -26,6 +26,7 @@ import org.scalatest.BeforeAndAfterAll
 import com.microsoft.hyperspace.{SparkInvolvedSuite, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 class IndexLogManagerImplTest extends HyperspaceSuite {
   val testRoot = inTempDir("indexLogManagerTests")
@@ -68,7 +69,7 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
         null,
         null,
         LogicalPlanFingerprint(
-          LogicalPlanFingerprint.Properties(Seq(Signature("provider", "signature"))))))),
+          LogicalPlanFingerprint.Properties(Seq(Signature("provider", Fingerprint("abcd")))))))),
     Map())
 
   private def getEntry(state: String): LogEntry = {

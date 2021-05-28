@@ -34,6 +34,7 @@ import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONF
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
+import com.microsoft.hyperspace.util.fingerprint.Fingerprint
 
 object RuleUtils {
 
@@ -54,7 +55,7 @@ object RuleUtils {
       indexes: Seq[IndexLogEntry],
       relation: FileBasedRelation): Seq[IndexLogEntry] = {
     // Map of a signature provider to a signature generated for the given plan.
-    val signatureMap = mutable.Map[String, Option[String]]()
+    val signatureMap = mutable.Map[String, Option[Fingerprint]]()
 
     def signatureValid(entry: IndexLogEntry): Boolean = {
       entry.withCachedTag(relation.plan, IndexLogEntryTags.SIGNATURE_MATCHED) {

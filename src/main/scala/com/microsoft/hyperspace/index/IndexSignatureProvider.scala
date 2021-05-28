@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-import com.microsoft.hyperspace.util.HashingUtils
+import com.microsoft.hyperspace.util.fingerprint.{Fingerprint, FingerprintBuilderFactory}
 
 /**
  * [[IndexSignatureProvider]] provides signature for a logical plan based on:
@@ -29,10 +29,13 @@ import com.microsoft.hyperspace.util.HashingUtils
  *
  * If the plan does not comply with [[FileBasedSignatureProvider]] or [[PlanSignatureProvider]]
  * requirements for signature computation, then no signature will be provided for the plan.
+ *
+ * @param fbf [[FingerprintBuilderFactory]] used for building fingerprints
  */
-class IndexSignatureProvider extends LogicalPlanSignatureProvider {
-  private val fileBasedSignatureProvider = new FileBasedSignatureProvider
-  private val planSignatureProvider = new PlanSignatureProvider
+class IndexSignatureProvider(fbf: FingerprintBuilderFactory)
+    extends LogicalPlanSignatureProvider {
+  private val fileBasedSignatureProvider = new FileBasedSignatureProvider(fbf)
+  private val planSignatureProvider = new PlanSignatureProvider(fbf)
 
   /**
    * Generate the signature of logical plan.
@@ -41,10 +44,10 @@ class IndexSignatureProvider extends LogicalPlanSignatureProvider {
    * @return signature, if both [[FileBasedSignatureProvider]] and [[PlanSignatureProvider]]
    *         can generate signature for the logical plan; Otherwise None.
    */
-  def signature(logicalPlan: LogicalPlan): Option[String] = {
+  def signature(logicalPlan: LogicalPlan): Option[Fingerprint] = {
     fileBasedSignatureProvider.signature(logicalPlan).flatMap { f =>
       planSignatureProvider.signature(logicalPlan).map { p =>
-        HashingUtils.md5Hex(f + p)
+        fbf.create.add(f).add(p).build()
       }
     }
   }
