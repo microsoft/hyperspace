@@ -67,8 +67,8 @@ object CandidateIndexCollector extends ActiveSparkSession {
  * Apply Hyperspace indexes based on the score of each index application.
  */
 class ScoreBasedIndexPlanOptimizer {
-  // TODO: FilterIndexRule :: JoinIndexRule :: Nil
-  private val rules: Seq[HyperspaceRule] = NoOpRule :: Nil
+  private val rules
+    : Seq[HyperspaceRule] = disabled.FilterIndexRule :: disabled.JoinIndexRule :: NoOpRule :: Nil
 
   // Map for memoization. The key is the logical plan before applying [[HyperspaceRule]]s
   // and its value is a pair of best transformed plan and its score.
@@ -78,8 +78,29 @@ class ScoreBasedIndexPlanOptimizer {
     // If pre-calculated value exists, return it.
     scoreMap.get(plan).foreach(res => return res)
 
-    val optResult = (plan, 0)
-    // TODO apply indexes recursively.
+    def recChildren(cur: LogicalPlan): (LogicalPlan, Int) = {
+      // Get the best plan & score for each child node.
+      var score = 0
+      val resultPlan = cur.mapChildren { child =>
+        val res = recApply(child, indexes)
+        score += res._2
+        res._1
+      }
+      (resultPlan, score)
+    }
+
+    var optResult = (plan, 0)
+    rules.foreach { rule =>
+      val (transformedPlan, curScore) = rule(plan, indexes)
+      if (curScore > 0 || rule.equals(NoOpRule)) {
+        // Positive curScore means the rule is applied.
+        val result = recChildren(transformedPlan)
+        if (optResult._2 < result._2 + curScore) {
+          // Update if the total score is higher than the previous optimal.
+          optResult = (result._1, result._2 + curScore)
+        }
+      }
+    }
 
     scoreMap.put(plan, optResult)
     optResult
@@ -109,7 +130,15 @@ object ApplyHyperspace
   type PlanToIndexesMap = Map[LogicalPlan, Seq[IndexLogEntry]]
   type PlanToSelectedIndexMap = Map[LogicalPlan, IndexLogEntry]
 
+  // Flag to disable ApplyHyperspace rule during index maintenance jobs such as createIndex,
+  // refreshIndex and optimizeIndex.
+  private[hyperspace] val disableForIndexMaintenance = new ThreadLocal[Boolean]
+
   override def apply(plan: LogicalPlan): LogicalPlan = {
+    if (disableForIndexMaintenance.get) {
+      return plan
+    }
+
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager

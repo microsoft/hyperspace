@@ -33,7 +33,7 @@ trait IndexFilter extends ActiveSparkSession {
    * Append a given reason string to FILTER_REASONS tag of the index if the condition is false and
    * FILTER_REASONS_ENABLED tag is set to the index.
    *
-   * @param condition Flag for reason string
+   * @param condition Flag to append reason string
    * @param plan Query plan to tag
    * @param index Index to tag
    * @param reasonString Informational message in case condition is false.

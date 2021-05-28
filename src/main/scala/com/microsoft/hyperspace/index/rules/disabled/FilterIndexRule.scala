@@ -129,7 +129,8 @@ object FilterRankFilter extends IndexRankFilter {
         || applicableIndexes.head._2.isEmpty) {
       Map.empty
     } else {
-      val selected = FilterIndexRanker.rank(spark, plan, applicableIndexes.head._2).get
+      val relation = RuleUtils.getRelation(spark, plan).get
+      val selected = FilterIndexRanker.rank(spark, relation.plan, applicableIndexes.head._2).get
       setFilterReasonTagForRank(plan, applicableIndexes.head._2, selected)
       Map(applicableIndexes.head._1 -> selected)
     }
