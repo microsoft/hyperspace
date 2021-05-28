@@ -24,18 +24,24 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING, DOESNOTEXIST}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.telemetry.{AppInfo, CreateActionEvent, HyperspaceEvent}
-import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 class CreateAction(
-    spark: SparkSession,
+    override val spark: SparkSession,
     df: DataFrame,
     indexConfig: IndexConfig,
     final override protected val logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
     with Action {
+  private lazy val (index, indexData) = {
+    updateFileIdTracker(spark, df)
+    val properties = Map.empty ++ hasLineageProperty
+    indexConfig.createIndex(this, df, properties)
+  }
+
   final override def logEntry: LogEntry =
-    getIndexLogEntry(spark, df, indexConfig, indexDataPath, endId)
+    getIndexLogEntry(spark, df, indexConfig.indexName, index, indexDataPath, endId)
 
   final override val transientState: String = CREATING
 
@@ -67,20 +73,25 @@ class CreateAction(
   private def isValidIndexSchema(config: IndexConfig, dataFrame: DataFrame): Boolean = {
     // Resolve index config columns from available column names present in the dataframe.
     ResolverUtils
-      .resolve(
-        spark,
-        config.indexedColumns ++ config.includedColumns,
-        dataFrame.queryExecution.analyzed)
+      .resolve(spark, config.referencedColumns, dataFrame.queryExecution.analyzed)
       .isDefined
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
   //   This needs to be refactored to mark this as protected.
-  final override def op(): Unit = write(spark, df, indexConfig)
+  final override def op(): Unit = index.write(this, indexData)
 
   final override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {
     // LogEntry instantiation may fail if index config is invalid. Hence the 'Try'.
     val index = Try(logEntry.asInstanceOf[IndexLogEntry]).toOption
     CreateActionEvent(appInfo, indexConfig, index, df.queryExecution.logical.toString, message)
+  }
+
+  private def hasLineageProperty: Option[(String, String)] = {
+    if (HyperspaceConf.indexLineageEnabled(spark)) {
+      Some(IndexConstants.LINEAGE_PROPERTY -> "true")
+    } else {
+      None
+    }
   }
 }

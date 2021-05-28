@@ -100,9 +100,14 @@ trait HyperspaceSuite
     try f
     finally {
       val hs = new Hyperspace(spark)
-      indexNames.foreach { name =>
-        hs.deleteIndex(name)
-        hs.vacuumIndex(name)
+      try {
+        indexNames.foreach { name =>
+          hs.deleteIndex(name)
+          hs.vacuumIndex(name)
+        }
+      } catch {
+        case e: Exception =>
+          logError(s"Exception thrown during clean up: indexes = $indexNames, exception = $e")
       }
     }
   }

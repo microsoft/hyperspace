@@ -35,7 +35,7 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
   private val testDir = inTempDir("RefreshIndexDeleteTests")
   private val nonPartitionedDataPath = testDir + "/nonpartitioned"
   private val partitionedDataPath = testDir + "/partitioned"
-  private val indexConfig = IndexConfig("index1", Seq("Query"), Seq("imprs"))
+  private val indexConfig = CoveringIndexConfig("index1", Seq("Query"), Seq("imprs"))
   private var hyperspace: Hyperspace = _
 
   override def beforeAll(): Unit = {
@@ -386,8 +386,8 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
       }
 
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
-      assert(!indexLogEntry.hasLineageColumn)
-      assert(indexLogEntry.numBuckets === 20)
+      assert(!indexLogEntry.derivedDataset.canHandleDeletedFiles)
+      assert(indexLogEntry.derivedDataset.asInstanceOf[CoveringIndex].numBuckets === 20)
     }
   }
 

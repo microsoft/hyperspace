@@ -153,7 +153,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     // Versions are comma separated - <index log version>:<delta table version>.
     // e.g. "1:2,3:5,5:9"
     val versions =
-      index.derivedDataset.properties.properties
+      index.derivedDataset.properties
         .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
 
     if (versions.nonEmpty) {
@@ -190,7 +190,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     //   See https://github.com/microsoft/hyperspace/issues/408.
     if (!(HyperspaceConf.hybridScanEnabled(spark) &&
           HyperspaceConf.hybridScanDeleteEnabled(spark) &&
-          index.hasLineageColumn)) {
+          index.derivedDataset.canHandleDeletedFiles)) {
       return index
     }
 

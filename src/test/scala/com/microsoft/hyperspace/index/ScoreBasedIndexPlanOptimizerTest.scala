@@ -64,11 +64,12 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
       withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
         {
           val leftDf = spark.read.parquet(testPath)
-          val leftDfJoinIndexConfig = IndexConfig("leftDfJoinIndex", Seq("c3"), Seq("c4"))
+          val leftDfJoinIndexConfig = CoveringIndexConfig("leftDfJoinIndex", Seq("c3"), Seq("c4"))
           hyperspace.createIndex(leftDf, leftDfJoinIndexConfig)
 
           val rightDf = spark.read.parquet(testPath)
-          val rightDfJoinIndexConfig = IndexConfig("rightDfJoinIndex", Seq("c3"), Seq("c5"))
+          val rightDfJoinIndexConfig =
+            CoveringIndexConfig("rightDfJoinIndex", Seq("c3"), Seq("c5"))
           hyperspace.createIndex(rightDf, rightDfJoinIndexConfig)
 
           // Append data to the same path.
@@ -76,11 +77,13 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
         }
 
         val leftDf = spark.read.parquet(testPath)
-        val leftDfFilterIndexConfig = IndexConfig("leftDfFilterIndex", Seq("c4"), Seq("c3"))
+        val leftDfFilterIndexConfig =
+          CoveringIndexConfig("leftDfFilterIndex", Seq("c4"), Seq("c3"))
         hyperspace.createIndex(leftDf, leftDfFilterIndexConfig)
 
         val rightDf = spark.read.parquet(testPath)
-        val rightDfFilterIndexConfig = IndexConfig("rightDfFilterIndex", Seq("c5"), Seq("c3"))
+        val rightDfFilterIndexConfig =
+          CoveringIndexConfig("rightDfFilterIndex", Seq("c5"), Seq("c3"))
         hyperspace.createIndex(rightDf, rightDfFilterIndexConfig)
 
         def query(left: DataFrame, right: DataFrame): () => DataFrame = { () =>

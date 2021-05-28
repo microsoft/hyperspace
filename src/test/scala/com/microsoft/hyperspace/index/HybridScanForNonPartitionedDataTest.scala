@@ -84,7 +84,7 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
   }
 
   test("Delete-only: Hybrid Scan for delete support doesn't work without lineage column.") {
-    val indexConfig = IndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
+    val indexConfig = CoveringIndexConfig("index_ParquetDelete2", Seq("clicks"), Seq("query"))
     Seq(("indexWithoutLineage", "false", false), ("indexWithLineage", "true", true)) foreach {
       case (indexName, lineageColumnConfig, transformationExpected) =>
         withTempPathAsString { testPath =>

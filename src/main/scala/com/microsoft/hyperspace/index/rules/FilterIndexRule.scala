@@ -93,24 +93,25 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
     val (rel, indexes) = candidateIndexes.head
     val filteredIndexes =
       indexes.filter { index =>
-        val ddColumns = index.derivedDataset.properties.columns
         withFilterReasonTag(
           plan,
           index,
           "The first indexed column should be in filter condition columns.") {
-          ResolverUtils.resolve(spark, ddColumns.indexed.head, filterColumnNames).isDefined
+          ResolverUtils
+            .resolve(spark, index.derivedDataset.indexedColumns.head, filterColumnNames)
+            .isDefined
         } &&
         withFilterReasonTag(
           plan,
           index,
           "Index does not contain required columns. Required columns: " +
             s"[${(filterColumnNames ++ projectColumnNames).mkString(",")}], Indexed & " +
-            s"included columns: [${(ddColumns.indexed ++ ddColumns.included).mkString(",")}]") {
+            s"included columns: [${(index.derivedDataset.referencedColumns).mkString(",")}]") {
           ResolverUtils
             .resolve(
               spark,
               filterColumnNames ++ projectColumnNames,
-              ddColumns.indexed ++ ddColumns.included)
+              index.derivedDataset.referencedColumns)
             .isDefined
         }
       }

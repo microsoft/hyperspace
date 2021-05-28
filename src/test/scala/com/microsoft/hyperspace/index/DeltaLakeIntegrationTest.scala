@@ -35,6 +35,8 @@ import com.microsoft.hyperspace.index.sources.delta.DeltaLakeRelation
 import com.microsoft.hyperspace.util.PathUtils
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
+  private val IndexConfig = CoveringIndexConfig
+
   override val indexLocationDirName = "deltaLakeIntegrationTest"
 
   private val sampleData = SampleData.testData

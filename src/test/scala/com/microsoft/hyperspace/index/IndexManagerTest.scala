@@ -24,7 +24,7 @@ import org.apache.spark.sql.execution.datasources.{BucketingUtils, HadoopFsRelat
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types._
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestCoveringIndex}
 import com.microsoft.hyperspace.TestUtils.{copyWithState, getFileIdTracker, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
@@ -32,6 +32,8 @@ import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTest extends HyperspaceSuite with SQLHelper {
+  private val IndexConfig = CoveringIndexConfig
+
   private def sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
@@ -68,11 +70,9 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
           val actual = IndexStatistics(
             columns.getAs[String]("name"),
             columns.getAs[Seq[String]]("indexedColumns"),
-            columns.getAs[Seq[String]]("includedColumns"),
-            columns.getAs[Int]("numBuckets"),
-            columns.getAs[String]("schema"),
             columns.getAs[String]("indexLocation"),
-            columns.getAs[String]("state"))
+            columns.getAs[String]("state"),
+            columns.getAs[Map[String, String]]("additionalStats"))
 
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
@@ -84,12 +84,13 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
           val expected = IndexStatistics(
             indexConfig1.indexName,
             indexConfig1.indexedColumns,
-            indexConfig1.includedColumns,
-            200,
-            expectedSchema.json,
             s"$systemPath/${indexConfig1.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Constants.States.ACTIVE)
+            Constants.States.ACTIVE,
+            Map(
+              "includedColumns" -> indexConfig1.includedColumns.mkString(", "),
+              "numBuckets" -> "200",
+              "schema" -> expectedSchema.json))
 
           assert(actual.equals(expected))
         }
@@ -742,7 +743,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
   }
 
   private def expectedIndex(
-      indexConfig: IndexConfig,
+      indexConfig: CoveringIndexConfig,
       schema: StructType,
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
@@ -786,13 +787,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
 
         val entry = IndexLogEntry.create(
           indexConfig.indexName,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
-                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
-              IndexLogEntry.schemaString(schema),
-              IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
-              Map())),
+          TestCoveringIndex(indexConfig, schema),
           Content.fromDirectory(
             PathUtils.makeAbsolute(
               s"$systemPath/${indexConfig.indexName}" +

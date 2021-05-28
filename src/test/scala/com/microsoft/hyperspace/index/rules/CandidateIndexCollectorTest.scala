@@ -26,10 +26,12 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.{CoveringIndexConfig, IndexCollectionManager, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.FileUtils
 
 class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
+  private val IndexConfig = CoveringIndexConfig
+
   override val indexLocationDirName = "candidateIndexCollectorTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()
@@ -429,7 +431,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
                     case "index_noCommonFiles" =>
                       assert(msg.get.exists(_.contains("No common files.")))
                     case "index_noLineage" =>
-                      assert(msg.get.exists(_.contains("Lineage column does not exist.")))
+                      assert(msg.get.exists(_.contains("Index doesn't support deleted files.")))
                     case "index_ok" =>
                       assert(msg.get.exists(_.contains("Deleted bytes ratio")))
                   }

@@ -16,12 +16,10 @@
 
 package com.microsoft.hyperspace.actions
 
-import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.SparkSession
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, RefreshIncrementalActionEvent}
 
 /**
@@ -56,7 +54,7 @@ class RefreshIncrementalAction(
       "Refresh index is updating index by removing index entries " +
         s"corresponding to ${deletedFiles.length} deleted source data files.")
 
-    if (appendedFiles.nonEmpty) {
+    lazy val dfWithAppendedFiles = {
       val internalFileFormatName = Hyperspace
         .getContext(spark)
         .sourceProviderManager
@@ -64,38 +62,19 @@ class RefreshIncrementalAction(
         .internalFileFormatName()
 
       // Create a df with only appended files from original list of files.
-      val dfWithAppendedFiles = spark.read
+      spark.read
         .schema(df.schema)
         .format(internalFileFormatName)
         .options(previousIndexLogEntry.relations.head.options)
         .load(appendedFiles.map(_.name): _*)
-      write(spark, dfWithAppendedFiles, indexConfig)
     }
-
-    if (deletedFiles.nonEmpty) {
-      // For an index with lineage, find all the source data files which have been deleted,
-      // and use index records' lineage to mark and remove index entries which belong to
-      // deleted source data files as those entries are no longer valid.
-      val refreshDF =
-        spark.read
-          .parquet(previousIndexLogEntry.content.files.map(_.toString): _*)
-          .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedFiles.map(_.id): _*))
-
-      // Write refreshed data using Append mode if there are index data files from appended files.
-      val writeMode = if (appendedFiles.nonEmpty) {
-        SaveMode.Append
-      } else {
-        SaveMode.Overwrite
-      }
-
-      refreshDF.write.saveWithBuckets(
-        refreshDF,
-        indexDataPath.toString,
-        previousIndexLogEntry.numBuckets,
-        // previousIndexLogEntry should contain the resolved and prefixed field names.
-        previousIndexLogEntry.derivedDataset.properties.columns.indexed,
-        writeMode)
-    }
+    updatedIndex = Some(
+      previousIndexLogEntry.derivedDataset.refresh(
+        this,
+        appendedFiles,
+        dfWithAppendedFiles,
+        deletedFiles,
+        previousIndexLogEntry.content))
   }
 
   /**
@@ -110,12 +89,14 @@ class RefreshIncrementalAction(
     }
 
     // To handle deleted files, lineage column is required for the index.
-    if (deletedFiles.nonEmpty && !hasLineage(spark)) {
+    if (deletedFiles.nonEmpty && !previousIndexLogEntry.derivedDataset.canHandleDeletedFiles) {
       throw HyperspaceException(
         "Index refresh (to handle deleted source data) is " +
           "only supported on an index with lineage.")
     }
   }
+
+  private var updatedIndex: Option[Index] = None
 
   /**
    * Create a log entry with all source data files, and all required index content. This contains
@@ -126,7 +107,9 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val entry = getIndexLogEntry(spark, df, indexConfig, indexDataPath, endId)
+    val index = updatedIndex.getOrElse(previousIndexLogEntry.derivedDataset)
+    val entry =
+      getIndexLogEntry(spark, df, previousIndexLogEntry.name, index, indexDataPath, endId)
 
     // If there is no deleted files, there are index data files only for appended data in this
     // version and we need to add the index data files of previous index version.

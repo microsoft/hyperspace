@@ -18,6 +18,7 @@ package org.apache.spark.sql.hyperspace
 
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.types.StructType
 
 package object utils {
   implicit class DataFrameUtils(df: DataFrame) {
@@ -28,5 +29,10 @@ package object utils {
 
   def logicalPlanToDataFrame(spark: SparkSession, logicalPlan: LogicalPlan): DataFrame = {
     Dataset.ofRows(spark, logicalPlan)
+  }
+
+  implicit class StructTypeUtils(st: StructType) {
+    // Expose package-private method
+    def merge(that: StructType): StructType = st.merge(that)
   }
 }

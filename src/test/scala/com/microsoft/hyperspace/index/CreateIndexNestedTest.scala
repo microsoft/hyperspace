@@ -29,6 +29,8 @@ import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
+  private val IndexConfig = CoveringIndexConfig
+
   private val testDir = inTempDir("createIndexTests")
   private val nonPartitionedDataPath = testDir + "/samplenestedparquet"
   private val partitionedDataPath = testDir + "/samplenestedpartitionedparquet"
@@ -74,10 +76,11 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
         .count == 1)
     assert(
       hyperspace.indexes
-        .where(array_contains(col("includedColumns"), "__hs_nested.nested.leaf.cnt"))
+        .where(element_at(col("additionalStats"), "includedColumns").contains(
+          "__hs_nested.nested.leaf.cnt"))
         .count == 1)
     val colTypes = hyperspace.indexes
-      .select("schema")
+      .select(element_at(col("additionalStats"), "schema"))
       .collect()
       .map(r => r.getString(0))
       .head
@@ -98,8 +101,8 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       "Indexed columns with wrong case are stored in metadata")
     assert(
       indexes.head
-        .getAs[WrappedArray[String]]("includedColumns")
-        .head == "__hs_nested.nested.leaf.cnt",
+        .getAs[Map[String, String]]("additionalStats")(
+          "includedColumns") == "__hs_nested.nested.leaf.cnt",
       "Included columns with wrong case are stored in metadata")
   }
 

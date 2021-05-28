@@ -52,7 +52,7 @@ class RefreshQuickAction(
     }
 
     // To handle deleted files, lineage column is required for the index.
-    if (deletedFiles.nonEmpty && !previousIndexLogEntry.hasLineageColumn) {
+    if (deletedFiles.nonEmpty && !previousIndexLogEntry.derivedDataset.canHandleDeletedFiles) {
       throw HyperspaceException(
         "Index refresh to handle deleted source data is only supported on an index with lineage.")
     }

@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rankers
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.{CoveringIndex, IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
@@ -68,18 +68,22 @@ object JoinIndexRanker {
         lazy val commonSizeInBytes2 =
           getCommonSizeInBytes(leftChild, left2) + getCommonSizeInBytes(rightChild, right2)
 
-        if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
+        val left1NumBuckets = left1.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
+        val right1NumBuckets = right1.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
+        val left2NumBuckets = left2.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
+        val right2NumBuckets = right2.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
+        if (left1NumBuckets == right1NumBuckets && left2NumBuckets == right2NumBuckets) {
           if (!hybridScanEnabled || (commonSizeInBytes1 == commonSizeInBytes2)) {
-            left1.numBuckets > left2.numBuckets
+            left1NumBuckets > left2NumBuckets
           } else {
             // If both index pairs have the same number of buckets and Hybrid Scan is enabled,
             // pick the pair with more common bytes with the given source plan, so as to
             // reduce the overhead from handling appended and deleted files.
             commonSizeInBytes1 > commonSizeInBytes2
           }
-        } else if (left1.numBuckets == right1.numBuckets) {
+        } else if (left1NumBuckets == right1NumBuckets) {
           true
-        } else if (left2.numBuckets == right2.numBuckets) {
+        } else if (left2NumBuckets == right2NumBuckets) {
           false
         } else {
           // At this point, both pairs have different number of buckets. If Hybrid Scan is enabled,

@@ -18,17 +18,16 @@ package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.yarn.util.Clock
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData, TestCoveringIndex}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.FileUtils
 
 class IndexCacheTest extends HyperspaceSuite {
   val sampleParquetDataLocation = inTempDir("sampleparquet")
-  val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
+  val indexConfig1 = CoveringIndexConfig("index1", Seq("RGUID"), Seq("Date"))
 
   before {
     FileUtils.delete(new Path(sampleParquetDataLocation))
@@ -49,13 +48,11 @@ class IndexCacheTest extends HyperspaceSuite {
 
     val entry = IndexLogEntry(
       "index1",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(Seq("RGUID"), Seq("Date")),
-          IndexLogEntry.schemaString(schema),
-          10,
-          Map())),
+      TestCoveringIndex(
+        Seq("RGUID"),
+        Seq("Date"),
+        schema,
+        10),
       Content(Directory(indexDir)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

@@ -19,14 +19,14 @@ package com.microsoft.hyperspace
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig}
+import com.microsoft.hyperspace.index.{CoveringIndexConfig, HyperspaceSuite}
 import com.microsoft.hyperspace.util.FileUtils
 
 class HyperspaceTest extends HyperspaceSuite {
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = inTempDir("sampleparquet")
-  private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
-  private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
+  private val indexConfig1 = CoveringIndexConfig("index1", Seq("RGUID"), Seq("Date"))
+  private val indexConfig2 = CoveringIndexConfig("index2", Seq("Query"), Seq("imprs"))
   private var df: DataFrame = _
 
   override def beforeAll(): Unit = {

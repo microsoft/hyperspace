@@ -422,7 +422,7 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
       requiredIndexCols: Seq[String],
       allRequiredCols: Seq[String]): Seq[IndexLogEntry] = {
     indexes.filter { idx =>
-      val allCols = idx.indexedColumns ++ idx.includedColumns
+      val allCols = idx.derivedDataset.referencedColumns
       // All required index columns should match one-to-one with all indexed columns and
       // vice-versa. All required columns must be present in the available index columns.
       withFilterReasonTag(
@@ -438,7 +438,7 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         idx,
         s"Index does not contain all required columns. " +
           s"Required columns: [${allRequiredCols.mkString(",")}], " +
-          s"Index columns: [${(idx.indexedColumns ++ idx.includedColumns).mkString(",")}]") {
+          s"Index columns: [${(idx.derivedDataset.referencedColumns).mkString(",")}]") {
         allRequiredCols.forall(allCols.contains)
       }
     }

@@ -27,6 +27,8 @@ import com.microsoft.hyperspace.{BuildInfo, Hyperspace, HyperspaceException, Sam
 import com.microsoft.hyperspace.util.FileUtils
 
 class CreateIndexTest extends HyperspaceSuite with SQLHelper {
+  private val IndexConfig = CoveringIndexConfig
+
   private val testDir = inTempDir("createIndexTests")
   private val nonPartitionedDataPath = testDir + "/sampleparquet"
   private val partitionedDataPath = testDir + "/samplepartitionedparquet"
@@ -105,7 +107,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
       indexes.head.getAs[WrappedArray[String]]("indexedColumns").head == "Query",
       "Indexed columns with wrong case are stored in metadata")
     assert(
-      indexes.head.getAs[WrappedArray[String]]("includedColumns").head == "imprs",
+      indexes.head.getAs[Map[String, String]]("additionalStats")("includedColumns") == "imprs",
       "Included columns with wrong case are stored in metadata")
   }
 

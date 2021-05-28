@@ -18,13 +18,14 @@ package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
+import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
 
-import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{HyperspaceException, SampleData}
+import com.microsoft.hyperspace.TestCoveringIndex
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
@@ -36,7 +37,9 @@ class RefreshActionTest extends HyperspaceSuite {
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
   private var testLogEntry: LogEntry = _
 
+  private val sparkSession = spark
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    override def spark: SparkSession = sparkSession
     def getSourceRelations(df: DataFrame): Seq[Relation] = {
       val provider = new FileBasedSourceProviderManager(spark)
       df.queryExecution.optimizedPlan.collect {
@@ -82,13 +85,11 @@ class RefreshActionTest extends HyperspaceSuite {
 
     val entry = IndexLogEntry(
       "index1",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(Seq("clicks"), Seq()),
-          "schema",
-          10,
-          Map())),
+      TestCoveringIndex(
+        Seq("clicks"),
+        Nil,
+        StructType(StructField("clicks", IntegerType) :: Nil),
+        10),
       Content(Directory("dirPath")),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

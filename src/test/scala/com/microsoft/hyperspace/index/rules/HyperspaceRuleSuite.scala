@@ -24,7 +24,7 @@ import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.{StructField, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{HyperspaceException, TestCoveringIndex}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Hdfs.Properties
@@ -63,13 +63,11 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
 
         val indexLogEntry = IndexLogEntry.create(
           name,
-          CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
-                .Columns(indexCols.map(_.name), includedCols.map(_.name)),
-              IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-              numBuckets,
-              Map())),
+          TestCoveringIndex(
+            indexCols.map(_.name),
+            includedCols.map(_.name),
+            schemaFromAttributes(indexCols ++ includedCols: _*),
+            numBuckets),
           Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
           Source(SparkPlan(sourcePlanProperties)),
           Map())

@@ -17,19 +17,20 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.mockito.Mockito._
 
-import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{HyperspaceException, SampleData}
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 import com.microsoft.hyperspace.util.FileUtils
 
 class CreateActionTest extends HyperspaceSuite with SQLHelper {
+  private val IndexConfig = CoveringIndexConfig
+
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
@@ -38,7 +39,9 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
 
+  private val sparkSession = spark
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    override def spark: SparkSession = sparkSession
     def getSourceRelations(df: DataFrame): Seq[Relation] = {
       val provider = new FileBasedSourceProviderManager(spark)
       df.queryExecution.optimizedPlan.collect {
@@ -116,12 +119,12 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
 
   test("op() fails if index config is of wrong case and spark is case-sensitive") {
     when(mockLogManager.getLatestLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
-    val indexConfig = IndexConfig("index1", Seq("rgUID"), Seq("dATE"))
-    val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
+    val action1 = new CreateAction(
+      spark, df, IndexConfig("index1", Seq("rgUID"), Seq("dATE")), mockLogManager, mockDataManager)
     withSQLConf("spark.sql.caseSensitive" -> "true") {
-      val ex = intercept[HyperspaceException](action.op())
+      val ex = intercept[HyperspaceException](action1.op())
       assert(
-        ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
+        ex.getMessage.contains("Columns 'rgUID' could not be resolved from available " +
           "source columns:\n" +
             "root\n " +
             "|-- Date: string (nullable = true)\n " +
@@ -129,6 +132,20 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
             "|-- Query: string (nullable = true)\n " +
             "|-- imprs: integer (nullable = true)\n " +
             "|-- clicks: integer (nullable = true)"))
+    }
+    val action2 = new CreateAction(
+      spark, df, IndexConfig("index1", Seq("RGUID"), Seq("dATE")), mockLogManager, mockDataManager)
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
+      val ex = intercept[HyperspaceException](action2.op())
+      assert(
+        ex.getMessage.contains("Columns 'dATE' could not be resolved from available " +
+          "source columns:\n" +
+          "root\n " +
+          "|-- Date: string (nullable = true)\n " +
+          "|-- RGUID: string (nullable = true)\n " +
+          "|-- Query: string (nullable = true)\n " +
+          "|-- imprs: integer (nullable = true)\n " +
+          "|-- clicks: integer (nullable = true)"))
     }
   }
 

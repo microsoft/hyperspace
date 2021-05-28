@@ -344,22 +344,6 @@ object FileInfo {
   }
 }
 
-// IndexLogEntry-specific CoveringIndex that represents derived dataset.
-case class CoveringIndex(properties: CoveringIndex.Properties) {
-  val kind = "CoveringIndex"
-  val kindAbbr = "CI"
-}
-object CoveringIndex {
-  case class Properties(columns: Properties.Columns,
-    schemaString: String,
-    numBuckets: Int,
-    properties: Map[String, String])
-
-  object Properties {
-    case class Columns(indexed: Seq[String], included: Seq[String])
-  }
-}
-
 // IndexLogEntry-specific Signature that stores the signature provider and value.
 case class Signature(provider: String, value: String)
 
@@ -438,14 +422,11 @@ case class Source(plan: SparkPlan)
  */
 case class IndexLogEntry(
     name: String,
-    derivedDataset: CoveringIndex,
+    derivedDataset: Index,
     content: Content,
     source: Source,
     properties: Map[String, String])
     extends LogEntry(IndexLogEntry.VERSION) {
-
-  def schema: StructType =
-    DataType.fromJson(derivedDataset.properties.schemaString).asInstanceOf[StructType]
 
   def created: Boolean = state.equals(Constants.States.ACTIVE)
 
@@ -515,17 +496,11 @@ case class IndexLogEntry(
                           Content.fromLeafFiles(deleted.map(toFileStatus), fileIdTracker)))))))))))
   }
 
-  def bucketSpec: BucketSpec =
-    BucketSpec(
-      numBuckets = numBuckets,
-      bucketColumnNames = indexedColumns,
-      sortColumnNames = indexedColumns)
-
   override def equals(o: Any): Boolean = o match {
     case that: IndexLogEntry =>
-      config.equals(that.config) &&
+      name.equals(that.name) &&
+        derivedDataset.equals(that.derivedDataset) &&
         signature.equals(that.signature) &&
-        numBuckets.equals(that.numBuckets) &&
         content.root.equals(that.content.root) &&
         source.equals(that.source) &&
         properties.equals(that.properties) &&
@@ -533,13 +508,11 @@ case class IndexLogEntry(
     case _ => false
   }
 
-  def numBuckets: Int = derivedDataset.properties.numBuckets
+  override def hashCode(): Int = {
+    (name, derivedDataset, signature, content).hashCode
+  }
 
-  def config: IndexConfig = IndexConfig(name, indexedColumns, includedColumns)
-
-  def indexedColumns: Seq[String] = derivedDataset.properties.columns.indexed
-
-  def includedColumns: Seq[String] = derivedDataset.properties.columns.included
+  def indexedColumns: Seq[String] = derivedDataset.indexedColumns
 
   def signature: Signature = {
     val sourcePlanSignatures = source.plan.properties.fingerprint.properties.signatures
@@ -547,26 +520,11 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
-  def hasLineageColumn: Boolean = {
-    derivedDataset.properties.properties.getOrElse(
-      IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT).toBoolean
-  }
-
-  def hasParquetAsSourceFormat: Boolean = {
-    relations.head.fileFormat.equals("parquet") ||
-      derivedDataset.properties.properties.getOrElse(
-        IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
-  }
-
   @JsonIgnore
   lazy val fileIdTracker: FileIdTracker = {
     val tracker = new FileIdTracker
     tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
     tracker
-  }
-
-  override def hashCode(): Int = {
-    config.hashCode + signature.hashCode + numBuckets.hashCode + content.hashCode
   }
 
   /**
@@ -633,7 +591,7 @@ object IndexLogEntry {
    */
   def create(
       name: String,
-      derivedDataset: CoveringIndex,
+      derivedDataset: Index,
       content: Content,
       source: Source,
       properties: Map[String, String]): IndexLogEntry = {

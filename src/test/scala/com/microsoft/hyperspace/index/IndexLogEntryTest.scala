@@ -23,12 +23,10 @@ import java.nio.file.{Files, Paths}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.scalatest.BeforeAndAfter
 
-import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestCoveringIndex, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
@@ -73,28 +71,30 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
   private def toFileStatus(path: file.Path): FileStatus = fs.getFileStatus(toPath(path))
 
   test("IndexLogEntry spec example") {
-    val schemaString =
-      """{\"type\":\"struct\",
-        |\"fields\":[
-        |{\"name\":\"RGUID\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},
-        |{\"name\":\"Date\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}
-        |""".stripMargin.replaceAll("\r", "").replaceAll("\n", "")
-
     val jsonString =
       s"""
          |{
          |  "name" : "indexName",
          |  "derivedDataset" : {
-         |    "properties" : {
-         |      "columns" : {
-         |        "indexed" : [ "col1" ],
-         |        "included" : [ "col2", "col3" ]
-         |      },
-         |      "schemaString" : "$schemaString",
-         |      "numBuckets" : 200,
-         |      "properties" : {}
+         |    "impl" : "com.microsoft.hyperspace.index.CoveringIndex",
+         |    "indexedColumns" : [ "col1" ],
+         |    "includedColumns" : [ "col2", "col3" ],
+         |    "schema" : {
+         |      "type" : "struct",
+         |      "fields" : [ {
+         |        "name" : "RGUID",
+         |        "type" : "string",
+         |        "nullable" : true,
+         |        "metadata" : { }
+         |      } , {
+         |        "name" : "Date",
+         |        "type" : "string",
+         |        "nullable" : true,
+         |        "metadata" : { }
+         |      } ]
          |    },
-         |    "kind" : "CoveringIndex"
+         |    "numBuckets" : 200,
+         |    "properties" : {}
          |  },
          |  "content" : {
          |    "root" : {
@@ -224,13 +224,11 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
 
     val expected = IndexLogEntry.create(
       "indexName",
-      CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(Seq("col1"), Seq("col2", "col3")),
-          schema.json,
-          200,
-          Map())),
+      TestCoveringIndex(
+        Seq("col1"),
+        Seq("col2", "col3"),
+        schema,
+        200),
       Content(Directory("rootContentPath")),
       Source(SparkPlan(expectedSourcePlanProperties)),
       Map())

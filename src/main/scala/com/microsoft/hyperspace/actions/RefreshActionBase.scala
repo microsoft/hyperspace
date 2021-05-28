@@ -50,24 +50,6 @@ private[actions] abstract class RefreshActionBase(
 
   override val fileIdTracker = previousIndexLogEntry.fileIdTracker
 
-  // Refresh maintains the same number of buckets as the existing index to be consistent
-  // throughout all index versions. For "full" refresh mode, we could allow to change configs
-  // like num buckets or lineage column as it is newly building the index data. This might
-  // be done with a different refresh mode if necessary.
-  override protected final def numBucketsForIndex(spark: SparkSession): Int = {
-    previousIndexLogEntry.numBuckets
-  }
-
-  // Refresh maintains the same lineage column config as the existing index.
-  // See above getNumBucketsConfig for more detail.
-  override protected final def hasLineage(spark: SparkSession): Boolean = {
-    previousIndexLogEntry.hasLineageColumn
-  }
-
-  override protected def prevIndexProperties: Map[String, String] = {
-    previousIndexLogEntry.derivedDataset.properties.properties
-  }
-
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
@@ -91,16 +73,6 @@ private[actions] abstract class RefreshActionBase(
     } else {
       df.load(latestRelation.rootPaths: _*)
     }
-  }
-
-  protected lazy val indexConfig: IndexConfig = {
-    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(
-      previousIndexLogEntry.name,
-      // As indexed & included columns in previousLogEntry are resolved & prefixed names,
-      // need to remove the prefix to resolve with the dataframe for refresh.
-      ddColumns.indexed.map(ResolvedColumn(_).name),
-      ddColumns.included.map(ResolvedColumn(_).name))
   }
 
   final override val transientState: String = REFRESHING
@@ -134,7 +106,9 @@ private[actions] abstract class RefreshActionBase(
    * Build Set[FileInfo] to compare the source file list with the previous index version.
    */
   protected lazy val currentFiles: Set[FileInfo] = {
-    getRelation(spark, df).allFiles
+    IndexUtils
+      .getRelation(spark, df.queryExecution.optimizedPlan)
+      .allFiles
       .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
       .toSet
   }

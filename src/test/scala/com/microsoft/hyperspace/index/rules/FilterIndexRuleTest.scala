@@ -233,7 +233,14 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val expectedLocation = getIndexDataFilesPaths(indexName)
     assert(location.rootPaths.equals(expectedLocation))
     assert(partitionSchema.equals(new StructType()))
-    assert(dataSchema.equals(allIndexes.filter(_.name.equals(indexName)).head.schema))
+    assert(
+      dataSchema.equals(
+        allIndexes
+          .filter(_.name.equals(indexName))
+          .head
+          .derivedDataset
+          .asInstanceOf[CoveringIndex]
+          .schema))
     assert(bucketSpec.isEmpty)
   }
 }
