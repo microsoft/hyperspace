@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.shim.StructTypeConverter
+import com.microsoft.hyperspace.shim.{StructTypeConverter, UntilSpark24}
 import com.microsoft.hyperspace.util.ResolverUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
@@ -190,6 +190,7 @@ case class CoveringIndex(
 
   // Shim for Spark 2.4 - StructType doesn't work well with Jackson by default.
   // These annotations are used to make json de/serialization work in Spark 2.4.
+  @UntilSpark24
   @JsonRawValue
   @JsonGetter("schema")
   private def schemaJson: String = schema.json

@@ -45,6 +45,9 @@ lazy val spark2_4 = (project in file("spark2.4"))
     crossScalaVersions := List(scala212, scala211),
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))
+  .dependsOn(macroSub % "compile-internal, test-internal")
+  .settings(scalaMacroSupport)
+  .settings(packageMacro)
 
 lazy val spark3_0 = (project in file("spark3.0"))
   .enablePlugins(BuildInfoPlugin)
@@ -54,6 +57,9 @@ lazy val spark3_0 = (project in file("spark3.0"))
     crossScalaVersions := List(scala212), // Spark 3 doesn't support Scala 2.11
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))
+  .dependsOn(macroSub % "compile-internal, test-internal")
+  .settings(scalaMacroSupport)
+  .settings(packageMacro)
 
 lazy val spark3_1 = (project in file("spark3.1"))
   .enablePlugins(BuildInfoPlugin)
@@ -63,6 +69,9 @@ lazy val spark3_1 = (project in file("spark3.1"))
     crossScalaVersions := List(scala212), // Spark 3 doesn't support Scala 2.11
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))
+  .dependsOn(macroSub % "compile-internal, test-internal")
+  .settings(scalaMacroSupport)
+  .settings(packageMacro)
 
 lazy val sparkVersion = settingKey[Version]("sparkVersion")
 
@@ -105,6 +114,48 @@ lazy val commonSettings = Seq(
   })
 
 lazy val listPythonFiles = taskKey[Seq[(File, String)]]("listPythonFiles")
+
+/**
+ * Macro configurations
+ */
+lazy val macroSub = (project in file("macro"))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](
+      // Dummy value for the compilation of macros.
+      // Actual value will be retrieved during the compilation of referencing projects.
+      "sparkShortVersion" -> "0.0"),
+    buildInfoPackage := "com.microsoft.hyperspace",
+    crossScalaVersions := List(scala212, scala211),
+    libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+    publish / skip := true)
+  .settings(scalaMacroSupport)
+
+lazy val scalaMacroSupport = Seq(
+  resolvers += Resolver.sonatypeRepo("releases"),
+  libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, n)) if n < 13 =>
+      Seq(compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full))
+    case _ => Nil
+  }),
+  scalacOptions ++= {
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((2, n)) if n >= 13 => Seq("-Ymacro-annotations")
+      case _ => Nil
+    }
+  })
+
+lazy val packageMacro = Seq(
+  Compile / packageBin / mappings ++=
+    excludeBuildInfo((macroSub / Compile / packageBin / mappings).value),
+  Compile / packageSrc / mappings ++=
+    excludeBuildInfo((macroSub / Compile / packageSrc / mappings).value))
+
+def excludeBuildInfo(files: Seq[(File, String)]): Seq[(File, String)] = {
+  files.filterNot { case (f, _) =>
+    Seq("BuildInfo.class", "BuildInfo$.class").contains(f.getName)
+  }
+}
 
 /**
  * ScalaStyle configurations
