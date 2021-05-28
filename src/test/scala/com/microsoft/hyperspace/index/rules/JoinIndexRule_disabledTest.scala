@@ -537,9 +537,8 @@ class JoinIndexRule_disabledTest extends HyperspaceRuleSuite with SQLHelper {
 
     {
       val (updatedPlan, _) = applyJoinIndexRuleHelper(newPlan)
-      assert(!updatedPlan.equals(plan))
+      assert(updatedPlan.equals(newPlan))
     }
-    assert(JoinIndexRule(newPlan).equals(newPlan))
   }
 
   private def verifyUpdatedIndex(

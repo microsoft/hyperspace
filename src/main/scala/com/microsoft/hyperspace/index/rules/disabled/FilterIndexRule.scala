@@ -18,12 +18,14 @@ package com.microsoft.hyperspace.index.rules.disabled
 
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 
+import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntryTags
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
 import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
+import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
@@ -133,6 +135,17 @@ object FilterRankFilter extends IndexRankFilter {
       val selected = FilterIndexRanker.rank(spark, relation.plan, applicableIndexes.head._2).get
       setFilterReasonTagForRank(plan, applicableIndexes.head._2, selected)
       Map(applicableIndexes.head._1 -> selected)
+    }
+  }
+}
+
+object ExtractRelation extends ActiveSparkSession {
+  def unapply(plan: LeafNode): Option[FileBasedRelation] = {
+    val provider = Hyperspace.getContext(spark).sourceProviderManager
+    if (provider.isSupportedRelation(plan)) {
+      Some(provider.getRelation(plan))
+    } else {
+      None
     }
   }
 }
