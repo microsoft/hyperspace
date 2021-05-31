@@ -26,12 +26,12 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.util.PathUtils
 
 class FilterIndexRuleTest extends HyperspaceRuleSuite {
   override val indexLocationDirName = "joinIndexTest"
   val indexName1 = "filterIxTestIndex1"
   val indexName2 = "filterIxTestIndex2"
+  val indexName3 = "filterIxTestIndex3"
 
   val c1 = AttributeReference("c1", StringType)()
   val c2 = AttributeReference("c2", StringType)()
@@ -51,14 +51,27 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     scanNode = LogicalRelation(relation, Seq(c1, c2, c3, c4), None, false)
 
     val indexPlan = Project(Seq(c1, c2, c3), scanNode)
-    createIndexLogEntry(indexName1, Seq(c3, c2), Seq(c1), indexPlan)
+    createIndexLogEntry(
+      indexName1,
+      Seq(c3, c2),
+      Seq(c1),
+      indexPlan,
+      inputFiles = tableLocation.allFiles.map(FileInfo.apply(_, 0, asFullPath = true)))
 
     val index2Plan = Project(Seq(c1, c2, c3, c4), scanNode)
     createIndexLogEntry(indexName2, Seq(c4, c2), Seq(c1, c3), index2Plan)
+    createIndexLogEntry(indexName3, Seq(c4, c2), Seq(c1, c3), index2Plan)
   }
 
   before {
     clearCache()
+  }
+
+  def applyFilterIndexRuleHelper(
+      plan: LogicalPlan,
+      allIndexes: Seq[IndexLogEntry]): (LogicalPlan, Int) = {
+    val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
+    FilterIndexRule.apply(plan, candidateIndexes)
   }
 
   test("Verify FilterIndex rule is applied correctly.") {
@@ -66,8 +79,8 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val filterNode = Filter(filterCondition, scanNode)
 
     val originalPlan = Project(Seq(c2, c3), filterNode)
-    val transformedPlan = FilterIndexRule(originalPlan)
-
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName1)
   }
@@ -79,8 +92,8 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val filterNode = Filter(filterCondition, scanNode)
 
     val originalPlan = Project(Seq(c2Caps, c3Caps), filterNode)
-    val transformedPlan = FilterIndexRule(originalPlan)
-
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName1)
   }
@@ -91,8 +104,8 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val filterNode = Filter(filterCondition, scanNode)
 
     val originalPlan = Project(Seq(c2, aliasExpr), filterNode)
-    val transformedPlan = FilterIndexRule(originalPlan)
-
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName1)
   }
@@ -102,8 +115,27 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val filterNode = Filter(filterCondition, scanNode)
 
     val originalPlan = Project(Seq(c2, c3, c4), filterNode) // c4 is not covered by index
-    val transformedPlan = FilterIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
+    val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(transformedPlan.equals(originalPlan), "Plan should not transform.")
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      index.name match {
+        case `indexName1` =>
+          assert(msg.isDefined)
+          assert(
+            msg.get.exists(
+              _.equals("Index does not contain required columns. Required columns: " +
+                "[c3,c2,c3,c4], Indexed & included columns: [c3,c2,c1]")))
+        case `indexName2` | `indexName3` =>
+          assert(msg.isDefined)
+          assert(
+            msg.get.exists(
+              _.contains("The first indexed column should be in filter condition columns.")))
+
+      }
+    }
   }
 
   test("Verify FilterIndex rule does not apply if filter does not contain first indexed column.") {
@@ -112,7 +144,8 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val filterNode = Filter(filterCondition, scanNode)
 
     val originalPlan = Project(Seq(c2, c3), filterNode)
-    val transformedPlan = FilterIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(transformedPlan.equals(originalPlan), "Plan should not transform.")
   }
 
@@ -120,23 +153,49 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
     val originalPlan = Filter(filterCondition, scanNode)
 
-    val transformedPlan = FilterIndexRule(originalPlan)
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
+    val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName2)
+    allIndexes.foreach { index =>
+      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      index.name match {
+        case `indexName1` =>
+          assert(msg.isDefined)
+          assert(
+            msg.get.exists(
+              _.contains("The first indexed column should be in filter condition columns.")))
+        case `indexName2` =>
+          assert(msg.isEmpty)
+        case `indexName3` =>
+          assert(msg.isDefined)
+          assert(msg.get.exists(_.contains(s"Another candidate index is applied: $indexName2")))
+      }
+    }
   }
 
   test("Verify FilterIndex rule is not applied for modified plan.") {
     val filterCondition = And(IsNotNull(c4), EqualTo(c4, Literal(10, IntegerType)))
     val plan = Filter(filterCondition, scanNode)
-    // Verify index rule updates the plan.
-    assert(!FilterIndexRule(plan).equals(plan))
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+
+    {
+      // Verify index rule updates the plan.
+      val (transformedPlan, score) = applyFilterIndexRuleHelper(plan, allIndexes)
+      assert(!transformedPlan.equals(plan), "No plan transformation.")
+    }
 
     // Mark the relation that the rule is applied and verify the plan does not change.
     val newPlan = plan transform {
       case r @ LogicalRelation(h: HadoopFsRelation, _, _, _) =>
         r.copy(relation = h.copy(options = Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark))
     }
-    assert(FilterIndexRule(newPlan).equals(newPlan))
+
+    {
+      val (transformedPlan, score) = applyFilterIndexRuleHelper(newPlan, allIndexes)
+      assert(transformedPlan.equals(newPlan))
+    }
   }
 
   private def verifyTransformedPlanWithIndex(

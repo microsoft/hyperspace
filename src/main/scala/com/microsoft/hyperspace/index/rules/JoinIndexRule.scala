@@ -19,124 +19,85 @@ package com.microsoft.hyperspace.index.rules
 import scala.collection.mutable
 import scala.util.Try
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, EqualTo, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Join, LeafNode, LogicalPlan}
-import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
+import com.microsoft.hyperspace.index.rules.JoinAttributeFilter.extractConditions
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.shim.JoinWithoutHint
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
-import com.microsoft.hyperspace.util.ResolverUtils._
+import com.microsoft.hyperspace.util.ResolverUtils.resolve
 
 /**
- * Rule to optimize a join between two indexed dataframes.
- *
- * This rule improves a SortMergeJoin performance by replacing data files with index files.
- * The index files being bucketed and sorted, will eliminate a full shuffle of the data
- * during a sort-merge-join operation.
- *
- * For e.g.
- * SELECT T1.A, T1.B, T2.C, T2.D FROM T1, T2 WHERE T1.A = T2.C
- * The above query can be optimized to use indexes if indexes of the following configs exist:
- * Index1: indexedColumns: T1.A, includedColumns: T1.B
- * Index2: indexedColumns: T2.C, includedColumns: T2.D
- *
- * These indexes are indexed by the join columns and can improve the query performance by
- * avoiding full shuffling of T1 and T2.
+ * JoinPlanNodeFilter filters indexes if
+ *   1) the given plan is not eligible join plan.
+ *   1-1) Join does not have condition.
+ *   1-2) Left or Right child is not linear plan.
+ *   1-3) Join condition is not eligible - only Equi-joins and simple CNF form are supported.
+ *   2) the source plan of indexes is not part of the join (neither Left nor Right).
  */
-object JoinIndexRule
-    extends Rule[LogicalPlan]
-    with Logging
-    with HyperspaceEventLogging
-    with ActiveSparkSession {
-  def apply(plan: LogicalPlan): LogicalPlan = plan transformUp {
-    case join @ JoinWithoutHint(l, r, _, Some(condition)) if isApplicable(l, r, condition) =>
-      try {
-        getBestIndexPair(l, r, condition)
-          .map {
-            case (lIndex, rIndex) =>
-              val updatedPlan =
-                join
-                  .copy(
-                    left = RuleUtils.transformPlanToUseIndex(
-                      spark,
-                      lIndex,
-                      l,
-                      useBucketSpec = true,
-                      useBucketUnionForAppended = true),
-                    right = RuleUtils.transformPlanToUseIndex(
-                      spark,
-                      rIndex,
-                      r,
-                      useBucketSpec = true,
-                      useBucketUnionForAppended = true))
-
-              logEvent(
-                HyperspaceIndexUsageEvent(
-                  AppInfo(
-                    sparkContext.sparkUser,
-                    sparkContext.applicationId,
-                    sparkContext.appName),
-                  Seq(lIndex, rIndex),
-                  join.toString,
-                  updatedPlan.toString,
-                  "Join index rule applied."))
-
-              updatedPlan
-          }
-          .getOrElse(join)
-      } catch {
-        case e: Exception =>
-          logWarning("Non fatal exception in running join index rule: " + e.getMessage)
-          join
-      }
-  }
-
-  /**
-   * Checks whether this join rule is applicable for the current node
-   *
-   * @param l left logical plan
-   * @param r right logical plan
-   * @param condition join condition
-   * @return true if supported. False if not.
-   */
-  private def isApplicable(l: LogicalPlan, r: LogicalPlan, condition: Expression): Boolean = {
-    // The given plan is eligible if it is supported and index has not been applied.
-    def isEligible(optRel: Option[FileBasedRelation]): Boolean = {
-      optRel.map(!RuleUtils.isIndexApplied(_)).getOrElse(false)
+object JoinPlanNodeFilter extends QueryPlanIndexFilter {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty) {
+      return Map.empty
     }
 
-    lazy val optLeftRel = RuleUtils.getRelation(spark, l)
-    lazy val optRightRel = RuleUtils.getRelation(spark, r)
+    plan match {
+      case JoinWithoutHint(l, r, _, Some(condition)) =>
+        val left = RuleUtils.getRelation(spark, l)
+        val right = RuleUtils.getRelation(spark, r)
 
-    isJoinConditionSupported(condition) &&
-    isPlanLinear(l) && isPlanLinear(r) &&
-    isEligible(optLeftRel) && isEligible(optRightRel) &&
-    ensureAttributeRequirements(optLeftRel.get, optRightRel.get, condition)
-  }
+        if (!(left.isDefined && right.isDefined && !RuleUtils.isIndexApplied(left.get) && !RuleUtils
+              .isIndexApplied(right.get))) {
+          return Map.empty
+        }
 
-  /**
-   * Check for supported Join Conditions. Equi-Joins in simple CNF form are supported.
-   *
-   * Predicates should be of the form (A = B and C = D and E = F and...). OR based conditions
-   * are not supported. E.g. (A = B OR C = D) is not supported
-   *
-   * TODO: Investigate whether OR condition can use bucketing info for optimization
-   *
-   * @param condition the join condition
-   * @return true if the condition is supported. False otherwise.
-   */
-  private def isJoinConditionSupported(condition: Expression): Boolean = {
-    condition match {
-      case EqualTo(_: AttributeReference, _: AttributeReference) => true
-      case And(left, right) => isJoinConditionSupported(left) && isJoinConditionSupported(right)
-      case _ => false
+        val leftAndRightIndexes = candidateIndexes.getOrElse(left.get.plan, Nil) ++ candidateIndexes
+          .getOrElse(right.get.plan, Nil)
+
+        val joinConditionCond = withFilterReasonTag(
+          plan,
+          leftAndRightIndexes,
+          "Join condition is not eligible. Equi-Joins in simple CNF form are supported. " +
+            "Literal is not supported.") {
+          isJoinConditionSupported(condition)
+        }
+
+        val leftPlanLinearCond =
+          withFilterReasonTag(plan, leftAndRightIndexes, "Left child is not a linear plan.") {
+            isPlanLinear(l)
+          }
+        val rightPlanLinearCond =
+          withFilterReasonTag(plan, leftAndRightIndexes, "Right child is not a linear plan.") {
+            isPlanLinear(r)
+          }
+
+        if (joinConditionCond && leftPlanLinearCond && rightPlanLinearCond) {
+          // Set join query context.
+          JoinIndexRule.leftRelation.set(left.get)
+          JoinIndexRule.rightRelation.set(right.get)
+          JoinIndexRule.joinCondition.set(condition)
+
+          (candidateIndexes.get(left.get.plan).map(lIndexes => left.get.plan -> lIndexes) ++
+            candidateIndexes
+              .get(right.get.plan)
+              .map(rIndexes => right.get.plan -> rIndexes)).toMap
+        } else {
+          Map.empty
+        }
+      case JoinWithoutHint(_, _, _, None) =>
+        setFilterReasonTag(
+          plan,
+          candidateIndexes.values.flatten.toSeq,
+          "Not eligible Join - no join condition.")
+        Map.empty
+      case _ =>
+        Map.empty
     }
   }
 
@@ -165,6 +126,56 @@ object JoinIndexRule
    */
   private def isPlanLinear(plan: LogicalPlan): Boolean =
     plan.children.length <= 1 && plan.children.forall(isPlanLinear)
+
+  /**
+   * Check for supported Join Conditions. Equi-Joins in simple CNF form are supported.
+   *
+   * Predicates should be of the form (A = B and C = D and E = F and...). OR based conditions
+   * are not supported. E.g. (A = B OR C = D) is not supported
+   *
+   * TODO: Investigate whether OR condition can use bucketing info for optimization
+   *
+   * @param condition Join condition
+   * @return True if the condition is supported. False otherwise.
+   */
+  private def isJoinConditionSupported(condition: Expression): Boolean = {
+    condition match {
+      case EqualTo(_: AttributeReference, _: AttributeReference) => true
+      case And(left, right) => isJoinConditionSupported(left) && isJoinConditionSupported(right)
+      case _ => false
+    }
+  }
+}
+
+/**
+ * JoinAttributeFilter filters indexes out if
+ *   1) each join condition column should com from relations directly
+ *   2) attributes from left plan must exclusively have one-to-one mapping with attribute
+ *       from attributes from right plan.
+ */
+object JoinAttributeFilter extends QueryPlanIndexFilter {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty || candidateIndexes.size != 2) {
+      return Map.empty
+    }
+
+    if (withFilterReasonTag(
+          plan,
+          candidateIndexes.head._2 ++ candidateIndexes.last._2,
+          "Each join condition column should come from " +
+            "relations directly and attributes from left plan must exclusively have " +
+            "one-to-one mapping with attributes from right plan. " +
+            "E.g. join(A = B and A = D) is not eligible.") {
+          ensureAttributeRequirements(
+            JoinIndexRule.leftRelation.get,
+            JoinIndexRule.rightRelation.get,
+            JoinIndexRule.joinCondition.get)
+        }) {
+      candidateIndexes
+    } else {
+      Map.empty
+    }
+  }
 
   /**
    * Requirements to support join optimizations using join indexes are as follows:
@@ -207,7 +218,6 @@ object JoinIndexRule
    * From looking at the join condition, we can't know whether the attributes used in the
    * condition were original columns from the base table, or were alias-turned-attributes.
    *
-   *
    * Algorithm:
    * 1. Collect base table attributes from the supported relation nodes. These are the output set
    * from leaf nodes.
@@ -225,11 +235,10 @@ object JoinIndexRule
    * Note: this check might affect performance of query optimizer for very large query plans,
    * because of multiple collectLeaves calls. We call this method as late as possible.
    *
-   * @param l left relation
-   * @param r right relation
-   * @param condition join condition
-   * @return true if all attributes in join condition are from base relation nodes. False
-   *         otherwise
+   * @param l Left relation
+   * @param r Right relation
+   * @param condition Join condition
+   * @return True if all attributes in join condition are from base relation nodes.
    */
   private def ensureAttributeRequirements(
       l: FileBasedRelation,
@@ -237,8 +246,8 @@ object JoinIndexRule
       condition: Expression): Boolean = {
     // Output attributes from base relations. Join condition attributes must belong to these
     // attributes. We work on canonicalized forms to make sure we support case-sensitivity.
-    val lBaseAttrs = l.output.map(_.canonicalized)
-    val rBaseAttrs = r.output.map(_.canonicalized)
+    val lBaseAttrs = l.plan.output.map(_.canonicalized)
+    val rBaseAttrs = r.plan.output.map(_.canonicalized)
 
     def fromDifferentBaseRelations(c1: Expression, c2: Expression): Boolean = {
       (lBaseAttrs.contains(c1) && rBaseAttrs.contains(c2)) ||
@@ -268,70 +277,171 @@ object JoinIndexRule
         } else {
           false
         }
-      case _ => throw new IllegalStateException("Unsupported condition found")
+      case _ => throw new IllegalStateException("Unsupported condition found.")
     }
   }
 
   /**
-   * Get best ranked index pair from available indexes of both sides.
+   * Simple single equi-join conditions and composite AND based conditions will be optimized.
+   * OR-based conditions will not be optimized.
    *
-   * @param left Left subplan.
-   * @param right Right subplan.
-   * @param joinCondition Join condition.
-   * @return The best index pair, where the first element is for left subplan, second for right.
+   * @param condition Join condition
+   * @return Sequence of simple conditions from original condition
    */
-  private def getBestIndexPair(
-      left: LogicalPlan,
-      right: LogicalPlan,
-      joinCondition: Expression): Option[(IndexLogEntry, IndexLogEntry)] = {
-    val indexManager = Hyperspace.getContext(spark).indexCollectionManager
+  private[hyperspace] def extractConditions(condition: Expression): Seq[Expression] =
+    condition match {
+      case EqualTo(_: AttributeReference, _: AttributeReference) =>
+        Seq(condition)
+      case And(left, right) =>
+        extractConditions(left) ++ extractConditions(right)
+      case _ => throw new IllegalStateException("Unsupported condition found")
+    }
+}
 
-    // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-    //  the code to support indexes in transitioning states as well.
-    //  See https://github.com/microsoft/hyperspace/issues/65
-    val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
+/**
+ * JoinColumnFilter filters indexes out if
+ *   1) an index does not contain all required columns
+ *   2) all join column should be the indexed columns of an index
+ */
+object JoinColumnFilter extends QueryPlanIndexFilter {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty || candidateIndexes.size != 2) {
+      return Map.empty
+    }
 
-    // TODO: we can write an extractor that applies `isApplicable` so that we don't have to
-    //   get relations twice. Note that `getRelation` should always succeed since this has
-    //   been already checked in `isApplicable`.
-    val leftRelation = RuleUtils.getRelation(spark, left).get
-    val rightRelation = RuleUtils.getRelation(spark, right).get
-    val lBaseAttrs = leftRelation.output.map(_.name)
-    val rBaseAttrs = rightRelation.output.map(_.name)
+    val leftRelation = JoinIndexRule.leftRelation.get
+    val rightRelation = JoinIndexRule.rightRelation.get
+
+    val lBaseAttrs = leftRelation.plan.output.map(_.name)
+    val rBaseAttrs = rightRelation.plan.output.map(_.name)
 
     // Map of left resolved columns with their corresponding right resolved
     // columns from condition.
-    val lRMap = getLRColumnMapping(lBaseAttrs, rBaseAttrs, joinCondition)
+    val lRMap = getLRColumnMapping(lBaseAttrs, rBaseAttrs, JoinIndexRule.joinCondition.get)
+    JoinIndexRule.leftToRightColumnMap.set(lRMap)
     val lRequiredIndexedCols = lRMap.keys.toSeq
     val rRequiredIndexedCols = lRMap.values.toSeq
 
-    // All required columns resolved with base relation.
-    val lRequiredAllCols = resolve(spark, allRequiredCols(left), lBaseAttrs).get
-    val rRequiredAllCols = resolve(spark, allRequiredCols(right), rBaseAttrs).get
+    plan match {
+      case JoinWithoutHint(l, r, _, _) =>
+        // All required columns resolved with base relation.
+        val lRequiredAllCols = resolve(spark, allRequiredCols(l), lBaseAttrs).get
+        val rRequiredAllCols = resolve(spark, allRequiredCols(r), rBaseAttrs).get
 
-    // Make sure required indexed columns are subset of all required columns for a subplan
-    require(resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined)
-    require(resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined)
+        if (withFilterReasonTag(
+              plan,
+              candidateIndexes.head._2 ++ candidateIndexes.last._2,
+              "Invalid query plan.") {
+              // Make sure required indexed columns are subset of all required columns.
+              resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined &&
+              resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined
+            }) {
+          val lIndexes =
+            getUsableIndexes(
+              plan,
+              candidateIndexes.getOrElse(leftRelation.plan, Nil),
+              lRequiredIndexedCols,
+              lRequiredAllCols)
+          val rIndexes =
+            getUsableIndexes(
+              plan,
+              candidateIndexes.getOrElse(rightRelation.plan, Nil),
+              rRequiredIndexedCols,
+              rRequiredAllCols)
 
-    val lUsable = getUsableIndexes(allIndexes, lRequiredIndexedCols, lRequiredAllCols)
-    val rUsable = getUsableIndexes(allIndexes, rRequiredIndexedCols, rRequiredAllCols)
+          if (withFilterReasonTag(
+                plan,
+                candidateIndexes.head._2 ++ candidateIndexes.last._2,
+                "No available indexes for left subplan.")(lIndexes.nonEmpty) &&
+              withFilterReasonTag(
+                plan,
+                candidateIndexes.head._2 ++ candidateIndexes.last._2,
+                "No available indexes for right subplan.")(rIndexes.nonEmpty)) {
+            Map(leftRelation.plan -> lIndexes, rightRelation.plan -> rIndexes)
+          } else {
+            Map.empty
+          }
+        } else {
+          Map.empty
+        }
+    }
+  }
 
-    val leftRel = RuleUtils.getRelation(spark, left).get
-    val rightRel = RuleUtils.getRelation(spark, right).get
+  /**
+   * Returns a one-to-one column mapping from the predicates. E.g. for predicate.
+   * T1.A = T2.B and T2.D = T1.C
+   * it returns a mapping (A -> B), (C -> D), assuming T1 is left table and t2 is right
+   *
+   * This mapping is used to find compatible indexes of T1 and T2.
+   *
+   * @param leftBaseAttrs required indexed columns from left plan
+   * @param rightBaseAttrs required indexed columns from right plan
+   * @param condition join condition which will be used to find the left-right column mapping
+   * @return Mapping of corresponding columns from left and right, depending on the join
+   *         condition. The keys represent columns from left subplan. The values are columns from
+   *         right subplan.
+   */
+  private[hyperspace] def getLRColumnMapping(
+      leftBaseAttrs: Seq[String],
+      rightBaseAttrs: Seq[String],
+      condition: Expression): Map[String, String] = {
+    extractConditions(condition).map {
+      case EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
+        Try {
+          (
+            resolve(spark, attr1.name, leftBaseAttrs).get,
+            resolve(spark, attr2.name, rightBaseAttrs).get)
+        }.getOrElse {
+          Try {
+            (
+              resolve(spark, attr2.name, leftBaseAttrs).get,
+              resolve(spark, attr1.name, rightBaseAttrs).get)
+          }.getOrElse {
+            throw new IllegalStateException("Unexpected exception while using join rule")
+          }
+        }
+    }.toMap
+  }
 
-    // Get candidate via file-level metadata validation. This is performed after pruning
-    // by column schema, as this might be expensive when there are numerous files in the
-    // relation or many indexes to be checked.
-    val lIndexes = RuleUtils.getCandidateIndexes(spark, lUsable, leftRel)
-    val rIndexes = RuleUtils.getCandidateIndexes(spark, rUsable, rightRel)
-
-    val compatibleIndexPairs = getCompatibleIndexPairs(lIndexes, rIndexes, lRMap)
-
-    compatibleIndexPairs.map(
-      indexPairs =>
-        JoinIndexRanker
-          .rank(spark, leftRel.plan, rightRel.plan, indexPairs)
-          .head)
+  /**
+   * Get usable indexes which satisfy indexed and included column requirements.
+   *
+   * Pre-requisite: the indexed and included columns required must be already resolved with their
+   * corresponding base relation columns at this point.
+   *
+   * @param plan Query plan
+   * @param indexes All available indexes for the logical plan
+   * @param requiredIndexCols required indexed columns resolved with their base relation column.
+   * @param allRequiredCols required included columns resolved with their base relation column.
+   * @return Indexes which satisfy the indexed and covering column requirements from the logical
+   *         plan and join condition
+   */
+  private def getUsableIndexes(
+      plan: LogicalPlan,
+      indexes: Seq[IndexLogEntry],
+      requiredIndexCols: Seq[String],
+      allRequiredCols: Seq[String]): Seq[IndexLogEntry] = {
+    indexes.filter { idx =>
+      val allCols = idx.indexedColumns ++ idx.includedColumns
+      // All required index columns should match one-to-one with all indexed columns and
+      // vice-versa. All required columns must be present in the available index columns.
+      withFilterReasonTag(
+        plan,
+        idx,
+        s"All join condition column should be the indexed columns. " +
+          s"Join columns: [${requiredIndexCols
+            .mkString(",")}], Indexed columns: [${idx.indexedColumns.mkString(",")}]") {
+        requiredIndexCols.toSet.equals(idx.indexedColumns.toSet)
+      } &&
+      withFilterReasonTag(
+        plan,
+        idx,
+        s"Index does not contain all required columns. " +
+          s"Required columns: [${allRequiredCols.mkString(",")}], " +
+          s"Index columns: [${(idx.indexedColumns ++ idx.includedColumns).mkString(",")}]") {
+        allRequiredCols.forall(allCols.contains)
+      }
+    }
   }
 
   /**
@@ -382,82 +492,39 @@ object JoinIndexRule
       case attr: AttributeReference => attr.name
     }
   }
+}
 
-  /**
-   * Returns a one-to-one column mapping from the predicates. E.g. for predicate.
-   * T1.A = T2.B and T2.D = T1.C
-   * it returns a mapping (A -> B), (C -> D), assuming T1 is left table and t2 is right
-   *
-   * This mapping is used to find compatible indexes of T1 and T2.
-   *
-   * @param leftBaseAttrs required indexed columns from left plan
-   * @param rightBaseAttrs required indexed columns from right plan
-   * @param condition join condition which will be used to find the left-right column mapping
-   * @return Mapping of corresponding columns from left and right, depending on the join
-   *         condition. The keys represent columns from left subplan. The values are columns from
-   *         right subplan.
-   */
-  private def getLRColumnMapping(
-      leftBaseAttrs: Seq[String],
-      rightBaseAttrs: Seq[String],
-      condition: Expression): Map[String, String] = {
-    extractConditions(condition).map {
-      case EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
-        Try {
-          (
-            resolve(spark, attr1.name, leftBaseAttrs).get,
-            resolve(spark, attr2.name, rightBaseAttrs).get)
-        }.getOrElse {
-          Try {
-            (
-              resolve(spark, attr2.name, leftBaseAttrs).get,
-              resolve(spark, attr1.name, rightBaseAttrs).get)
-          }.getOrElse {
-            throw new IllegalStateException("Unexpected exception while using join rule")
-          }
-        }
-    }.toMap
-  }
-
-  /**
-   * Simple single equi-join conditions and composite AND based conditions will be optimized.
-   * OR-based conditions will not be optimized
-   *
-   * @param condition Join condition
-   * @return Sequence of simple conditions from original condition
-   */
-  private def extractConditions(condition: Expression): Seq[Expression] = condition match {
-    case EqualTo(_: AttributeReference, _: AttributeReference) =>
-      Seq(condition)
-    case And(left, right) =>
-      extractConditions(left) ++ extractConditions(right)
-    case _ => throw new IllegalStateException("Unsupported condition found")
-  }
-
-  /**
-   * Get usable indexes which satisfy indexed and included column requirements.
-   *
-   * Pre-requisite: the indexed and included columns required must be already resolved with their
-   * corresponding base relation columns at this point.
-   *
-   * @param indexes All available indexes for the logical plan
-   * @param requiredIndexCols required indexed columns resolved with their base relation column.
-   * @param allRequiredCols required included columns resolved with their base relation column.
-   * @return Indexes which satisfy the indexed and covering column requirements from the logical
-   *         plan and join condition
-   */
-  private def getUsableIndexes(
-      indexes: Seq[IndexLogEntry],
-      requiredIndexCols: Seq[String],
-      allRequiredCols: Seq[String]): Seq[IndexLogEntry] = {
-    indexes.filter { idx =>
-      val allCols = idx.indexedColumns ++ idx.includedColumns
-
-      // All required index columns should match one-to-one with all indexed columns and
-      // vice-versa. All required columns must be present in the available index columns.
-      requiredIndexCols.toSet.equals(idx.indexedColumns.toSet) &&
-      allRequiredCols.forall(allCols.contains)
+/**
+ * JoinRankFilter selected the best applicable pair of indexes for Left and Right plan.
+ */
+object JoinRankFilter extends IndexRankFilter {
+  override def apply(plan: LogicalPlan, indexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
+    if (indexes.isEmpty || indexes.size != 2) {
+      return Map.empty
     }
+
+    val leftRelation = JoinIndexRule.leftRelation.get
+    val rightRelation = JoinIndexRule.rightRelation.get
+    val lRMap = JoinIndexRule.leftToRightColumnMap.get
+    val compatibleIndexPairs =
+      getCompatibleIndexPairs(indexes(leftRelation.plan), indexes(rightRelation.plan), lRMap)
+
+    compatibleIndexPairs
+      .map { indexPairs =>
+        val index = JoinIndexRanker
+          .rank(spark, leftRelation.plan, rightRelation.plan, indexPairs)
+          .head
+        setFilterReasonTagForRank(plan, indexes(leftRelation.plan), index._1)
+        setFilterReasonTagForRank(plan, indexes(rightRelation.plan), index._2)
+        Map(leftRelation.plan -> index._1, rightRelation.plan -> index._2)
+      }
+      .getOrElse {
+        setFilterReasonTag(
+          plan,
+          indexes.head._2 ++ indexes.last._2,
+          "No compatible left and right index pair.")
+        Map.empty
+      }
   }
 
   /**
@@ -528,5 +595,104 @@ object JoinIndexRule
 
     val requiredRightIndexedCols = lIndex.indexedColumns.map(columnMapping)
     rIndex.indexedColumns.equals(requiredRightIndexedCols)
+  }
+}
+
+/**
+ * Rule to optimize a join between two indexed dataframes.
+ *
+ * This rule improves a SortMergeJoin performance by replacing data files with index files.
+ * The index files being bucketed and sorted, will eliminate a full shuffle of the data
+ * during a sort-merge-join operation.
+ *
+ * For e.g.
+ * SELECT T1.A, T1.B, T2.C, T2.D FROM T1, T2 WHERE T1.A = T2.C
+ * The above query can be optimized to use indexes if indexes of the following configs exist:
+ * Index1: indexedColumns: T1.A, includedColumns: T1.B
+ * Index2: indexedColumns: T2.C, includedColumns: T2.D
+ *
+ * These indexes are indexed by the join columns and can improve the query performance by
+ * avoiding full shuffling of T1 and T2.
+ */
+object JoinIndexRule extends HyperspaceRule with HyperspaceEventLogging {
+
+  override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
+    JoinPlanNodeFilter :: JoinAttributeFilter :: JoinColumnFilter :: Nil
+
+  override val indexRanker: IndexRankFilter = JoinRankFilter
+
+  // Execution context
+  var leftRelation: ThreadLocal[FileBasedRelation] = new ThreadLocal[FileBasedRelation]
+  var rightRelation: ThreadLocal[FileBasedRelation] = new ThreadLocal[FileBasedRelation]
+  var joinCondition: ThreadLocal[Expression] = new ThreadLocal[Expression]
+  var leftToRightColumnMap: ThreadLocal[Map[String, String]] =
+    new ThreadLocal[Map[String, String]]
+
+  override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = {
+    if (indexes.size != 2) {
+      return plan
+    }
+    plan match {
+      case join @ JoinWithoutHint(l, r, _, _) =>
+        val lIndex = indexes(leftRelation.get.plan)
+        val rIndex = indexes(rightRelation.get.plan)
+
+        val updatedPlan =
+          join
+            .copy(
+              left = RuleUtils.transformPlanToUseIndex(
+                spark,
+                lIndex,
+                l,
+                useBucketSpec = true,
+                useBucketUnionForAppended = true),
+              right = RuleUtils.transformPlanToUseIndex(
+                spark,
+                rIndex,
+                r,
+                useBucketSpec = true,
+                useBucketUnionForAppended = true))
+
+        logEvent(
+          HyperspaceIndexUsageEvent(
+            AppInfo(sparkContext.sparkUser, sparkContext.applicationId, sparkContext.appName),
+            Seq(lIndex, rIndex),
+            join.toString,
+            updatedPlan.toString,
+            "Join index rule applied."))
+        updatedPlan
+    }
+  }
+
+  override def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int = {
+    if (indexes.size != 2) {
+      return 0
+    }
+
+    val lIndex = indexes(leftRelation.get.plan)
+    val rIndex = indexes(rightRelation.get.plan)
+
+    def getCommonBytes(index: IndexLogEntry, relation: FileBasedRelation): Long = {
+      index
+        .getTagValue(relation.plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+        .getOrElse {
+          relation.allFileInfos.foldLeft(0L) { (res, f) =>
+            if (index.sourceFileInfoSet.contains(f)) {
+              res + f.size // count, total bytes
+            } else {
+              res
+            }
+          }
+        }
+    }
+
+    val leftCommonBytes = getCommonBytes(lIndex, leftRelation.get)
+    val rightCommonBytes = getCommonBytes(rIndex, rightRelation.get)
+
+    // TODO Enhance scoring function.
+    //  See https://github.com/microsoft/hyperspace/issues/444
+
+    (70 * (leftCommonBytes.toFloat / leftRelation.get.allFileSizeInBytes)).round +
+      (70 * (rightCommonBytes.toFloat / rightRelation.get.allFileSizeInBytes)).round
   }
 }

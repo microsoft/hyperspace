@@ -16,172 +16,125 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
-import org.apache.spark.sql.catalyst.rules.Rule
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
-import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.IndexLogEntryTags
 import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
- * FilterIndex rule looks for opportunities in a logical plan to replace
- * a relation with an available covering index according to columns in
- * filter predicate.
+ * FilterPlanNodeFilter filters indexes out if
+ *   1) the given plan is not eligible filter plan node.
+ *   2) the source plan of index is not part of the filter plan.
  */
-object FilterIndexRule
-    extends Rule[LogicalPlan]
-    with Logging
-    with HyperspaceEventLogging
-    with ActiveSparkSession {
-  override def apply(plan: LogicalPlan): LogicalPlan = {
-    // FilterIndex rule looks for below patterns, in ordered manner, to trigger a transformation:
+object FilterPlanNodeFilter extends QueryPlanIndexFilter {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty) {
+      return Map.empty
+    }
+
+    // FilterPlanNodeFilter looks for below patterns, in ordered manner:
     //  Pattern-1: Scan -> Filter -> Project
     //  Pattern-2: Scan -> Filter
-    // Pattern-2 covers the case where project node is eliminated or not present. An example is
-    // when all columns are selected.
-    // Currently, this rule replaces a relation with an index when:
-    //  1. The index covers all columns from the filter predicate and output columns list, and
-    //  2. Filter predicate's columns include the first 'indexed' column of the index.
-    plan transformDown {
-      case ExtractFilterNode(originalPlan, filter, outputColumns, filterColumns) =>
-        try {
-          val candidateIndexes =
-            findCoveringIndexes(filter, outputColumns, filterColumns)
-          FilterIndexRanker.rank(spark, filter, candidateIndexes) match {
-            case Some(index) =>
-              // As FilterIndexRule is not intended to support bucketed scan, we set
-              // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
-              // unnecessary shuffle for appended data to apply BucketUnion for merging data.
-              val transformedPlan =
-                RuleUtils.transformPlanToUseIndex(
-                  spark,
-                  index,
-                  originalPlan,
-                  useBucketSpec = HyperspaceConf.useBucketSpecForFilterRule(spark),
-                  useBucketUnionForAppended = false)
-              logEvent(
-                HyperspaceIndexUsageEvent(
-                  AppInfo(
-                    sparkContext.sparkUser,
-                    sparkContext.applicationId,
-                    sparkContext.appName),
-                  Seq(index),
-                  filter.toString,
-                  transformedPlan.toString,
-                  "Filter index rule applied."))
-              transformedPlan
-            case None => originalPlan
-          }
-        } catch {
-          case e: Exception =>
-            logWarning("Non fatal exception in running filter index rule: " + e.getMessage)
-            originalPlan
-        }
+    // Pattern-2 covers the case where project node is eliminated or not present.
+    // An example is when all columns are selected.
+    plan match {
+      case Project(_, Filter(_: Expression, ExtractRelation(relation)))
+          if !RuleUtils.isIndexApplied(relation) =>
+        candidateIndexes.filterKeys(relation.plan.equals(_))
+      case Filter(_: Expression, ExtractRelation(relation))
+          if !RuleUtils.isIndexApplied(relation) =>
+        candidateIndexes.filterKeys(relation.plan.equals(_))
+      case _ =>
+        Map.empty
     }
-  }
-
-  /**
-   * For a given relation, find all available indexes on it which fully cover given output and
-   * filter columns.
-   *
-   * @param filter Filter node in the subplan that is being optimized.
-   * @param outputColumns List of output columns in subplan.
-   * @param filterColumns List of columns in filter predicate.
-   * @return List of available candidate indexes on fsRelation for the given columns.
-   */
-  private def findCoveringIndexes(
-      filter: Filter,
-      outputColumns: Seq[String],
-      filterColumns: Seq[String]): Seq[IndexLogEntry] = {
-    RuleUtils.getRelation(spark, filter) match {
-      case Some(r) =>
-        val indexManager = Hyperspace
-          .getContext(spark)
-          .indexCollectionManager
-
-        // TODO: the following check only considers indexes in ACTIVE state for usage. Update
-        //  the code to support indexes in transitioning states as well.
-        //  See https://github.com/microsoft/hyperspace/issues/65
-        val allIndexes = indexManager.getIndexes(Seq(Constants.States.ACTIVE))
-
-        val candidateIndexes = allIndexes.filter { index =>
-          indexCoversPlan(
-            outputColumns,
-            filterColumns,
-            index.indexedColumns,
-            index.includedColumns)
-        }
-
-        // Get candidate via file-level metadata validation. This is performed after pruning
-        // by column schema, as this might be expensive when there are numerous files in the
-        // relation or many indexes to be checked.
-        RuleUtils.getCandidateIndexes(spark, candidateIndexes, r)
-
-      case None => Nil // There is zero or more than one supported relations in Filter's sub-plan.
-    }
-  }
-
-  /**
-   * For a given index and filter and output columns, check if index covers them
-   * according to the FilterIndex rule requirement.
-   *
-   * @param outputColumns List of output columns in subplan.
-   * @param filterColumns List of columns in filter predicate.
-   * @param indexedColumns List of indexed columns (e.g. from an index being checked)
-   * @param includedColumns List of included columns (e.g. from an index being checked)
-   * @param fileFormat FileFormat for input relation in original logical plan.
-   * @return 'true' if
-   *         1. Index fully covers output and filter columns, and
-   *         2. Filter predicate contains first column in index's 'indexed' columns.
-   */
-  private def indexCoversPlan(
-      outputColumns: Seq[String],
-      filterColumns: Seq[String],
-      indexedColumns: Seq[String],
-      includedColumns: Seq[String]): Boolean = {
-    val allColumnsInPlan = outputColumns ++ filterColumns
-    val allColumnsInIndex = indexedColumns ++ includedColumns
-
-    // TODO: Normalize predicates into CNF and incorporate more conditions.
-    ResolverUtils.resolve(spark, indexedColumns.head, filterColumns).isDefined &&
-    ResolverUtils.resolve(spark, allColumnsInPlan, allColumnsInIndex).isDefined
   }
 }
 
-object ExtractFilterNode {
-  type returnType = (
-      LogicalPlan, // original plan
-      Filter,
-      Seq[String], // output columns
-      Seq[String]) // filter columns
+/**
+ * FilterColumnFilter filters indexes out if
+ *   1) an index doesn't have all required output columns.
+ *   2) filter condition doesn't have the first indexed column of the given index.
+ */
+object FilterColumnFilter extends QueryPlanIndexFilter {
+  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
+    if (candidateIndexes.isEmpty || candidateIndexes.size != 1) {
+      return Map.empty
+    }
 
-  def unapply(plan: LogicalPlan): Option[returnType] = plan match {
-    case project @ Project(_, filter @ Filter(condition: Expression, ExtractRelation(relation)))
-        if !RuleUtils.isIndexApplied(relation) =>
-      val projectColumnNames = CleanupAliases(project)
-        .asInstanceOf[Project]
-        .projectList
-        .map(_.references.map(_.asInstanceOf[AttributeReference].name))
-        .flatMap(_.toSeq)
-      val filterColumnNames = condition.references.map(_.name).toSeq
+    val (filterColumnNames, projectColumnNames) = plan match {
+      case project @ Project(_, _ @Filter(condition: Expression, ExtractRelation(relation)))
+          if !RuleUtils.isIndexApplied(relation) =>
+        val projectColumnNames = CleanupAliases(project)
+          .asInstanceOf[Project]
+          .projectList
+          .map(_.references.map(_.asInstanceOf[AttributeReference].name))
+          .flatMap(_.toSeq)
+        val filterColumnNames = condition.references.map(_.name).toSeq
+        (filterColumnNames, projectColumnNames)
 
-      Some(project, filter, projectColumnNames, filterColumnNames)
+      case Filter(condition: Expression, ExtractRelation(relation))
+          if !RuleUtils.isIndexApplied(relation) =>
+        val relationColumnNames = relation.plan.output.map(_.name)
+        val filterColumnNames = condition.references.map(_.name).toSeq
+        (filterColumnNames, relationColumnNames)
+      case _ =>
+        (Seq(), Seq())
+    }
 
-    case filter @ Filter(condition: Expression, ExtractRelation(relation))
-        if !RuleUtils.isIndexApplied(relation) =>
-      val relationColumnsName = relation.output.map(_.name)
-      val filterColumnNames = condition.references.map(_.name).toSeq
+    // Filter candidate indexes if:
+    //  1. Filter predicate's columns include the first 'indexed' column of the index.
+    //  2. The index covers all columns from the filter predicate and output columns list.
+    val (rel, indexes) = candidateIndexes.head
+    val filteredIndexes =
+      indexes.filter { index =>
+        val ddColumns = index.derivedDataset.properties.columns
+        withFilterReasonTag(
+          plan,
+          index,
+          "The first indexed column should be in filter condition columns.") {
+          ResolverUtils.resolve(spark, ddColumns.indexed.head, filterColumnNames).isDefined
+        } &&
+        withFilterReasonTag(
+          plan,
+          index,
+          "Index does not contain required columns. Required columns: " +
+            s"[${(filterColumnNames ++ projectColumnNames).mkString(",")}], Indexed & " +
+            s"included columns: [${(ddColumns.indexed ++ ddColumns.included).mkString(",")}]") {
+          ResolverUtils
+            .resolve(
+              spark,
+              filterColumnNames ++ projectColumnNames,
+              ddColumns.indexed ++ ddColumns.included)
+            .isDefined
+        }
+      }
 
-      Some(filter, filter, relationColumnsName, filterColumnNames)
+    Map(rel -> filteredIndexes)
+  }
+}
 
-    case _ => None // plan does not match with any of filter index rule patterns
+/**
+ * IndexRankFilter selects the best applicable index.
+ */
+object FilterRankFilter extends IndexRankFilter {
+  override def apply(
+      plan: LogicalPlan,
+      applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
+    if (applicableIndexes.isEmpty || applicableIndexes.size != 1
+        || applicableIndexes.head._2.isEmpty) {
+      Map.empty
+    } else {
+      val relation = RuleUtils.getRelation(spark, plan).get
+      val selected = FilterIndexRanker.rank(spark, relation.plan, applicableIndexes.head._2).get
+      setFilterReasonTagForRank(plan, applicableIndexes.head._2, selected)
+      Map(applicableIndexes.head._1 -> selected)
+    }
   }
 }
 
@@ -193,5 +146,58 @@ object ExtractRelation extends ActiveSparkSession {
     } else {
       None
     }
+  }
+}
+
+/**
+ * FilterIndexRule looks for opportunities in a logical plan to replace
+ * a relation with an available hash partitioned index according to columns in
+ * filter predicate.
+ */
+object FilterIndexRule extends HyperspaceRule {
+  override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
+    FilterPlanNodeFilter :: FilterColumnFilter :: Nil
+
+  override val indexRanker: IndexRankFilter = FilterRankFilter
+
+  override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = {
+    if (indexes.isEmpty || (indexes.size != 1)) {
+      return plan
+    }
+
+    // As FilterIndexRule is not intended to support bucketed scan, we set
+    // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
+    // unnecessary shuffle for appended data to apply BucketUnion for merging data.
+    RuleUtils.transformPlanToUseIndex(
+      spark,
+      indexes.head._2,
+      plan,
+      useBucketSpec = HyperspaceConf.useBucketSpecForFilterRule(spark),
+      useBucketUnionForAppended = false)
+  }
+
+  override def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int = {
+    if (indexes.isEmpty || (indexes.size != 1)) {
+      return 0
+    }
+
+    val candidateIndex = indexes.head._2
+    // Filter index rule
+    val relation = RuleUtils.getRelation(spark, plan).get
+    val commonBytes = candidateIndex
+      .getTagValue(relation.plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
+      .getOrElse {
+        relation.allFileInfos.foldLeft(0L) { (res, f) =>
+          if (candidateIndex.sourceFileInfoSet.contains(f)) {
+            res + f.size // count, total bytes
+          } else {
+            res
+          }
+        }
+      }
+
+    // TODO: Enhance scoring function.
+    //  See https://github.com/microsoft/hyperspace/issues/444
+    (50 * (commonBytes.toFloat / relation.allFileSizeInBytes)).round
   }
 }
