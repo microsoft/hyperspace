@@ -179,7 +179,12 @@ ThisBuild / developers := List(
     id = "thugsatbay",
     name = "Gurleen Singh",
     email = "",
-    url = url("https://github.com/thugsatbay")))
+    url = url("https://github.com/thugsatbay")),
+  Developer(
+    id = "clee704",
+    name = "Chungmin Lee",
+    email = "",
+    url = url("https://github.com/clee704")))
 
 ThisBuild / description := "Hyperspace: An Indexing Subsystem for Apache Spark"
 ThisBuild / licenses := List(
