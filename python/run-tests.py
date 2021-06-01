@@ -88,7 +88,7 @@ def prepare(root_dir):
     version = '0.0.0'
     with open(os.path.join(root_dir, "version.sbt")) as fd:
         version = fd.readline().split('"')[1]
-    package = "com.microsoft.hyperspace:hyperspace-core_spark2.4_2.12:" + version
+    package = "com.microsoft.hyperspace:hyperspace-core-spark2.4_2.12:" + version
     return package
 
 
