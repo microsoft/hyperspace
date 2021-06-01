@@ -28,12 +28,12 @@ jobs:
           inputs:
             sourceFolder: '$(Build.SourcesDirectory)/target/'
             contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Hyperspace artifacts'
           inputs:
-            artifactName: 'hyperspace-core_spark2.4'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
+            artifactName: 'hyperspace-core-spark2.4'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
 
   - job: Build_Spark2_4_2_12
     displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.12'
@@ -51,12 +51,12 @@ jobs:
           inputs:
             sourceFolder: '$(Build.SourcesDirectory)/target/'
             contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Hyperspace artifacts'
           inputs:
-            artifactName: 'hyperspace-core_spark2.4'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark2.4/'
+            artifactName: 'hyperspace-core-spark2.4'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
 
   - job: Build_Spark3_0_2_12
     displayName: 'Build sources and run unit tests for Spark 3.0 / Scala 2.12'
@@ -74,12 +74,12 @@ jobs:
           inputs:
             sourceFolder: '$(Build.SourcesDirectory)/target/'
             contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.0/'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.0/'
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Hyperspace artifacts'
           inputs:
-            artifactName: 'hyperspace-core_spark3.0'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.0/'
+            artifactName: 'hyperspace-core-spark3.0'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.0/'
 
   - job: Build_Spark3_1_2_12
     displayName: 'Build sources and run unit tests for Spark 3.1 / Scala 2.12'
@@ -97,12 +97,12 @@ jobs:
           inputs:
             sourceFolder: '$(Build.SourcesDirectory)/target/'
             contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.1/'
+            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
         - task: PublishBuildArtifacts@1
           displayName: 'Publish Hyperspace artifacts'
           inputs:
-            artifactName: 'hyperspace-core_spark3.1'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core_spark3.1/'
+            artifactName: 'hyperspace-core-spark3.1'
+            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
 
   - job: PythonTest
     displayName: 'Run Python tests'
