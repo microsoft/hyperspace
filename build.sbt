@@ -90,7 +90,7 @@ lazy val commonSettings = Seq(
   buildInfoPackage := "com.microsoft.hyperspace",
 
   name := "hyperspace-core",
-  moduleName := name.value + s"_spark${sparkVersion.value.short}",
+  moduleName := name.value + s"-spark${sparkVersion.value.short}",
   libraryDependencies ++= deps(sparkVersion.value),
 
   // Scalastyle
