@@ -292,10 +292,10 @@ object Directory {
       path: Path,
       pathFilter: PathFilter,
       fs: FileSystem): Seq[FileStatus] = {
-      val (files, directories) = fs.listStatus(path).partition(_.isFile)
-      // TODO: explore fs.listFiles(recursive = true) for better performance of file listing.
-      files.filter(s => pathFilter.accept(s.getPath)) ++
-        directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, fs))
+    val (files, directories) = fs.listStatus(path).partition(_.isFile)
+    // TODO: explore fs.listFiles(recursive = true) for better performance of file listing.
+    files.filter(s => pathFilter.accept(s.getPath)) ++
+      directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, fs))
   }
 }
 

@@ -140,7 +140,11 @@ class OptimizeAction(
     // the list of newly created index files.
     val hadoopConf = spark.sessionState.newHadoopConf()
     val absolutePath = PathUtils.makeAbsolute(indexDataPath.toString, hadoopConf)
-    val newContent = Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
+    val newContent = if (absolutePath.getFileSystem(hadoopConf).exists(absolutePath)) {
+      Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
+    } else {
+      Content(Directory.createEmptyDirectory(absolutePath))
+    }
     val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.copy(
       properties = previousIndexLogEntry.derivedDataset.properties
         .copy(
