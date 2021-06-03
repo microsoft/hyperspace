@@ -100,7 +100,12 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager) 
               IndexLogEntry.schemaString(indexDataFrame.schema),
               numBuckets,
               coveringIndexProperties)),
-          Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
+          if (absolutePath.getFileSystem(hadoopConf).exists(absolutePath)) {
+            Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
+          } else {
+            // Create empty Content if the index content path does not exist.
+            Content(Directory.createEmptyDirectory(absolutePath))
+          },
           Source(SparkPlan(sourcePlanProperties)),
           Map())
 

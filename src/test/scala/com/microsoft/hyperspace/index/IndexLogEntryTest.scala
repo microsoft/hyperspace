@@ -362,33 +362,10 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
     assert(directoryEquals(actual, expected))
   }
 
-  test("Directory.fromLeafFiles: throwIfNotExist flag throws exception for non-existent" +
-    "directory, otherwise works as expected.") {
-    val testDirPath = toPath(testDir)
-    val nonExistentDir = new Path(testDirPath, "nonexistent")
-
-    // Try create Directory object with throwIfNotExists to true. This should throw exception.
-    intercept[FileNotFoundException] {
-      Directory.fromDirectory(nonExistentDir, fileIdTracker, throwIfNotExists = true)
-    }
-
-    // Try create Directory object with throwIfNotExists to false. This should create empty
-    // Directory.
-    val expected = {
-      val nonExistentDirDirectory = Directory(nonExistentDir.getName)
-      createDirectory(nonExistentDir, nonExistentDirDirectory)
-    }
-
-    val actual = Directory.fromDirectory(nonExistentDir, fileIdTracker, throwIfNotExists = false)
-    assert(directoryEquals(actual, expected))
-  }
-
   test("Directory.fromDirectory where the directory is empty.") {
     val testDirPath = toPath(testDir)
     val emptyDirPath = new Path(testDirPath, "empty")
 
-    // Try create Directory object with throwifNotExists to false. This should create empt
-    // Directory.
     val expected = {
       val emptyDirDirectory = Directory(emptyDirPath.getName)
       createDirectory(emptyDirPath, emptyDirDirectory)
