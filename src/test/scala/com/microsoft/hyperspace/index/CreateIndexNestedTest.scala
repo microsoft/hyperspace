@@ -76,11 +76,10 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
         .count == 1)
     assert(
       hyperspace.indexes
-        .where(element_at(col("additionalStats"), "includedColumns").contains(
-          "__hs_nested.nested.leaf.cnt"))
+        .where(col("additionalStats.includedColumns").contains("__hs_nested.nested.leaf.cnt"))
         .count == 1)
     val colTypes = hyperspace.indexes
-      .select(element_at(col("additionalStats"), "schema"))
+      .select("additionalStats.schema")
       .collect()
       .map(r => r.getString(0))
       .head
