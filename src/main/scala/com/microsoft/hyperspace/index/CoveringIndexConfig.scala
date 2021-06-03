@@ -25,8 +25,8 @@ import com.microsoft.hyperspace.util.HyperspaceConf
 /**
  * CoveringIndexConfig specifies the configuration of an index.
  *
- * @param indexName       Index name.
- * @param indexedColumns  Columns from which an index is created.
+ * @param indexName Index name.
+ * @param indexedColumns Columns from which an index is created.
  * @param includedColumns Columns to be included in the index.
  */
 case class CoveringIndexConfig(
@@ -104,8 +104,8 @@ case class CoveringIndexConfig(
 }
 
 /**
- * Defines [[CoveringIndexConfig.Builder]] and relevant helper methods
- * for enabling builder pattern for [[CoveringIndexConfig]].
+ * Defines [[CoveringIndexConfig.Builder]] and relevant helper methods for enabling builder pattern for
+ * [[CoveringIndexConfig]].
  */
 object CoveringIndexConfig {
 
@@ -114,8 +114,8 @@ object CoveringIndexConfig {
    */
   class Builder {
 
-    private[this] var indexedColumns: Seq[String] = Nil
-    private[this] var includedColumns: Seq[String] = Nil
+    private[this] var indexedColumns: Seq[String] = Seq()
+    private[this] var includedColumns: Seq[String] = Seq()
     private[this] var indexName: String = ""
 
     /**
@@ -142,7 +142,7 @@ object CoveringIndexConfig {
      *
      * Note: API signature supports passing one or more argument.
      *
-     * @param indexedColumn  indexed column for the [[CoveringIndexConfig]].
+     * @param indexedColumn indexed column for the [[CoveringIndexConfig]].
      * @param indexedColumns indexed columns for the [[CoveringIndexConfig]].
      * @return an [[CoveringIndexConfig.Builder]] object with updated indexed columns.
      */
@@ -160,7 +160,7 @@ object CoveringIndexConfig {
      *
      * Note: API signature supports passing one or more argument.
      *
-     * @param includedColumn  included column for [[CoveringIndexConfig]].
+     * @param includedColumn included column for [[CoveringIndexConfig]].
      * @param includedColumns included columns for [[CoveringIndexConfig]].
      * @return an [[CoveringIndexConfig.Builder]] object with updated included columns.
      */
