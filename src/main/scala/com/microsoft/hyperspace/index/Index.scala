@@ -23,8 +23,8 @@ import org.apache.spark.sql.DataFrame
  * Represents an index.
  *
  * Index is any data structure that can be used to improve the performance
- * of a query that references the source data which is indexed by the index
- * by rewriting the query and returning a new, more efficient plan.
+ * of a query that references source data indexed by the index by rewriting
+ * the query and returning a new, more efficient plan.
  *
  * The framework manages various types of indexes through this interface.
  */
@@ -52,7 +52,7 @@ trait Index {
   def indexedColumns: Seq[String]
 
   /**
-   * Returns the column names which this index references.
+   * Returns the column names this index references.
    *
    * Referenced columns include indexed columns, plus additional columns
    * that the index may reference.
@@ -72,7 +72,7 @@ trait Index {
   def properties: Map[String, String]
 
   /**
-   * Returns a copy of this index, with the properties replaced by
+   * Returns a copy of this index, with the properties replaced with
    * the new properties.
    */
   def withNewProperties(newProperties: Map[String, String]): Index

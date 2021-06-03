@@ -44,7 +44,7 @@ trait IndexConfig {
   /**
    * Creates an index from this configuration.
    *
-   * @param ctx        Helper object for indexing operations
+   * @param ctx Helper object for indexing operations
    * @param sourceData Source data to index
    * @param properties Properties for [[Index]]
    * @return Created index and index data
