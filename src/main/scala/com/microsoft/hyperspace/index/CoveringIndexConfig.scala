@@ -104,8 +104,8 @@ case class CoveringIndexConfig(
 }
 
 /**
- * Defines [[CoveringIndexConfig.Builder]] and relevant helper methods for enabling builder pattern for
- * [[CoveringIndexConfig]].
+ * Defines [[CoveringIndexConfig.Builder]] and relevant helper methods for enabling builder pattern
+ * for [[CoveringIndexConfig]].
  */
 object CoveringIndexConfig {
 

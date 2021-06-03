@@ -212,8 +212,8 @@ object CoveringIndex {
       includedColumns: Seq[String],
       hasLineageColumn: Boolean): (DataFrame, Seq[ResolvedColumn], Seq[ResolvedColumn]) = {
     val spark = ctx.spark
-    val resolvedIndexedColumns = resolveColumns(sourceData, indexedColumns)
-    val resolvedIncludedColumns = resolveColumns(sourceData, includedColumns)
+    val (resolvedIndexedColumns, resolvedIncludedColumns) =
+      resolveConfig(sourceData, indexedColumns, includedColumns)
     val projectColumns = (resolvedIndexedColumns ++ resolvedIncludedColumns).map(_.toColumn)
 
     val indexData =
@@ -259,14 +259,19 @@ object CoveringIndex {
     (indexData, resolvedIndexedColumns, resolvedIncludedColumns)
   }
 
-  private def resolveColumns(df: DataFrame, columns: Seq[String]): Seq[ResolvedColumn] = {
+  private def resolveConfig(
+      df: DataFrame,
+      indexedColumns: Seq[String],
+      includedColumns: Seq[String]): (Seq[ResolvedColumn], Seq[ResolvedColumn]) = {
     val spark = df.sparkSession
     val plan = df.queryExecution.analyzed
-    val resolvedColumns = ResolverUtils.resolve(spark, columns, plan)
-    resolvedColumns match {
-      case Some(cols) => cols
+    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, plan)
+    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, plan)
+
+    (resolvedIndexedColumns, resolvedIncludedColumns) match {
+      case (Some(indexed), Some(included)) => (indexed, included)
       case _ =>
-        val unresolvedColumns = columns
+        val unresolvedColumns = (indexedColumns ++ includedColumns)
           .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan).map(_.map(_.name))))
           .collect { case (c, r) if r.isEmpty => c }
         throw HyperspaceException(

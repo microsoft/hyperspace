@@ -119,12 +119,12 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
 
   test("op() fails if index config is of wrong case and spark is case-sensitive") {
     when(mockLogManager.getLatestLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
-    val action1 = new CreateAction(
-      spark, df, IndexConfig("index1", Seq("rgUID"), Seq("dATE")), mockLogManager, mockDataManager)
+    val indexConfig = IndexConfig("index1", Seq("rgUID"), Seq("dATE"))
+    val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
     withSQLConf("spark.sql.caseSensitive" -> "true") {
-      val ex = intercept[HyperspaceException](action1.op())
+      val ex = intercept[HyperspaceException](action.op())
       assert(
-        ex.getMessage.contains("Columns 'rgUID' could not be resolved from available " +
+        ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
           "source columns:\n" +
             "root\n " +
             "|-- Date: string (nullable = true)\n " +
@@ -132,20 +132,6 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
             "|-- Query: string (nullable = true)\n " +
             "|-- imprs: integer (nullable = true)\n " +
             "|-- clicks: integer (nullable = true)"))
-    }
-    val action2 = new CreateAction(
-      spark, df, IndexConfig("index1", Seq("RGUID"), Seq("dATE")), mockLogManager, mockDataManager)
-    withSQLConf("spark.sql.caseSensitive" -> "true") {
-      val ex = intercept[HyperspaceException](action2.op())
-      assert(
-        ex.getMessage.contains("Columns 'dATE' could not be resolved from available " +
-          "source columns:\n" +
-          "root\n " +
-          "|-- Date: string (nullable = true)\n " +
-          "|-- RGUID: string (nullable = true)\n " +
-          "|-- Query: string (nullable = true)\n " +
-          "|-- imprs: integer (nullable = true)\n " +
-          "|-- clicks: integer (nullable = true)"))
     }
   }
 
