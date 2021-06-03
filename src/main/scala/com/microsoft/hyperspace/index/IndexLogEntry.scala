@@ -79,14 +79,19 @@ object Content {
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
    * @return Content object with Directory tree starting at root, and containing all leaf files
-   *         from "path" argument.
+   *         from "path" argument. If the given path does not exist, return empty Directory.
    */
   def fromDirectory(
       path: Path,
       fileIdTracker: FileIdTracker,
       hadoopConfiguration: Configuration,
-      pathFilter: PathFilter = PathUtils.DataPathFilter): Content =
-    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration))
+      pathFilter: PathFilter = PathUtils.DataPathFilter): Content = {
+    if (path.getFileSystem(hadoopConfiguration).exists(path)) {
+      Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration))
+    } else {
+      Content(Directory.createEmptyDirectory(path))
+    }
+  }
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
