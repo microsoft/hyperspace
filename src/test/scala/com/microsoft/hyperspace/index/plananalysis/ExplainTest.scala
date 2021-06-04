@@ -23,13 +23,11 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits}
-import com.microsoft.hyperspace.index.{CoveringIndexConfig, HyperspaceSuite, IndexConstants}
+import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.PathUtils
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 class ExplainTest extends SparkFunSuite with HyperspaceSuite {
-  private val IndexConfig = CoveringIndexConfig
-
   private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val fileSystem = new Path(sampleParquetDataLocation).getFileSystem(new Configuration)
   private var sampleParquetDataFullPath: String = ""

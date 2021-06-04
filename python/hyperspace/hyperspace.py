@@ -19,17 +19,17 @@ class Hyperspace:
         self.jvm = spark._jvm
         self.hyperspace = self.jvm.com.microsoft.hyperspace.Hyperspace(spark._jsparkSession)
 
-    def _getJavaCoveringIndexConfig(self, index_config):
+    def _getJavaIndexConfig(self, index_config):
         """
-        Constructs CoveringIndexConfig Java object from python wrapper CoveringIndexConfig object.
-        :param index_config: CoveringIndexConfig java object
-        :return: CoveringIndexConfig python object
+        Constructs IndexConfig Java object from python wrapper IndexConfig object.
+        :param index_config: IndexConfig java object
+        :return: IndexConfig python object
 
-        >>> _getJavaCoveringIndexConfig(idx_config)
+        >>> _getJavaIndexConfig(idx_config)
         """
         indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
         included_columns = self._getScalaSeqFromList(index_config.includedColumns)
-        _jindexConfig = self.jvm.com.microsoft.hyperspace.index.CoveringIndexConfig(
+        _jindexConfig = self.jvm.com.microsoft.hyperspace.index.IndexConfig(
             self.jvm.java.lang.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig
 
@@ -67,11 +67,11 @@ class Hyperspace:
         :param indexConfig: indexConfig
 
         >>> hyperspace = Hyperspace(spark)
-        >>> idxConfig = CoveringIndexConfig("indexName", ["c1"], ["c2","c3"])
+        >>> idxConfig = IndexConfig("indexName", ["c1"], ["c2","c3"])
         >>> df = spark.read.parquet("./sample.parquet").toDF("c1", "c2", "c3")
         >>> hyperspace.createIndex(df, indexConfig)
         """
-        self.hyperspace.createIndex(dataFrame._jdf, self._getJavaCoveringIndexConfig(indexConfig))
+        self.hyperspace.createIndex(dataFrame._jdf, self._getJavaIndexConfig(indexConfig))
 
     def deleteIndex(self, indexName):
         """

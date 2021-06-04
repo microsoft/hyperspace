@@ -33,7 +33,7 @@ class IndexCollectionManager(
     extends IndexManager {
   private val conf: SQLConf = spark.sessionState.conf
 
-  override def create(df: DataFrame, indexConfig: IndexConfig): Unit = {
+  override def create(df: DataFrame, indexConfig: IndexConfigTrait): Unit = {
     val hadoopConf = spark.sessionState.newHadoopConf()
     val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
       .getIndexPath(indexConfig.indexName)

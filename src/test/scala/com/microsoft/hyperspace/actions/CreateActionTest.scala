@@ -29,8 +29,6 @@ import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 import com.microsoft.hyperspace.util.FileUtils
 
 class CreateActionTest extends HyperspaceSuite with SQLHelper {
-  private val IndexConfig = CoveringIndexConfig
-
   private val sampleData = SampleData.testData
   private val sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig = IndexConfig("index1", Seq("RGUID"), Seq("Date"))

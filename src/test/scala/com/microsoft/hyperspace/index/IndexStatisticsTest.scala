@@ -28,7 +28,7 @@ class IndexStatisticsTest extends QueryTest with HyperspaceSuite {
   override val indexLocationDirName = "indexStatsTest"
   private val dataColumns = Seq("Date", "RGUID", "Query", "imprs", "clicks")
   private val dataPath = inTempDir("sampleparquet")
-  private val indexConfig = CoveringIndexConfig("index1", Seq("RGUID"), Seq("Date"))
+  private val indexConfig = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private var dataDF: DataFrame = _
   private var hyperspace: Hyperspace = _
 

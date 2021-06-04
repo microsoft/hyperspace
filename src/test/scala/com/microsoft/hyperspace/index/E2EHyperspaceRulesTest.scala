@@ -34,8 +34,6 @@ import com.microsoft.hyperspace.index.rules.JoinIndexRule
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
-  private val IndexConfig = CoveringIndexConfig
-
   private val testDir = inTempDir("e2eTests")
   private val nonPartitionedDataPath = testDir + "/sampleparquet"
   private val partitionedDataPath = testDir + "/samplepartitionedparquet"

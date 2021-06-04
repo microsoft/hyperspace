@@ -26,7 +26,7 @@ import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestCoveringIndex, TestUtils}
+import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
@@ -224,11 +224,12 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
 
     val expected = IndexLogEntry.create(
       "indexName",
-      TestCoveringIndex(
+      CoveringIndex(
         Seq("col1"),
         Seq("col2", "col3"),
         schema,
-        200),
+        200,
+        Map()),
       Content(Directory("rootContentPath")),
       Source(SparkPlan(expectedSourcePlanProperties)),
       Map())

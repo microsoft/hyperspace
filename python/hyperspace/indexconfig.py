@@ -1,13 +1,13 @@
-class CoveringIndexConfig:
+class IndexConfig:
     def __init__(self, indexName, indexedColumns, includedColumns):
         """
-        Initializes CoveringIndexConfig object.
+        Initializes IndexConfig object.
         :param indexName: index name
         :param indexedColumns: indexed columns
         :param includedColumns: included columns
-        :return: CoveringIndexConfig object
+        :return: IndexConfig object
 
-        >>> idxConfig = CoveringIndexConfig("indexName", ["c1"], ["c2","c3"])
+        >>> idxConfig = IndexConfig("indexName", ["c1"], ["c2","c3"])
         """
         self.indexName = indexName
         self.indexedColumns = indexedColumns

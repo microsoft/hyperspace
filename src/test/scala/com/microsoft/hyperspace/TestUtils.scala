@@ -18,10 +18,9 @@ package com.microsoft.hyperspace
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
-import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.MockEventLogger.reset
-import com.microsoft.hyperspace.index.{CoveringIndex, CoveringIndexConfig, FileIdTracker, IndexConfig, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
+import com.microsoft.hyperspace.index.{FileIdTracker, IndexConfigTrait, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
 import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -83,7 +82,7 @@ object TestUtils {
       .asInstanceOf[IndexLogEntry]
   }
 
-  def getFileIdTracker(systemPath: Path, indexConfig: IndexConfig): FileIdTracker = {
+  def getFileIdTracker(systemPath: Path, indexConfig: IndexConfigTrait): FileIdTracker = {
     latestIndexLogEntry(systemPath, indexConfig.indexName).fileIdTracker
   }
 }
@@ -119,47 +118,4 @@ object TestConfig {
     IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
     IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
     IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0")
-}
-
-/**
- * Helper for creating CoveringIndex with default values and
- * no column resolution/normalization.
- */
-object TestCoveringIndex {
-
-  def apply(
-      indexedColumns: Seq[String],
-      includedColumns: Seq[String] = Nil,
-      schema: StructType = new StructType(),
-      numBuckets: Int = IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
-      properties: Map[String, String] = Map()): CoveringIndex = {
-    CoveringIndex(
-      indexedColumns,
-      includedColumns,
-      schema,
-      numBuckets,
-      properties)
-  }
-
-  def apply(indexConfig: CoveringIndexConfig): CoveringIndex = {
-    TestCoveringIndex(indexConfig.indexedColumns, indexConfig.includedColumns)
-  }
-
-  def apply(indexConfig: CoveringIndexConfig, schema: StructType): CoveringIndex = {
-    TestCoveringIndex(
-      indexConfig.indexedColumns,
-      indexConfig.includedColumns,
-      schema)
-  }
-
-  def apply(
-      indexConfig: CoveringIndexConfig,
-      schema: StructType,
-      numBuckets: Int): CoveringIndex = {
-    TestCoveringIndex(
-      indexConfig.indexedColumns,
-      indexConfig.includedColumns,
-      schema,
-      numBuckets)
-  }
 }

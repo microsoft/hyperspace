@@ -41,8 +41,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
 
   import spark.implicits._
   val dfFromSample = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
-  val indexConfig1 = CoveringIndexConfig("indexType1", Seq("clicks"), Seq("query"))
-  val indexConfig2 = CoveringIndexConfig("indexType2", Seq("clicks"), Seq("Date"))
+  val indexConfig1 = IndexConfig("indexType1", Seq("clicks"), Seq("query"))
+  val indexConfig2 = IndexConfig("indexType2", Seq("clicks"), Seq("Date"))
 
   protected val fileFormat = "parquet"
   protected val fileFormat2 = "json"
@@ -60,7 +60,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
   def setupIndexAndChangeData(
       sourceFileFormat: String,
       sourcePath: String,
-      indexConfig: IndexConfig,
+      indexConfig: IndexConfigTrait,
       appendCnt: Int,
       deleteCnt: Int): (Seq[String], Seq[String]) = {
     dfFromSample.write.format(sourceFileFormat).save(sourcePath)

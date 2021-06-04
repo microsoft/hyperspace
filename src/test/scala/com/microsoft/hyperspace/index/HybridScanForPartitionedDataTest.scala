@@ -34,7 +34,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
   override def setupIndexAndChangeData(
       sourceFileFormat: String,
       sourcePath: String,
-      indexConfig: IndexConfig,
+      indexConfig: IndexConfigTrait,
       appendCnt: Int,
       deleteCnt: Int): (Seq[String], Seq[String]) = {
     dfFromSample.write.partitionBy("clicks", "Date").format(sourceFileFormat).save(sourcePath)
@@ -72,7 +72,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
         .save(testPath)
 
       val df = spark.read.format(fileFormat).load(testPath)
-      hyperspace.createIndex(df, CoveringIndexConfig("indexName", Seq("Date"), Seq("clicks")))
+      hyperspace.createIndex(df, IndexConfig("indexName", Seq("Date"), Seq("clicks")))
       def filterQuery(df: DataFrame): DataFrame = {
         df.filter(df("Date") > "2000-01-01").select(df("clicks"))
       }
@@ -150,7 +150,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
       val indexSourcePaths = Seq(testPath + "/Date=2017-09-03", testPath + "/Date=2018-09-03")
       val df =
         spark.read.format(fileFormat).option("basePath", testPath).load(indexSourcePaths: _*)
-      hyperspace.createIndex(df, CoveringIndexConfig("indexName", Seq("Date"), Seq("clicks")))
+      hyperspace.createIndex(df, IndexConfig("indexName", Seq("Date"), Seq("clicks")))
       def filterQuery(df: DataFrame): DataFrame = {
         df.filter(df("Date") > "2000-01-01").select(df("clicks"))
       }

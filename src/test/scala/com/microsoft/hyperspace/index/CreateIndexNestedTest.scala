@@ -29,8 +29,6 @@ import com.microsoft.hyperspace.util.FileUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
-  private val IndexConfig = CoveringIndexConfig
-
   private val testDir = inTempDir("createIndexTests")
   private val nonPartitionedDataPath = testDir + "/samplenestedparquet"
   private val partitionedDataPath = testDir + "/samplenestedpartitionedparquet"

@@ -24,7 +24,7 @@ import org.apache.spark.sql.execution.datasources.{BucketingUtils, HadoopFsRelat
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types._
 
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData, TestCoveringIndex}
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogger, SampleData}
 import com.microsoft.hyperspace.TestUtils.{copyWithState, getFileIdTracker, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
@@ -32,8 +32,6 @@ import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class IndexManagerTest extends HyperspaceSuite with SQLHelper {
-  private val IndexConfig = CoveringIndexConfig
-
   private def sampleParquetDataLocation = inTempDir("sampleparquet")
   private val indexConfig1 = IndexConfig("index1", Seq("RGUID"), Seq("Date"))
   private val indexConfig2 = IndexConfig("index2", Seq("Query"), Seq("imprs"))
@@ -743,7 +741,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
   }
 
   private def expectedIndex(
-      indexConfig: CoveringIndexConfig,
+      indexConfig: IndexConfig,
       schema: StructType,
       df: DataFrame,
       state: String = Constants.States.ACTIVE): IndexLogEntry = {
@@ -787,7 +785,12 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
 
         val entry = IndexLogEntry.create(
           indexConfig.indexName,
-          TestCoveringIndex(indexConfig, schema),
+          CoveringIndex(
+            indexConfig.indexedColumns,
+            indexConfig.includedColumns,
+            schema,
+            IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
+            Map()),
           Content.fromDirectory(
             PathUtils.makeAbsolute(
               s"$systemPath/${indexConfig.indexName}" +

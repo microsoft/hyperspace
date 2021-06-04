@@ -22,7 +22,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.{TestCoveringIndex, TestUtils}
+import com.microsoft.hyperspace.TestUtils
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
@@ -30,7 +30,7 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
   val testRoot = inTempDir("indexLogManagerTests")
   val sampleIndexLogEntry: IndexLogEntry = IndexLogEntry(
     "entityName",
-    TestCoveringIndex(
+    CoveringIndex(
       Seq("id"),
       Seq("name", "school"),
       StructType(
@@ -38,7 +38,8 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
           StructField("name", StringType) ::
           StructField("school", StringType) ::
           Nil),
-      100),
+      100,
+      Map()),
     Content(
       Directory(
         "/root/log",

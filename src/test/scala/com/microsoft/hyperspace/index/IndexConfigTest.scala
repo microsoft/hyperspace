@@ -18,9 +18,7 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.SparkFunSuite
 
-class CoveringIndexConfigTest extends SparkFunSuite {
-  private val IndexConfig = CoveringIndexConfig
-
+class IndexConfigTest extends SparkFunSuite {
   test("Empty index name is not allowed.") {
     intercept[IllegalArgumentException](IndexConfig("", Seq("c1"), Seq("c2")))
     intercept[IllegalArgumentException](IndexConfig.builder.indexBy("c1").include("c2").create)

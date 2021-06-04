@@ -25,13 +25,11 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index.{CoveringIndexConfig, IndexCollectionManager, IndexConstants, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.{IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
 import com.microsoft.hyperspace.shim.{JoinWithoutHint, RepartitionByExpressionWithOptionalNumPartitions}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
 class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
-  private val IndexConfig = CoveringIndexConfig
-
   override val indexLocationDirName = "ruleUtilsTest"
 
   val t1c1 = AttributeReference("t1c1", IntegerType)()

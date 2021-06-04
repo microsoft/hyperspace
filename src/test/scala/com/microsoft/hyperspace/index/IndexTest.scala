@@ -19,15 +19,14 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-import com.microsoft.hyperspace.TestCoveringIndex
 import com.microsoft.hyperspace.actions.Constants
 
 class IndexTest extends SparkFunSuite {
-  val indexConfig1 = CoveringIndexConfig("myIndex1", Array("id"), Seq("name"))
-  val indexConfig2 = CoveringIndexConfig("myIndex2", Array("id"), Seq("school"))
+  val indexConfig1 = IndexConfig("myIndex1", Array("id"), Seq("name"))
+  val indexConfig2 = IndexConfig("myIndex2", Array("id"), Seq("school"))
 
   def toIndex(
-      config: CoveringIndexConfig,
+      config: IndexConfig,
       path: String,
       schema: StructType,
       numBuckets: Int): IndexLogEntry = {
@@ -40,7 +39,12 @@ class IndexTest extends SparkFunSuite {
 
     val entry = IndexLogEntry(
       config.indexName,
-      TestCoveringIndex(config, schema, numBuckets),
+      CoveringIndex(
+        config.indexedColumns,
+        config.includedColumns,
+        schema,
+        numBuckets,
+        Map()),
       Content(Directory(path)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

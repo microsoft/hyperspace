@@ -25,7 +25,6 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.{mock, when}
 
 import com.microsoft.hyperspace.{HyperspaceException, SampleData}
-import com.microsoft.hyperspace.TestCoveringIndex
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
@@ -85,11 +84,12 @@ class RefreshActionTest extends HyperspaceSuite {
 
     val entry = IndexLogEntry(
       "index1",
-      TestCoveringIndex(
+      CoveringIndex(
         Seq("clicks"),
-        Nil,
+        Seq(),
         StructType(StructField("clicks", IntegerType) :: Nil),
-        10),
+        10,
+        Map()),
       Content(Directory("dirPath")),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

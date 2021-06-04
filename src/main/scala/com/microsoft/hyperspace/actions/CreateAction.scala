@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 class CreateAction(
     override val spark: SparkSession,
     df: DataFrame,
-    indexConfig: IndexConfig,
+    indexConfig: IndexConfigTrait,
     final override protected val logManager: IndexLogManager,
     dataManager: IndexDataManager)
     extends CreateActionBase(dataManager)
@@ -70,7 +70,7 @@ class CreateAction(
     }
   }
 
-  private def isValidIndexSchema(config: IndexConfig, dataFrame: DataFrame): Boolean = {
+  private def isValidIndexSchema(config: IndexConfigTrait, dataFrame: DataFrame): Boolean = {
     // Resolve index config columns from available column names present in the dataframe.
     ResolverUtils
       .resolve(spark, config.referencedColumns, dataFrame.queryExecution.analyzed)

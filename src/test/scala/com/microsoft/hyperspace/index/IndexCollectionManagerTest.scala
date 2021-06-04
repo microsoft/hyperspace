@@ -22,7 +22,7 @@ import org.apache.spark.sql.types.StructType
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{mock, when}
 
-import com.microsoft.hyperspace.{HyperspaceException, TestCoveringIndex}
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
 
@@ -47,11 +47,12 @@ class IndexCollectionManagerTest extends HyperspaceSuite {
 
           val entry = IndexLogEntry(
             indexPath.toString,
-            TestCoveringIndex(
+            CoveringIndex(
               Seq("RGUID"),
               Seq("Date"),
               new StructType(),
-              10),
+              10,
+              Map()),
             Content(Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
             Source(SparkPlan(sourcePlanProperties)),
             Map())
@@ -97,11 +98,12 @@ class IndexCollectionManagerTest extends HyperspaceSuite {
 
       val entry = IndexLogEntry(
         str,
-        TestCoveringIndex(
+        CoveringIndex(
           Seq("RGUID"),
           Seq("Date"),
           new StructType(),
-          10),
+          10,
+          Map()),
         Content(Directory(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
         Source(SparkPlan(sourcePlanProperties)),
         Map())
