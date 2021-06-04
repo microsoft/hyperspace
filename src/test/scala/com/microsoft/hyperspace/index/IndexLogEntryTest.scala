@@ -365,14 +365,23 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
   test("Directory.fromDirectory where the directory is empty.") {
     val testDirPath = toPath(testDir)
     val emptyDirPath = new Path(testDirPath, "empty")
-
     val expected = {
       val emptyDirDirectory = Directory(emptyDirPath.getName)
       createDirectory(emptyDirPath, emptyDirDirectory)
     }
 
-    val actual = Directory.fromDirectory(emptyDirPath, fileIdTracker)
-    assert(directoryEquals(actual, expected))
+    {
+      // Test non-existent directory.
+      val actual = Directory.fromDirectory(emptyDirPath, fileIdTracker)
+      assert(directoryEquals(actual, expected))
+    }
+
+    {
+      // Test empty directory.
+      emptyDirPath.getFileSystem(new Configuration).mkdirs(emptyDirPath)
+      val actual = Directory.fromDirectory(emptyDirPath, fileIdTracker)
+      assert(directoryEquals(actual, expected))
+    }
   }
 
   test("Directory Test: pathfilter adds only valid files to Directory object.") {
