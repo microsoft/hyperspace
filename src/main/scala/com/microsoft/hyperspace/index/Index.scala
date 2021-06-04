@@ -31,7 +31,7 @@ import org.apache.spark.sql.DataFrame
 @JsonTypeInfo(
   use = JsonTypeInfo.Id.CLASS,
   include = JsonTypeInfo.As.PROPERTY,
-  property = "impl"
+  property = "type"
 )
 trait Index {
 

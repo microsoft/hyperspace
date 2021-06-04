@@ -76,7 +76,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
          |{
          |  "name" : "indexName",
          |  "derivedDataset" : {
-         |    "impl" : "com.microsoft.hyperspace.index.CoveringIndex",
+         |    "type" : "com.microsoft.hyperspace.index.CoveringIndex",
          |    "indexedColumns" : [ "col1" ],
          |    "includedColumns" : [ "col2", "col3" ],
          |    "schema" : {
