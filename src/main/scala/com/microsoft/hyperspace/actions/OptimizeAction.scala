@@ -119,13 +119,12 @@ class OptimizeAction(
     val hadoopConf = spark.sessionState.newHadoopConf()
     val absolutePath = PathUtils.makeAbsolute(indexDataPath.toString, hadoopConf)
     val newContent = Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
-    val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.withNewProperties(
-      Hyperspace
-        .getContext(spark)
-        .sourceProviderManager
-        .getRelationMetadata(previousIndexLogEntry.relations.head)
-        .enrichIndexProperties(previousIndexLogEntry.derivedDataset.properties
-          + (IndexConstants.INDEX_LOG_VERSION -> endId.toString)))
+    val updatedIndexProperties = Hyperspace
+      .getContext(spark)
+      .sourceProviderManager
+      .getRelationMetadata(previousIndexLogEntry.relations.head)
+      .enrichIndexProperties(previousIndexLogEntry.properties
+        + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))
 
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {
@@ -136,9 +135,9 @@ class OptimizeAction(
         Directory.fromLeafFiles(filesToIgnoreStatuses, fileIdTracker)
       }
       val mergedContent = Content(newContent.root.merge(filesToIgnoreDirectory))
-      previousIndexLogEntry.copy(derivedDataset = updatedDerivedDataset, content = mergedContent)
+      previousIndexLogEntry.copy(content = mergedContent, properties = updatedIndexProperties)
     } else {
-      previousIndexLogEntry.copy(derivedDataset = updatedDerivedDataset, content = newContent)
+      previousIndexLogEntry.copy(content = newContent, properties = updatedIndexProperties)
     }
   }
 

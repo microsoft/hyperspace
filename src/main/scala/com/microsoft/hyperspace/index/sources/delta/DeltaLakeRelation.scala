@@ -153,7 +153,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     // Versions are comma separated - <index log version>:<delta table version>.
     // e.g. "1:2,3:5,5:9"
     val versions =
-      index.derivedDataset.properties
+      index.properties
         .getOrElse(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY, "")
 
     if (versions.nonEmpty) {

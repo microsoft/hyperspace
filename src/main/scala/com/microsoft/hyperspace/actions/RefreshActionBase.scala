@@ -50,6 +50,10 @@ private[actions] abstract class RefreshActionBase(
 
   override val fileIdTracker = previousIndexLogEntry.fileIdTracker
 
+  override protected val prevIndexProperties: Map[String, String] = {
+    previousIndexLogEntry.properties
+  }
+
   // Reconstruct a df from schema
   protected lazy val df = {
     val relations = previousIndexLogEntry.relations
