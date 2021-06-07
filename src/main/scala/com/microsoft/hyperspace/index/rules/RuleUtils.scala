@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -30,7 +28,6 @@ import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
@@ -180,7 +177,7 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
-    val coveringIndex = index.derivedDataset.asInstanceOf[CoveringIndex]
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     var unhandledAppendedFiles: Seq[Path] = Nil
     // Get transformed plan with index data and appended files if applicable.
@@ -201,8 +198,7 @@ object RuleUtils {
           } else {
             val curFiles = relation.allFiles.map(f =>
               FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
-            if (HyperspaceConf.hybridScanDeleteEnabled(
-                spark) && coveringIndex.canHandleDeletedFiles) {
+            if (HyperspaceConf.hybridScanDeleteEnabled(spark) && ci.canHandleDeletedFiles) {
               val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
               val filesAppended = nonExist.map(f => new Path(f.name))
               if (exist.length < index.sourceFileInfoSet.size) {
@@ -221,9 +217,8 @@ object RuleUtils {
           }
 
         val filesToRead = {
-          if (useBucketSpec || !coveringIndex.hasParquetAsSourceFormat(
-              index) || filesDeleted.nonEmpty ||
-            relation.partitionSchema.nonEmpty) {
+          if (useBucketSpec || !ci.hasParquetAsSourceFormat(index) || filesDeleted.nonEmpty ||
+              relation.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -248,7 +243,7 @@ object RuleUtils {
         // we could inject Filter-Not-In conditions on the lineage column to exclude the indexed
         // rows from the deleted files.
         val newSchema = StructType(
-          coveringIndex.schema.filter(s =>
+          ci.schema.filter(s =>
             relation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
@@ -266,7 +261,7 @@ object RuleUtils {
           newLocation,
           new StructType(),
           newSchema,
-          if (useBucketSpec) Some(coveringIndex.bucketSpec) else None,
+          if (useBucketSpec) Some(ci.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
@@ -304,7 +299,7 @@ object RuleUtils {
         // Although only numBuckets of BucketSpec is used in BucketUnion*, bucketColumnNames
         // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
         // misunderstanding.
-        val bucketSpec = coveringIndex.bucketSpec.copy(sortColumnNames = Nil)
+        val bucketSpec = ci.bucketSpec.copy(sortColumnNames = Nil)
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(

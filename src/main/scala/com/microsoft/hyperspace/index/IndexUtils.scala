@@ -16,28 +16,20 @@
 
 package com.microsoft.hyperspace.index
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
-
-import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
-import com.microsoft.hyperspace.index.sources.FileBasedRelation
-
 object IndexUtils {
 
   /**
-   * Returns a [[FileBasedRelation]] from the relation in the logical plan.
+   * Returns whether the lineage feature is enabled for the index by looking at
+   * the index properties.
    *
-   * There should be only a single supported relation in the plan.
+   * If the index has no corresponding key in the property map,
+   * [[IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT]] will be returned.
+   *
+   * @param properties Index properties
    */
-  def getRelation(spark: SparkSession, plan: LogicalPlan): FileBasedRelation = {
-    val provider = Hyperspace.getContext(spark).sourceProviderManager
-    val relations = plan.collect {
-      case l: LeafNode if provider.isSupportedRelation(l) =>
-        provider.getRelation(l)
-    }
-    if (relations.length != 1) {
-      throw HyperspaceException("Only a single relation is supported for indexing.")
-    }
-    relations.head
+  def hasLineageColumn(properties: Map[String, String]): Boolean = {
+    properties
+      .getOrElse(IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
+      .toBoolean
   }
 }

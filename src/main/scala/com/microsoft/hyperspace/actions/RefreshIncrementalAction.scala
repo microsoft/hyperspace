@@ -69,7 +69,7 @@ class RefreshIncrementalAction(
         .load(appendedFiles.map(_.name): _*)
     }
     updatedIndex = Some(
-      previousIndexLogEntry.derivedDataset.refresh(
+      previousIndexLogEntry.derivedDataset.refreshIncremental(
         this,
         appendedFiles,
         dfWithAppendedFiles,

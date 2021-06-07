@@ -106,7 +106,7 @@ private[actions] abstract class RefreshActionBase(
    * Build Set[FileInfo] to compare the source file list with the previous index version.
    */
   protected lazy val currentFiles: Set[FileInfo] = {
-    IndexUtils
+    RelationUtils
       .getRelation(spark, df.queryExecution.optimizedPlan)
       .allFiles
       .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))

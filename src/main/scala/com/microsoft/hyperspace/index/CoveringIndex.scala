@@ -85,7 +85,7 @@ case class CoveringIndex(
       SaveMode.Overwrite)
   }
 
-  override def refresh(
+  override def refreshIncremental(
       ctx: IndexerContext,
       appendedSourceDataFiles: Seq[FileInfo],
       appendedSourceData: => DataFrame,
@@ -131,7 +131,7 @@ case class CoveringIndex(
     updatedIndex
   }
 
-  override def rebuild(ctx: IndexerContext, sourceData: DataFrame): (CoveringIndex, DataFrame) = {
+  override def refreshFull(ctx: IndexerContext, sourceData: DataFrame): (CoveringIndex, DataFrame) = {
     val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
       CoveringIndex.createIndexData(
         ctx,
@@ -175,7 +175,7 @@ case class CoveringIndex(
       .toBoolean
   }
 
-  def hasLineageColumn: Boolean = CoveringIndex.hasLineageColumn(properties)
+  def hasLineageColumn: Boolean = IndexUtils.hasLineageColumn(properties)
 
   private def simpleStatistics: Map[String, String] = {
     Map(
@@ -199,12 +199,36 @@ object CoveringIndex {
   final val kind = "CoveringIndex"
   final val kindAbbr = "CI"
 
-  def hasLineageColumn(properties: Map[String, String]): Boolean = {
-    properties
-      .getOrElse(IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
-      .toBoolean
-  }
-
+  /**
+   * Creates index data from the given source data.
+   *
+   * Roughly speaking, index data for [[CoveringIndex]] is just a vertical
+   * slice of the source data, including only the indexed and included columns,
+   * bucketed and sorted by the indexed columns for efficient access.
+   *
+   * If hasLineageColumn is true, then the index data will contain a
+   * lineage column representing the source file the row came from, as well
+   * as the indexed and included columns.
+   *
+   * This method returns resolved and normalized indexed/included columns
+   * in addition to the index data. Resolved means that exact column names are
+   * retrieved from the schema. For example, when Spark is configured as
+   * case-insensitive and a column name "Foo.BaR" is given, and the schema is
+   * "root |-- foo |-- bar: integer", a resolved column name would be "foo.bar".
+   * This step is necessary to make the index work regardless of the current
+   * case-sensitivity setting. Normalization is to supported nested columns.
+   * Nested columns in the source data is stored as a normal column in the
+   * index data.
+   *
+   * @param ctx Helper object for indexing operations
+   * @param sourceData Source data to index
+   * @param indexedColumns Column names to be indexed
+   * @param includedColumns Column names to be included
+   * @param hasLineageColumn Whether or not to include the lineage column in
+   *                         the index data
+   * @return Tuple of (index data, resolved indexed columns, resolved included
+   *         columns)
+   */
   def createIndexData(
       ctx: IndexerContext,
       sourceData: DataFrame,
@@ -218,7 +242,7 @@ object CoveringIndex {
 
     val indexData =
       if (hasLineageColumn) {
-        val relation = IndexUtils.getRelation(spark, sourceData.queryExecution.optimizedPlan)
+        val relation = RelationUtils.getRelation(spark, sourceData.queryExecution.optimizedPlan)
 
         // Lineage is captured using two sets of columns:
         // 1. DATA_FILE_ID_COLUMN column contains source data file id for each index record.

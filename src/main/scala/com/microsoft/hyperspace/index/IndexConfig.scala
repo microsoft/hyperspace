@@ -20,12 +20,16 @@ import java.util.Locale
 
 import org.apache.spark.sql.DataFrame
 
+import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
- * IndexConfig specifies the configuration of an index.
+ * IndexConfig specifies the configuration of a covering index.
  *
- * Implementation note: the name of this class might be changed in v1.0.
+ * Use this class to create a covering index with [[Hyperspace.createIndex()]].
+ *
+ * Implementation note: This is an implementation of [[IndexConfigTrait]]
+ * for the covering index. The name of this class might be changed in v1.0.
  *
  * @param indexName Index name.
  * @param indexedColumns Columns from which an index is created.
@@ -94,7 +98,7 @@ case class IndexConfig(
         sourceData,
         indexedColumns,
         includedColumns,
-        CoveringIndex.hasLineageColumn(properties))
+        IndexUtils.hasLineageColumn(properties))
     val index = CoveringIndex(
       resolvedIndexedColumns.map(_.normalizedName),
       resolvedIncludedColumns.map(_.normalizedName),

@@ -53,7 +53,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager)
     val sourcePlan = df.queryExecution.optimizedPlan
     signatureProvider.signature(sourcePlan) match {
       case Some(s) =>
-        val relation = IndexUtils.getRelation(spark, sourcePlan)
+        val relation = RelationUtils.getRelation(spark, sourcePlan)
         val sourcePlanProperties = SparkPlan.Properties(
           Seq(relation.createRelationMetadata(fileIdTracker)),
           null,
@@ -86,7 +86,7 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager)
     val signatureProvider = LogicalPlanSignatureProvider.create()
     signatureProvider.signature(sourceData.queryExecution.optimizedPlan) match {
       case Some(_) =>
-        val relation = IndexUtils.getRelation(spark, sourceData.queryExecution.optimizedPlan)
+        val relation = RelationUtils.getRelation(spark, sourceData.queryExecution.optimizedPlan)
         relation.createRelationMetadata(fileIdTracker)
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }

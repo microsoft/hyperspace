@@ -38,7 +38,7 @@ class RefreshAction(
     with Action {
   private lazy val (updatedIndex, indexData) = {
     updateFileIdTracker(spark, df)
-    previousIndexLogEntry.derivedDataset.rebuild(this, df)
+    previousIndexLogEntry.derivedDataset.refreshFull(this, df)
   }
 
   override def logEntry: LogEntry =

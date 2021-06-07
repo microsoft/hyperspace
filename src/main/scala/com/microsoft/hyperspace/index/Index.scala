@@ -126,7 +126,7 @@ trait Index {
    * @return Updated index resulting from the indexing operation, or this
    *         index if no update is needed
    */
-  def refresh(
+  def refreshIncremental(
     ctx: IndexerContext,
     appendedSourceDataFiles: Seq[FileInfo],
     appendedSourceData: => DataFrame,
@@ -145,5 +145,5 @@ trait Index {
    * @return Updated index resulting from the indexing operation, or this
    *         index if no update is needed
    */
-  def rebuild(ctx: IndexerContext, sourceData: DataFrame): (Index, DataFrame)
+  def refreshFull(ctx: IndexerContext, sourceData: DataFrame): (Index, DataFrame)
 }
