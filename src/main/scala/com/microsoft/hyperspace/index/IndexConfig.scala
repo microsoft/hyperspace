@@ -87,7 +87,7 @@ case class IndexConfig(
   override def createIndex(
       ctx: IndexerContext,
       sourceData: DataFrame,
-      properties: Map[String, String]): (Index, DataFrame) = {
+      properties: Map[String, String]): (CoveringIndex, DataFrame) = {
     val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
       CoveringIndex.createIndexData(
         ctx,

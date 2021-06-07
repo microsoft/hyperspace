@@ -45,7 +45,7 @@ case class CoveringIndex(
 
   override def referencedColumns: Seq[String] = indexedColumns ++ includedColumns
 
-  override def withNewProperties(newProperties: Map[String, String]): Index = {
+  override def withNewProperties(newProperties: Map[String, String]): CoveringIndex = {
     copy(properties = newProperties)
   }
 
@@ -90,7 +90,7 @@ case class CoveringIndex(
       appendedSourceDataFiles: Seq[FileInfo],
       appendedSourceData: => DataFrame,
       deletedSourceDataFiles: Seq[FileInfo],
-      indexContent: Content): Index = {
+      indexContent: Content): CoveringIndex = {
     val updatedIndex = if (appendedSourceDataFiles.nonEmpty) {
       val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
         CoveringIndex.createIndexData(
@@ -131,7 +131,7 @@ case class CoveringIndex(
     updatedIndex
   }
 
-  override def rebuild(ctx: IndexerContext, sourceData: DataFrame): (Index, DataFrame) = {
+  override def rebuild(ctx: IndexerContext, sourceData: DataFrame): (CoveringIndex, DataFrame) = {
     val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
       CoveringIndex.createIndexData(
         ctx,
