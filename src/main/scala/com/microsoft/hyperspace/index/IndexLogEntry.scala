@@ -508,10 +508,6 @@ case class IndexLogEntry(
     case _ => false
   }
 
-  override def hashCode(): Int = {
-    (name, derivedDataset, signature, content).hashCode
-  }
-
   def indexedColumns: Seq[String] = derivedDataset.indexedColumns
 
   def signature: Signature = {
@@ -531,6 +527,10 @@ case class IndexLogEntry(
     val tracker = new FileIdTracker
     tracker.addFileInfo(sourceFileInfoSet ++ content.fileInfos)
     tracker
+  }
+
+  override def hashCode(): Int = {
+    (name, derivedDataset, signature, content).hashCode
   }
 
   /**
