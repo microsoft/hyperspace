@@ -73,7 +73,10 @@ class CreateAction(
   private def isValidIndexSchema(config: IndexConfigTrait, dataFrame: DataFrame): Boolean = {
     // Resolve index config columns from available column names present in the dataframe.
     ResolverUtils
-      .resolve(spark, config.referencedColumns, dataFrame.queryExecution.analyzed)
+      .resolve(
+        spark,
+        config.referencedColumns,
+        dataFrame.queryExecution.analyzed)
       .isDefined
   }
 
