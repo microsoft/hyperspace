@@ -20,7 +20,7 @@ import Path.relativeTo
 lazy val scala212 = "2.12.8"
 lazy val scala211 = "2.11.12"
 
-ThisBuild / scalaVersion := scala212
+scalaVersion := scala212
 
 ThisBuild / scalacOptions ++= Seq("-target:jvm-1.8")
 
@@ -81,7 +81,10 @@ lazy val addSparkVersionSpecificSourceDirectories = unmanagedSourceDirectories +
 lazy val commonSettings = Seq(
   // The following creates target/scala-2.*/src_managed/main/sbt-buildinfo/BuildInfo.scala.
   buildInfoKeys := Seq[BuildInfoKey](
+    name,
     version,
+    scalaVersion,
+    sbtVersion,
     sparkVersion,
     "sparkShortVersion" -> sparkVersion.value.short),
   buildInfoPackage := "com.microsoft.hyperspace",
