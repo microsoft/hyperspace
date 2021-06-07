@@ -68,22 +68,18 @@ object JoinIndexRanker {
         lazy val commonSizeInBytes2 =
           getCommonSizeInBytes(leftChild, left2) + getCommonSizeInBytes(rightChild, right2)
 
-        val left1NumBuckets = left1.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
-        val right1NumBuckets = right1.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
-        val left2NumBuckets = left2.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
-        val right2NumBuckets = right2.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
-        if (left1NumBuckets == right1NumBuckets && left2NumBuckets == right2NumBuckets) {
+        if (left1.numBuckets == right1.numBuckets && left2.numBuckets == right2.numBuckets) {
           if (!hybridScanEnabled || (commonSizeInBytes1 == commonSizeInBytes2)) {
-            left1NumBuckets > left2NumBuckets
+            left1.numBuckets > left2.numBuckets
           } else {
             // If both index pairs have the same number of buckets and Hybrid Scan is enabled,
             // pick the pair with more common bytes with the given source plan, so as to
             // reduce the overhead from handling appended and deleted files.
             commonSizeInBytes1 > commonSizeInBytes2
           }
-        } else if (left1NumBuckets == right1NumBuckets) {
+        } else if (left1.numBuckets == right1.numBuckets) {
           true
-        } else if (left2NumBuckets == right2NumBuckets) {
+        } else if (left2.numBuckets == right2.numBuckets) {
           false
         } else {
           // At this point, both pairs have different number of buckets. If Hybrid Scan is enabled,
@@ -91,5 +87,9 @@ object JoinIndexRanker {
           !hybridScanEnabled || commonSizeInBytes1 > commonSizeInBytes2
         }
     }
+  }
+
+  private implicit class CoveringIndexLogEntry(entry: IndexLogEntry) {
+    def numBuckets: Int = entry.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
   }
 }
