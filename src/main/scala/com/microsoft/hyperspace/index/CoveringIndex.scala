@@ -209,7 +209,7 @@ object CoveringIndex {
    * bucketed and sorted by the indexed columns for efficient access.
    *
    * If hasLineageColumn is true, then the index data will contain a
-   * lineage column representing the source file the row came from, as well
+   * lineage column representing the source file each row came from, as well
    * as the indexed and included columns.
    *
    * This method returns resolved and normalized indexed/included columns
@@ -218,7 +218,7 @@ object CoveringIndex {
    * case-insensitive and a column name "Foo.BaR" is given, and the schema is
    * "root |-- foo |-- bar: integer", a resolved column name would be "foo.bar".
    * This step is necessary to make the index work regardless of the current
-   * case-sensitivity setting. Normalization is to supported nested columns.
+   * case-sensitivity setting. Normalization is to supporte nested columns.
    * Nested columns in the source data is stored as a normal column in the
    * index data.
    *
