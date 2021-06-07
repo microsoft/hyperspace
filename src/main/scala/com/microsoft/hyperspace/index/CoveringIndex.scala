@@ -131,7 +131,9 @@ case class CoveringIndex(
     updatedIndex
   }
 
-  override def refreshFull(ctx: IndexerContext, sourceData: DataFrame): (CoveringIndex, DataFrame) = {
+  override def refreshFull(
+      ctx: IndexerContext,
+      sourceData: DataFrame): (CoveringIndex, DataFrame) = {
     val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
       CoveringIndex.createIndexData(
         ctx,
