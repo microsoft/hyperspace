@@ -82,7 +82,9 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
     val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
     val ex = intercept[HyperspaceException](action.validate())
     assert(
-      ex.getMessage.contains("Only creating index over HDFS file based scan nodes is supported"))
+      ex.getMessage.contains(
+        "Only creating index over HDFS file based scan nodes is supported. " +
+          "Source plan: LocalTableScan "))
   }
 
   test("validate() fails if index config doesn't contain columns from df") {
@@ -121,8 +123,9 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
     withSQLConf("spark.sql.caseSensitive" -> "true") {
       val ex = intercept[HyperspaceException](action.op())
       assert(
-        ex.getMessage.contains("Columns 'rgUID,dATE' could not be resolved from available " +
-          "source columns:\n" +
+        ex.getMessage.contains(
+          "Columns 'rgUID,dATE' could not be resolved from available " +
+            "source columns:\n" +
             "root\n " +
             "|-- Date: string (nullable = true)\n " +
             "|-- RGUID: string (nullable = true)\n " +
