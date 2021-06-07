@@ -520,6 +520,12 @@ case class IndexLogEntry(
     sourcePlanSignatures.head
   }
 
+  def hasParquetAsSourceFormat: Boolean = {
+    relations.head.fileFormat.equals("parquet") ||
+      properties.getOrElse(
+        IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
+  }
+
   @JsonIgnore
   lazy val fileIdTracker: FileIdTracker = {
     val tracker = new FileIdTracker

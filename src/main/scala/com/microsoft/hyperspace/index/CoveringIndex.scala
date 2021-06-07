@@ -169,13 +169,6 @@ case class CoveringIndex(
       bucketColumnNames = indexedColumns,
       sortColumnNames = indexedColumns)
 
-  def hasParquetAsSourceFormat(logEntry: IndexLogEntry): Boolean = {
-    logEntry.relations.head.fileFormat.equals("parquet") ||
-    properties
-      .getOrElse(IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false")
-      .toBoolean
-  }
-
   def hasLineageColumn: Boolean = IndexUtils.hasLineageColumn(properties)
 
   private def simpleStatistics: Map[String, String] = {

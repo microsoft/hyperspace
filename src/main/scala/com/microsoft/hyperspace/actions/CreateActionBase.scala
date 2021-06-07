@@ -68,15 +68,14 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager)
             .getRelationMetadata(sourcePlanProperties.relations.head)
             .enrichIndexProperties(
               index.properties
-                + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
-                ++ hasParquetAsSourceFormatProperty(relation))
+                + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString))
 
         IndexLogEntry.create(
           indexName,
           index.withNewProperties(indexProperties),
           Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
           Source(SparkPlan(sourcePlanProperties)),
-          Map())
+          Map() ++ hasParquetAsSourceFormatProperty(relation))
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }
