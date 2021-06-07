@@ -38,11 +38,6 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager)
 
   override val fileIdTracker = new FileIdTracker
 
-  protected def prevIndexProperties: Map[String, String] = {
-    // Return empty map for index creation - no previous properties.
-    Map()
-  }
-
   protected def getIndexLogEntry(
       spark: SparkSession,
       df: DataFrame,
@@ -72,15 +67,16 @@ private[actions] abstract class CreateActionBase(dataManager: IndexDataManager)
             .sourceProviderManager
             .getRelationMetadata(sourcePlanProperties.relations.head)
             .enrichIndexProperties(
-              prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
+              index.properties
+                + (IndexConstants.INDEX_LOG_VERSION -> versionId.toString)
                 ++ hasParquetAsSourceFormatProperty(relation))
 
         IndexLogEntry.create(
           indexName,
-          index,
+          index.withNewProperties(indexProperties),
           Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf),
           Source(SparkPlan(sourcePlanProperties)),
-          indexProperties)
+          Map())
 
       case None => throw HyperspaceException("Invalid plan for creating an index.")
     }

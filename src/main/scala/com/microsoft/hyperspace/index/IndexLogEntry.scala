@@ -518,7 +518,7 @@ case class IndexLogEntry(
 
   def hasParquetAsSourceFormat: Boolean = {
     relations.head.fileFormat.equals("parquet") ||
-      properties.getOrElse(
+      derivedDataset.properties.getOrElse(
         IndexConstants.HAS_PARQUET_AS_SOURCE_FORMAT_PROPERTY, "false").toBoolean
   }
 
