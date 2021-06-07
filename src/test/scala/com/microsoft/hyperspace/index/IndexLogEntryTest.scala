@@ -362,7 +362,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
     assert(directoryEquals(actual, expected))
   }
 
-  test("Directory.fromDirectory where the directory is empty.") {
+  test("Directory.fromDirectory where the directory is empty or nonexistent.") {
     val testDirPath = toPath(testDir)
     val emptyDirPath = new Path(testDirPath, "empty")
     val expected = {
