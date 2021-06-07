@@ -50,7 +50,7 @@ private[actions] abstract class RefreshActionBase(
 
   override val fileIdTracker = previousIndexLogEntry.fileIdTracker
 
-  override protected val prevIndexProperties: Map[String, String] = {
+  override protected def prevIndexProperties: Map[String, String] = {
     previousIndexLogEntry.properties
   }
 
