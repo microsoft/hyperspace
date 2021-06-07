@@ -80,7 +80,7 @@ object Content {
    *                   codebase, which filters out files like _SUCCESS.
    * @return Content object with Directory tree starting at root, and containing all leaf files
    *         from "path" argument. If the given path does not exist, return Content object with
-   *         empty Directory object represents the path.
+   *         empty Directory object that represents the path.
    */
   def fromDirectory(
       path: Path,
