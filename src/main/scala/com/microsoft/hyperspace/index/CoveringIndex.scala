@@ -87,15 +87,14 @@ case class CoveringIndex(
 
   override def refreshIncremental(
       ctx: IndexerContext,
-      appendedSourceDataFiles: Seq[FileInfo],
-      appendedSourceData: => DataFrame,
+      appendedSourceData: => Option[DataFrame],
       deletedSourceDataFiles: Seq[FileInfo],
       indexContent: Content): CoveringIndex = {
-    val updatedIndex = if (appendedSourceDataFiles.nonEmpty) {
+    val updatedIndex = if (appendedSourceData.nonEmpty) {
       val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
         CoveringIndex.createIndexData(
           ctx,
-          appendedSourceData,
+          appendedSourceData.get,
           indexedColumns.map(ResolvedColumn(_).name),
           includedColumns.map(ResolvedColumn(_).name),
           hasLineageColumn)
@@ -116,7 +115,7 @@ case class CoveringIndex(
         .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedSourceDataFiles.map(_.id): _*))
 
       // Write refreshed data using Append mode if there are index data files from appended files.
-      val writeMode = if (appendedSourceDataFiles.nonEmpty) {
+      val writeMode = if (appendedSourceData.nonEmpty) {
         SaveMode.Append
       } else {
         SaveMode.Overwrite

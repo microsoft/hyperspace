@@ -54,7 +54,7 @@ class RefreshIncrementalAction(
       "Refresh index is updating index by removing index entries " +
         s"corresponding to ${deletedFiles.length} deleted source data files.")
 
-    lazy val dfWithAppendedFiles = {
+    val dfWithAppendedFiles = if (appendedFiles.nonEmpty) {
       val internalFileFormatName = Hyperspace
         .getContext(spark)
         .sourceProviderManager
@@ -62,16 +62,18 @@ class RefreshIncrementalAction(
         .internalFileFormatName()
 
       // Create a df with only appended files from original list of files.
-      spark.read
-        .schema(df.schema)
-        .format(internalFileFormatName)
-        .options(previousIndexLogEntry.relations.head.options)
-        .load(appendedFiles.map(_.name): _*)
+      Some(
+        spark.read
+          .schema(df.schema)
+          .format(internalFileFormatName)
+          .options(previousIndexLogEntry.relations.head.options)
+          .load(appendedFiles.map(_.name): _*))
+    } else {
+      None
     }
     updatedIndex = Some(
       previousIndexLogEntry.derivedDataset.refreshIncremental(
         this,
-        appendedFiles,
         dfWithAppendedFiles,
         deletedFiles,
         previousIndexLogEntry.content))

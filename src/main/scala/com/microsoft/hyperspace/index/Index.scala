@@ -117,9 +117,8 @@ trait Index {
    * source data files.
    *
    * @param ctx Helper object for indexing operations
-   * @param appendedSourceDataFiles Source data files appended to the source
-   *   since the creation of this index
-   * @param appendedSourceData Source dataframe for appended files
+   * @param appendedSourceData Source dataframe for appended files, if there are
+   *   appended files; None otherwise
    * @param deletedSourceDataFiles Source data files deleted from the source
    *   since the creation of this index
    * @param indexContent Unrefreshed index data files
@@ -128,8 +127,7 @@ trait Index {
    */
   def refreshIncremental(
     ctx: IndexerContext,
-    appendedSourceDataFiles: Seq[FileInfo],
-    appendedSourceData: => DataFrame,
+    appendedSourceData: => Option[DataFrame],
     deletedSourceDataFiles: Seq[FileInfo],
     indexContent: Content): Index
 
