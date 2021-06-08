@@ -87,7 +87,7 @@ case class CoveringIndex(
 
   override def refreshIncremental(
       ctx: IndexerContext,
-      appendedSourceData: => Option[DataFrame],
+      appendedSourceData: Option[DataFrame],
       deletedSourceDataFiles: Seq[FileInfo],
       indexContent: Content): CoveringIndex = {
     val updatedIndex = if (appendedSourceData.nonEmpty) {

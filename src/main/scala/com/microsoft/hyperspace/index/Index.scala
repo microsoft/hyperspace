@@ -127,7 +127,7 @@ trait Index {
    */
   def refreshIncremental(
     ctx: IndexerContext,
-    appendedSourceData: => Option[DataFrame],
+    appendedSourceData: Option[DataFrame],
     deletedSourceDataFiles: Seq[FileInfo],
     indexContent: Content): Index
 
