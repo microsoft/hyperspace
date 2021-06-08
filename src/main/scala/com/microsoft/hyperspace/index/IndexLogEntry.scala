@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.FileNotFoundException
-
 import scala.annotation.tailrec
 import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.mutable
@@ -80,19 +78,21 @@ object Content {
    * @param hadoopConfiguration Hadoop configuration.
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
-   * @param throwIfNotExists Throws FileNotFoundException if path is not found. Else creates a
-   *                         blank directory tree with no files.
    * @return Content object with Directory tree starting at root, and containing all leaf files
-   *         from "path" argument.
+   *         from "path" argument. If the given path does not exist, return Content object with
+   *         empty Directory object that represents the path.
    */
   def fromDirectory(
       path: Path,
       fileIdTracker: FileIdTracker,
       hadoopConfiguration: Configuration,
-      pathFilter: PathFilter = PathUtils.DataPathFilter,
-      throwIfNotExists: Boolean = false): Content =
-    Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration,
-      throwIfNotExists))
+      pathFilter: PathFilter = PathUtils.DataPathFilter): Content = {
+    if (path.getFileSystem(hadoopConfiguration).exists(path)) {
+      Content(Directory.fromDirectory(path, fileIdTracker, pathFilter, hadoopConfiguration))
+    } else {
+      Content(Directory.createEmptyDirectory(path))
+    }
+  }
 
   /**
    * Create a Content object from a specified list of leaf files. Any files not listed here will
@@ -178,27 +178,20 @@ object Directory {
    * Create a Directory object from a directory path by recursively listing its leaf files. All
    * files from the directory tree will be part of the Directory.
    *
-   * If the directory doesn't exist on file system, it will either throw an exception if
-   * throwIfNotExists flag is set. Otherwise, this will create an empty Directory object
-   * starting at the root, ending at the directory path specified.
-   *
    * @param path Starting directory path under which the files will be considered part of the
    *             Directory object.
    * @param fileIdTracker FileIdTracker to keep mapping of file properties to assigned file ids.
    * @param pathFilter Filter for accepting paths. The default filter is picked from spark
    *                   codebase, which filters out files like _SUCCESS.
-   * @param throwIfNotExists If true, throw FileNotFoundException if path is not found. If set to
-   *                         false, create a blank directory tree with no files.
    * @return Directory tree starting at root, and containing the files from "path" argument.
    */
   def fromDirectory(
       path: Path,
       fileIdTracker: FileIdTracker,
       pathFilter: PathFilter = PathUtils.DataPathFilter,
-      hadoopConfiguration: Configuration = new Configuration,
-      throwIfNotExists: Boolean = false): Directory = {
+      hadoopConfiguration: Configuration = new Configuration): Directory = {
     val fs = path.getFileSystem(hadoopConfiguration)
-    val leafFiles = listLeafFiles(path, pathFilter, throwIfNotExists, fs)
+    val leafFiles = listLeafFiles(path, pathFilter, fs)
 
     if (leafFiles.nonEmpty) {
       fromLeafFiles(leafFiles, fileIdTracker)
@@ -211,7 +204,9 @@ object Directory {
   }
 
   @tailrec
-  private def createEmptyDirectory(path: Path, subDirs: Seq[Directory] = Seq()): Directory = {
+  private[hyperspace] def createEmptyDirectory(
+      path: Path,
+      subDirs: Seq[Directory] = Seq()): Directory = {
     if (path.isRoot) {
       Directory(path.toString, subDirs = subDirs)
     } else {
@@ -302,17 +297,11 @@ object Directory {
   private def listLeafFiles(
       path: Path,
       pathFilter: PathFilter,
-      throwIfNotExists: Boolean,
       fs: FileSystem): Seq[FileStatus] = {
-    try {
-      val (files, directories) = fs.listStatus(path).partition(_.isFile)
-      // TODO: explore fs.listFiles(recursive = true) for better performance of file listing.
-      files.filter(s => pathFilter.accept(s.getPath)) ++
-        directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, throwIfNotExists, fs))
-    } catch {
-      case _: FileNotFoundException if !throwIfNotExists => Seq()
-      case e: Throwable => throw e
-    }
+    val (files, directories) = fs.listStatus(path).partition(_.isFile)
+    // TODO: explore fs.listFiles(recursive = true) for better performance of file listing.
+    files.filter(s => pathFilter.accept(s.getPath)) ++
+      directories.flatMap(d => listLeafFiles(d.getPath, pathFilter, fs))
   }
 }
 
