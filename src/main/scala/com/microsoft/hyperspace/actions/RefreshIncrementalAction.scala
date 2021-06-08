@@ -52,7 +52,8 @@ class RefreshIncrementalAction(
   final override def op(): Unit = {
     logInfo(
       "Refresh index is updating index by removing index entries " +
-        s"corresponding to ${deletedFiles.length} deleted source data files.")
+        s"corresponding to ${deletedFiles.length} deleted source data files and " +
+        s"indexing ${appendedFiles.length} appended source data files.")
 
     val appendedSourceData = if (appendedFiles.nonEmpty) {
       val internalFileFormatName = Hyperspace

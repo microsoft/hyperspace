@@ -52,7 +52,8 @@ class CreateAction(
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     if (!provider.isSupportedRelation(df.queryExecution.optimizedPlan)) {
       throw HyperspaceException(
-        "Only creating index over HDFS file based scan nodes is supported.")
+        "Only creating index over HDFS file based scan nodes is supported. " +
+          s"Source plan: ${df.queryExecution.sparkPlan}")
     }
 
     // schema validity checks
