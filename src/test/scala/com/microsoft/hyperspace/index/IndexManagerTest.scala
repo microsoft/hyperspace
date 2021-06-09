@@ -771,7 +771,7 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
             Relation(
               location.rootPaths.map(_.toString),
               Hdfs(sourceDataProperties),
-              dataSchema.json,
+              dataSchema,
               fileFormatName,
               options - "path")
         }

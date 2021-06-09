@@ -50,7 +50,7 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
             Relation(
               Seq("dummy"),
               Hdfs(Properties(Content(Directory("/", files = inputFiles)))),
-              "schema",
+              new StructType(),
               "format",
               Map())),
           null,

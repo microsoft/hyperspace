@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index
 
-import com.fasterxml.jackson.annotation.{JsonGetter, JsonRawValue}
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.functions.{col, input_file_name}
@@ -26,15 +24,13 @@ import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
-import com.microsoft.hyperspace.shim.StructTypeConverter
 import com.microsoft.hyperspace.util.ResolverUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
 case class CoveringIndex(
     override val indexedColumns: Seq[String],
     includedColumns: Seq[String],
-    // See schemaJson for more information about the annotation.
-    @JsonDeserialize(converter = classOf[StructTypeConverter.T]) schema: StructType,
+    schema: StructType,
     numBuckets: Int,
     override val properties: Map[String, String])
     extends Index {
@@ -181,12 +177,6 @@ case class CoveringIndex(
   private def extendedStatistics: Map[String, String] = {
     Map("hasLineage" -> hasLineageColumn.toString)
   }
-
-  // Shim for Spark 2.4 - StructType doesn't work well with Jackson by default.
-  // These annotations are used to make json de/serialization work in Spark 2.4.
-  @JsonRawValue
-  @JsonGetter("schema")
-  private def schemaJson: String = schema.json
 }
 
 object CoveringIndex {

@@ -157,7 +157,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
          |            },
          |            "kind" : "HDFS"
          |          },
-         |          "dataSchemaJson" : "schema",
+         |          "dataSchema" : {"type":"struct","fields":[]},
          |          "fileFormat" : "type",
          |          "options" : { }
          |        } ],
@@ -210,7 +210,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
               )
             )
           ),
-          "schema",
+          new StructType(),
           "type",
           Map()
         )

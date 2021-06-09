@@ -16,10 +16,16 @@
 
 package com.microsoft.hyperspace.util
 
+import scala.math.Ordered.orderingToOrdered
+
 import com.fasterxml.jackson.annotation.JsonInclude.Include
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.{JsonDeserializer, JsonSerializer, ObjectMapper}
+import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.hyperspace.module.scala.ScalaObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import org.apache.spark.sql.types.StructType
+
+import com.microsoft.hyperspace.shim.{StructTypeDeserializer, StructTypeSerializer}
 
 /**
  * Useful json functions used around the Hyperspace codebase.
@@ -30,6 +36,15 @@ object JsonUtils {
   private val objectMapper = new ObjectMapper() with ScalaObjectMapper
   objectMapper.setSerializationInclusion(Include.ALWAYS)
   objectMapper.registerModule(DefaultScalaModule)
+
+  if (BuildInfoExt.sparkVersion < (3, 0, 0)) {
+    // Fix StructType serialization in Spark 2
+    objectMapper.registerModule {
+      new SimpleModule()
+        .addSerializer(classOf[StructType], new StructTypeSerializer)
+        .addDeserializer(classOf[StructType], new StructTypeDeserializer)
+    }
+  }
 
   def toJson[T: Manifest](obj: T): String = {
     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj)

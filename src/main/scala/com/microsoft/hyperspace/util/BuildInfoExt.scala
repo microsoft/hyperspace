@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.shim
+package com.microsoft.hyperspace.util
 
-import com.fasterxml.jackson.databind.util.Converter
+import com.microsoft.hyperspace.BuildInfo
 
-// Shim for StructType deserialization with Jackson.
-// Since Spark 3 it works fine without additional annotations.
-// Converter.None is used to make @JsonDeserialize(converter = classOf[T]) do nothing.
-object StructTypeConverter {
-  type T = Converter.None
+object BuildInfoExt {
+  def sparkVersion: (Int, Int, Int) = {
+    val Array(major, minor, patch) = BuildInfo.sparkVersion.split('.').map(_.toInt)
+    (major, minor, patch)
+  }
 }

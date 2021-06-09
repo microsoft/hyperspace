@@ -175,7 +175,7 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
           case _ => location.rootPaths.map(_.toString)
         }
 
-        Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema.json, fileFormatName, opts)
+        Relation(rootPaths, Hdfs(sourceDataProperties), dataSchema, fileFormatName, opts)
     }
   }
 

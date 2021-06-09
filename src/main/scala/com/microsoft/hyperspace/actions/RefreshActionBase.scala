@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, REFRESHING}
@@ -58,7 +58,7 @@ private[actions] abstract class RefreshActionBase(
       .sourceProviderManager
       .getRelationMetadata(relations.head)
     val latestRelation = relationMetadata.refresh()
-    val dataSchema = DataType.fromJson(latestRelation.dataSchemaJson).asInstanceOf[StructType]
+    val dataSchema = latestRelation.dataSchema
     val df = {
       if (relationMetadata.canSupportUserSpecifiedSchema) spark.read.schema(dataSchema)
       else spark.read
