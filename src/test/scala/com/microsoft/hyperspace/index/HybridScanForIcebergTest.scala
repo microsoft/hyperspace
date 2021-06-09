@@ -47,7 +47,7 @@ class HybridScanForIcebergTest extends HybridScanSuite {
   override def setupIndexAndChangeData(
       sourceFileFormat: String,
       sourcePath: String,
-      indexConfig: IndexConfig,
+      indexConfig: IndexConfigTrait,
       appendCnt: Int,
       deleteCnt: Int): (Seq[String], Seq[String]) = {
     // Use partition to control the number of appended and deleted files.

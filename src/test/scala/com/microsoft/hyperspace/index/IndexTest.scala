@@ -40,12 +40,11 @@ class IndexTest extends SparkFunSuite {
     val entry = IndexLogEntry(
       config.indexName,
       CoveringIndex(
-        CoveringIndex.Properties(
-          CoveringIndex.Properties
-            .Columns(config.indexedColumns, config.includedColumns),
-          IndexLogEntry.schemaString(schema),
-          numBuckets,
-          Map())),
+        config.indexedColumns,
+        config.includedColumns,
+        schema,
+        numBuckets,
+        Map()),
       Content(Directory(path)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())

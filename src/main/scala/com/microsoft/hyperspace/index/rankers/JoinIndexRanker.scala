@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rankers
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.{CoveringIndex, IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
@@ -87,5 +87,9 @@ object JoinIndexRanker {
           !hybridScanEnabled || commonSizeInBytes1 > commonSizeInBytes2
         }
     }
+  }
+
+  private implicit class CoveringIndexLogEntry(entry: IndexLogEntry) {
+    def numBuckets: Int = entry.derivedDataset.asInstanceOf[CoveringIndex].numBuckets
   }
 }

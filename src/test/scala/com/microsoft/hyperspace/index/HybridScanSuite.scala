@@ -60,7 +60,7 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
   def setupIndexAndChangeData(
       sourceFileFormat: String,
       sourcePath: String,
-      indexConfig: IndexConfig,
+      indexConfig: IndexConfigTrait,
       appendCnt: Int,
       deleteCnt: Int): (Seq[String], Seq[String]) = {
     dfFromSample.write.format(sourceFileFormat).save(sourcePath)

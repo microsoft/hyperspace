@@ -20,7 +20,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 
 import com.microsoft.hyperspace.MockEventLogger.reset
-import com.microsoft.hyperspace.index.{FileIdTracker, IndexConfig, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
+import com.microsoft.hyperspace.index.{FileIdTracker, IndexConfigTrait, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
 import com.microsoft.hyperspace.telemetry.{EventLogger, HyperspaceEvent}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
@@ -82,7 +82,7 @@ object TestUtils {
       .asInstanceOf[IndexLogEntry]
   }
 
-  def getFileIdTracker(systemPath: Path, indexConfig: IndexConfig): FileIdTracker = {
+  def getFileIdTracker(systemPath: Path, indexConfig: IndexConfigTrait): FileIdTracker = {
     latestIndexLogEntry(systemPath, indexConfig.indexName).fileIdTracker
   }
 }

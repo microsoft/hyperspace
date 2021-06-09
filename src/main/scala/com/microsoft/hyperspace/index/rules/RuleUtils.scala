@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index.rules
 
-import scala.collection.mutable
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -30,7 +28,6 @@ import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
@@ -131,6 +128,7 @@ object RuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     // Note that we transform *only* the base relation and not other portions of the plan
     // (e.g., filters). For instance, given the following input plan:
@@ -147,8 +145,8 @@ object RuleUtils {
         val indexFsRelation = new IndexHadoopFsRelation(
           location,
           new StructType(),
-          StructType(index.schema.filter(relation.schema.contains(_))),
-          if (useBucketSpec) Some(index.bucketSpec) else None,
+          StructType(ci.schema.filter(relation.schema.contains(_))),
+          if (useBucketSpec) Some(ci.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
@@ -179,6 +177,7 @@ object RuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     var unhandledAppendedFiles: Seq[Path] = Nil
     // Get transformed plan with index data and appended files if applicable.
@@ -199,7 +198,7 @@ object RuleUtils {
           } else {
             val curFiles = relation.allFiles.map(f =>
               FileInfo(f, index.fileIdTracker.addFile(f), asFullPath = true))
-            if (HyperspaceConf.hybridScanDeleteEnabled(spark) && index.hasLineageColumn) {
+            if (HyperspaceConf.hybridScanDeleteEnabled(spark) && ci.canHandleDeletedFiles) {
               val (exist, nonExist) = curFiles.partition(index.sourceFileInfoSet.contains)
               val filesAppended = nonExist.map(f => new Path(f.name))
               if (exist.length < index.sourceFileInfoSet.size) {
@@ -244,7 +243,7 @@ object RuleUtils {
         // we could inject Filter-Not-In conditions on the lineage column to exclude the indexed
         // rows from the deleted files.
         val newSchema = StructType(
-          index.schema.filter(s =>
+          ci.schema.filter(s =>
             relation.schema.contains(s) || (filesDeleted.nonEmpty && s.name.equals(
               IndexConstants.DATA_FILE_NAME_ID))))
 
@@ -262,7 +261,7 @@ object RuleUtils {
           newLocation,
           new StructType(),
           newSchema,
-          if (useBucketSpec) Some(index.bucketSpec) else None,
+          if (useBucketSpec) Some(ci.bucketSpec) else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
@@ -300,7 +299,7 @@ object RuleUtils {
         // Although only numBuckets of BucketSpec is used in BucketUnion*, bucketColumnNames
         // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
         // misunderstanding.
-        val bucketSpec = index.bucketSpec.copy(sortColumnNames = Nil)
+        val bucketSpec = ci.bucketSpec.copy(sortColumnNames = Nil)
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(
@@ -333,6 +332,7 @@ object RuleUtils {
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     // Transform the relation node to include appended files.
     val planForAppended = originalPlan transformDown {
@@ -354,10 +354,10 @@ object RuleUtils {
         // Include partition columns for data loading.
         val partitionColumns = relation.partitionSchema.map(_.name)
         val updatedSchema = StructType(relation.schema.filter(col =>
-          index.schema.contains(col) || relation.partitionSchema.contains(col)))
+          ci.schema.contains(col) || relation.partitionSchema.contains(col)))
         val updatedOutput = relation.output
           .filter(attr =>
-            index.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
+            ci.schema.fieldNames.contains(attr.name) || partitionColumns.contains(attr.name))
           .map(_.asInstanceOf[AttributeReference])
         val newRelation = relation.createHadoopFsRelation(
           newLocation,

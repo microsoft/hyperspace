@@ -17,13 +17,12 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, OPTIMIZING}
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.index.IndexConstants.OPTIMIZE_MODES
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, OptimizeActionEvent}
 import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
@@ -70,11 +69,6 @@ class OptimizeAction(
     }
   }
 
-  private lazy val indexConfig: IndexConfig = {
-    val ddColumns = previousIndexLogEntry.derivedDataset.properties.columns
-    IndexConfig(previousIndexLogEntry.name, ddColumns.indexed, ddColumns.included)
-  }
-
   override val fileIdTracker = previousIndexLogEntry.fileIdTracker
 
   final override val transientState: String = OPTIMIZING
@@ -82,19 +76,7 @@ class OptimizeAction(
   final override val finalState: String = ACTIVE
 
   final override def op(): Unit = {
-    // Rewrite index using the eligible files to optimize.
-    val numBuckets = previousIndexLogEntry.numBuckets
-    val indexDF = spark.read.parquet(filesToOptimize.map(_.name): _*)
-
-    val repartitionedDf =
-      indexDF.repartition(numBuckets, indexConfig.indexedColumns.map(indexDF(_)): _*)
-
-    repartitionedDf.write.saveWithBuckets(
-      repartitionedDf,
-      indexDataPath.toString,
-      numBuckets,
-      indexConfig.indexedColumns,
-      SaveMode.Overwrite)
+    previousIndexLogEntry.derivedDataset.optimize(this, filesToOptimize)
   }
 
   override def validate(): Unit = {
@@ -131,25 +113,19 @@ class OptimizeAction(
     (filesToOptimize.flatten.toSeq, singleFilesToIgnore.flatten.toSeq ++ largeFilesToIgnore)
   }
 
-  override protected def prevIndexProperties: Map[String, String] = {
-    previousIndexLogEntry.derivedDataset.properties.properties
-  }
-
   override def logEntry: LogEntry = {
     // Update `previousIndexLogEntry` to keep `filesToIngore` files and append to it
     // the list of newly created index files.
     val hadoopConf = spark.sessionState.newHadoopConf()
     val absolutePath = PathUtils.makeAbsolute(indexDataPath.toString, hadoopConf)
     val newContent = Content.fromDirectory(absolutePath, fileIdTracker, hadoopConf)
-    val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.copy(
-      properties = previousIndexLogEntry.derivedDataset.properties
-        .copy(
-          properties = Hyperspace
-            .getContext(spark)
-            .sourceProviderManager
-            .getRelationMetadata(previousIndexLogEntry.relations.head)
-            .enrichIndexProperties(
-              prevIndexProperties + (IndexConstants.INDEX_LOG_VERSION -> endId.toString))))
+    val updatedDerivedDataset = previousIndexLogEntry.derivedDataset.withNewProperties(
+      Hyperspace
+        .getContext(spark)
+        .sourceProviderManager
+        .getRelationMetadata(previousIndexLogEntry.relations.head)
+        .enrichIndexProperties(previousIndexLogEntry.derivedDataset.properties
+          + (IndexConstants.INDEX_LOG_VERSION -> endId.toString)))
 
     if (filesToIgnore.nonEmpty) {
       val filesToIgnoreDirectory = {

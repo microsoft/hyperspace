@@ -17,13 +17,12 @@
 package com.microsoft.hyperspace.actions
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.mockito.Mockito._
 
-import com.microsoft.hyperspace.{HyperspaceException, SampleData, SparkInvolvedSuite}
+import com.microsoft.hyperspace.{HyperspaceException, SampleData}
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
@@ -38,7 +37,9 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
 
+  private val sparkSession = spark
   object CreateActionBaseWrapper extends CreateActionBase(mockDataManager) {
+    override def spark: SparkSession = sparkSession
     def getSourceRelations(df: DataFrame): Seq[Relation] = {
       val provider = new FileBasedSourceProviderManager(spark)
       df.queryExecution.optimizedPlan.collect {

@@ -429,7 +429,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
                     case "index_noCommonFiles" =>
                       assert(msg.get.exists(_.contains("No common files.")))
                     case "index_noLineage" =>
-                      assert(msg.get.exists(_.contains("Lineage column does not exist.")))
+                      assert(msg.get.exists(_.contains("Index doesn't support deleted files.")))
                     case "index_ok" =>
                       assert(msg.get.exists(_.contains("Deleted bytes ratio")))
                   }

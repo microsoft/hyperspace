@@ -105,7 +105,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
       indexes.head.getAs[WrappedArray[String]]("indexedColumns").head == "Query",
       "Indexed columns with wrong case are stored in metadata")
     assert(
-      indexes.head.getAs[WrappedArray[String]]("includedColumns").head == "imprs",
+      indexes.head.getAs[Map[String, String]]("additionalStats")("includedColumns") == "imprs",
       "Included columns with wrong case are stored in metadata")
   }
 

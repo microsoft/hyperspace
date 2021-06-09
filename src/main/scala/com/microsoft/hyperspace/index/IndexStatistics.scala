@@ -23,13 +23,9 @@ import org.apache.hadoop.fs.Path
  *
  * @param name Index name.
  * @param indexedColumns Indexed columns.
- * @param includedColumns Included columns.
- * @param numBuckets Number of buckets.
- * @param schema Index schema json.
  * @param indexLocation Path to parent directory containing index files for all versions.
  * @param state Index state.
  * @param kind Index kind.
- * @param hasLineage Lineage enabled on index.
  * @param numIndexFiles Total number of index files.
  * @param sizeIndexFiles Total size of index files.
  * @param numSourceFiles Total number of source data files.
@@ -39,17 +35,14 @@ import org.apache.hadoop.fs.Path
  * @param numDeletedFiles Total number of deleted source data files.
  * @param sizeDeletedFiles Total size of deleted source data files.
  * @param indexContentPaths Path(s) to directories containing index files for latest version.
+ * @param additionalStats Index-kind-specific properties.
  */
 private[hyperspace] case class IndexStatistics(
     name: String,
     indexedColumns: Seq[String],
-    includedColumns: Seq[String],
-    numBuckets: Int,
-    schema: String,
     indexLocation: String,
     state: String,
     kind: String,
-    hasLineage: Boolean,
     numIndexFiles: Int,
     sizeIndexFiles: Long,
     numSourceFiles: Int,
@@ -58,17 +51,16 @@ private[hyperspace] case class IndexStatistics(
     sizeAppendedFiles: Long,
     numDeletedFiles: Int,
     sizeDeletedFiles: Long,
-    indexContentPaths: Seq[String])
+    indexContentPaths: Seq[String],
+    additionalStats: Map[String, String])
 
 private[hyperspace] object IndexStatistics {
   val INDEX_SUMMARY_COLUMNS: Seq[String] = Seq(
     "name",
     "indexedColumns",
-    "includedColumns",
-    "numBuckets",
-    "schema",
     "indexLocation",
-    "state")
+    "state",
+    "additionalStats")
 
   /**
    * Create IndexStatistics instance for a given IndexLogEntry.
@@ -82,14 +74,10 @@ private[hyperspace] object IndexStatistics {
     if (extended) {
       IndexStatistics(
         entry.name,
-        entry.derivedDataset.properties.columns.indexed,
-        entry.derivedDataset.properties.columns.included,
-        entry.numBuckets,
-        entry.derivedDataset.properties.schemaString,
+        entry.derivedDataset.indexedColumns,
         indexDirPath(entry),
         entry.state,
         entry.derivedDataset.kind,
-        entry.hasLineageColumn,
         entry.content.fileInfos.size,
         entry.content.fileInfos.foldLeft(0L)(_ + _.size),
         entry.sourceFileInfoSet.size,
@@ -98,16 +86,15 @@ private[hyperspace] object IndexStatistics {
         entry.appendedFiles.foldLeft(0L)(_ + _.size),
         entry.deletedFiles.size,
         entry.deletedFiles.foldLeft(0L)(_ + _.size),
-        getIndexContentDirectoryPaths(entry))
+        getIndexContentDirectoryPaths(entry),
+        entry.derivedDataset.statistics(extended = true))
     } else {
       IndexStatistics(
         entry.name,
-        entry.derivedDataset.properties.columns.indexed,
-        entry.derivedDataset.properties.columns.included,
-        entry.numBuckets,
-        entry.derivedDataset.properties.schemaString,
+        entry.derivedDataset.indexedColumns,
         indexDirPath(entry),
-        entry.state)
+        entry.state,
+        entry.derivedDataset.statistics(extended = false))
     }
   }
 
@@ -116,31 +103,23 @@ private[hyperspace] object IndexStatistics {
    *
    * @param name Index name.
    * @param indexedColumns Indexed columns list.
-   * @param includedColumns Included columns list.
-   * @param buckets Number of buckets.
-   * @param schema Index schema.
    * @param location Index files location.
    * @param state Index state.
+   * @param additionalStats Index-kind-specific properties.
    * @return IndexStatistics instance created from given values.
    */
   def apply(
       name: String,
       indexedColumns: Seq[String],
-      includedColumns: Seq[String],
-      buckets: Int,
-      schema: String,
       location: String,
-      state: String): IndexStatistics = {
+      state: String,
+      additionalStats: Map[String, String]): IndexStatistics = {
     new IndexStatistics(
       name,
       indexedColumns,
-      includedColumns,
-      buckets,
-      schema,
       location,
       state,
       "",
-      false,
       0,
       0L,
       0,
@@ -149,7 +128,8 @@ private[hyperspace] object IndexStatistics {
       0L,
       0,
       0L,
-      Nil)
+      Nil,
+      additionalStats)
   }
 
   /**

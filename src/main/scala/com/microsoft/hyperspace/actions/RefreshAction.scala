@@ -36,10 +36,15 @@ class RefreshAction(
     dataManager: IndexDataManager)
     extends RefreshActionBase(spark, logManager, dataManager)
     with Action {
+  private lazy val (updatedIndex, indexData) = {
+    updateFileIdTracker(spark, df)
+    previousIndexLogEntry.derivedDataset.refreshFull(this, df)
+  }
 
-  override def logEntry: LogEntry = getIndexLogEntry(spark, df, indexConfig, indexDataPath, endId)
+  override def logEntry: LogEntry =
+    getIndexLogEntry(spark, df, previousIndexLogEntry.name, updatedIndex, indexDataPath, endId)
 
-  final override def op(): Unit = write(spark, df, indexConfig)
+  final override def op(): Unit = updatedIndex.write(this, indexData)
 
   /**
    * Validate index is in active state for refreshing and there are some changes in

@@ -1,5 +1,5 @@
 /*
- * Copyright (2020) The Hyperspace Project Authors.
+ * Copyright (2021) The Hyperspace Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,17 +18,28 @@ package com.microsoft.hyperspace.index
 
 import java.util.Locale
 
+import org.apache.spark.sql.DataFrame
+
+import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.util.HyperspaceConf
+
 /**
- * IndexConfig specifies the configuration of an index.
+ * IndexConfig specifies the configuration of a covering index.
+ *
+ * Use this class to create a covering index with [[Hyperspace.createIndex()]].
+ *
+ * Implementation note: This is an implementation of [[IndexConfigTrait]]
+ * for the covering index. The name of this class might be changed in v1.0.
  *
  * @param indexName Index name.
  * @param indexedColumns Columns from which an index is created.
  * @param includedColumns Columns to be included in the index.
  */
 case class IndexConfig(
-    indexName: String,
+    override val indexName: String,
     indexedColumns: Seq[String],
-    includedColumns: Seq[String] = Seq()) {
+    includedColumns: Seq[String] = Seq())
+    extends IndexConfigTrait {
   if (indexName.isEmpty || indexedColumns.isEmpty) {
     throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")
   }
@@ -74,6 +85,28 @@ case class IndexConfig(
   }
 
   private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
+
+  override def referencedColumns: Seq[String] = indexedColumns ++ includedColumns
+
+  override def createIndex(
+      ctx: IndexerContext,
+      sourceData: DataFrame,
+      properties: Map[String, String]): (CoveringIndex, DataFrame) = {
+    val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
+      CoveringIndex.createIndexData(
+        ctx,
+        sourceData,
+        indexedColumns,
+        includedColumns,
+        IndexUtils.hasLineageColumn(properties))
+    val index = CoveringIndex(
+      resolvedIndexedColumns.map(_.normalizedName),
+      resolvedIncludedColumns.map(_.normalizedName),
+      indexData.schema,
+      HyperspaceConf.numBucketsForIndex(ctx.spark),
+      properties)
+    (index, indexData)
+  }
 }
 
 /**

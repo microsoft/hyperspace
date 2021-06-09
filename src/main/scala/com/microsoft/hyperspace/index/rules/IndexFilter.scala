@@ -189,9 +189,9 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
         index,
         "Column Schema does not match. " +
           s"Relation columns: [${relationColumnNames.mkString(", ")}], " +
-          s"Index columns: [${(index.indexedColumns ++ index.includedColumns).mkString(", ")}]") {
+          s"Index columns: [${(index.derivedDataset.referencedColumns).mkString(", ")}]") {
         ResolverUtils
-          .resolve(spark, index.indexedColumns ++ index.includedColumns, relationColumnNames)
+          .resolve(spark, index.derivedDataset.referencedColumns, relationColumnNames)
           .isDefined
       }
     }
@@ -305,8 +305,8 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
 
         // Tag to original index log entry to check the reason string with the given log entry.
         lazy val hasLineageColumnCond =
-          withFilterReasonTag(relation.plan, index, "Lineage column does not exist.")(
-            entry.hasLineageColumn)
+          withFilterReasonTag(relation.plan, index, "Index doesn't support deleted files.")(
+            entry.derivedDataset.canHandleDeletedFiles)
         lazy val hasCommonFilesCond =
           withFilterReasonTag(relation.plan, index, "No common files.")(commonCnt > 0)
         lazy val appendThresholdCond = withFilterReasonTag(

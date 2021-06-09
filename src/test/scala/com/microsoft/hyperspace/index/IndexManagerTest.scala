@@ -68,11 +68,9 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
           val actual = IndexStatistics(
             columns.getAs[String]("name"),
             columns.getAs[Seq[String]]("indexedColumns"),
-            columns.getAs[Seq[String]]("includedColumns"),
-            columns.getAs[Int]("numBuckets"),
-            columns.getAs[String]("schema"),
             columns.getAs[String]("indexLocation"),
-            columns.getAs[String]("state"))
+            columns.getAs[String]("state"),
+            columns.getAs[Map[String, String]]("additionalStats"))
 
           var expectedSchema =
             StructType(Seq(StructField("RGUID", StringType), StructField("Date", StringType)))
@@ -84,12 +82,13 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
           val expected = IndexStatistics(
             indexConfig1.indexName,
             indexConfig1.indexedColumns,
-            indexConfig1.includedColumns,
-            200,
-            expectedSchema.json,
             s"$systemPath/${indexConfig1.indexName}" +
               s"/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0",
-            Constants.States.ACTIVE)
+            Constants.States.ACTIVE,
+            Map(
+              "includedColumns" -> indexConfig1.includedColumns.mkString(", "),
+              "numBuckets" -> "200",
+              "schema" -> expectedSchema.json))
 
           assert(actual.equals(expected))
         }
@@ -787,12 +786,11 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
         val entry = IndexLogEntry.create(
           indexConfig.indexName,
           CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
-                .Columns(indexConfig.indexedColumns, indexConfig.includedColumns),
-              IndexLogEntry.schemaString(schema),
-              IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
-              Map())),
+            indexConfig.indexedColumns,
+            indexConfig.includedColumns,
+            schema,
+            IndexConstants.INDEX_NUM_BUCKETS_DEFAULT,
+            Map()),
           Content.fromDirectory(
             PathUtils.makeAbsolute(
               s"$systemPath/${indexConfig.indexName}" +

@@ -34,7 +34,7 @@ class HybridScanForPartitionedDataTest extends HybridScanSuite {
   override def setupIndexAndChangeData(
       sourceFileFormat: String,
       sourcePath: String,
-      indexConfig: IndexConfig,
+      indexConfig: IndexConfigTrait,
       appendCnt: Int,
       deleteCnt: Int): (Seq[String], Seq[String]) = {
     dfFromSample.write.partitionBy("clicks", "Date").format(sourceFileFormat).save(sourcePath)

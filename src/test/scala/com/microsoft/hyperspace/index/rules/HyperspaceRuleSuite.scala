@@ -64,12 +64,11 @@ trait HyperspaceRuleSuite extends HyperspaceSuite {
         val indexLogEntry = IndexLogEntry.create(
           name,
           CoveringIndex(
-            CoveringIndex.Properties(
-              CoveringIndex.Properties
-                .Columns(indexCols.map(_.name), includedCols.map(_.name)),
-              IndexLogEntry.schemaString(schemaFromAttributes(indexCols ++ includedCols: _*)),
-              numBuckets,
-              Map())),
+            indexCols.map(_.name),
+            includedCols.map(_.name),
+            schemaFromAttributes(indexCols ++ includedCols: _*),
+            numBuckets,
+            Map()),
           Content.fromLeafFiles(indexFiles, new FileIdTracker).get,
           Source(SparkPlan(sourcePlanProperties)),
           Map())

@@ -386,8 +386,8 @@ class RefreshIndexTest extends QueryTest with HyperspaceSuite {
       }
 
       val indexLogEntry = getLatestStableLog(indexConfig.indexName)
-      assert(!indexLogEntry.hasLineageColumn)
-      assert(indexLogEntry.numBuckets === 20)
+      assert(!indexLogEntry.derivedDataset.canHandleDeletedFiles)
+      assert(indexLogEntry.derivedDataset.asInstanceOf[CoveringIndex].numBuckets === 20)
     }
   }
 
