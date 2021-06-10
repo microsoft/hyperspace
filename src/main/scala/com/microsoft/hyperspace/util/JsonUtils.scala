@@ -36,14 +36,10 @@ object JsonUtils {
   private val objectMapper = new ObjectMapper() with ScalaObjectMapper
   objectMapper.setSerializationInclusion(Include.ALWAYS)
   objectMapper.registerModule(DefaultScalaModule)
-
-  if (BuildInfoExt.sparkVersion < (3, 0, 0)) {
-    // Fix StructType serialization in Spark 2
-    objectMapper.registerModule {
-      new SimpleModule()
-        .addSerializer(classOf[StructType], new StructTypeSerializer)
-        .addDeserializer(classOf[StructType], new StructTypeDeserializer)
-    }
+  objectMapper.registerModule {
+    new SimpleModule()
+      .addSerializer(classOf[StructType], new StructTypeSerializer)
+      .addDeserializer(classOf[StructType], new StructTypeDeserializer)
   }
 
   def toJson[T: Manifest](obj: T): String = {
