@@ -221,20 +221,10 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   }
 
   /**
-   * Returns list of pairs of (file path, file id) to build lineage column.
-   *
-   * File paths should be the same format as "input_file_name()" of the given relation type.
-   * input_file_name() could be different depending on the OS and source.
-   *
    * For [[DefaultFileBasedRelation]], each file path should be in this format:
    *   `file:///path/to/file`
-   *
-   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
-   * @return List of pairs of (file path, file id).
    */
-  override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
-    fileIdTracker.getFileToIdMapping.map { kv =>
-      (kv._1._1.replace("file:/", "file:///"), kv._2)
-    }
+  override def pathNormalizer: String => String = {
+    _.replace("file:/", "file:///")
   }
 }
