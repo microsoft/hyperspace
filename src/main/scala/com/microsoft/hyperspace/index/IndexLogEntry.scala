@@ -23,9 +23,8 @@ import scala.collection.mutable
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
@@ -376,14 +375,14 @@ object Hdfs {
  * @param data Source data for the relation.
  *             Hdfs.properties.content captures source data which derived dataset was created from.
  *             Hdfs.properties.update captures any updates since the derived dataset was created.
- * @param dataSchemaJson Schema in json format.
+ * @param dataSchema Schema.
  * @param fileFormat File format name.
  * @param options Options to read the source relation.
  */
 case class Relation(
     rootPaths: Seq[String],
     data: Hdfs,
-    dataSchemaJson: String,
+    dataSchema: StructType,
     fileFormat: String,
     options: Map[String, String])
 

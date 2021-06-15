@@ -65,7 +65,7 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
               Directory(
                 "dir2",
                 Seq(FileInfo("1.json", 100L, 200L, 7L), FileInfo("2.json", 100L, 200L, 8L)))))))),
-          "schema",
+          new StructType(),
           "type",
           Map())),
         null,

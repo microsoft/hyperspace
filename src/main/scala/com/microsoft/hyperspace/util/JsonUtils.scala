@@ -17,9 +17,14 @@
 package com.microsoft.hyperspace.util
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.core.{JsonGenerator, JsonParser}
+import com.fasterxml.jackson.databind.{DeserializationContext, ObjectMapper, SerializerProvider}
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer
+import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.fasterxml.jackson.hyperspace.module.scala.ScalaObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import org.apache.spark.sql.types.{DataType, StructType}
 
 /**
  * Useful json functions used around the Hyperspace codebase.
@@ -31,6 +36,13 @@ object JsonUtils {
   objectMapper.setSerializationInclusion(Include.ALWAYS)
   objectMapper.registerModule(DefaultScalaModule)
 
+  // Only needed for Spark 2.4
+  objectMapper.registerModule {
+    new SimpleModule()
+      .addSerializer(classOf[StructType], new StructTypeSerializer)
+      .addDeserializer(classOf[StructType], new StructTypeDeserializer)
+  }
+
   def toJson[T: Manifest](obj: T): String = {
     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj)
   }
@@ -41,5 +53,20 @@ object JsonUtils {
 
   def jsonToMap(json: String): Map[String, Any] = {
     objectMapper.readValue[Map[String, Any]](json)
+  }
+
+  private class StructTypeSerializer extends StdSerializer[StructType](classOf[StructType]) {
+    override def serialize(
+        value: StructType,
+        gen: JsonGenerator,
+        provider: SerializerProvider): Unit = {
+      gen.writeRawValue(value.json)
+    }
+  }
+
+  private class StructTypeDeserializer extends StdDeserializer[StructType](classOf[StructType]) {
+    override def deserialize(p: JsonParser, ctx: DeserializationContext): StructType = {
+      DataType.fromJson(p.readValueAsTree().toString).asInstanceOf[StructType]
+    }
   }
 }

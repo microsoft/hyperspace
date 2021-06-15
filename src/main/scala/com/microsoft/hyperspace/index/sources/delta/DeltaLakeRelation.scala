@@ -102,7 +102,7 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
               .makeAbsolute(location.path.toString, spark.sessionState.newHadoopConf())
               .toString),
           Hdfs(sourceDataProperties),
-          dataSchema.json,
+          dataSchema,
           fileFormatName,
           opts)
     }

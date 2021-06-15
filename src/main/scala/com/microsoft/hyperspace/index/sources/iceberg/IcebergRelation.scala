@@ -110,7 +110,7 @@ class IcebergRelation(
           .makeAbsolute(table.location(), spark.sessionState.newHadoopConf())
           .toString),
       Hdfs(sourceDataProperties),
-      SparkSchemaUtil.convert(table.schema).json,
+      SparkSchemaUtil.convert(table.schema),
       fileFormatName,
       opts)
   }
