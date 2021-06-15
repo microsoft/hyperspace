@@ -262,8 +262,8 @@ object CoveringIndex {
         //    + file:/C:/hyperspace/src/test/part-00003.snappy.parquet
         import spark.implicits._
         val dataPathColumn = "_data_path"
-        val lineagePairs = relation.lineagePairs(ctx.fileIdTracker)
-        val lineageDF = lineagePairs.toDF(dataPathColumn, IndexConstants.DATA_FILE_NAME_ID)
+        val lineagePairs = ctx.fileIdTracker.getIdToFileMapping(relation.pathNormalizer)
+        val lineageDF = lineagePairs.toDF(IndexConstants.DATA_FILE_NAME_ID, dataPathColumn)
 
         sourceData
           .withColumn(dataPathColumn, input_file_name())

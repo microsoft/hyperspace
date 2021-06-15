@@ -123,18 +123,10 @@ class IcebergRelation(
   override def hasParquetAsSourceFormat: Boolean = true
 
   /**
-   * Returns list of pairs of (file path, file id) to build lineage column.
-   *
-   * File paths should be the same format as "input_file_name()" of the given relation type.
-   * input_file_name() could be different depending on the OS and source.
-   *
    * For [[IcebergRelation]], each file path should be in this format:
    *   `/path/to/file` or `X:/path/to/file` for Windows file system.
-   *
-   * @param fileIdTracker [[FileIdTracker]] to create the list of (file path, file id).
-   * @return List of pairs of (file path, file id).
    */
-  override def lineagePairs(fileIdTracker: FileIdTracker): Seq[(String, Long)] = {
+  override def pathNormalizer: String => String = {
     // For Windows,
     //   original file path: file:/C:/path/to/file
     //   input_file_name(): C:/path/to/file
@@ -142,13 +134,9 @@ class IcebergRelation(
     //   original file path: file:///path/to/file or file:/path/to/file
     //   input_file_name(): /path/to/file
     if (Path.WINDOWS) {
-      fileIdTracker.getFileToIdMapping.map { kv =>
-        (kv._1._1.stripPrefix("file:/"), kv._2)
-      }
+      _.stripPrefix("file:/")
     } else {
-      fileIdTracker.getFileToIdMapping.map { kv =>
-        (kv._1._1.replaceFirst("^file:/{1,3}", "/"), kv._2)
-      }
+      _.replaceFirst("^file:/{1,3}", "/")
     }
   }
 

@@ -672,4 +672,13 @@ class FileIdTracker {
         maxId
       })
   }
+
+  /**
+   * Returns a list of pairs of (file id, file path).
+   *
+   * Paths are normalized with the given function, which defaults to identity.
+   */
+  def getIdToFileMapping(normalizePath: String => String = identity): Seq[(Long, String)] = {
+    getFileToIdMapping.map(kv => kv._2 -> normalizePath(kv._1._1))
+  }
 }
