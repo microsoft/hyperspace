@@ -978,7 +978,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Deleted indexes are not applied.") {
+  test("Deleted indexes should not be applied.") {
     spark.enableHyperspace()
     val df = spark.read.parquet(nonPartitionedDataPath)
     hyperspace.createIndex(df, IndexConfig("myind", Seq("c1"), Seq("c2")))
@@ -989,7 +989,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     assert(!query.queryExecution.simpleString.contains("FileScan Hyperspace"))
   }
 
-  test("Deleted indexes are shown as deleted.") {
+  test("Deleted indexes should be shown as deleted.") {
     spark.enableHyperspace()
     val df = spark.read.parquet(nonPartitionedDataPath)
     hyperspace.createIndex(df, IndexConfig("myind", Seq("c1"), Seq("c2")))
