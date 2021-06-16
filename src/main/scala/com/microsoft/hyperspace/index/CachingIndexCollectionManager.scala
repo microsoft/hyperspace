@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index
 
+import scala.collection.mutable
+
 import org.apache.hadoop.yarn.util.Clock
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -47,8 +49,7 @@ class CachingIndexCollectionManager(
       indexDataManagerFactory,
       fileSystemFactory) {
 
-  private val indexCache: Cache[Seq[IndexLogEntry]] =
-    indexCacheFactory.create(spark, IndexCacheType.CREATION_TIME_BASED)
+  private val indexCache: mutable.Map[Seq[String], Cache[Seq[IndexLogEntry]]] = mutable.Map.empty
 
   /**
    * This API tries to use the cache to fetch a list of indexes.
@@ -59,11 +60,16 @@ class CachingIndexCollectionManager(
    * @return list of indexes whose current state is among desired states
    */
   override def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
-    indexCache.get().getOrElse {
-      val originalIndexes = super.getIndexes(states)
-      indexCache.set(originalIndexes)
-      originalIndexes
-    }
+    indexCache
+      .getOrElseUpdate(
+        states,
+        indexCacheFactory.create(spark, IndexCacheType.CREATION_TIME_BASED))
+      .get()
+      .getOrElse {
+        val originalIndexes = super.getIndexes(states)
+        indexCache(states).set(originalIndexes)
+        originalIndexes
+      }
   }
 
   /**

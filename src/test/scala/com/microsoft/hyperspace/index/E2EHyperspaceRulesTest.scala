@@ -978,6 +978,28 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Deleted indexes are not applied.") {
+    spark.enableHyperspace()
+    val df = spark.read.parquet(nonPartitionedDataPath)
+    hyperspace.createIndex(df, IndexConfig("myind", Seq("c1"), Seq("c2")))
+    def query = df.filter("c1 == '2019-10-03'").select("c2")
+    assert(query.queryExecution.simpleString.contains("FileScan Hyperspace"))
+    hyperspace.deleteIndex("myind")
+    assert(hyperspace.indexes.filter("name == 'myind' and state == 'DELETED'").count() === 1)
+    assert(!query.queryExecution.simpleString.contains("FileScan Hyperspace"))
+  }
+
+  test("Deleted indexes are shown as deleted.") {
+    spark.enableHyperspace()
+    val df = spark.read.parquet(nonPartitionedDataPath)
+    hyperspace.createIndex(df, IndexConfig("myind", Seq("c1"), Seq("c2")))
+    def query = df.filter("c1 == '2019-10-03'").select("c2")
+    assert(query.queryExecution.simpleString.contains("FileScan Hyperspace"))
+    hyperspace.deleteIndex("myind")
+    assert(!query.queryExecution.simpleString.contains("FileScan Hyperspace"))
+    assert(hyperspace.indexes.filter("name == 'myind' and state == 'DELETED'").count() === 1)
+  }
+
   /**
    * Verify that the query plan has the expected rootPaths.
    *
