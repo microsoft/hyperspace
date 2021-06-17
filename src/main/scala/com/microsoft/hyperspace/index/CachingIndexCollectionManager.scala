@@ -59,11 +59,14 @@ class CachingIndexCollectionManager(
    * @return list of indexes whose current state is among desired states
    */
   override def getIndexes(states: Seq[String] = Seq()): Seq[IndexLogEntry] = {
-    indexCache.get().getOrElse {
-      val originalIndexes = super.getIndexes(states)
-      indexCache.set(originalIndexes)
-      originalIndexes
-    }
+    indexCache
+      .get()
+      .getOrElse {
+        val originalIndexes = super.getIndexes()
+        indexCache.set(originalIndexes)
+        originalIndexes
+      }
+      .filter(index => states.isEmpty || states.contains(index.state))
   }
 
   /**
