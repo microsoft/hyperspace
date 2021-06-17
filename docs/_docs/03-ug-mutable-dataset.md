@@ -267,7 +267,7 @@ spark.conf.set("spark.hyperspace.index.hybridscan.maxDeletedRatio", 0.2) // 20% 
 
 Python:
 ```python
-spark.conf.set("spark.hyperspace.index.hybridscan.enabled", true)
+spark.conf.set("spark.hyperspace.index.hybridscan.enabled", True)
 spark.conf.set("spark.hyperspace.index.hybridscan.maxAppendedRatio", 0.3) # 30% by default
 spark.conf.set("spark.hyperspace.index.hybridscan.maxDeletedRatio", 0.2) # 20% by default
 ```
