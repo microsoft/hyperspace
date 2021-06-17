@@ -194,18 +194,18 @@ hs.vacuumIndex("index")
 Python:
 
 ```python
-// Refreshes the given index if the source data changes.
+# Refreshes the given index if the source data changes.
 hs.refreshIndex("index")
 
-// Soft-deletes the given index and does not physically remove it from filesystem.
+# Soft-deletes the given index and does not physically remove it from filesystem.
 hs.deleteIndex("index")
 
-// Restores the soft-deleted index.
+# Restores the soft-deleted index.
 hs.restoreIndex("index")
 
-// Soft-delete the given index for vacuum.
+# Soft-delete the given index for vacuum.
 hs.deleteIndex("index")
-// Hard-delete the given index and physically remove it from filesystem.
+# Hard-delete the given index and physically remove it from filesystem.
 hs.vacuumIndex("index")
 ```
 
