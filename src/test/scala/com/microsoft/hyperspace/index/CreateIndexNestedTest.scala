@@ -43,6 +43,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
+    spark.conf.set(IndexConstants.TEMP_NESTED_COLUMN_ENABLED, "true")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir), isRecursive = true)
 
@@ -57,6 +58,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   }
 
   override def afterAll(): Unit = {
+    spark.conf.unset(IndexConstants.TEMP_NESTED_COLUMN_ENABLED)
     FileUtils.delete(new Path(testDir), isRecursive = true)
     super.afterAll()
   }

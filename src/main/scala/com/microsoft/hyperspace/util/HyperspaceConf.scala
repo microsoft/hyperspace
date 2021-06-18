@@ -97,6 +97,14 @@ object HyperspaceConf {
         "avro,csv,json,orc,parquet,text")
   }
 
+  def tempNestedColumnEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.TEMP_NESTED_COLUMN_ENABLED,
+        IndexConstants.TEMP_NESTED_COLUMN_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
   /**
    * Returns the config value whose key matches the first key given multiple keys. If no keys are
    * matched, the given default value is returned.

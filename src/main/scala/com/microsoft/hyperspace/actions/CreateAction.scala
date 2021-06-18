@@ -56,12 +56,22 @@ class CreateAction(
           s"Source plan: ${df.queryExecution.sparkPlan}")
     }
 
-    // schema validity checks
-    if (!isValidIndexSchema(indexConfig, df)) {
+    // Schema validity checks
+
+    // Resolve index config columns from available column names present in the dataframe.
+    val resolvedColumns = ResolverUtils
+      .resolve(spark, indexConfig.referencedColumns, df.queryExecution.analyzed)
+    if (resolvedColumns.isEmpty) {
       throw HyperspaceException("Index config is not applicable to dataframe schema.")
     }
 
-    // valid state check
+    // TODO: Temporarily block creating indexes using nested columns until it's fully supported.
+    if (!(HyperspaceConf.tempNestedColumnEnabled(spark) || resolvedColumns.get.forall(
+          !_.isNested))) {
+      throw HyperspaceException("Hyperspace does not support nested columns.")
+    }
+
+    // Valid state check
     logManager.getLatestLog() match {
       case None => // valid
       case Some(entry) if entry.state.equals(DOESNOTEXIST) => // valid
@@ -69,16 +79,6 @@ class CreateAction(
         throw HyperspaceException(
           s"Another Index with name ${indexConfig.indexName} already exists")
     }
-  }
-
-  private def isValidIndexSchema(config: IndexConfigTrait, dataFrame: DataFrame): Boolean = {
-    // Resolve index config columns from available column names present in the dataframe.
-    ResolverUtils
-      .resolve(
-        spark,
-        config.referencedColumns,
-        dataFrame.queryExecution.analyzed)
-      .isDefined
   }
 
   // TODO: The following should be protected, but RefreshAction is calling CreateAction.op().
