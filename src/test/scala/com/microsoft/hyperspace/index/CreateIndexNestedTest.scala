@@ -208,4 +208,12 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       lineageValues.forall(lineageRange.contains(_))
     }
   }
+
+  test("Disable index creation with nested columns until fully supported.") {
+    spark.conf.set(IndexConstants.TEMP_NESTED_COLUMN_ENABLED, "false")
+    val exception = intercept[HyperspaceException] {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+    }
+    assert(exception.getMessage.contains("Hyperspace does not support nested columns."))
+  }
 }
