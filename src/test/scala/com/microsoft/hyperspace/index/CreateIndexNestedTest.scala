@@ -98,8 +98,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       "Indexed columns with wrong case are stored in metadata")
     assert(
       indexes.head
-        .getAs[Map[String, String]]("additionalStats")(
-          "includedColumns") == "__hs_nested.nested.leaf.cnt",
+        .getAs[Map[String, String]]("additionalStats")("includedColumns") == "__hs_nested.nested.leaf.cnt",
       "Included columns with wrong case are stored in metadata")
   }
 
@@ -139,10 +138,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
     val dfB = nonPartitionedDataDF.as("B")
     val dfJoin = dfA
       .join(dfB, dfA("Query") === dfB("Query"))
-      .select(
-        dfA("RGUID"),
-        dfA("Query"),
-        dfA("nested.leaf.cnt"))
+      .select(dfA("RGUID"), dfA("Query"), dfA("nested.leaf.cnt"))
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfJoin, indexConfig1)
     }
@@ -206,4 +202,30 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       lineageValues.forall(lineageRange.contains(_))
     }
   }
+
+  test("Verify index creation with StructType column.") {
+    val indexConfig = IndexConfig("index1", Seq("nested"), Seq("clicks"))
+    val indexConfig2 = IndexConfig("index2", Seq("clicks"), Seq("nested"))
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig2)
+    assert(hyperspace.indexes.where(s"name = 'index1' ").count == 1)
+    assert(hyperspace.indexes.where(s"name = 'index2' ").count == 1)
+
+    import com.microsoft.hyperspace._
+    spark.enableHyperspace
+
+    {
+      val filter = nonPartitionedDataDF.filter(col("nested").isNotNull).select("nested", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index1"))
+    }
+    {
+      val filter = nonPartitionedDataDF.filter("clicks = 1000").select("nested", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index2"))
+    }
+  }
+
 }
