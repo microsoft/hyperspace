@@ -98,7 +98,8 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       "Indexed columns with wrong case are stored in metadata")
     assert(
       indexes.head
-        .getAs[Map[String, String]]("additionalStats")("includedColumns") == "__hs_nested.nested.leaf.cnt",
+        .getAs[Map[String, String]]("additionalStats")("includedColumns") ==
+        "__hs_nested.nested.leaf.cnt",
       "Included columns with wrong case are stored in metadata")
   }
 
