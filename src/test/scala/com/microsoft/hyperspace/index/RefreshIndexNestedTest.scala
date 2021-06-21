@@ -40,13 +40,13 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set(IndexConstants.TEMP_NESTED_COLUMN_ENABLED, "true")
+    spark.conf.set(IndexConstants.DEV_NESTED_COLUMN_ENABLED, "true")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir))
   }
 
   override def afterAll(): Unit = {
-    spark.conf.unset(IndexConstants.TEMP_NESTED_COLUMN_ENABLED)
+    spark.conf.unset(IndexConstants.DEV_NESTED_COLUMN_ENABLED)
     FileUtils.delete(new Path(testDir))
     super.afterAll()
   }

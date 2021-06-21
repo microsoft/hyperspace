@@ -43,7 +43,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    spark.conf.set(IndexConstants.TEMP_NESTED_COLUMN_ENABLED, "true")
+    spark.conf.set(IndexConstants.DEV_NESTED_COLUMN_ENABLED, "true")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir), isRecursive = true)
 
@@ -58,7 +58,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   }
 
   override def afterAll(): Unit = {
-    spark.conf.unset(IndexConstants.TEMP_NESTED_COLUMN_ENABLED)
+    spark.conf.unset(IndexConstants.DEV_NESTED_COLUMN_ENABLED)
     FileUtils.delete(new Path(testDir), isRecursive = true)
     super.afterAll()
   }
@@ -210,10 +210,10 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   }
 
   test("Disable index creation with nested columns until fully supported.") {
-    spark.conf.set(IndexConstants.TEMP_NESTED_COLUMN_ENABLED, "false")
+    spark.conf.set(IndexConstants.DEV_NESTED_COLUMN_ENABLED, "false")
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
     }
-    assert(exception.getMessage.contains("Hyperspace does not support nested columns."))
+    assert(exception.getMessage.contains("Hyperspace does not support nested columns yet."))
   }
 }
