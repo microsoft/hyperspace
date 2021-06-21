@@ -32,7 +32,7 @@ jobs:
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            sourceFolder: '$(Build.SourcesDirectory)/spark2.4/target/'
             contents: '**/*.jar'
             targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
         - task: PublishBuildArtifacts@1
@@ -61,7 +61,7 @@ jobs:
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            sourceFolder: '$(Build.SourcesDirectory)/spark2.4/target/'
             contents: '**/*.jar'
             targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
         - task: PublishBuildArtifacts@1
@@ -90,7 +90,7 @@ jobs:
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            sourceFolder: '$(Build.SourcesDirectory)/spark3.0/target/'
             contents: '**/*.jar'
             targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.0/'
         - task: PublishBuildArtifacts@1
@@ -119,7 +119,7 @@ jobs:
         - task: CopyFiles@2
           displayName: 'Copy hyperspace-core JAR'
           inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
+            sourceFolder: '$(Build.SourcesDirectory)/spark3.1/target/'
             contents: '**/*.jar'
             targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
         - task: PublishBuildArtifacts@1
