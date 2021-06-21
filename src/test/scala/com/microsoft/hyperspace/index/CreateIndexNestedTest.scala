@@ -222,6 +222,19 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
           .contains("Hyperspace(Type: CI, Name: index1"))
     }
     {
+      val filter = nonPartitionedDataDF.filter("nested.id = \"id1\"").select("nested", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index1"))
+    }
+    {
+      val filter =
+        nonPartitionedDataDF.filter("nested.id = \"id1\"").select("nested.id", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index1"))
+    }
+    {
       val filter = nonPartitionedDataDF.filter("clicks = 1000").select("nested", "clicks")
       assert(
         filter.queryExecution.optimizedPlan.toString
