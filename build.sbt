@@ -88,6 +88,10 @@ lazy val commonSettings = Seq(
 
   name := "hyperspace-core",
   moduleName := name.value + s"-spark${sparkVersion.value.short}",
+
+  resolvers += "SynapseMaven" at "https://msdata.pkgs.visualstudio.com/A365/_packaging/SynapseMaven/maven/v1",
+  credentials += Credentials(new File(".synapsecredentials")),
+  useCoursier := false,
   libraryDependencies ++= deps(sparkVersion.value),
 
   // Scalastyle

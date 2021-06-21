@@ -17,6 +17,12 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
+      - task: Bash@3
+        env:
+          SYNAPSE_MAVEN_PASSWORD: $(synapse.maven.password)
+        inputs:
+          filePath: 'script/synapse_credentials.sh'
+        displayName: 'Downloading SynapseMaven credentials'
       - script: sbt ++2.11.12 "project spark2_4" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
@@ -40,6 +46,12 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
+      - task: Bash@3
+        env:
+          SYNAPSE_MAVEN_PASSWORD: $(synapse.maven.password)
+        inputs:
+          filePath: 'script/synapse_credentials.sh'
+        displayName: 'Downloading SynapseMaven credentials'
       - script: sbt ++2.12.8 "project spark2_4" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
@@ -63,6 +75,12 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
+      - task: Bash@3
+        env:
+          SYNAPSE_MAVEN_PASSWORD: $(synapse.maven.password)
+        inputs:
+          filePath: 'script/synapse_credentials.sh'
+        displayName: 'Downloading SynapseMaven credentials'
       - script: sbt ++2.12.8 "project spark3_0" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
@@ -86,6 +104,12 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
+      - task: Bash@3
+        env:
+          SYNAPSE_MAVEN_PASSWORD: $(synapse.maven.password)
+        inputs:
+          filePath: 'script/synapse_credentials.sh'
+        displayName: 'Downloading SynapseMaven credentials'
       - script: sbt ++2.12.8 "project spark3_1" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
       # If not a pull request, publish artifacts.
@@ -120,6 +144,12 @@ jobs:
           versionSpec: '8'
           jdkArchitectureOption: 'x64'
           jdkSourceOption: 'PreInstalled'
+      - task: Bash@3
+        env:
+          SYNAPSE_MAVEN_PASSWORD: $(synapse.maven.password)
+        inputs:
+          filePath: 'script/synapse_credentials.sh'
+        displayName: 'Downloading SynapseMaven credentials'
       - script: sbt ++2.11.12 "project spark2_4" clean update compile
         displayName: 'Running $sbt clean & update & compile'
       - task: Bash@3

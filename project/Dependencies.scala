@@ -23,6 +23,7 @@ object Dependencies {
       "org.apache.spark" %% "spark-catalyst" % sv % "provided" withSources (),
       "org.apache.spark" %% "spark-core" % sv % "provided" withSources (),
       "org.apache.spark" %% "spark-sql" % sv % "provided" withSources (),
+      "com.microsoft.synapse" %% "synapse-spark-telemetry" % "0.0.1",
       // Test dependencies
       "org.mockito" %% "mockito-scala" % "0.4.0" % "test",
       "org.apache.spark" %% "spark-catalyst" % sv % "test" classifier "tests",
