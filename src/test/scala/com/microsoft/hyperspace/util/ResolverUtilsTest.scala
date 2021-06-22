@@ -88,6 +88,18 @@ class ResolverUtilsTest extends SparkFunSuite with SparkInvolvedSuite {
             ResolvedColumn("nested.n.n.n.f2", true),
             ResolvedColumn("nested.n.n.nf1_b", true),
             ResolvedColumn("nested.nf1", true))))
+    assert(
+      ResolverUtils
+        .resolve(
+          spark,
+          Seq("nm", "nested", "nested.n", "nested.n.n", "nested.nf1"),
+          df.queryExecution.analyzed)
+        .contains(Seq(
+          ResolvedColumn("nm", false),
+          ResolvedColumn("nested", false),
+          ResolvedColumn("nested.n", true),
+          ResolvedColumn("nested.n.n", true),
+          ResolvedColumn("nested.nf1", true))))
   }
 
   test("Verify testResolve against dataframe - unsupported nested field names") {
