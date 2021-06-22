@@ -226,5 +226,6 @@ object ResolverUtils {
           throw HyperspaceException("Map types are not supported")
         case f => Seq(f.name)
       }
+     case _ => Nil
   }
 }

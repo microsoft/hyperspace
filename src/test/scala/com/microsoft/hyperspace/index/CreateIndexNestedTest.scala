@@ -216,4 +216,42 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
     }
     assert(exception.getMessage.contains("Hyperspace does not support nested columns yet."))
   }
+
+  test("Verify index creation with StructType column.") {
+    val indexConfig = IndexConfig("index1", Seq("nested"), Seq("clicks"))
+    val indexConfig2 = IndexConfig("index2", Seq("clicks"), Seq("nested"))
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig)
+    hyperspace.createIndex(nonPartitionedDataDF, indexConfig2)
+    assert(hyperspace.indexes.where(s"name = 'index1' ").count == 1)
+    assert(hyperspace.indexes.where(s"name = 'index2' ").count == 1)
+
+    import com.microsoft.hyperspace._
+    spark.enableHyperspace
+
+    {
+      val filter = nonPartitionedDataDF.filter(col("nested").isNotNull).select("nested", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index1"))
+    }
+    {
+      val filter = nonPartitionedDataDF.filter("nested.id = \"id1\"").select("nested", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index1"))
+    }
+    {
+      val filter =
+        nonPartitionedDataDF.filter("nested.id = \"id1\"").select("nested.id", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index1"))
+    }
+    {
+      val filter = nonPartitionedDataDF.filter("clicks = 1000").select("nested", "clicks")
+      assert(
+        filter.queryExecution.optimizedPlan.toString
+          .contains("Hyperspace(Type: CI, Name: index2"))
+    }
+  }
 }
