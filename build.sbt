@@ -196,14 +196,7 @@ ThisBuild / homepage := Some(url("https://github.com/microsoft/hyperspace"))
 ThisBuild / pomIncludeRepository := { _ =>
   false
 }
-ThisBuild / publishTo := {
-  val nexus = "https://oss.sonatype.org/"
-  if (isSnapshot.value) {
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  } else {
-    Some("releases" at nexus + "service/local/staging/deploy/maven2")
-  }
-}
+ThisBuild / publishTo := Some("SynapseMaven" at "https://msdata.pkgs.visualstudio.com/A365/_packaging/SynapseMaven/maven/v1")
 
 ThisBuild / publishMavenStyle := true
 
