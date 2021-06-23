@@ -8,7 +8,7 @@ steps:
     displayName: 'Running $sbt clean & update & compile & test'
     # If not a pull request, publish artifacts.
   - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-    - script: sbt ${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersionUnderBar }}" package
+    - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersionUnderBar }}" package
       displayName: 'Running $sbt package'
     - task: CopyFiles@2
       displayName: 'Copy hyperspace-core JAR'

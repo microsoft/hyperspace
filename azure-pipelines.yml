@@ -97,75 +97,30 @@ jobs:
     pool:
       vmImage: 'windows-2019'
     steps:
-      - task: PowerShell@2
-        displayName: Download Winutils.exe
-        inputs:
-          workingDirectory: $(Build.BinariesDirectory)
-          pwsh: true
-          targetType: inline
-          script: |
-            echo "Download Hadoop utils for Windows."
-            curl -k -L -o hadoop.zip https://github.com/steveloughran/winutils/releases/download/tag_2017-08-29-hadoop-2.8.1-native/hadoop-2.8.1.zip
-            unzip hadoop.zip
-            New-Item -ItemType Directory -Force -Path hadoop\bin
-            cp hadoop-2.8.1\winutils.exe hadoop\bin
-            cp hadoop-2.8.1\hadoop.dll hadoop\bin
-      - task: JavaToolInstaller@0
-        displayName: 'Set Java version'
-        inputs:
-          versionSpec: '8'
-          jdkArchitectureOption: 'x64'
-          jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 "project spark2_4" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-        env:
-          HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "2_4"
+          scalaVersion: "2.11.12"
 
   - job: Build_Spark2_4_2_12_WIN
     displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.12 on Windows'
     pool:
       vmImage: 'windows-2019'
     steps:
-      - task: PowerShell@2
-        displayName: Download Winutils.exe
-        inputs:
-          workingDirectory: $(Build.BinariesDirectory)
-          pwsh: true
-          targetType: inline
-          script: |
-            echo "Download Hadoop utils for Windows."
-            curl -k -L -o hadoop.zip https://github.com/steveloughran/winutils/releases/download/tag_2017-08-29-hadoop-2.8.1-native/hadoop-2.8.1.zip
-            unzip hadoop.zip
-            New-Item -ItemType Directory -Force -Path hadoop\bin
-            cp hadoop-2.8.1\winutils.exe hadoop\bin
-            cp hadoop-2.8.1\hadoop.dll hadoop\bin
-      - script: sbt ++2.12.8 "project spark2_4" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-        env:
-          HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "2_4"
+          scalaVersion: "2.12.8"
 
   - job: Build_Spark3_0_2_12_WIN
     displayName: 'Build sources and run unit tests for Spark 3.0 / Scala 2.12 on Windows'
     pool:
       vmImage: 'windows-2019'
     steps:
-      - task: PowerShell@2
-        displayName: Download Winutils.exe
-        inputs:
-          workingDirectory: $(Build.BinariesDirectory)
-          pwsh: true
-          targetType: inline
-          script: |
-            echo "Download Hadoop utils for Windows."
-            curl -k -L -o hadoop.zip https://github.com/steveloughran/winutils/releases/download/tag_2017-08-29-hadoop-2.8.1-native/hadoop-2.8.1.zip
-            unzip hadoop.zip
-            New-Item -ItemType Directory -Force -Path hadoop\bin
-            cp hadoop-2.8.1\winutils.exe hadoop\bin
-            cp hadoop-2.8.1\hadoop.dll hadoop\bin
-      - script: sbt ++2.12.8 "project spark3_0" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-        env:
-          HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "3_0"
+          scalaVersion: "2.12.8"
 
   - job: Build_Spark3_1_2_12_WIN
     displayName: 'Build sources and run unit tests for Spark 3.1 / Scala 2.12 on Windows'
