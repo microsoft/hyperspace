@@ -86,23 +86,11 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark3_1" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-      # If not a pull request, publish artifacts.
-      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 "project spark3_1" package
-          displayName: 'Running $sbt package'
-        - task: CopyFiles@2
-          displayName: 'Copy hyperspace-core JAR'
-          inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
-            contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
-        - task: PublishBuildArtifacts@1
-          displayName: 'Publish Hyperspace artifacts'
-          inputs:
-            artifactName: 'hyperspace-core-spark3.1'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
+      - template: 'ci/linux_test.yml'
+        parameters:
+          sparkVersionUnderBar: "3_1"
+          sparkVersion: "3.1"
+          scalaVersion: "2.12.8"
 
   - job: Build_Spark2_4_2_11_WIN
     displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.11 on Windows'
@@ -186,7 +174,7 @@ jobs:
     steps:
       - template: 'ci/windows_test.yml'
         parameters:
-          sparkVersion: "3_1"
+          sparkVersionUnderBar: "3_1"
           scalaVersion: "2.12.8"
 
   - job: PythonTest
