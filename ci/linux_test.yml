@@ -1,23 +1,32 @@
 parameters:
   sparkVersion: ''
   scalaVersion: ''
-
-variables:
-  sparkVersionUnderBar: ${{ replace(${{ parameters.sparkVersion }}, '.', '_') }}
+  sparkVersionUnderBar: ''
 
 steps:
+  - task: JavaToolInstaller@0
+    displayName: 'Set Java version'
+    condition: startsWith(${{ parameters.scalaVersion }}, '2.11')
+    inputs:
+      versionSpec: '8'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
   - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ variables.sparkVersionUnderBar }}" clean update compile test
     displayName: 'Running $sbt clean & update & compile & test'
+
     # If not a pull request, publish artifacts.
   - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
     - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ variables.sparkVersionUnderBar }}" package
       displayName: 'Running $sbt package'
+
     - task: CopyFiles@2
       displayName: 'Copy hyperspace-core JAR'
       inputs:
         sourceFolder: '$(Build.SourcesDirectory)/target/'
         contents: '**/*.jar'
         targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark${{ parameters.sparkVersion }}/'
+
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Hyperspace artifacts'
       inputs:
