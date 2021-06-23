@@ -192,13 +192,11 @@ jobs:
           targetType: inline
           script: |
             echo "Download Hadoop utils for Windows."
-            curl -k -L -o hdfs.dll https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.1.2/bin/hdfs.dll
-            curl -k -L -o hadoop.dll https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.1.2/bin/hadoop.dll
-            curl -k -L -o winutils.exe https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.1.2/bin/winutils.exe
+            curl -k -L -o hadoop.dll https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.2.1/bin/hadoop.dll
+            curl -k -L -o winutils.exe https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.2.1/bin/winutils.exe
             New-Item -ItemType Directory -Force -Path hadoop\bin
             cp winutils.exe hadoop\bin
             cp hadoop.dll hadoop\bin
-            cp hdfs.dll hadoop\bin
             cp hadoop.dll c:\windows\system32
       - script: sbt ++2.12.8 "project spark3_1" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
