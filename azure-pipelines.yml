@@ -174,7 +174,7 @@ jobs:
             New-Item -ItemType Directory -Force -Path hadoop\bin
             cp hadoop-2.8.1\winutils.exe hadoop\bin
             cp hadoop-2.8.1\hadoop.dll hadoop\bin
-            ls -al hadoop\bin
+            ls hadoop\bin
       - script: sbt ++2.12.8 "project spark3_0" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
         env:
@@ -198,7 +198,7 @@ jobs:
             New-Item -ItemType Directory -Force -Path hadoop\bin
             cp winutils.exe hadoop\bin
             cp hadoop.dll hadoop\bin
-            ls -al hadoop\bin
+            ls hadoop\bin
       - script: sbt ++2.12.8 "project spark3_1" clean update compile test
         displayName: 'Running $sbt clean & update & compile & test'
         env:
