@@ -12,12 +12,12 @@ steps:
       jdkArchitectureOption: 'x64'
       jdkSourceOption: 'PreInstalled'
 
-  - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ variables.sparkVersionUnderBar }}" clean update compile test
+  - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersionUnderBar }}" clean update compile test
     displayName: 'Running $sbt clean & update & compile & test'
 
     # If not a pull request, publish artifacts.
   - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-    - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ variables.sparkVersionUnderBar }}" package
+    - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersionUnderBar }}" package
       displayName: 'Running $sbt package'
 
     - task: CopyFiles@2
