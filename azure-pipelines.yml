@@ -104,6 +104,68 @@ jobs:
             artifactName: 'hyperspace-core-spark3.1'
             pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
 
+  - job: Build_2_11_WIN
+    displayName: 'Build sources and run unit tests for Scala 2.11 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - task: PowerShell@2
+        displayName: Download Winutils.exe
+        inputs:
+          workingDirectory: $(Build.BinariesDirectory)
+          pwsh: true
+          targetType: inline
+          script: |
+            echo "Download Hadoop utils for Windows."
+            curl -k -L -o hadoop.zip https://github.com/steveloughran/winutils/releases/download/tag_2017-08-29-hadoop-2.8.1-native/hadoop-2.8.1.zip
+            unzip hadoop.zip
+            New-Item -ItemType Directory -Force -Path hadoop\bin
+            cp hadoop-2.8.1\winutils.exe hadoop\bin
+      - task: JavaToolInstaller@0
+        displayName: 'Set Java version'
+        inputs:
+          versionSpec: '8'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'PreInstalled'
+      - script: sbt ++2.11.12 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.11.12 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.11.12 compile
+        displayName: 'Running $sbt compile'
+      - script: sbt ++2.11.12 test
+        displayName: 'Running $sbt test'
+        env:
+          HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
+
+  - job: Build_2_12_WIN
+    displayName: 'Build sources and run unit tests for Scala 2.12 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - task: PowerShell@2
+        displayName: Download Winutils.exe
+        inputs:
+          workingDirectory: $(Build.BinariesDirectory)
+          pwsh: true
+          targetType: inline
+          script: |
+            echo "Download Hadoop utils for Windows."
+            curl -k -L -o hadoop.zip https://github.com/steveloughran/winutils/releases/download/tag_2017-08-29-hadoop-2.8.1-native/hadoop-2.8.1.zip
+            unzip hadoop.zip
+            New-Item -ItemType Directory -Force -Path hadoop\bin
+            cp hadoop-2.8.1\winutils.exe hadoop\bin
+      - script: sbt ++2.12.8 clean
+        displayName: 'Running $sbt clean'
+      - script: sbt ++2.12.8 update
+        displayName: 'Running $sbt update'
+      - script: sbt ++2.12.8 compile
+        displayName: 'Running $sbt compile'
+      - script: sbt ++2.12.8 test
+        displayName: 'Running $sbt test'
+        env:
+          HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
+
   - job: PythonTest
     displayName: 'Run Python tests'
     pool:
