@@ -23,7 +23,7 @@ steps:
       versionSpec: '8'
       jdkArchitectureOption: 'x64'
       jdkSourceOption: 'PreInstalled'
-  - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersion }}" clean update compile test
+  - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersionUnderBar }}" clean update compile test
     displayName: 'Running $sbt clean & update & compile & test'
     env:
       HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
