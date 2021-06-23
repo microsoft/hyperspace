@@ -52,6 +52,10 @@ object IndexConstants {
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC = "spark.hyperspace.index.filterRule.useBucketSpec"
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT = "false"
 
+  // TODO: Remove dev config when nested column is fully supported.
+  val DEV_NESTED_COLUMN_ENABLED = "spark.hyperspace.dev.index.nestedColumn.enabled"
+  val DEV_NESTED_COLUMN_ENABLED_DEFAULT = "false"
+
   // Identifier injected to HadoopFsRelation as an option if an index is applied.
   // Currently, the identifier is added to options field of HadoopFsRelation.
   // In Spark 3.0, we could utilize TreeNodeTag to mark the identifier for each plan.
