@@ -43,6 +43,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
+    spark.conf.set(IndexConstants.DEV_NESTED_COLUMN_ENABLED, "true")
     hyperspace = new Hyperspace(spark)
     FileUtils.delete(new Path(testDir), isRecursive = true)
 
@@ -57,6 +58,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
   }
 
   override def afterAll(): Unit = {
+    spark.conf.unset(IndexConstants.DEV_NESTED_COLUMN_ENABLED)
     FileUtils.delete(new Path(testDir), isRecursive = true)
     super.afterAll()
   }
@@ -98,8 +100,8 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
       "Indexed columns with wrong case are stored in metadata")
     assert(
       indexes.head
-        .getAs[Map[String, String]]("additionalStats")("includedColumns") ==
-        "__hs_nested.nested.leaf.cnt",
+        .getAs[Map[String, String]]("additionalStats")(
+          "includedColumns") == "__hs_nested.nested.leaf.cnt",
       "Included columns with wrong case are stored in metadata")
   }
 
@@ -139,7 +141,10 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
     val dfB = nonPartitionedDataDF.as("B")
     val dfJoin = dfA
       .join(dfB, dfA("Query") === dfB("Query"))
-      .select(dfA("RGUID"), dfA("Query"), dfA("nested.leaf.cnt"))
+      .select(
+        dfA("RGUID"),
+        dfA("Query"),
+        dfA("nested.leaf.cnt"))
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfJoin, indexConfig1)
     }
@@ -204,6 +209,14 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
     }
   }
 
+  test("Disable index creation with nested columns until fully supported.") {
+    spark.conf.set(IndexConstants.DEV_NESTED_COLUMN_ENABLED, "false")
+    val exception = intercept[HyperspaceException] {
+      hyperspace.createIndex(nonPartitionedDataDF, indexConfig1)
+    }
+    assert(exception.getMessage.contains("Hyperspace does not support nested columns yet."))
+  }
+
   test("Verify index creation with StructType column.") {
     val indexConfig = IndexConfig("index1", Seq("nested"), Seq("clicks"))
     val indexConfig2 = IndexConfig("index2", Seq("clicks"), Seq("nested"))
@@ -241,5 +254,4 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
           .contains("Hyperspace(Type: CI, Name: index2"))
     }
   }
-
 }
