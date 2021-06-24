@@ -9,8 +9,7 @@ Scala Coding Style
 
 * For formatting, [scalafmt](https://scalameta.org/scalafmt) is used with the custom configuration (found in [/dev/.scalafmt.conf](/dev/.scalafmt.conf))
   * Set scalafmt as the formatter
-    * For the current project (recommended): Preferences (Settings if you use Windows) > Editor > Code Style > Scala
-    * For all new projects: File > Other Settings > Preferences for New Projects… > Editor > Code Style > Scala
+    * Open Preferences (Settings if you use Windows) > Editor > Code Style > Scala
     * Select Scalafmt as the formatter
     * Check 'Reformat on file save'
     * Select ./dev/.scalafmt.conf for Configuration
