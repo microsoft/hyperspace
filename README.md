@@ -28,7 +28,7 @@ This repository contains symbolic links which don't work properly on Windows. To
 ```sh
 $ git config --local include.path ../dev/.gitconfig
 $ git replace-symlinks # replace symlinks with junctions
-$ git restore-symlinks # restore symlinks
+$ #git restore-symlinks # use this to restore symlinks if you need
 ```
 
 ### Using IntelliJ
