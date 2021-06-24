@@ -39,24 +39,26 @@ You can use the built-in sbt shell in IntelliJ without any problems. However, th
 - Mark `src/main/scala` and `src/main/scala-spark3` as "Sources" and `src/test/scala` and `src/test/scala-spark3` as "Tests" for the `spark3_0` module
 - Remove the `root` and `hyperspace-sources` modules
 
+![Project Structure](./docs/assets/images/project_structure.png)
+
 Additionally, you might have to run `sbt buildInfo` if you encounter an error like `object BuildInfo is not a member of package com.microsoft.hyperspace` for the first build.
 
 ## Inspiration and Special Thanks
 
 This project would not have been possible without the outstanding work from the following communities:
 
-- [Apache Spark](https://spark.apache.org/): Unified Analytics Engine for Big Data, the engine that 
+- [Apache Spark](https://spark.apache.org/): Unified Analytics Engine for Big Data, the engine that
   Hyperspace builds on top of.
-- [Delta Lake](https://delta.io): Delta Lake is an open-source storage layer that brings ACID 
-  transactions to Apache Spark™ and big data workloads. Hyperspace derives quite a bit of inspiration 
-  from the way the Delta Lake community operates and pioneering of some surrounding ideas in the 
-  context of data lakes (e.g., their novel use of optimistic concurrency). 
-- [Databricks](https://databricks.com/): Unified analytics platform. Many thanks to all the inspiration 
+- [Delta Lake](https://delta.io): Delta Lake is an open-source storage layer that brings ACID
+  transactions to Apache Spark™ and big data workloads. Hyperspace derives quite a bit of inspiration
+  from the way the Delta Lake community operates and pioneering of some surrounding ideas in the
+  context of data lakes (e.g., their novel use of optimistic concurrency).
+- [Databricks](https://databricks.com/): Unified analytics platform. Many thanks to all the inspiration
   they have provided us.
-- [.NET for Apache Spark™](https://github.com/dotnet/spark): Hyperspace offers .NET bindings for 
+- [.NET for Apache Spark™](https://github.com/dotnet/spark): Hyperspace offers .NET bindings for
   developers, thanks to the efforts of this team in collaborating and releasing the bindings just-in-time.
-- [Minimal Mistakes](https://github.com/mmistakes/minimal-mistakes): The awesome theme behind 
-  Hyperspace documentation. 
+- [Minimal Mistakes](https://github.com/mmistakes/minimal-mistakes): The awesome theme behind
+  Hyperspace documentation.
 
 ## Code of Conduct
 
