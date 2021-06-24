@@ -38,8 +38,7 @@ You can use the built-in sbt shell in IntelliJ without any problems. However, th
 - Mark `src/main/scala` and `src/main/scala-spark2` as "Sources" and `src/test/scala` and `src/test/scala-spark2` as "Tests" for the `spark2_4` module
 - Mark `src/main/scala` and `src/main/scala-spark3` as "Sources" and `src/test/scala` and `src/test/scala-spark3` as "Tests" for the `spark3_0` module
 - Remove the `root` and `hyperspace-sources` modules
-
-![Project Structure](./docs/assets/images/project_structure.png)
+- An example of [Project Structure.](./docs/assets/images/project_structure.png)
 
 Additionally, you might have to run `sbt buildInfo` if you encounter an error like `object BuildInfo is not a member of package com.microsoft.hyperspace` for the first build.
 
