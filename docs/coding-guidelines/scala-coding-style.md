@@ -12,7 +12,7 @@ Scala Coding Style
     * Open Preferences (Settings if you use Windows) > Editor > Code Style > Scala
     * Select Scalafmt as the formatter
     * Check 'Reformat on file save'
-    * Select ./dev/.scalafmt.conf for Configuration
+    * Select `./dev/.scalafmt.conf` for Configuration
     ![Setting](../assets/images/scalafmt_settings.png)
   * Detailed installation of `scalafmt` can be found [here](https://scalameta.org/scalafmt/docs/installation.html)
   
