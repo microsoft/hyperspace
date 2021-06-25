@@ -11,98 +11,84 @@ jobs:
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - task: JavaToolInstaller@0
-        displayName: 'Set Java version'
-        inputs:
-          versionSpec: '8'
-          jdkArchitectureOption: 'x64'
-          jdkSourceOption: 'PreInstalled'
-      - script: sbt ++2.11.12 "project spark2_4" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-      # If not a pull request, publish artifacts.
-      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.11.12 "project spark2_4" package
-          displayName: 'Running $sbt package'
-        - task: CopyFiles@2
-          displayName: 'Copy hyperspace-core JAR'
-          inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
-            contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
-        - task: PublishBuildArtifacts@1
-          displayName: 'Publish Hyperspace artifacts'
-          inputs:
-            artifactName: 'hyperspace-core-spark2.4'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
+      - template: 'ci/linux_test.yml'
+        parameters:
+          sparkVersionUnderBar: "2_4"
+          sparkVersion: "2.4"
+          scalaVersion: "2.11.12"
 
   - job: Build_Spark2_4_2_12
     displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.12'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark2_4" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-      # If not a pull request, publish artifacts.
-      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 "project spark2_4" package
-          displayName: 'Running $sbt package'
-        - task: CopyFiles@2
-          displayName: 'Copy hyperspace-core JAR'
-          inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
-            contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
-        - task: PublishBuildArtifacts@1
-          displayName: 'Publish Hyperspace artifacts'
-          inputs:
-            artifactName: 'hyperspace-core-spark2.4'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark2.4/'
+      - template: 'ci/linux_test.yml'
+        parameters:
+          sparkVersionUnderBar: "2_4"
+          sparkVersion: "2.4"
+          scalaVersion: "2.12.8"
 
   - job: Build_Spark3_0_2_12
     displayName: 'Build sources and run unit tests for Spark 3.0 / Scala 2.12'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark3_0" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-      # If not a pull request, publish artifacts.
-      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 "project spark3_0" package
-          displayName: 'Running $sbt package'
-        - task: CopyFiles@2
-          displayName: 'Copy hyperspace-core JAR'
-          inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
-            contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.0/'
-        - task: PublishBuildArtifacts@1
-          displayName: 'Publish Hyperspace artifacts'
-          inputs:
-            artifactName: 'hyperspace-core-spark3.0'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.0/'
+      - template: 'ci/linux_test.yml'
+        parameters:
+          sparkVersionUnderBar: "3_0"
+          sparkVersion: "3.0"
+          scalaVersion: "2.12.8"
 
   - job: Build_Spark3_1_2_12
     displayName: 'Build sources and run unit tests for Spark 3.1 / Scala 2.12'
     pool:
       vmImage: 'ubuntu-18.04'
     steps:
-      - script: sbt ++2.12.8 "project spark3_1" clean update compile test
-        displayName: 'Running $sbt clean & update & compile & test'
-      # If not a pull request, publish artifacts.
-      - ${{ if and(ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
-        - script: sbt ++2.12.8 "project spark3_1" package
-          displayName: 'Running $sbt package'
-        - task: CopyFiles@2
-          displayName: 'Copy hyperspace-core JAR'
-          inputs:
-            sourceFolder: '$(Build.SourcesDirectory)/target/'
-            contents: '**/*.jar'
-            targetFolder: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
-        - task: PublishBuildArtifacts@1
-          displayName: 'Publish Hyperspace artifacts'
-          inputs:
-            artifactName: 'hyperspace-core-spark3.1'
-            pathtoPublish: '$(Build.ArtifactStagingDirectory)/hyperspace-core-spark3.1/'
+      - template: 'ci/linux_test.yml'
+        parameters:
+          sparkVersionUnderBar: "3_1"
+          sparkVersion: "3.1"
+          scalaVersion: "2.12.8"
+
+  - job: Build_Spark2_4_2_11_WIN
+    displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.11 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "2_4"
+          scalaVersion: "2.11.12"
+
+  - job: Build_Spark2_4_2_12_WIN
+    displayName: 'Build sources and run unit tests for Spark 2.4 / Scala 2.12 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "2_4"
+          scalaVersion: "2.12.8"
+
+  - job: Build_Spark3_0_2_12_WIN
+    displayName: 'Build sources and run unit tests for Spark 3.0 / Scala 2.12 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "3_0"
+          scalaVersion: "2.12.8"
+
+  - job: Build_Spark3_1_2_12_WIN
+    displayName: 'Build sources and run unit tests for Spark 3.1 / Scala 2.12 on Windows'
+    pool:
+      vmImage: 'windows-2019'
+    steps:
+      - template: 'ci/windows_test.yml'
+        parameters:
+          sparkVersionUnderBar: "3_1"
+          scalaVersion: "2.12.8"
 
   - job: PythonTest
     displayName: 'Run Python tests'

@@ -1,0 +1,32 @@
+parameters:
+  sparkVersionUnderBar: ''
+  scalaVersion: ''
+
+steps:
+  - task: PowerShell@2
+    displayName: Download Winutils.exe
+    inputs:
+      workingDirectory: $(Build.BinariesDirectory)
+      pwsh: true
+      targetType: inline
+      script: |
+        echo "Download Hadoop utils for Windows."
+        curl -k -L -o hadoop.zip https://github.com/steveloughran/winutils/releases/download/tag_2017-08-29-hadoop-2.8.1-native/hadoop-2.8.1.zip
+        unzip hadoop.zip
+        New-Item -ItemType Directory -Force -Path hadoop\bin
+        cp hadoop-2.8.1\winutils.exe hadoop\bin
+        cp hadoop-2.8.1\hadoop.dll hadoop\bin
+        cp hadoop-2.8.1\hadoop.dll c:\windows\system32
+
+  - task: JavaToolInstaller@0
+    displayName: 'Set Java version'
+    condition: startsWith(${{ parameters.scalaVersion }}, '2.11')
+    inputs:
+      versionSpec: '8'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  - script: sbt ++${{ parameters.scalaVersion }} "project spark${{ parameters.sparkVersionUnderBar }}" clean update compile test
+    displayName: 'Running $sbt clean & update & compile & test'
+    env:
+      HADOOP_HOME: $(Build.BinariesDirectory)\hadoop
