@@ -117,15 +117,34 @@ class CreateActionTest extends HyperspaceSuite with SQLHelper {
       ex.getMessage.contains(s"Another Index with name ${indexConfig.indexName} already exists"))
   }
 
-  test("op() fails if index config is of wrong case and spark is case-sensitive") {
+  test("op() fails if indexed column is of wrong case and spark is case-sensitive") {
     when(mockLogManager.getLatestLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
-    val indexConfig = IndexConfig("index1", Seq("rgUID"), Seq("dATE"))
+    val indexConfig = IndexConfig("index1", Seq("rgUID"), Seq("Date"))
     val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
     withSQLConf("spark.sql.caseSensitive" -> "true") {
       val ex = intercept[HyperspaceException](action.op())
       assert(
         ex.getMessage.contains(
-          "Columns 'rgUID,dATE' could not be resolved from available " +
+          "Columns 'rgUID' could not be resolved from available " +
+            "source columns:\n" +
+            "root\n " +
+            "|-- Date: string (nullable = true)\n " +
+            "|-- RGUID: string (nullable = true)\n " +
+            "|-- Query: string (nullable = true)\n " +
+            "|-- imprs: integer (nullable = true)\n " +
+            "|-- clicks: integer (nullable = true)"))
+    }
+  }
+
+  test("op() fails if included config is of wrong case and spark is case-sensitive") {
+    when(mockLogManager.getLatestLog()).thenReturn(Some(TestLogEntry(ACTIVE)))
+    val indexConfig = IndexConfig("index1", Seq("RGUID"), Seq("dATE"))
+    val action = new CreateAction(spark, df, indexConfig, mockLogManager, mockDataManager)
+    withSQLConf("spark.sql.caseSensitive" -> "true") {
+      val ex = intercept[HyperspaceException](action.op())
+      assert(
+        ex.getMessage.contains(
+          "Columns 'dATE' could not be resolved from available " +
             "source columns:\n" +
             "root\n " +
             "|-- Date: string (nullable = true)\n " +

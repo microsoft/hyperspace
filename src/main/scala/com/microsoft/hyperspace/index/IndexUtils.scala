@@ -16,6 +16,12 @@
 
 package com.microsoft.hyperspace.index
 
+import org.apache.spark.sql.DataFrame
+
+import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.util.ResolverUtils
+import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
+
 object IndexUtils {
 
   /**
@@ -31,5 +37,22 @@ object IndexUtils {
     properties
       .getOrElse(IndexConstants.LINEAGE_PROPERTY, IndexConstants.INDEX_LINEAGE_ENABLED_DEFAULT)
       .toBoolean
+  }
+
+  def resolveColumns(df: DataFrame, columns: Seq[String]): Seq[ResolvedColumn] = {
+    val spark = df.sparkSession
+    val plan = df.queryExecution.analyzed
+    val resolvedColumns = ResolverUtils.resolve(spark, columns, plan)
+
+    resolvedColumns match {
+      case Some(cs) => cs
+      case _ =>
+        val unresolvedColumns = columns
+          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan).map(_.map(_.name))))
+          .collect { case (c, r) if r.isEmpty => c }
+        throw HyperspaceException(
+          s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
+            s"from available source columns:\n${df.schema.treeString}")
+    }
   }
 }
