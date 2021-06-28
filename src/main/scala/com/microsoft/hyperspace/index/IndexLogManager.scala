@@ -71,8 +71,16 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
     if (!fs.exists(path)) {
       return None
     }
+
     val contents = FileUtils.readContents(fs, path)
-    Some(LogEntry.fromJson(contents))
+
+    try {
+      Some(LogEntry.fromJson(contents))
+    } catch {
+      case e: Exception =>
+        logError(s"Cannot parse json with file path: ${path}")
+        throw e
+    }
   }
 
   override def getLog(id: Int): Option[LogEntry] = {
