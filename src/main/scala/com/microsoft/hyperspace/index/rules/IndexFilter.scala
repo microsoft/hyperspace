@@ -44,8 +44,8 @@ trait IndexFilter extends ActiveSparkSession {
       index: IndexLogEntry,
       reasonString: => String): Unit = {
     if (!condition && index
-          .getTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED)
-          .getOrElse(false)) {
+        .getTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED)
+        .getOrElse(false)) {
       val prevReason =
         index.getTagValue(plan, IndexLogEntryTags.FILTER_REASONS).getOrElse(Nil)
       index.setTagValue(plan, IndexLogEntryTags.FILTER_REASONS, prevReason :+ reasonString)

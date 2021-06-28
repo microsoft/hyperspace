@@ -58,7 +58,6 @@ import com.microsoft.hyperspace.util.SparkTestShims.SimpleExplainCommand
  * The explain files are saved to help debug later, they are not checked. Only the simplified
  * plans are checked (by string comparison).
  *
- *
  * To run the entire test suite:
  * {{{
  *   sbt "test:testOnly *PlanStabilitySuite"
@@ -178,14 +177,15 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
     val exchangeIdMap = new mutable.HashMap[SparkPlan, Int]()
     val subqueriesMap = new mutable.HashMap[SparkPlan, Int]()
 
-    def getId(plan: SparkPlan): Int = plan match {
-      case exchange: Exchange => exchangeIdMap.getOrElseUpdate(exchange, exchangeIdMap.size + 1)
-      case ReusedExchangeExec(_, exchange) =>
-        exchangeIdMap.getOrElseUpdate(exchange, exchangeIdMap.size + 1)
-      case subquery: SubqueryExec =>
-        subqueriesMap.getOrElseUpdate(subquery, subqueriesMap.size + 1)
-      case _ => -1
-    }
+    def getId(plan: SparkPlan): Int =
+      plan match {
+        case exchange: Exchange => exchangeIdMap.getOrElseUpdate(exchange, exchangeIdMap.size + 1)
+        case ReusedExchangeExec(_, exchange) =>
+          exchangeIdMap.getOrElseUpdate(exchange, exchangeIdMap.size + 1)
+        case subquery: SubqueryExec =>
+          subqueriesMap.getOrElseUpdate(subquery, subqueriesMap.size + 1)
+        case _ => -1
+      }
 
     /**
      * Some expression names have ExprId in them due to using things such as
@@ -273,7 +273,9 @@ trait PlanStabilitySuite extends TPCDSBase with SQLHelper with Logging {
  */
 class TPCDSV1_4_SparkPlanStabilitySuite extends PlanStabilitySuite {
   override val goldenFilePath: String = {
-    new File(baseResourcePath, s"spark-${BuildInfo.sparkShortVersion}/approved-plans-v1_4").getAbsolutePath
+    new File(
+      baseResourcePath,
+      s"spark-${BuildInfo.sparkShortVersion}/approved-plans-v1_4").getAbsolutePath
   }
 
   // Enable cross join because some queries fail during query optimization phase.

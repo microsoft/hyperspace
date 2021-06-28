@@ -37,10 +37,11 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   /**
    * Computes the signature of the current relation.
    */
-  override def signature: String = plan.relation match {
-    case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
-      location.tableVersion + location.path.toString
-  }
+  override def signature: String =
+    plan.relation match {
+      case HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _) =>
+        location.tableVersion + location.path.toString
+    }
 
   /**
    * All the files that the current relation references to.
@@ -57,11 +58,12 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
   /**
    * The optional partition base path of the current relation.
    */
-  override def partitionBasePath: Option[String] = plan.relation match {
-    case HadoopFsRelation(t: TahoeLogFileIndex, _, _, _, _, _) if t.partitionSchema.nonEmpty =>
-      Some(t.path.toString)
-    case _ => None
-  }
+  override def partitionBasePath: Option[String] =
+    plan.relation match {
+      case HadoopFsRelation(t: TahoeLogFileIndex, _, _, _, _, _) if t.partitionSchema.nonEmpty =>
+        Some(t.path.toString)
+      case _ => None
+    }
 
   /**
    * Creates [[Relation]] for IndexLogEntry using the current relation.
@@ -179,8 +181,8 @@ class DeltaLakeRelation(spark: SparkSession, override val plan: LogicalRelation)
     // TODO: Support time travel utilizing Hybrid Scan append-only.
     //   See https://github.com/microsoft/hyperspace/issues/408.
     if (!(HyperspaceConf.hybridScanEnabled(spark) &&
-          HyperspaceConf.hybridScanDeleteEnabled(spark) &&
-          index.derivedDataset.canHandleDeletedFiles)) {
+        HyperspaceConf.hybridScanDeleteEnabled(spark) &&
+        index.derivedDataset.canHandleDeletedFiles)) {
       return index
     }
 

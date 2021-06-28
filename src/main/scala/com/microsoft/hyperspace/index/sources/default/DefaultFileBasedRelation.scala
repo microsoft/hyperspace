@@ -42,14 +42,15 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   /**
    * Computes the signature of the current relation.
    */
-  override def signature: String = plan.relation match {
-    case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
-      val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
-        (acc: String, f: FileStatus) =>
-          HashingUtils.md5Hex(acc + fingerprint(f))
-      }
-      result
-  }
+  override def signature: String =
+    plan.relation match {
+      case HadoopFsRelation(location: PartitioningAwareFileIndex, _, _, _, _, _) =>
+        val result = filesFromIndex(location).sortBy(_.getPath.toString).foldLeft("") {
+          (acc: String, f: FileStatus) =>
+            HashingUtils.md5Hex(acc + fingerprint(f))
+        }
+        result
+    }
 
   /**
    * FileStatus list for all source files that the current relation references to.
@@ -62,28 +63,30 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   /**
    * The partition schema of the current relation.
    */
-  override def partitionSchema: StructType = plan.relation match {
-    case HadoopFsRelation(location: FileIndex, _, _, _, _, _) =>
-      location.partitionSchema
-  }
+  override def partitionSchema: StructType =
+    plan.relation match {
+      case HadoopFsRelation(location: FileIndex, _, _, _, _, _) =>
+        location.partitionSchema
+    }
 
   /**
    * The optional partition base path of the current relation.
    */
-  override def partitionBasePath: Option[String] = plan.relation match {
-    case HadoopFsRelation(p: PartitioningAwareFileIndex, _, _, _, _, _)
-        if p.partitionSpec.partitions.nonEmpty =>
-      // For example, we could have the following in PartitionSpec:
-      //   - partition columns = "col1", "col2"
-      //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
-      // , and going up the same number of directory levels as the number of partition columns
-      // will compute the base path. Note that PartitionSpec.partitions will always contain
-      // all the partitions in the path, so "partitions.head" is taken as an initial value.
-      val basePath = p.partitionSpec.partitionColumns
-        .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
-      Some(basePath.toString)
-    case _ => None
-  }
+  override def partitionBasePath: Option[String] =
+    plan.relation match {
+      case HadoopFsRelation(p: PartitioningAwareFileIndex, _, _, _, _, _)
+          if p.partitionSpec.partitions.nonEmpty =>
+        // For example, we could have the following in PartitionSpec:
+        //   - partition columns = "col1", "col2"
+        //   - partitions: "/path/col1=1/col2=1", "/path/col1=1/col2=2", etc.
+        // , and going up the same number of directory levels as the number of partition columns
+        // will compute the base path. Note that PartitionSpec.partitions will always contain
+        // all the partitions in the path, so "partitions.head" is taken as an initial value.
+        val basePath = p.partitionSpec.partitionColumns
+          .foldLeft(p.partitionSpec.partitions.head.path)((path, _) => path.getParent)
+        Some(basePath.toString)
+      case _ => None
+    }
 
   /**
    * Creates [[HadoopFsRelation]] based on the current relation.
@@ -93,10 +96,11 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   override def createHadoopFsRelation(
       location: FileIndex,
       dataSchema: StructType,
-      options: Map[String, String]): HadoopFsRelation = plan.relation match {
-    case h: HadoopFsRelation =>
-      h.copy(location = location, dataSchema = dataSchema, options = options)(spark)
-  }
+      options: Map[String, String]): HadoopFsRelation =
+    plan.relation match {
+      case h: HadoopFsRelation =>
+        h.copy(location = location, dataSchema = dataSchema, options = options)(spark)
+    }
 
   /**
    * Creates [[LogicalRelation]] based on the current relation.
@@ -118,12 +122,12 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
   override def createRelationMetadata(fileIdTracker: FileIdTracker): Relation = {
     plan.relation match {
       case HadoopFsRelation(
-          location: PartitioningAwareFileIndex,
-          _,
-          dataSchema,
-          _,
-          fileFormat,
-          options) =>
+            location: PartitioningAwareFileIndex,
+            _,
+            dataSchema,
+            _,
+            fileFormat,
+            options) =>
         val files = filesFromIndex(location)
         // Note that source files are currently fingerprinted when the optimized plan is
         // fingerprinted by LogicalPlanFingerprint.
@@ -215,10 +219,11 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
    *
    * @return True if source files of the current relation are parquet.
    */
-  def hasParquetAsSourceFormat: Boolean = plan.relation match {
-    case h: HadoopFsRelation =>
-      h.fileFormat.asInstanceOf[DataSourceRegister].shortName.equals("parquet")
-  }
+  def hasParquetAsSourceFormat: Boolean =
+    plan.relation match {
+      case h: HadoopFsRelation =>
+        h.fileFormat.asInstanceOf[DataSourceRegister].shortName.equals("parquet")
+    }
 
   /**
    * For [[DefaultFileBasedRelation]], each file path should be in this format:

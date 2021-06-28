@@ -376,10 +376,10 @@ class IcebergIntegrationTest extends QueryTest with HyperspaceSuite {
   def isIndexUsed(plan: LogicalPlan, expectedPathsSubStr: String*): Boolean = {
     val rootPaths = plan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+            HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
         location.rootPaths
     }.flatten
     rootPaths.nonEmpty && rootPaths.forall(p =>

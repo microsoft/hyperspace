@@ -435,7 +435,8 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       sortedRowsWithHyperspaceDisabled.sameElements(getSortedRows(dfAfterHyperspaceDisabled)))
   }
 
-  test("Verify JoinIndexRule utilizes indexes correctly after incremental refresh (append-only).") {
+  test(
+    "Verify JoinIndexRule utilizes indexes correctly after incremental refresh (append-only).") {
     withTempPathAsString { testPath =>
       // Setup. Create data.
       val indexConfig = IndexConfig("index", Seq("c2"), Seq("c4"))
@@ -596,7 +597,8 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         verifyIndexUsage(
           query,
           getIndexFilesPath(indexConfig.indexName, Seq(1)) ++ // for Left
-            getIndexFilesPath(indexConfig.indexName, Seq(1))) // for Right
+            getIndexFilesPath(indexConfig.indexName, Seq(1))
+        ) // for Right
 
         // Verify correctness of results.
         spark.disableHyperspace()
@@ -659,7 +661,8 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         verifyIndexUsage(
           query,
           getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles ++
-            getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles) // for Right
+            getIndexFilesPath(indexConfig.indexName, Seq(0)) ++ appendedFiles
+        ) // for Right
 
         // Verify correctness of results.
         spark.disableHyperspace()
@@ -1021,10 +1024,10 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   private def getAllRootPaths(optimizedPlan: LogicalPlan): Seq[Path] = {
     optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+            HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
         location.rootPaths
     }.flatten
   }

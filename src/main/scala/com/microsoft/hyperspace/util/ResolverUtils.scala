@@ -94,7 +94,9 @@ object ResolverUtils {
      */
     def apply(normalizedColumnName: String): ResolvedColumn = {
       if (normalizedColumnName.startsWith(NESTED_FIELD_PREFIX)) {
-        ResolvedColumn(normalizedColumnName.substring(NESTED_FIELD_PREFIX.length), isNested = true)
+        ResolvedColumn(
+          normalizedColumnName.substring(NESTED_FIELD_PREFIX.length),
+          isNested = true)
       } else {
         ResolvedColumn(normalizedColumnName, isNested = false)
       }
@@ -212,20 +214,21 @@ object ResolverUtils {
   private def getColumnNameFromSchema(
       schema: StructType,
       resolvedColNameParts: Seq[String],
-      resolver: Resolver): Seq[String] = resolvedColNameParts match {
-    case h :: tail =>
-      val field = schema.find(f => resolver(f.name, h)).get
-      field match {
-        case StructField(name, s: StructType, _, _) =>
-          name +: getColumnNameFromSchema(s, tail, resolver)
-        case StructField(_, _: ArrayType, _, _) =>
-          // TODO: Nested arrays will be supported later
-          throw HyperspaceException("Array types are not supported.")
-        case StructField(_, _: MapType, _, _) =>
-          // TODO: Nested maps will be supported later
-          throw HyperspaceException("Map types are not supported")
-        case f => Seq(f.name)
-      }
-     case _ => Nil
-  }
+      resolver: Resolver): Seq[String] =
+    resolvedColNameParts match {
+      case h :: tail =>
+        val field = schema.find(f => resolver(f.name, h)).get
+        field match {
+          case StructField(name, s: StructType, _, _) =>
+            name +: getColumnNameFromSchema(s, tail, resolver)
+          case StructField(_, _: ArrayType, _, _) =>
+            // TODO: Nested arrays will be supported later
+            throw HyperspaceException("Array types are not supported.")
+          case StructField(_, _: MapType, _, _) =>
+            // TODO: Nested maps will be supported later
+            throw HyperspaceException("Map types are not supported")
+          case f => Seq(f.name)
+        }
+      case _ => Nil
+    }
 }

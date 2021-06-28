@@ -36,11 +36,13 @@ import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
  */
 class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedSourceProvider {
   private val supportedFormats: CacheWithTransform[String, Set[String]] =
-    new CacheWithTransform[String, Set[String]]({ () =>
-      HyperspaceConf.supportedFileFormatsForDefaultFileBasedSource(spark)
-    }, { formats =>
-      formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
-    })
+    new CacheWithTransform[String, Set[String]](
+      { () =>
+        HyperspaceConf.supportedFileFormatsForDefaultFileBasedSource(spark)
+      },
+      { formats =>
+        formats.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
+      })
 
   /**
    * Returns true if the given [[FileFormat]] is supported, false otherwise.
@@ -71,15 +73,16 @@ class DefaultFileBasedSource(private val spark: SparkSession) extends FileBasedS
    * @param plan Logical plan to check if it's supported.
    * @return Some(true) if the given plan is a supported relation, otherwise None.
    */
-  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
-    case LogicalRelation(
-        HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, fileFormat, _),
-        _,
-        _,
-        _) if isSupportedFileFormat(fileFormat) =>
-      Some(true)
-    case _ => None
-  }
+  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] =
+    plan match {
+      case LogicalRelation(
+            HadoopFsRelation(_: PartitioningAwareFileIndex, _, _, _, fileFormat, _),
+            _,
+            _,
+            _) if isSupportedFileFormat(fileFormat) =>
+        Some(true)
+      case _ => None
+    }
 
   /**
    * Returns the [[FileBasedRelation]] that wraps the given logical plan if the given

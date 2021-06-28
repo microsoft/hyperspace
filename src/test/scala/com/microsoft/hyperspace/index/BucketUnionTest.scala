@@ -109,7 +109,7 @@ class BucketUnionTest extends SparkFunSuite with SparkInvolvedSuite {
     val rdd = new BucketUnionRDD[Row](spark.sparkContext, Seq(p1.rdd, p2.rdd), bucketSpec)
     assert(
       rdd.collect.sortBy(r => (r.getInt(0), r.getString(1))).map(r => r.toSeq.toList).toList
-         == Seq(Seq(2, "name1"), Seq(2, "name3"), Seq(3, "name2"), Seq(3, "name4")))
+        == Seq(Seq(2, "name1"), Seq(2, "name3"), Seq(3, "name2"), Seq(3, "name4")))
     assert(rdd.getPartitions.length == 10)
     assert(rdd.partitions.head.isInstanceOf[BucketUnionRDDPartition])
 

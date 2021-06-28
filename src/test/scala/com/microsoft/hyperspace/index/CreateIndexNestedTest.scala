@@ -141,10 +141,7 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
     val dfB = nonPartitionedDataDF.as("B")
     val dfJoin = dfA
       .join(dfB, dfA("Query") === dfB("Query"))
-      .select(
-        dfA("RGUID"),
-        dfA("Query"),
-        dfA("nested.leaf.cnt"))
+      .select(dfA("RGUID"), dfA("Query"), dfA("nested.leaf.cnt"))
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfJoin, indexConfig1)
     }
@@ -153,7 +150,8 @@ class CreateIndexNestedTest extends HyperspaceSuite with SQLHelper {
         "Only creating index over HDFS file based scan nodes is supported."))
   }
 
-  test("Check lineage in index records for partitioned data when partition key is not in config.") {
+  test(
+    "Check lineage in index records for partitioned data when partition key is not in config.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       hyperspace.createIndex(partitionedDataDF, indexConfig2)
       val indexRecordsDF = spark.read.parquet(

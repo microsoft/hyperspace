@@ -138,10 +138,10 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
   private def getAllRootPaths(optimizedPlan: LogicalPlan): Seq[Path] = {
     optimizedPlan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+            HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
         location.rootPaths
     }.flatten
   }

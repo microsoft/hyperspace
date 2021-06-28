@@ -549,10 +549,10 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   private def getDeltaLakeTableVersion(df: DataFrame): Long = {
     df.queryExecution.optimizedPlan match {
       case LogicalRelation(
-          HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+            HadoopFsRelation(location: TahoeLogFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
         location.tableVersion
     }
   }
@@ -586,10 +586,10 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   def isIndexUsed(plan: LogicalPlan, expectedPathsSubStr: String*): Boolean = {
     val rootPaths = plan.collect {
       case LogicalRelation(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
-          _,
-          _,
-          _) =>
+            HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _),
+            _,
+            _,
+            _) =>
         location.rootPaths
     }.flatten
     rootPaths.nonEmpty && rootPaths.forall(p =>

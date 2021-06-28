@@ -116,7 +116,6 @@ class JoinIndexRankerTest extends HyperspaceRuleSuite with SQLHelper {
       val r_20 = createIndexLogEntry("r2", Seq(t2c1), Seq(t2c2), rightPlan, 20, fileList1, false)
       setCommonSourceSizeInBytesTag(r_20, rightPlan, fileList1)
 
-
       val indexPairs = Seq((l_10, r_10), (l_10, r_20), (l_20, r_20))
       val expectedOrder = Seq((l_20, r_20), (l_10, r_10), (l_10, r_20))
       val actualOrder = JoinIndexRanker.rank(spark, leftPlan, rightPlan, indexPairs)

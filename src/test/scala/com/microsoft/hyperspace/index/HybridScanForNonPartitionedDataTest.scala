@@ -142,14 +142,16 @@ class HybridScanForNonPartitionedDataTest extends HybridScanSuite {
       val deletedRatio = 1 - (afterDeleteSize / sourceSize.toFloat)
 
       withSQLConf(TestConfig.HybridScanEnabled: _*) {
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
-          (deletedRatio + 0.1).toString) {
+        withSQLConf(
+          IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+            (deletedRatio + 0.1).toString) {
           val filter = filterQuery
           // As deletedRatio is less than the threshold, the index can be applied.
           assert(!basePlan.equals(filter.queryExecution.optimizedPlan))
         }
-        withSQLConf(IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
-          (deletedRatio - 0.1).toString) {
+        withSQLConf(
+          IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD ->
+            (deletedRatio - 0.1).toString) {
           val filter = filterQuery
           // As deletedRatio is greater than the threshold, the index shouldn't be applied.
           assert(basePlan.equals(filter.queryExecution.optimizedPlan))

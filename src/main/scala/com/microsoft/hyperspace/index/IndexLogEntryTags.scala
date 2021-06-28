@@ -47,12 +47,12 @@ object IndexLogEntryTags {
   // INMEMORYFILEINDEX_HYBRID_SCAN stores InMemoryFileIndex including index data files and also
   // appended files for Hybrid Scan.
   val INMEMORYFILEINDEX_HYBRID_SCAN: IndexLogEntryTag[InMemoryFileIndex] =
-  IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScan")
+    IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScan")
 
   // INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED stores InMemoryFileIndex including only appended files
   // for Hybrid Scan.
   val INMEMORYFILEINDEX_HYBRID_SCAN_APPENDED: IndexLogEntryTag[InMemoryFileIndex] =
-  IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
+    IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
 
   // FILTER_REASONS stores reason strings for disqualification.
   val FILTER_REASONS: IndexLogEntryTag[Seq[String]] =

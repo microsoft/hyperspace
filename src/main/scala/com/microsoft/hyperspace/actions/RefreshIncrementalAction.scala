@@ -72,12 +72,8 @@ class RefreshIncrementalAction(
     } else {
       None
     }
-    updatedIndex = Some(
-      previousIndexLogEntry.derivedDataset.refreshIncremental(
-        this,
-        appendedSourceData,
-        deletedFiles,
-        previousIndexLogEntry.content))
+    updatedIndex = Some(previousIndexLogEntry.derivedDataset
+      .refreshIncremental(this, appendedSourceData, deletedFiles, previousIndexLogEntry.content))
   }
 
   /**

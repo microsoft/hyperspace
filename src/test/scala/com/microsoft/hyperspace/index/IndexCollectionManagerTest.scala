@@ -47,12 +47,7 @@ class IndexCollectionManagerTest extends HyperspaceSuite {
 
           val entry = IndexLogEntry(
             indexPath.toString,
-            CoveringIndex(
-              Seq("RGUID"),
-              Seq("Date"),
-              new StructType(),
-              10,
-              Map()),
+            CoveringIndex(Seq("RGUID"), Seq("Date"), new StructType(), 10, Map()),
             Content(Directory(s"$indexPath/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
             Source(SparkPlan(sourcePlanProperties)),
             Map())
@@ -98,12 +93,7 @@ class IndexCollectionManagerTest extends HyperspaceSuite {
 
       val entry = IndexLogEntry(
         str,
-        CoveringIndex(
-          Seq("RGUID"),
-          Seq("Date"),
-          new StructType(),
-          10,
-          Map()),
+        CoveringIndex(Seq("RGUID"), Seq("Date"), new StructType(), 10, Map()),
         Content(Directory(s"$str/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=0")),
         Source(SparkPlan(sourcePlanProperties)),
         Map())

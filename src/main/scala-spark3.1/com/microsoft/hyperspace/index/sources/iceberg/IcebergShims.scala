@@ -26,11 +26,12 @@ import org.apache.spark.util.hyperspace.Utils
 
 object IcebergShims {
 
-  def isIcebergRelation(plan: LogicalPlan): Boolean = plan match {
-    case DataSourceV2Relation(_: SparkTable, _, _, _, _) => true
-    case DataSourceV2ScanRelation(DataSourceV2Relation(_: SparkTable, _, _, _, _), _, _) => true
-    case _ => false
-  }
+  def isIcebergRelation(plan: LogicalPlan): Boolean =
+    plan match {
+      case DataSourceV2Relation(_: SparkTable, _, _, _, _) => true
+      case DataSourceV2ScanRelation(DataSourceV2Relation(_: SparkTable, _, _, _, _), _, _) => true
+      case _ => false
+    }
 
   def loadIcebergTable(spark: SparkSession, plan: LogicalPlan): (Table, Option[Long]) =
     plan match {

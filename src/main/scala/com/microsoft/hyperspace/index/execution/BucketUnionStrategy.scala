@@ -26,9 +26,10 @@ import com.microsoft.hyperspace.index.plans.logical.BucketUnion
  * to [[BucketUnionExec]] (Spark Plan)
  */
 private[hyperspace] object BucketUnionStrategy extends SparkStrategy {
-  override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-    case p: BucketUnion =>
-      BucketUnionExec(p.children.map(planLater), p.bucketSpec) :: Nil
-    case _ => Nil
-  }
+  override def apply(plan: LogicalPlan): Seq[SparkPlan] =
+    plan match {
+      case p: BucketUnion =>
+        BucketUnionExec(p.children.map(planLater), p.bucketSpec) :: Nil
+      case _ => Nil
+    }
 }

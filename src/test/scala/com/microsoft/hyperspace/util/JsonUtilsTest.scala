@@ -39,12 +39,7 @@ class JsonUtilsTest extends SparkFunSuite {
 
     val index = IndexLogEntry(
       "myIndex",
-      CoveringIndex(
-        Seq("id"),
-        Seq("name", "school"),
-        schema,
-        10,
-        Map()),
+      CoveringIndex(Seq("id"), Seq("name", "school"), schema, 10, Map()),
       Content(Directory("path")),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
