@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index.rankers.JoinIndexRanker
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.rules.JoinAttributeFilter.extractConditions
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
-import com.microsoft.hyperspace.shim.JoinWithoutHint
+import com.microsoft.hyperspace.shim.{JoinUtils, JoinWithoutHint}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEventLogging, HyperspaceIndexUsageEvent}
 import com.microsoft.hyperspace.util.ResolverUtils.resolve
 
@@ -638,20 +638,20 @@ object JoinIndexRule extends HyperspaceRule with HyperspaceEventLogging {
         val rIndex = indexes(rightRelation.get.plan)
 
         val updatedPlan =
-          join
-            .copy(
-              left = RuleUtils.transformPlanToUseIndex(
-                spark,
-                lIndex,
-                l,
-                useBucketSpec = true,
-                useBucketUnionForAppended = true),
-              right = RuleUtils.transformPlanToUseIndex(
-                spark,
-                rIndex,
-                r,
-                useBucketSpec = true,
-                useBucketUnionForAppended = true))
+          JoinUtils.withNewChildren(
+            join = join,
+            left = RuleUtils.transformPlanToUseIndex(
+              spark,
+              lIndex,
+              l,
+              useBucketSpec = true,
+              useBucketUnionForAppended = true),
+            right = RuleUtils.transformPlanToUseIndex(
+              spark,
+              rIndex,
+              r,
+              useBucketSpec = true,
+              useBucketUnionForAppended = true))
 
         logEvent(
           HyperspaceIndexUsageEvent(
