@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index.types.covering
 
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPla
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntryTags
-import com.microsoft.hyperspace.index.rankers.FilterIndexRanker
+import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, QueryPlanIndexFilter}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
@@ -157,7 +157,7 @@ object ExtractRelation extends ActiveSparkSession {
  */
 object FilterIndexRule extends HyperspaceRule {
   override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
-    FilterPlanNodeFilter :: FilterColumnFilter :: Nil
+    CoveringIndexFilter :: FilterPlanNodeFilter :: FilterColumnFilter :: Nil
 
   override val indexRanker: IndexRankFilter = FilterRankFilter
 

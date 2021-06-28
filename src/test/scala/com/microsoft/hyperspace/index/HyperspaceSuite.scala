@@ -22,18 +22,11 @@ import java.nio.charset.StandardCharsets
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.util.hyperspace.Utils
-import org.scalatest.{BeforeAndAfterAllConfigMap, ConfigMap}
 
 import com.microsoft.hyperspace.{BuildInfo, Hyperspace, SparkInvolvedSuite}
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
-trait HyperspaceSuite
-    extends SparkFunSuite
-    with SparkInvolvedSuite
-    with BeforeAndAfterAllConfigMap {
-
-  // Needed to resolve conflicts between BeforeAndAfterAll and BeforeAndAfterAllConfigMap
-  override val invokeBeforeAllAndAfterAllEvenIfNoTestsAreExpected = false
+trait HyperspaceSuite extends SparkFunSuite with SparkInvolvedSuite {
 
   // Temporary directory
   lazy val tempDir: Path = new Path(Utils.createTempDir().getAbsolutePath)
@@ -47,7 +40,7 @@ trait HyperspaceSuite
   // Each test suite that extends HyperspaceSuite should define this.
   lazy val systemPath: Path = PathUtils.makeAbsolute(inTempDir(indexLocationDirName))
 
-  override def beforeAll(cm: ConfigMap): Unit = {
+  override def beforeAll(): Unit = {
     super.beforeAll()
     FileUtils.delete(tempDir)
     spark.conf.set(IndexConstants.INDEX_SYSTEM_PATH, systemPath.toUri.toString)

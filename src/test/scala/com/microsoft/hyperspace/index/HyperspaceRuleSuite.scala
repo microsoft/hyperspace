@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
@@ -26,8 +26,8 @@ import org.apache.spark.sql.types.{StructField, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
-import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.Hdfs.Properties
+import com.microsoft.hyperspace.index.types.covering.CoveringIndex
 import com.microsoft.hyperspace.util.PathUtils
 
 trait HyperspaceRuleSuite extends HyperspaceSuite {

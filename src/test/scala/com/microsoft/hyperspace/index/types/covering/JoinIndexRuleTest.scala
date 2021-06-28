@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index.types.covering
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Row
@@ -26,6 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.rules.CandidateIndexCollector
 import com.microsoft.hyperspace.shim.{JoinWithoutHint => Join}
 import com.microsoft.hyperspace.util.{FileUtils, SparkTestShims}
 

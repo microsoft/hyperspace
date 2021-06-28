@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rankers
+package com.microsoft.hyperspace.index.types.covering
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -23,8 +23,7 @@ import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants}
-import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
+import com.microsoft.hyperspace.index.{FileInfo, HyperspaceRuleSuite, IndexConstants}
 import com.microsoft.hyperspace.util.FileUtils
 
 class JoinIndexRankerTest extends HyperspaceRuleSuite with SQLHelper {

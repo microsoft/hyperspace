@@ -28,6 +28,7 @@ import com.microsoft.hyperspace.{HyperspaceException, SampleData}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
+import com.microsoft.hyperspace.index.types.covering.CoveringIndex
 
 class RefreshActionTest extends HyperspaceSuite {
   private val sampleParquetDataLocation = inTempDir("sampleparquet")

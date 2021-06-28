@@ -25,6 +25,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.TestUtils
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
+import com.microsoft.hyperspace.index.types.covering.CoveringIndex
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
 class IndexLogManagerImplTest extends HyperspaceSuite {

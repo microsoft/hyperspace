@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
-
-import com.microsoft.hyperspace.index.LogicalPlanSignatureProvider
 
 object RuleTestHelper {
   class TestSignatureProvider extends LogicalPlanSignatureProvider {

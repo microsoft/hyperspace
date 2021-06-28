@@ -23,6 +23,7 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, SampleData}
 import com.microsoft.hyperspace.actions.Constants
+import com.microsoft.hyperspace.index.types.covering.CoveringIndex
 import com.microsoft.hyperspace.util.FileUtils
 
 class IndexCacheTest extends HyperspaceSuite {
