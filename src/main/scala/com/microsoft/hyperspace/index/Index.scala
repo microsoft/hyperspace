@@ -118,14 +118,17 @@ trait Index {
    * @param deletedSourceDataFiles Source data files deleted from the source
    *   since the creation of this index
    * @param indexContent Unrefreshed index data files
-   * @return Updated index resulting from the indexing operation, or this
-   *         index if no update is needed
+   * @return Pair of (updated index, update mode) where the first value is an
+   *         updated index resulting from the indexing operation or this index
+   *         if no update is needed, and the second value is whether the
+   *         updated index data needs to be merged to the existing index data
+   *         or the existing index data should be overwritten
    */
   def refreshIncremental(
       ctx: IndexerContext,
       appendedSourceData: Option[DataFrame],
       deletedSourceDataFiles: Seq[FileInfo],
-      indexContent: Content): Index
+      indexContent: Content): (Index, Index.UpdateMode)
 
   /**
    * Indexes the source data and returns an updated index and index data.
@@ -140,4 +143,24 @@ trait Index {
    *         index if no update is needed
    */
   def refreshFull(ctx: IndexerContext, sourceData: DataFrame): (Index, DataFrame)
+
+  /**
+   * Returns true if and only if this index equals to that.
+   *
+   * Indexes only differing in their [[properties]] should be considered equal.
+   */
+  def equals(that: Any): Boolean
+
+  /**
+   * Returns the hash code for this index.
+   */
+  def hashCode: Int
+}
+
+object Index {
+  sealed trait UpdateMode
+  object UpdateMode {
+    case object Merge extends UpdateMode
+    case object Overwrite extends UpdateMode
+  }
 }

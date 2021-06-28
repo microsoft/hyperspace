@@ -72,8 +72,14 @@ class RefreshIncrementalAction(
     } else {
       None
     }
-    updatedIndex = Some(previousIndexLogEntry.derivedDataset
-      .refreshIncremental(this, appendedSourceData, deletedFiles, previousIndexLogEntry.content))
+    val (updatedIndex, updateMode) =
+      previousIndexLogEntry.derivedDataset.refreshIncremental(
+        this,
+        appendedSourceData,
+        deletedFiles,
+        previousIndexLogEntry.content)
+    updatedIndexOpt = Some(updatedIndex)
+    updateModeOpt = Some(updateMode)
   }
 
   /**
@@ -95,7 +101,8 @@ class RefreshIncrementalAction(
     }
   }
 
-  private var updatedIndex: Option[Index] = None
+  private var updatedIndexOpt: Option[Index] = None
+  private var updateModeOpt: Option[Index.UpdateMode] = None
 
   /**
    * Create a log entry with all source data files, and all required index content. This contains
@@ -106,15 +113,11 @@ class RefreshIncrementalAction(
    * @return Refreshed index log entry.
    */
   override def logEntry: LogEntry = {
-    val index = updatedIndex.getOrElse(previousIndexLogEntry.derivedDataset)
+    val index = updatedIndexOpt.getOrElse(previousIndexLogEntry.derivedDataset)
     val entry =
       getIndexLogEntry(spark, df, previousIndexLogEntry.name, index, indexDataPath, endId)
 
-    // If there is no deleted files, there are index data files only for appended data in this
-    // version and we need to add the index data files of previous index version.
-    // Otherwise, as previous index data is rewritten in this version while excluding
-    // indexed rows from deleted files, all necessary index data files exist in this version.
-    if (deletedFiles.isEmpty) {
+    if (updateModeOpt.contains(Index.UpdateMode.Merge)) {
       // Merge new index files with old index files.
       val mergedContent = Content(previousIndexLogEntry.content.root.merge(entry.content.root))
       entry.copy(content = mergedContent)

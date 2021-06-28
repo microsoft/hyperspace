@@ -22,7 +22,6 @@ import org.apache.spark.sql.functions.{col, input_file_name}
 import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.ResolverUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
@@ -85,7 +84,7 @@ case class CoveringIndex(
       ctx: IndexerContext,
       appendedSourceData: Option[DataFrame],
       deletedSourceDataFiles: Seq[FileInfo],
-      indexContent: Content): CoveringIndex = {
+      indexContent: Content): (CoveringIndex, Index.UpdateMode) = {
     val updatedIndex = if (appendedSourceData.nonEmpty) {
       val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
         CoveringIndex.createIndexData(
@@ -123,7 +122,17 @@ case class CoveringIndex(
         indexedColumns,
         writeMode)
     }
-    updatedIndex
+
+    // If there is no deleted files, there are index data files only for appended data in this
+    // version and we need to add the index data files of previous index version.
+    // Otherwise, as previous index data is rewritten in this version while excluding
+    // indexed rows from deleted files, all necessary index data files exist in this version.
+    val updatedMode = if (deletedSourceDataFiles.isEmpty) {
+      Index.UpdateMode.Merge
+    } else {
+      Index.UpdateMode.Overwrite
+    }
+    (updatedIndex, updatedMode)
   }
 
   override def refreshFull(
@@ -221,8 +230,8 @@ object CoveringIndex {
       includedColumns: Seq[String],
       hasLineageColumn: Boolean): (DataFrame, Seq[ResolvedColumn], Seq[ResolvedColumn]) = {
     val spark = ctx.spark
-    val (resolvedIndexedColumns, resolvedIncludedColumns) =
-      resolveConfig(sourceData, indexedColumns, includedColumns)
+    val resolvedIndexedColumns = IndexUtils.resolveColumns(sourceData, indexedColumns)
+    val resolvedIncludedColumns = IndexUtils.resolveColumns(sourceData, includedColumns)
     val projectColumns = (resolvedIndexedColumns ++ resolvedIncludedColumns).map(_.toColumn)
 
     val indexData =
@@ -266,26 +275,5 @@ object CoveringIndex {
       }
 
     (indexData, resolvedIndexedColumns, resolvedIncludedColumns)
-  }
-
-  private def resolveConfig(
-      df: DataFrame,
-      indexedColumns: Seq[String],
-      includedColumns: Seq[String]): (Seq[ResolvedColumn], Seq[ResolvedColumn]) = {
-    val spark = df.sparkSession
-    val plan = df.queryExecution.analyzed
-    val resolvedIndexedColumns = ResolverUtils.resolve(spark, indexedColumns, plan)
-    val resolvedIncludedColumns = ResolverUtils.resolve(spark, includedColumns, plan)
-
-    (resolvedIndexedColumns, resolvedIncludedColumns) match {
-      case (Some(indexed), Some(included)) => (indexed, included)
-      case _ =>
-        val unresolvedColumns = (indexedColumns ++ includedColumns)
-          .map(c => (c, ResolverUtils.resolve(spark, Seq(c), plan).map(_.map(_.name))))
-          .collect { case (c, r) if r.isEmpty => c }
-        throw HyperspaceException(
-          s"Columns '${unresolvedColumns.mkString(",")}' could not be resolved " +
-            s"from available source columns:\n${df.schema.treeString}")
-    }
   }
 }
