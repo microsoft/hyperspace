@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
 import org.apache.spark.internal.Logging
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
@@ -79,7 +80,7 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
     } catch {
       case e: Exception =>
         logError(s"Cannot parse json with file path: ${path}")
-        throw e
+        throw HyperspaceException(s"Cannot parse json with file path: ${path}")
     }
   }
 
