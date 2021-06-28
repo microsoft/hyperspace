@@ -66,8 +66,7 @@ class CreateAction(
     }
 
     // TODO: Temporarily block creating indexes using nested columns until it's fully supported.
-    if (!(HyperspaceConf.nestedColumnEnabled(spark) || resolvedColumns.get.forall(
-          !_.isNested))) {
+    if (!(HyperspaceConf.nestedColumnEnabled(spark) || resolvedColumns.get.forall(!_.isNested))) {
       throw HyperspaceException("Hyperspace does not support nested columns yet.")
     }
 

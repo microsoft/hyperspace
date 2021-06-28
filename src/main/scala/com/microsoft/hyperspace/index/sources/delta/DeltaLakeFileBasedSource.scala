@@ -45,11 +45,12 @@ class DeltaLakeFileBasedSource(private val spark: SparkSession) extends FileBase
    * @param plan Logical plan to check if it's supported.
    * @return Some(true) if the given plan is a supported relation, otherwise None.
    */
-  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] = plan match {
-    case LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
-      Some(true)
-    case _ => None
-  }
+  def isSupportedRelation(plan: LogicalPlan): Option[Boolean] =
+    plan match {
+      case LogicalRelation(HadoopFsRelation(_: TahoeLogFileIndex, _, _, _, _, _), _, _, _) =>
+        Some(true)
+      case _ => None
+    }
 
   /**
    * Returns the [[FileBasedRelation]] that wraps the given logical plan if the given

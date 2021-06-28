@@ -138,7 +138,8 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     }
   }
 
-  test("Verify FilterIndex rule does not apply if filter does not contain first indexed column.") {
+  test(
+    "Verify FilterIndex rule does not apply if filter does not contain first indexed column.") {
     val filterCondition =
       And(IsNotNull(c2), EqualTo(c2, Literal("RGUID_VALUE"))) // c2 is not first indexed column
     val filterNode = Filter(filterCondition, scanNode)

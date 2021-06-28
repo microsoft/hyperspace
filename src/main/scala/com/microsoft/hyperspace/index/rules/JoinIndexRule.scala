@@ -52,13 +52,15 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
         val left = RuleUtils.getRelation(spark, l)
         val right = RuleUtils.getRelation(spark, r)
 
-        if (!(left.isDefined && right.isDefined && !RuleUtils.isIndexApplied(left.get) && !RuleUtils
-              .isIndexApplied(right.get))) {
+        if (!(left.isDefined && right.isDefined && !RuleUtils.isIndexApplied(
+            left.get) && !RuleUtils
+            .isIndexApplied(right.get))) {
           return Map.empty
         }
 
-        val leftAndRightIndexes = candidateIndexes.getOrElse(left.get.plan, Nil) ++ candidateIndexes
-          .getOrElse(right.get.plan, Nil)
+        val leftAndRightIndexes =
+          candidateIndexes.getOrElse(left.get.plan, Nil) ++ candidateIndexes
+            .getOrElse(right.get.plan, Nil)
 
         val joinConditionCond = withFilterReasonTag(
           plan,
@@ -160,17 +162,17 @@ object JoinAttributeFilter extends QueryPlanIndexFilter {
     }
 
     if (withFilterReasonTag(
-          plan,
-          candidateIndexes.head._2 ++ candidateIndexes.last._2,
-          "Each join condition column should come from " +
-            "relations directly and attributes from left plan must exclusively have " +
-            "one-to-one mapping with attributes from right plan. " +
-            "E.g. join(A = B and A = D) is not eligible.") {
-          ensureAttributeRequirements(
-            JoinIndexRule.leftRelation.get,
-            JoinIndexRule.rightRelation.get,
-            JoinIndexRule.joinCondition.get)
-        }) {
+        plan,
+        candidateIndexes.head._2 ++ candidateIndexes.last._2,
+        "Each join condition column should come from " +
+          "relations directly and attributes from left plan must exclusively have " +
+          "one-to-one mapping with attributes from right plan. " +
+          "E.g. join(A = B and A = D) is not eligible.") {
+        ensureAttributeRequirements(
+          JoinIndexRule.leftRelation.get,
+          JoinIndexRule.rightRelation.get,
+          JoinIndexRule.joinCondition.get)
+      }) {
       candidateIndexes
     } else {
       Map.empty
@@ -205,7 +207,6 @@ object JoinAttributeFilter extends QueryPlanIndexFilter {
    * E.g. (A = B and C = D) is supported. A maps with B, C maps with D exclusively.
    * E.g. (A = B and A = D) is not supported. A maps with both B and D. There isn't a one-to-one
    * mapping.
-   *
    *
    * Background knowledge:
    * An alias in a query plan is represented as [[Alias]] at the time of
@@ -329,13 +330,13 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         val rRequiredAllCols = resolve(spark, allRequiredCols(r), rBaseAttrs).get
 
         if (withFilterReasonTag(
-              plan,
-              candidateIndexes.head._2 ++ candidateIndexes.last._2,
-              "Invalid query plan.") {
-              // Make sure required indexed columns are subset of all required columns.
-              resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined &&
-              resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined
-            }) {
+            plan,
+            candidateIndexes.head._2 ++ candidateIndexes.last._2,
+            "Invalid query plan.") {
+            // Make sure required indexed columns are subset of all required columns.
+            resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined &&
+            resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined
+          }) {
           val lIndexes =
             getUsableIndexes(
               plan,
@@ -350,13 +351,13 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
               rRequiredAllCols)
 
           if (withFilterReasonTag(
-                plan,
-                candidateIndexes.head._2 ++ candidateIndexes.last._2,
-                "No available indexes for left subplan.")(lIndexes.nonEmpty) &&
-              withFilterReasonTag(
-                plan,
-                candidateIndexes.head._2 ++ candidateIndexes.last._2,
-                "No available indexes for right subplan.")(rIndexes.nonEmpty)) {
+              plan,
+              candidateIndexes.head._2 ++ candidateIndexes.last._2,
+              "No available indexes for left subplan.")(lIndexes.nonEmpty) &&
+            withFilterReasonTag(
+              plan,
+              candidateIndexes.head._2 ++ candidateIndexes.last._2,
+              "No available indexes for right subplan.")(rIndexes.nonEmpty)) {
             Map(leftRelation.plan -> lIndexes, rightRelation.plan -> rIndexes)
           } else {
             Map.empty

@@ -218,7 +218,7 @@ object RuleUtils {
 
         val filesToRead = {
           if (useBucketSpec || !index.hasParquetAsSourceFormat || filesDeleted.nonEmpty ||
-              relation.partitionSchema.nonEmpty) {
+            relation.partitionSchema.nonEmpty) {
             // Since the index data is in "parquet" format, we cannot read source files
             // in formats other than "parquet" using one FileScan node as the operator requires
             // files in one homogenous format. To address this, we need to read the appended
@@ -388,16 +388,17 @@ object RuleUtils {
     // Extract top level plan including all required columns for shuffle in its output.
     object ExtractTopLevelPlanForShuffle {
       type returnType = (LogicalPlan, Seq[Option[Attribute]], Boolean)
-      def unapply(plan: LogicalPlan): Option[returnType] = plan match {
-        case p @ Project(_, Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _))) =>
-          Some(p, getIndexedAttrs(p, bucketSpec.bucketColumnNames), true)
-        case p @ Project(_, LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
-          Some(p, getIndexedAttrs(p, bucketSpec.bucketColumnNames), true)
-        case f @ Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
-          Some(f, getIndexedAttrs(f, bucketSpec.bucketColumnNames), false)
-        case r @ LogicalRelation(_: HadoopFsRelation, _, _, _) =>
-          Some(r, getIndexedAttrs(r, bucketSpec.bucketColumnNames), false)
-      }
+      def unapply(plan: LogicalPlan): Option[returnType] =
+        plan match {
+          case p @ Project(_, Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _))) =>
+            Some(p, getIndexedAttrs(p, bucketSpec.bucketColumnNames), true)
+          case p @ Project(_, LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
+            Some(p, getIndexedAttrs(p, bucketSpec.bucketColumnNames), true)
+          case f @ Filter(_, LogicalRelation(_: HadoopFsRelation, _, _, _)) =>
+            Some(f, getIndexedAttrs(f, bucketSpec.bucketColumnNames), false)
+          case r @ LogicalRelation(_: HadoopFsRelation, _, _, _) =>
+            Some(r, getIndexedAttrs(r, bucketSpec.bucketColumnNames), false)
+        }
 
       private def getIndexedAttrs(
           plan: LogicalPlan,

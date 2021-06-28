@@ -536,8 +536,7 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
         |`t_shift` STRING,
         |`t_sub_shift` STRING,
         |`t_meal_time` STRING
-      """.stripMargin
-  )
+      """.stripMargin)
 
   val tableNames: Iterable[String] = tableColumns.keys
 
@@ -546,8 +545,7 @@ trait TPCDSBase extends SparkFunSuite with SparkInvolvedSuite {
       tableName: String,
       format: String = "parquet",
       options: Seq[String] = Nil): Unit = {
-    spark.sql(
-      s"""
+    spark.sql(s"""
          |CREATE TABLE `$tableName` (${tableColumns(tableName)})
          |USING $format
          |${options.mkString("\n")}

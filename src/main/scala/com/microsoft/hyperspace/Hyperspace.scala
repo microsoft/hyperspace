@@ -156,8 +156,8 @@ class Hyperspace(spark: SparkSession) {
    * @param redirectFunc optional function to redirect output of explain.
    * @param verbose Flag to enable verbose mode.
    */
-  def explain(df: DataFrame, verbose: Boolean = false)(
-      implicit redirectFunc: String => Unit = print): Unit = {
+  def explain(df: DataFrame, verbose: Boolean = false)(implicit
+      redirectFunc: String => Unit = print): Unit = {
     redirectFunc(PlanAnalyzer.explainString(df, spark, indexManager.indexes, verbose))
   }
 

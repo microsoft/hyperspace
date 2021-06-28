@@ -145,10 +145,7 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     val dfB = nonPartitionedDataDF.as("B")
     val dfJoin = dfA
       .join(dfB, dfA("Query") === dfB("Query"))
-      .select(
-        dfA("RGUID"),
-        dfA("Query"),
-        dfA("imprs"))
+      .select(dfA("RGUID"), dfA("Query"), dfA("imprs"))
     val exception = intercept[HyperspaceException] {
       hyperspace.createIndex(dfJoin, indexConfig1)
     }
@@ -171,7 +168,8 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Check lineage in index records for partitioned data when partition key is not in config.") {
+  test(
+    "Check lineage in index records for partitioned data when partition key is not in config.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       hyperspace.createIndex(partitionedDataDF, indexConfig3)
       val indexRecordsDF = spark.read.parquet(
@@ -201,7 +199,8 @@ class CreateIndexTest extends HyperspaceSuite with SQLHelper {
     }
   }
 
-  test("Check lineage in index records for partitioned data when partition key is in load path.") {
+  test(
+    "Check lineage in index records for partitioned data when partition key is in load path.") {
     withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
       val dataDF =
         spark.read.parquet(s"$partitionedDataPath/${partitionKeys.head}=2017-09-03")

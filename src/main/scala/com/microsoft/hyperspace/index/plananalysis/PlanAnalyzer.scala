@@ -140,7 +140,7 @@ object PlanAnalyzer {
     val usedPaths = new ListBuffer[String]
     sparkPlan.foreach {
       case ExtractFileSourceScanExecRelation(
-          HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _)) =>
+            HadoopFsRelation(location: InMemoryFileIndex, _, _, _, _, _)) =>
         usedPaths += location.rootPaths.head.getParent.toString
       case other =>
         other.subqueries.foreach { subQuery =>

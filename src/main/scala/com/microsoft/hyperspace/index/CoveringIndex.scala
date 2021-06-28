@@ -146,10 +146,11 @@ case class CoveringIndex(
       indexData)
   }
 
-  override def equals(o: Any): Boolean = o match {
-    case that: CoveringIndex => comparedData == that.comparedData
-    case _ => false
-  }
+  override def equals(o: Any): Boolean =
+    o match {
+      case that: CoveringIndex => comparedData == that.comparedData
+      case _ => false
+    }
 
   override def hashCode: Int = {
     comparedData.hashCode

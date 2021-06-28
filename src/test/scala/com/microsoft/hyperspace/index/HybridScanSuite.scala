@@ -129,8 +129,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
       }.flatten
       val deletedFilesList = plan collect {
         case Filter(
-            Not(EqualTo(left: Attribute, right: Literal)),
-            LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+              Not(EqualTo(left: Attribute, right: Literal)),
+              LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
           // Check new filter condition on lineage column.
           val colName = left.toString
           val deletedFile = right.toString
@@ -142,8 +142,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           assert(files.nonEmpty && files.forall(_.contains(indexName)))
           deleted
         case Filter(
-            Not(InSet(attr, deletedFileIds)),
-            LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+              Not(InSet(attr, deletedFileIds)),
+              LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
           // Check new filter condition on lineage column.
           assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
           val deleted = deletedFileIds.map(_.toString).toSeq
@@ -156,8 +156,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
           assert(files.nonEmpty && files.forall(_.contains(indexName)))
           deleted
         case Filter(
-            Not(In(attr, deletedFileIds)),
-            LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
+              Not(In(attr, deletedFileIds)),
+              LogicalRelation(fsRelation: HadoopFsRelation, _, _, _)) =>
           // Check new filter condition on lineage column.
           assert(attr.toString.contains(IndexConstants.DATA_FILE_NAME_ID))
           val deleted = deletedFileIds.map(_.toString)
@@ -290,7 +290,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
         case p @ BucketUnionExec(children, bucketSpec) =>
           assert(children.size === 2)
           // children.head is always the index plan.
-          assert(children.head.isInstanceOf[ProjectExec] || children.head.isInstanceOf[FilterExec])
+          assert(
+            children.head.isInstanceOf[ProjectExec] || children.head.isInstanceOf[FilterExec])
           assert(children.last.isInstanceOf[ShuffleExchangeExec])
           assert(bucketSpec.numBuckets === 200)
           p
@@ -582,7 +583,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
     }
   }
 
-  test("Delete-only: join rule, deleted files should be excluded from each index data relation.") {
+  test(
+    "Delete-only: join rule, deleted files should be excluded from each index data relation.") {
     withTempPathAsString { testPath =>
       val deletePath1 = testPath + "/delete1"
       val deletePath2 = testPath + "/delete2"

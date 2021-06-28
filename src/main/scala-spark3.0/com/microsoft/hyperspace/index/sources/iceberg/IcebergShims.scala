@@ -28,11 +28,12 @@ object IcebergShims {
 
   // In Spark 3, the V2ScanRelationPushdown rule can convert DataSourceV2Relation into
   // DataSourceV2ScanRelation.
-  def isIcebergRelation(plan: LogicalPlan): Boolean = plan match {
-    case DataSourceV2Relation(_: SparkTable, _, _, _, _) => true
-    case DataSourceV2ScanRelation(_: SparkTable, _, _) => true
-    case _ => false
-  }
+  def isIcebergRelation(plan: LogicalPlan): Boolean =
+    plan match {
+      case DataSourceV2Relation(_: SparkTable, _, _, _, _) => true
+      case DataSourceV2ScanRelation(_: SparkTable, _, _) => true
+      case _ => false
+    }
 
   def loadIcebergTable(spark: SparkSession, plan: LogicalPlan): (Table, Option[Long]) =
     plan match {

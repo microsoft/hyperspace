@@ -114,7 +114,7 @@ case class CancelActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
  * @param message Message about event.
  */
 case class RefreshIncrementalActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-  extends HyperspaceIndexCRUDEvent
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index Refresh Event for quick mode. Emitted when refresh is called on an index
@@ -125,7 +125,7 @@ case class RefreshIncrementalActionEvent(appInfo: AppInfo, index: IndexLogEntry,
  * @param message Message about event.
  */
 case class RefreshQuickActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-  extends HyperspaceIndexCRUDEvent
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index Optimize Event for index files.
@@ -135,7 +135,7 @@ case class RefreshQuickActionEvent(appInfo: AppInfo, index: IndexLogEntry, messa
  * @param message Message about event.
  */
 case class OptimizeActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
-  extends HyperspaceIndexCRUDEvent
+    extends HyperspaceIndexCRUDEvent
 
 /**
  * Index usage event. This event is emitted when an index is picked instead of original data

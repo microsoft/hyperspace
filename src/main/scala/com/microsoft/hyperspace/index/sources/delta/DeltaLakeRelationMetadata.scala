@@ -47,9 +47,12 @@ class DeltaLakeRelationMetadata(metadata: Relation) extends FileBasedRelationMet
     val deltaVerHistory = metadata.options.get("versionAsOf").map { deltaVersion =>
       val newVersionMapping = s"$indexVersion:$deltaVersion"
       DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY ->
-        properties.get(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY).map { prop =>
-          s"$prop,$newVersionMapping"
-        }.getOrElse(newVersionMapping)
+        properties
+          .get(DeltaLakeConstants.DELTA_VERSION_HISTORY_PROPERTY)
+          .map { prop =>
+            s"$prop,$newVersionMapping"
+          }
+          .getOrElse(newVersionMapping)
     }
     properties ++ deltaVerHistory
   }

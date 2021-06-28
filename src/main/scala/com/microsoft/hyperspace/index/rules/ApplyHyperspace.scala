@@ -32,8 +32,8 @@ import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
  * Collect candidate indexes for each source plan.
  */
 object CandidateIndexCollector extends ActiveSparkSession {
-  private val sourceFilters
-    : Seq[SourcePlanIndexFilter] = ColumnSchemaFilter :: FileSignatureFilter :: Nil
+  private val sourceFilters: Seq[SourcePlanIndexFilter] =
+    ColumnSchemaFilter :: FileSignatureFilter :: Nil
 
   private def initializePlanToIndexes(
       plan: LogicalPlan,
@@ -56,9 +56,11 @@ object CandidateIndexCollector extends ActiveSparkSession {
     val planToIndexes = initializePlanToIndexes(plan, allIndexes)
     planToIndexes.flatMap {
       case (node, allIndexes) =>
-        Some(node, sourceFilters.foldLeft(allIndexes) { (indexes, filter) =>
-          filter(node, indexes)
-        }).filter(_._2.nonEmpty)
+        Some(
+          node,
+          sourceFilters.foldLeft(allIndexes) { (indexes, filter) =>
+            filter(node, indexes)
+          }).filter(_._2.nonEmpty)
     }
   }
 }

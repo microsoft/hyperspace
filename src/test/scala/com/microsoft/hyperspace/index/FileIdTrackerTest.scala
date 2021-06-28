@@ -58,14 +58,15 @@ class FileIdTrackerTest extends SparkFunSuite {
     val tracker = new FileIdTracker
     tracker.addFileInfo(Set(FileInfo("def", 123, 555, 10)))
     val ex = intercept[HyperspaceException] {
-      implicit def ordering: Ordering[FileInfo] = new Ordering[FileInfo] {
-        override def compare(x: FileInfo, y: FileInfo): Int = {
-          x.name.compareTo(y.name)
+      implicit def ordering: Ordering[FileInfo] =
+        new Ordering[FileInfo] {
+          override def compare(x: FileInfo, y: FileInfo): Int = {
+            x.name.compareTo(y.name)
+          }
         }
-      }
-      tracker.addFileInfo(scala.collection.immutable.SortedSet(
-        FileInfo("abc", 100, 555, 15),
-        FileInfo("def", 123, 555, 11)))
+      tracker.addFileInfo(
+        scala.collection.immutable
+          .SortedSet(FileInfo("abc", 100, 555, 15), FileInfo("def", 123, 555, 11)))
     }
     assert(ex.getMessage.contains("Adding file info with a conflicting id"))
     assert(tracker.getFileId("abc", 100, 555).contains(15))

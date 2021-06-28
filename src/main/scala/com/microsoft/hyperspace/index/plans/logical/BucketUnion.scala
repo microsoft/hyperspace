@@ -62,7 +62,7 @@ private[hyperspace] case class BucketUnion(children: Seq[LogicalPlan], bucketSpe
             // compare the data types with the first child
             child.output.zip(children.head.output).forall {
               case (l, r) => l.dataType.equals(r.dataType)
-          })
+            })
     children.length > 1 && childrenResolved && allChildrenCompatible
   }
 }

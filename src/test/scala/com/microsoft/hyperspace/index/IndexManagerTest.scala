@@ -417,8 +417,8 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
         // Check emitted events.
         MockEventLogger.emittedEvents match {
           case Seq(
-              OptimizeActionEvent(_, _, "Operation started."),
-              OptimizeActionEvent(_, _, msg)) =>
+                OptimizeActionEvent(_, _, "Operation started."),
+                OptimizeActionEvent(_, _, msg)) =>
             assert(
               msg.contains(
                 "Optimize aborted as no optimizable index files smaller than 1 found."))
@@ -477,8 +477,8 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
       // Check emitted events.
       MockEventLogger.emittedEvents match {
         case Seq(
-            OptimizeActionEvent(_, _, "Operation started."),
-            OptimizeActionEvent(_, _, msg)) =>
+              OptimizeActionEvent(_, _, "Operation started."),
+              OptimizeActionEvent(_, _, msg)) =>
           assert(
             msg.contains(
               "Optimize aborted as no optimizable index files smaller than 268435456 found."))
@@ -751,16 +751,16 @@ class IndexManagerTest extends HyperspaceSuite with SQLHelper {
       case Some(s) =>
         val relations = df.queryExecution.optimizedPlan.collect {
           case LogicalRelation(
-              HadoopFsRelation(
-                location: PartitioningAwareFileIndex,
+                HadoopFsRelation(
+                  location: PartitioningAwareFileIndex,
+                  _,
+                  dataSchema,
+                  _,
+                  fileFormat,
+                  options),
                 _,
-                dataSchema,
                 _,
-                fileFormat,
-                options),
-              _,
-              _,
-              _) =>
+                _) =>
             val files = location.allFiles
             val sourceDataProperties =
               Hdfs.Properties(Content.fromLeafFiles(files, fileIdTracker).get)

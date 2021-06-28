@@ -128,7 +128,7 @@ object FilterRankFilter extends IndexRankFilter {
       plan: LogicalPlan,
       applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
     if (applicableIndexes.isEmpty || applicableIndexes.size != 1
-        || applicableIndexes.head._2.isEmpty) {
+      || applicableIndexes.head._2.isEmpty) {
       Map.empty
     } else {
       val relation = RuleUtils.getRelation(spark, plan).get

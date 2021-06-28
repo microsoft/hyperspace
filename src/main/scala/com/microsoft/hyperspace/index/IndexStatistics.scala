@@ -55,12 +55,8 @@ private[hyperspace] case class IndexStatistics(
     additionalStats: Map[String, String])
 
 private[hyperspace] object IndexStatistics {
-  val INDEX_SUMMARY_COLUMNS: Seq[String] = Seq(
-    "name",
-    "indexedColumns",
-    "indexLocation",
-    "state",
-    "additionalStats")
+  val INDEX_SUMMARY_COLUMNS: Seq[String] =
+    Seq("name", "indexedColumns", "indexLocation", "state", "additionalStats")
 
   /**
    * Create IndexStatistics instance for a given IndexLogEntry.
@@ -146,7 +142,7 @@ private[hyperspace] object IndexStatistics {
     var root = entry.content.root
     var prefix = entry.content.root.name
     while (root.subDirs.size == 1 &&
-           !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
+      !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
       prefix += s"${root.subDirs.head.name}/"
       root = root.subDirs.head
     }

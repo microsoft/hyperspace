@@ -28,11 +28,7 @@ import org.apache.spark.sql.DataFrame
  *
  * The framework manages various types of indexes through this interface.
  */
-@JsonTypeInfo(
-  use = JsonTypeInfo.Id.CLASS,
-  include = JsonTypeInfo.As.PROPERTY,
-  property = "type"
-)
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 trait Index {
 
   /**
@@ -126,10 +122,10 @@ trait Index {
    *         index if no update is needed
    */
   def refreshIncremental(
-    ctx: IndexerContext,
-    appendedSourceData: Option[DataFrame],
-    deletedSourceDataFiles: Seq[FileInfo],
-    indexContent: Content): Index
+      ctx: IndexerContext,
+      appendedSourceData: Option[DataFrame],
+      deletedSourceDataFiles: Seq[FileInfo],
+      indexContent: Content): Index
 
   /**
    * Indexes the source data and returns an updated index and index data.

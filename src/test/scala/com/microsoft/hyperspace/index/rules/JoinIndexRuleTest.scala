@@ -259,7 +259,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     }
   }
 
-  test("Join rule does not update plan if index doesn't satisfy included columns from any side.") {
+  test(
+    "Join rule does not update plan if index doesn't satisfy included columns from any side.") {
     val t1FilterNode = Filter(IsNotNull(t1c1), t1ScanNode)
     val t2FilterNode = Filter(IsNotNull(t2c1), t2ScanNode)
 

@@ -48,12 +48,7 @@ class IndexCacheTest extends HyperspaceSuite {
 
     val entry = IndexLogEntry(
       "index1",
-      CoveringIndex(
-        Seq("RGUID"),
-        Seq("Date"),
-        schema,
-        10,
-        Map()),
+      CoveringIndex(Seq("RGUID"), Seq("Date"), schema, 10, Map()),
       Content(Directory(indexDir)),
       Source(SparkPlan(sourcePlanProperties)),
       Map())
@@ -152,7 +147,7 @@ class IndexCacheTest extends HyperspaceSuite {
 
 /**
  * Mock for testing purposes so we can validate and invalidate entries based on time.
-
+ *
  * @param time Current time.
  */
 class MockClock(private var time: Long = 0L) extends Clock {

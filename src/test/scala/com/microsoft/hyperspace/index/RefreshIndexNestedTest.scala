@@ -154,8 +154,8 @@ class RefreshIndexNestedTest extends QueryTest with HyperspaceSuite {
       // Check emitted events.
       MockEventLogger.emittedEvents match {
         case Seq(
-            RefreshIncrementalActionEvent(_, _, "Operation started."),
-            RefreshIncrementalActionEvent(_, _, msg)) =>
+              RefreshIncrementalActionEvent(_, _, "Operation started."),
+              RefreshIncrementalActionEvent(_, _, msg)) =>
           assert(msg.contains("Refresh incremental aborted as no source data change found."))
         case _ => fail()
       }

@@ -32,10 +32,11 @@ import com.microsoft.hyperspace.util.JavaConverters._
 
 object IcebergShims {
 
-  def isIcebergRelation(plan: LogicalPlan): Boolean = plan match {
-    case DataSourceV2Relation(_: IcebergSource, _, _, _, _) => true
-    case _ => false
-  }
+  def isIcebergRelation(plan: LogicalPlan): Boolean =
+    plan match {
+      case DataSourceV2Relation(_: IcebergSource, _, _, _, _) => true
+      case _ => false
+    }
 
   def loadIcebergTable(spark: SparkSession, plan: LogicalPlan): (Table, Option[Long]) = {
     val conf = spark.sessionState.newHadoopConf()

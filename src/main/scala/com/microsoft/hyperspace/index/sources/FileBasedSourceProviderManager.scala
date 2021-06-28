@@ -37,11 +37,13 @@ import com.microsoft.hyperspace.util.{CacheWithTransform, HyperspaceConf}
  */
 class FileBasedSourceProviderManager(spark: SparkSession) {
   private val sourceProviders: CacheWithTransform[String, Seq[FileBasedSourceProvider]] =
-    new CacheWithTransform[String, Seq[FileBasedSourceProvider]]({ () =>
-      HyperspaceConf.fileBasedSourceBuilders(spark)
-    }, { builderClassNames =>
-      buildProviders(builderClassNames)
-    })
+    new CacheWithTransform[String, Seq[FileBasedSourceProvider]](
+      { () =>
+        HyperspaceConf.fileBasedSourceBuilders(spark)
+      },
+      { builderClassNames =>
+        buildProviders(builderClassNames)
+      })
 
   /**
    * Returns true if the given logical plan is a supported relation. If all of the registered
