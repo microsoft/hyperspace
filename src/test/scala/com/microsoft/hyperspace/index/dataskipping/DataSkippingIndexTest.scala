@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions.{input_file_name, max, min}
 
-import com.microsoft.hyperspace.index.{FileInfo, Index}
+import com.microsoft.hyperspace.index.{Content, FileInfo, Index}
 import com.microsoft.hyperspace.index.types.dataskipping.sketch.{MinMaxSketch, ValueListSketch}
 
 class DataSkippingIndexTest extends DataSkippingSuite {
@@ -114,15 +114,14 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     assert(optimizedIndexDataFiles.length < indexDataFiles.length)
   }
 
-  test("refreshIncremental") {
+  test("refreshIncremental works correctly for appended data.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
     val sourceData = createSourceData(spark.range(100).toDF("A"))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
     index.write(ctx, indexData)
 
-    // Index data files for the appended data is put in indexDataPath2.
-    val appendedSourceData =
-      createSourceData(spark.range(100, 200).toDF("A"), SaveMode.Append)
+    val appendedSourceData = createSourceData(spark.range(100, 200).toDF("A"), SaveMode.Append)
+
     val indexDataPath2 = new Path(inTempDir("Index2"))
     indexDataPathVar = indexDataPath2
     val (newIndex, updateMode) =
@@ -133,6 +132,65 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     val updatedIndexData = spark.read.parquet(indexDataPath.toString, indexDataPath2.toString)
     val expectedSketchValues = sourceData
       .union(appendedSourceData)
+      .groupBy(input_file_name().as(fileNameCol))
+      .agg(min("A"), max("A"))
+    checkAnswer(updatedIndexData, withFileId(expectedSketchValues))
+  }
+
+  test("refreshIncremental works correctly for deleted data.") {
+    val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
+    val sourceData = createSourceData(spark.range(100).toDF("A"))
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    index.write(ctx, indexData)
+
+    val deletedFile = listFiles(dataPath).filter(isParquet).head
+    deleteFile(deletedFile.getPath)
+
+    val indexDataPath2 = new Path(inTempDir("Index2"))
+    indexDataPathVar = indexDataPath2
+    val (newIndex, updateMode) =
+      index.refreshIncremental(
+        ctx,
+        None,
+        Seq(FileInfo(deletedFile, fileIdTracker.addFile(deletedFile), true)),
+        Content.fromDirectory(indexDataPath, fileIdTracker, new Configuration))
+    assert(newIndex === index)
+    assert(updateMode === Index.UpdateMode.Overwrite)
+
+    val updatedIndexData = spark.read.parquet(indexDataPath2.toString)
+    val expectedSketchValues = spark.read
+      .parquet(dataPath.toString)
+      .union(spark.read.parquet(dataPath.toString))
+      .groupBy(input_file_name().as(fileNameCol))
+      .agg(min("A"), max("A"))
+    checkAnswer(updatedIndexData, withFileId(expectedSketchValues))
+  }
+
+  test("refreshIncremental works correctly for appended and deleted data.") {
+    val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
+    val sourceData = createSourceData(spark.range(100).toDF("A"))
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    index.write(ctx, indexData)
+
+    val deletedFile = listFiles(dataPath).filter(isParquet).head
+    deleteFile(deletedFile.getPath)
+    val appendedSourceData = createSourceData(spark.range(100, 200).toDF("A"), SaveMode.Append)
+
+    val indexDataPath2 = new Path(inTempDir("Index2"))
+    indexDataPathVar = indexDataPath2
+    val (newIndex, updateMode) =
+      index.refreshIncremental(
+        ctx,
+        Some(appendedSourceData),
+        Seq(FileInfo(deletedFile, fileIdTracker.addFile(deletedFile), true)),
+        Content.fromDirectory(indexDataPath, fileIdTracker, new Configuration))
+    assert(newIndex === index)
+    assert(updateMode === Index.UpdateMode.Overwrite)
+
+    val updatedIndexData = spark.read.parquet(indexDataPath2.toString)
+    val expectedSketchValues = spark.read
+      .parquet(dataPath.toString)
+      .union(spark.read.parquet(dataPath.toString))
       .groupBy(input_file_name().as(fileNameCol))
       .agg(min("A"), max("A"))
     checkAnswer(updatedIndexData, withFileId(expectedSketchValues))

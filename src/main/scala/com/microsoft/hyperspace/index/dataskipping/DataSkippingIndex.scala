@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.types.dataskipping
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
-import org.apache.spark.sql.functions.input_file_name
+import org.apache.spark.sql.functions.{col, input_file_name}
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.types.dataskipping.sketch.Sketch
@@ -61,7 +61,7 @@ case class DataSkippingIndex(
   override def canHandleDeletedFiles: Boolean = true
 
   override def write(ctx: IndexerContext, indexData: DataFrame): Unit = {
-    indexData.write.mode(SaveMode.Overwrite).parquet(ctx.indexDataPath.toString)
+    writeImpl(ctx, indexData, SaveMode.Overwrite)
   }
 
   override def optimize(ctx: IndexerContext, indexDataFilesToOptimize: Seq[FileInfo]): Unit = {
@@ -77,7 +77,26 @@ case class DataSkippingIndex(
     if (appendedSourceData.nonEmpty) {
       write(ctx, index(ctx, appendedSourceData.get))
     }
-    (this, Index.UpdateMode.Merge)
+    if (deletedSourceDataFiles.nonEmpty) {
+      val spark = ctx.spark
+      import spark.implicits._
+      val deletedFileIds = deletedSourceDataFiles.map(_.id).toDF(IndexConstants.DATA_FILE_NAME_ID)
+      val updatedIndexData = ctx.spark.read
+        .parquet(indexContent.files.map(_.toString): _*)
+        .join(deletedFileIds, Seq(IndexConstants.DATA_FILE_NAME_ID), "left_anti")
+      val writeMode = if (appendedSourceData.nonEmpty) {
+        SaveMode.Append
+      } else {
+        SaveMode.Overwrite
+      }
+      writeImpl(ctx, updatedIndexData, writeMode)
+    }
+    val updateMode = if (deletedSourceDataFiles.isEmpty) {
+      Index.UpdateMode.Merge
+    } else {
+      Index.UpdateMode.Overwrite
+    }
+    (this, updateMode)
   }
 
   override def refreshFull(
@@ -121,6 +140,10 @@ case class DataSkippingIndex(
       .drop(fileNameCol)
     val cols = indexDataWithFileId.columns
     indexDataWithFileId.select(cols.last, cols.dropRight(1): _*)
+  }
+
+  private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
+    indexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
   }
 
   override def equals(o: Any): Boolean =

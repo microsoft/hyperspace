@@ -29,7 +29,7 @@ import com.microsoft.hyperspace.index.{Content, Directory, FileIdTracker, Hypers
 import com.microsoft.hyperspace.index.types.dataskipping.sketch.{BloomFilterSketch, MinMaxSketch, ValueListSketch}
 import com.microsoft.hyperspace.util.FileUtils
 
-class DataSkippingSuite extends QueryTest with HyperspaceSuite {
+trait DataSkippingSuite extends QueryTest with HyperspaceSuite {
   import spark.implicits._
 
   val dataPath = new Path(inTempDir("Data"))
@@ -81,6 +81,11 @@ class DataSkippingSuite extends QueryTest with HyperspaceSuite {
   def listFiles(paths: Path*): Seq[FileStatus] = {
     val fs = paths.head.getFileSystem(new Configuration)
     fs.listStatus(paths.filter(fs.exists(_)).toArray)
+  }
+
+  def deleteFile(path: Path): Unit = {
+    val fs = path.getFileSystem(new Configuration)
+    fs.delete(path, true)
   }
 
   def isParquet: FileStatus => Boolean = _.getPath.getName.endsWith(".parquet")
