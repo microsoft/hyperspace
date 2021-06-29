@@ -79,8 +79,8 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
       Some(LogEntry.fromJson(contents))
     } catch {
       case e: Exception =>
-        logError(s"Cannot parse json with file path: ${path}")
-        throw HyperspaceException(s"Cannot parse json with file path: ${path}")
+        throw HyperspaceException(
+          s"Cannot parse json with file path: ${path}, reason: ${e.getMessage()}")
     }
   }
 
