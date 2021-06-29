@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.TestUtils
 import com.microsoft.hyperspace.index.IndexConstants.HYPERSPACE_LOG
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
@@ -102,6 +103,23 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
     val actual = new IndexLogManagerImpl(path).getLog(0).get
     val expected = sampleIndexLogEntry
     assert(actual.equals(expected))
+  }
+
+  test("testGetLog fails with Exception if json is not in proper form") {
+    val path = new Path(testRoot, "testPath")
+
+    // find position to insert \0
+    val jsonContent = JsonUtils.toJson(sampleIndexLogEntry)
+    val sourceIndex = jsonContent.indexOf("\"source\"")
+    val damagedJsonContent = jsonContent.substring(0, sourceIndex + 8) + "\0" + jsonContent
+      .substring(sourceIndex + 8);
+
+    FileUtils.createFile(
+      path.getFileSystem(new Configuration),
+      new Path(path, s"$HYPERSPACE_LOG/0"),
+      damagedJsonContent)
+
+    assertThrows[HyperspaceException](new IndexLogManagerImpl(path).getLog(0).get)
   }
 
   test("testGetLog for path") {}
@@ -223,8 +241,7 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
     val path = new Path(testRoot, UUID.randomUUID().toString)
     val fs = path.getFileSystem(new Configuration)
     FileUtils.createFile(fs, new Path(path, s"$HYPERSPACE_LOG/0"), "Invalid Log Entry")
-    assertThrows[com.fasterxml.jackson.core.JsonParseException](
-      new IndexLogManagerImpl(path).createLatestStableLog(0))
+    assertThrows[HyperspaceException](new IndexLogManagerImpl(path).createLatestStableLog(0))
   }
 
   // TODO: Test the case where the id does not exist.

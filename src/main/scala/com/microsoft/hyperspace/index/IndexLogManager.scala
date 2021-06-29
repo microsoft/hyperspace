@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
 import org.apache.spark.internal.Logging
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.util.{FileUtils, JsonUtils}
 
@@ -71,8 +72,16 @@ class IndexLogManagerImpl(indexPath: Path, hadoopConfiguration: Configuration = 
     if (!fs.exists(path)) {
       return None
     }
+
     val contents = FileUtils.readContents(fs, path)
-    Some(LogEntry.fromJson(contents))
+
+    try {
+      Some(LogEntry.fromJson(contents))
+    } catch {
+      case e: Exception =>
+        throw HyperspaceException(
+          s"Cannot parse JSON in ${path}: ${e.getMessage}")
+    }
   }
 
   override def getLog(id: Int): Option[LogEntry] = {
