@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream
 import org.apache.spark.sql.functions.{array_sort, collect_set, input_file_name, max, min}
 import org.apache.spark.util.sketch.BloomFilter
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexConstants
 import com.microsoft.hyperspace.index.types.dataskipping.sketch.{BloomFilterSketch, MinMaxSketch, ValueListSketch}
 
@@ -38,6 +39,22 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
   test("sketches returns two sketches.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), ValueListSketch("B"))
     assert(indexConfig.sketches === Seq(MinMaxSketch("A"), ValueListSketch("B")))
+  }
+
+  test("Duplicate sketches are not allowed.") {
+    val exception = intercept[HyperspaceException] {
+      DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("A"))
+    }
+    assert(exception.getMessage.contains("MinMax(A) is specified multiple times."))
+  }
+
+  test("Duplicate sketches are not allowed after the column resolution.") {
+    val sourceData = createSourceData(spark.range(10).toDF("A"))
+    val exception = intercept[HyperspaceException] {
+      val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("a"))
+      indexConfig.createIndex(ctx, sourceData, Map())
+    }
+    assert(exception.getMessage.contains("MinMax(A) is specified multiple times."))
   }
 
   test("referencedColumns returns referenced columns of sketches.") {

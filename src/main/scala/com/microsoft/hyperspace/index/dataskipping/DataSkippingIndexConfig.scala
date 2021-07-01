@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index.types.dataskipping
 
+import scala.collection.mutable
+
 import org.apache.spark.sql.DataFrame
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -39,6 +41,7 @@ case class DataSkippingIndexConfig(
     firstSketch: Sketch,
     moreSketches: Sketch*)
     extends IndexConfigTrait {
+  checkDuplicateSketches(sketches)
 
   /**
    * Returns all sketches this config has.
@@ -55,7 +58,18 @@ case class DataSkippingIndexConfig(
       sourceData: DataFrame,
       properties: Map[String, String]): (DataSkippingIndex, DataFrame) = {
     val resolvedSketches = DataSkippingIndex.resolveSketch(sketches, sourceData)
+    checkDuplicateSketches(resolvedSketches)
     val index = DataSkippingIndex(resolvedSketches, properties)
     (index, index.index(ctx, sourceData))
+  }
+
+  private def checkDuplicateSketches(sketches: Seq[Sketch]): Unit = {
+    val uniqueSketches = mutable.Set[Sketch]()
+    sketches.foreach { sketch =>
+      if (uniqueSketches.contains(sketch)) {
+        throw HyperspaceException(s"$sketch is specified multiple times.")
+      }
+      uniqueSketches.add(sketch)
+    }
   }
 }
