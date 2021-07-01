@@ -18,11 +18,11 @@ package com.microsoft.hyperspace.index.types.dataskipping
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.{Column, SaveMode}
 import org.apache.spark.sql.functions.{input_file_name, max, min}
 
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index}
-import com.microsoft.hyperspace.index.types.dataskipping.sketch.{MinMaxSketch, ValueListSketch}
+import com.microsoft.hyperspace.index.types.dataskipping.sketch.{MinMaxSketch, Sketch, ValueListSketch}
 
 class DataSkippingIndexTest extends DataSkippingSuite {
   test("sketchOffsets is computed correctly for a single sketch.") {
@@ -58,6 +58,21 @@ class DataSkippingIndexTest extends DataSkippingSuite {
   test("referencedColumns returns indexed columns of sketches.") {
     val index = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")))
     assert(index.referencedColumns === Seq("A", "B"))
+  }
+
+  test("indexColumns and referencedColumns may return different columns") {
+    case class MySketch(indexed: String, aux: String) extends Sketch {
+      def aggregateFunctions: Seq[Column] = throw new NotImplementedError()
+      def auxiliaryColumns: Seq[String] = aux :: Nil
+      def indexedColumns: Seq[String] = indexed :: Nil
+      def numValues: Int = 1
+      def withNewColumns(columnMapping: Map[String, String]): Sketch = {
+        copy(indexed = columnMapping(indexed), aux = columnMapping(aux))
+      }
+    }
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MySketch("B", "C")))
+    assert(index.indexedColumns === Seq("A", "B"))
+    assert(index.referencedColumns === Seq("A", "B", "C"))
   }
 
   test(
