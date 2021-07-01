@@ -94,6 +94,12 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     assert(index.canHandleDeletedFiles === true)
   }
 
+  test("Two indexes are equal if they have the same set of sketches.") {
+    val index1 = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")))
+    val index2 = DataSkippingIndex(Seq(ValueListSketch("B"), MinMaxSketch("A")))
+    assert(index1 === index2)
+  }
+
   test("write writes the index data in a Parquet format.") {
     val sourceData = createSourceData(spark.range(100).toDF("A"))
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
@@ -218,6 +224,7 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     index.write(ctx, indexData)
 
     val newSourceData = createSourceData(spark.range(200).toDF("A"))
+
     val (newIndex, newIndexData) = index.refreshFull(ctx, newSourceData)
     assert(newIndex === index)
 

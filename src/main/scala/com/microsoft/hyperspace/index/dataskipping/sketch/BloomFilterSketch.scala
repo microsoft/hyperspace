@@ -47,4 +47,12 @@ case class BloomFilterSketch(col: String, fpp: Double, expectedDistinctCountPerF
   }
 
   override def numValues: Int = 1
+
+  override def equals(that: Any): Boolean =
+    that match {
+      case BloomFilterSketch(thatCol, _, _) => col == thatCol
+      case _ => false
+    }
+
+  override def hashCode: Int = ("BloomFilterSketch", col).hashCode
 }

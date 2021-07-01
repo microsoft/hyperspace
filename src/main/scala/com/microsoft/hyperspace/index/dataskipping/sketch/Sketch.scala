@@ -68,4 +68,17 @@ trait Sketch {
    * Returns a human-readable string describing this sketch.
    */
   def toString: String
+
+  /**
+   * Returns true if and only if this sketch equals to that.
+   *
+   * Sketches should be considered equal when their types and columns are
+   * equal.
+   */
+  def equals(that: Any): Boolean
+
+  /**
+   * Returns the hash code for this sketch.
+   */
+  def hashCode: Int
 }

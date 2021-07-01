@@ -146,9 +146,9 @@ case class DataSkippingIndex(
     indexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
   }
 
-  override def equals(o: Any): Boolean =
-    o match {
-      case that: DataSkippingIndex => sketches == that.sketches
+  override def equals(that: Any): Boolean =
+    that match {
+      case DataSkippingIndex(thatSketches, _) => sketches.toSet == thatSketches.toSet
       case _ => false
     }
 
