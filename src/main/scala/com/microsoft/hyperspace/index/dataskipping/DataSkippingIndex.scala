@@ -135,11 +135,10 @@ case class DataSkippingIndex(
 
     // Drop the file name column and reorder the columns
     // so that the file id column comes first.
-    val indexDataWithFileId = indexDataWithFileName
+    indexDataWithFileName
       .join(fileIdDf.hint("broadcast"), fileNameCol)
+      .select(IndexConstants.DATA_FILE_NAME_ID, indexDataWithFileName.columns: _*)
       .drop(fileNameCol)
-    val cols = indexDataWithFileId.columns
-    indexDataWithFileId.select(cols.last, cols.dropRight(1): _*)
   }
 
   private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
