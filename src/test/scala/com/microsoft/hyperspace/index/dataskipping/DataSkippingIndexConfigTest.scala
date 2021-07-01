@@ -25,27 +25,27 @@ import com.microsoft.hyperspace.index.IndexConstants
 import com.microsoft.hyperspace.index.types.dataskipping.sketch.{BloomFilterSketch, MinMaxSketch, ValueListSketch}
 
 class DataSkippingIndexConfigTest extends DataSkippingSuite {
-  test("indexName") {
+  test("indexName returns the index name.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
     assert(indexConfig.indexName === "myIndex")
   }
 
-  test("sketches: One sketch") {
+  test("sketches returns a single sketch.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
     assert(indexConfig.sketches === Seq(MinMaxSketch("A")))
   }
 
-  test("sketches: Two sketches") {
+  test("sketches returns two sketches.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), ValueListSketch("B"))
     assert(indexConfig.sketches === Seq(MinMaxSketch("A"), ValueListSketch("B")))
   }
 
-  test("referencedColumns") {
+  test("referencedColumns returns referenced columns of sketches.") {
     val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("A"), MinMaxSketch("B"))
     assert(indexConfig.referencedColumns === Seq("A", "B"))
   }
 
-  test("createIndex: MinMaxSketch") {
+  test("createIndex works correctly with a MinMaxSketch.") {
     val sourceData = createSourceData(spark.range(100).toDF("A"))
     val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("A"))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
@@ -57,7 +57,7 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
     assert(indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "min_A_", "max_A_"))
   }
 
-  test("createIndex: ValueListSketch") {
+  test("createIndex works correctly with a ValueListSketch.") {
     val sourceData =
       createSourceData(spark.range(100).selectExpr("cast(id / 10 as int) as A").toDF)
     val indexConfig = DataSkippingIndexConfig("MyIndex", ValueListSketch("A"))
@@ -70,7 +70,7 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
     assert(indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "value_list_A_"))
   }
 
-  test("createIndex: BloomFilterSketch") {
+  test("createIndex works correctly with a BloomFilterSketch.") {
     val sourceData = createSourceData(spark.range(100).toDF("A"))
     val indexConfig = DataSkippingIndexConfig("MyIndex", BloomFilterSketch("A", 0.001, 20))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
@@ -94,7 +94,7 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
     assert(indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "bloom_filter_A_"))
   }
 
-  test("createIndex: column resolution") {
+  test("createIndex resolves column names.") {
     val sourceData = createSourceData(spark.range(10).toDF("Foo"))
     val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("foO"))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())

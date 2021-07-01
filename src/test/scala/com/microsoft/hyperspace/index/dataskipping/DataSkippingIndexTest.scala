@@ -196,7 +196,7 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     checkAnswer(updatedIndexData, withFileId(expectedSketchValues))
   }
 
-  test("refreshFull") {
+  test("refreshFull works correctly for fully overwritten data.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
     val sourceData = createSourceData(spark.range(100).toDF("A"))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
