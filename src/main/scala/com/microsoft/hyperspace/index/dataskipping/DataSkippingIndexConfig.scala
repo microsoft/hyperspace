@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping
+package com.microsoft.hyperspace.index.dataskipping
 
 import scala.collection.mutable
 
@@ -22,7 +22,7 @@ import org.apache.spark.sql.DataFrame
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{IndexConfigTrait, IndexerContext}
-import com.microsoft.hyperspace.index.types.dataskipping.sketch.Sketch
+import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
 
 /**
  * DataSkippingIndexConfig is used to create a [[DataSkippingIndex]] via

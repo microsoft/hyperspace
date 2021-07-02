@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping
+package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -22,7 +22,7 @@ import org.apache.spark.sql.{Column, SaveMode}
 import org.apache.spark.sql.functions.{input_file_name, max, min}
 
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index}
-import com.microsoft.hyperspace.index.types.dataskipping.sketch.{MinMaxSketch, Sketch, ValueListSketch}
+import com.microsoft.hyperspace.index.dataskipping.sketch.{MinMaxSketch, Sketch, ValueListSketch}
 
 class DataSkippingIndexTest extends DataSkippingSuite {
   test("sketchOffsets is computed correctly for a single sketch.") {

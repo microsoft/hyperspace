@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketch
 
 import org.apache.spark.sql.functions.{max, min}
 
-import com.microsoft.hyperspace.index.types.dataskipping.DataSkippingSuite
+import com.microsoft.hyperspace.index.dataskipping.DataSkippingSuite
 
 class MinMaxSketchTest extends DataSkippingSuite {
   import spark.implicits._

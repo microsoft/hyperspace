@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping
+package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.functions.{col, input_file_name}
 
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.types.dataskipping.sketch.Sketch
+import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
 
 /**
  * DataSkippingIndex is an index that can accelerate queries by filtering out

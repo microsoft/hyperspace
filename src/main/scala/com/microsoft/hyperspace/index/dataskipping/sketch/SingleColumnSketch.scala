@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketch
 
 /**
  * Base class for sketches which are based on and can be used for a single

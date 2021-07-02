@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketch
 
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.{array_sort, collect_set}

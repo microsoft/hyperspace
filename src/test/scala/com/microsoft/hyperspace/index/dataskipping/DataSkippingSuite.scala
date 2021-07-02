@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.dataskipping
+package com.microsoft.hyperspace.index.dataskipping
 
 import java.io.ByteArrayInputStream
 
@@ -26,7 +26,7 @@ import org.apache.spark.util.sketch.BloomFilter
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, Directory, FileIdTracker, HyperspaceSuite, IndexConstants, IndexerContext}
-import com.microsoft.hyperspace.index.types.dataskipping.sketch.{BloomFilterSketch, MinMaxSketch, ValueListSketch}
+import com.microsoft.hyperspace.index.dataskipping.sketch.{BloomFilterSketch, MinMaxSketch, ValueListSketch}
 import com.microsoft.hyperspace.util.FileUtils
 
 trait DataSkippingSuite extends QueryTest with HyperspaceSuite {
