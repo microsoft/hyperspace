@@ -26,9 +26,10 @@ import org.apache.spark.sql.functions.{array_sort, collect_set}
  * column. It can be useful when the number of distinct values is expected to
  * be small and each file tends to store only a subset of the values.
  */
-case class ValueListSketch(col: String) extends SingleColumnSketch("ValueList", col) {
-  override def withNewColumn(newColumn: String): Sketch = copy(col = newColumn)
+case class ValueListSketch(col: String) extends SingleColumnSketch[ValueListSketch](col) {
+  override def withNewColumn(newColumn: String): ValueListSketch = copy(col = newColumn)
   override def aggregateFunctions: Seq[Column] =
     array_sort(collect_set(col)).as(s"value_list($col)") :: Nil
   override def numValues: Int = 1
+  override def toString: String = s"ValueList($col)"
 }

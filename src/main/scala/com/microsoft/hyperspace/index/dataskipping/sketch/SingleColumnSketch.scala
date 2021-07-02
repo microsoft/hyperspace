@@ -20,11 +20,10 @@ package com.microsoft.hyperspace.index.dataskipping.sketch
  * Base class for sketches which are based on and can be used for a single
  * column.
  *
- * @param sketchName Name of this sketch type to be used for toString
  * @param column Column name this sketch is based on
  */
-abstract class SingleColumnSketch(sketchName: String, column: String) extends Sketch {
-  final override def withNewColumns(columnMapping: Map[String, String]): Sketch = {
+abstract class SingleColumnSketch[T <: SingleColumnSketch[T]](column: String) extends Sketch {
+  final override def withNewColumns(columnMapping: Map[String, String]): T = {
     assert(columnMapping.contains(column))
     withNewColumn(columnMapping(column))
   }
@@ -32,11 +31,9 @@ abstract class SingleColumnSketch(sketchName: String, column: String) extends Sk
   /**
    * Returns a copy of this sketch with an updated column.
    */
-  def withNewColumn(newColumn: String): Sketch
+  def withNewColumn(newColumn: String): T
 
   final override def indexedColumns: Seq[String] = column :: Nil
 
   final override def auxiliaryColumns: Seq[String] = Nil
-
-  final override def toString: String = s"$sketchName($column)"
 }

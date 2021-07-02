@@ -36,9 +36,9 @@ import org.apache.spark.sql.functions.column
  * @param expectedDistinctCountPerFile Expected number of distinct values per file
  */
 case class BloomFilterSketch(col: String, fpp: Double, expectedDistinctCountPerFile: Long)
-    extends SingleColumnSketch("BloomFilter", col) {
+    extends SingleColumnSketch[BloomFilterSketch](col) {
 
-  override def withNewColumn(newColumn: String): Sketch = copy(col = newColumn)
+  override def withNewColumn(newColumn: String): BloomFilterSketch = copy(col = newColumn)
 
   override def aggregateFunctions: Seq[Column] = {
     new Column(
@@ -55,4 +55,6 @@ case class BloomFilterSketch(col: String, fpp: Double, expectedDistinctCountPerF
     }
 
   override def hashCode: Int = ("BloomFilterSketch", col).hashCode
+
+  override def toString: String = s"BloomFilter($col, $fpp, $expectedDistinctCountPerFile)"
 }

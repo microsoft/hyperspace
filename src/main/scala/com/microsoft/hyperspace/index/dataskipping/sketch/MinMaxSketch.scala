@@ -22,8 +22,9 @@ import org.apache.spark.sql.functions.{max, min}
 /**
  * Sketch based on minimum and maximum values for a given column.
  */
-case class MinMaxSketch(col: String) extends SingleColumnSketch("MinMax", col) {
-  override def withNewColumn(newColumn: String): Sketch = copy(col = newColumn)
+case class MinMaxSketch(col: String) extends SingleColumnSketch[MinMaxSketch](col) {
+  override def withNewColumn(newColumn: String): MinMaxSketch = copy(col = newColumn)
   override def aggregateFunctions: Seq[Column] = min(col) :: max(col) :: Nil
   override def numValues: Int = 2
+  override def toString: String = s"MinMax($col)"
 }
