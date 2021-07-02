@@ -13,5 +13,4 @@ class CoveringIndexConfig:
         self.indexedColumns = indexedColumns
         self.includedColumns = includedColumns
 
-# TODO(ChungminL): Add deprecation warning
 IndexConfig = CoveringIndexConfig
