@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.covering
+package com.microsoft.hyperspace.index.covering
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path

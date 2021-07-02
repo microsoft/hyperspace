@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.Hdfs.Properties
-import com.microsoft.hyperspace.index.types.covering.CoveringIndex
+import com.microsoft.hyperspace.index.covering.CoveringIndex
 import com.microsoft.hyperspace.util.PathUtils
 
 trait HyperspaceRuleSuite extends HyperspaceSuite {

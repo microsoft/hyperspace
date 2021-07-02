@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.types.covering
+package com.microsoft.hyperspace.index.covering
 
 import java.util.Locale
 

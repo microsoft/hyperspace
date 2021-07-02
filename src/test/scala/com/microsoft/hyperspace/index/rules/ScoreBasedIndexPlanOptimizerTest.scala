@@ -25,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.types.covering.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.covering.{FilterIndexRule, JoinIndexRule}
 
 class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
   private val testDir = inTempDir("scoreBasedIndexPlanOptimizerTest")

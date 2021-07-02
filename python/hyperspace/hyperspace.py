@@ -29,7 +29,7 @@ class Hyperspace:
         """
         indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
         included_columns = self._getScalaSeqFromList(index_config.includedColumns)
-        _jindexConfig = self.jvm.com.microsoft.hyperspace.index.types.covering.CoveringIndexConfig(
+        _jindexConfig = self.jvm.com.microsoft.hyperspace.index.covering.CoveringIndexConfig(
             self.jvm.java.lang.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig
 

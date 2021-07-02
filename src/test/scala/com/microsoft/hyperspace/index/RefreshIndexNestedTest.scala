@@ -24,7 +24,7 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogge
 import com.microsoft.hyperspace.TestUtils.{getFileIdTracker, logManager}
 import com.microsoft.hyperspace.actions.{RefreshIncrementalAction, RefreshQuickAction}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_INCREMENTAL
-import com.microsoft.hyperspace.index.types.covering.CoveringIndex
+import com.microsoft.hyperspace.index.covering.CoveringIndex
 import com.microsoft.hyperspace.telemetry.RefreshIncrementalActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter

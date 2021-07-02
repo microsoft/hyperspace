@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace
 
-import com.microsoft.hyperspace.index.types.covering.CoveringIndexConfig
+import com.microsoft.hyperspace.index.covering.CoveringIndexConfig
 
 package object index {
 

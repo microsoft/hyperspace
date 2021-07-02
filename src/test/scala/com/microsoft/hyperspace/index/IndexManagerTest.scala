@@ -28,7 +28,7 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException, MockEventLogge
 import com.microsoft.hyperspace.TestUtils.{copyWithState, getFileIdTracker, latestIndexLogEntry, logManager}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, OPTIMIZE_FILE_SIZE_THRESHOLD, REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL}
-import com.microsoft.hyperspace.index.types.covering.CoveringIndex
+import com.microsoft.hyperspace.index.covering.CoveringIndex
 import com.microsoft.hyperspace.telemetry.OptimizeActionEvent
 import com.microsoft.hyperspace.util.{FileUtils, PathUtils}
 
