@@ -92,6 +92,8 @@ trait Index {
   /**
    * Writes the index data to the specified path.
    *
+   * Any data that was already at the specified path is overwritten.
+   *
    * @param ctx Helper object for indexing operations
    * @param indexData Index data to write
    */

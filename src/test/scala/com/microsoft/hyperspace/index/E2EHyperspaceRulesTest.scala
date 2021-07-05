@@ -29,6 +29,8 @@ import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.covering.JoinIndexRule
+import com.microsoft.hyperspace.index.dataskipping.DataSkippingIndexConfig
+import com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector}
 import com.microsoft.hyperspace.util.PathUtils
@@ -1001,6 +1003,22 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     hyperspace.deleteIndex("myind")
     assert(!query.queryExecution.simpleString.contains("FileScan Hyperspace"))
     assert(hyperspace.indexes.filter("name == 'myind' and state == 'DELETED'").count() === 1)
+  }
+
+  test("FilterIndexRule ignores unsupported indexes.") {
+    val df = spark.read.parquet(nonPartitionedDataPath)
+    hyperspace.createIndex(df, IndexConfig("myind1", Seq("c1"), Seq("c4")))
+    hyperspace.createIndex(df, DataSkippingIndexConfig("myind2", MinMaxSketch("c1")))
+    def query(): DataFrame = df.filter("c1 == '2019-10-03'").select("c4")
+    verifyIndexUsage(query, getIndexFilesPath("myind1"))
+  }
+
+  test("JoinIndexRule ignores unsupported indexes.") {
+    val df = spark.read.parquet(nonPartitionedDataPath)
+    hyperspace.createIndex(df, IndexConfig("myind1", Seq("c1"), Seq("c4")))
+    hyperspace.createIndex(df, DataSkippingIndexConfig("myind2", MinMaxSketch("c1")))
+    def query(): DataFrame = df.as("x").join(df.as("y"), "c1").select("x.c4")
+    verifyIndexUsage(query, getIndexFilesPath("myind1") ++ getIndexFilesPath("myind1"))
   }
 
   /**
