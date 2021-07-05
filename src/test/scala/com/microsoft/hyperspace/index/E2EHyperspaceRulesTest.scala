@@ -28,9 +28,9 @@ import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
+import com.microsoft.hyperspace.index.covering.JoinIndexRule
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector}
-import com.microsoft.hyperspace.index.rules.JoinIndexRule
 import com.microsoft.hyperspace.util.PathUtils
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index.covering
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -26,6 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.rules.CandidateIndexCollector
 
 class FilterIndexRuleTest extends HyperspaceRuleSuite {
   override val indexLocationDirName = "joinIndexTest"

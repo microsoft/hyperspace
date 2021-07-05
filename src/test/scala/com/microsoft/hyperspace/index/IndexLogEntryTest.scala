@@ -28,6 +28,7 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 import com.microsoft.hyperspace.{BuildInfo, HyperspaceException, TestUtils}
 import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
+import com.microsoft.hyperspace.index.covering.CoveringIndex
 import com.microsoft.hyperspace.util.{JsonUtils, PathUtils}
 
 class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
@@ -76,7 +77,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
          |{
          |  "name" : "indexName",
          |  "derivedDataset" : {
-         |    "type" : "com.microsoft.hyperspace.index.CoveringIndex",
+         |    "type" : "com.microsoft.hyperspace.index.covering.CoveringIndex",
          |    "indexedColumns" : [ "col1" ],
          |    "includedColumns" : [ "col2", "col3" ],
          |    "schema" : {

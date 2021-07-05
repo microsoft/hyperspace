@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index
+package com.microsoft.hyperspace.index.covering
 
 import java.util.Locale
 
 import org.apache.spark.sql.DataFrame
 
 import com.microsoft.hyperspace.Hyperspace
+import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
- * IndexConfig specifies the configuration of a covering index.
+ * CoveringIndexConfig specifies the configuration of a covering index.
  *
  * Use this class to create a covering index with [[Hyperspace.createIndex()]].
  *
@@ -35,7 +36,7 @@ import com.microsoft.hyperspace.util.HyperspaceConf
  * @param indexedColumns Columns from which an index is created.
  * @param includedColumns Columns to be included in the index.
  */
-case class IndexConfig(
+case class CoveringIndexConfig(
     override val indexName: String,
     indexedColumns: Seq[String],
     includedColumns: Seq[String] = Seq())
@@ -65,7 +66,7 @@ case class IndexConfig(
 
   override def equals(that: Any): Boolean = {
     that match {
-      case IndexConfig(thatIndexName, thatIndexedColumns, thatIncludedColumns) =>
+      case CoveringIndexConfig(thatIndexName, thatIndexedColumns, thatIncludedColumns) =>
         indexName.equalsIgnoreCase(thatIndexName) &&
           lowerCaseIndexedColumns.equals(toLowerCase(thatIndexedColumns)) &&
           lowerCaseIncludedColumnsSet.equals(toLowerCase(thatIncludedColumns).toSet)
@@ -110,13 +111,13 @@ case class IndexConfig(
 }
 
 /**
- * Defines [[IndexConfig.Builder]] and relevant helper methods for enabling builder pattern for
- * [[IndexConfig]].
+ * Defines [[CoveringIndexConfig.Builder]] and relevant helper methods for enabling builder pattern
+ * for [[CoveringIndexConfig]].
  */
-object IndexConfig {
+object CoveringIndexConfig {
 
   /**
-   * Builder for [[IndexConfig]].
+   * Builder for [[CoveringIndexConfig]].
    */
   class Builder {
 
@@ -125,10 +126,10 @@ object IndexConfig {
     private[this] var indexName: String = ""
 
     /**
-     * Updates index name for [[IndexConfig]].
+     * Updates index name for [[CoveringIndexConfig]].
      *
-     * @param indexName index name for the [[IndexConfig]].
-     * @return an [[IndexConfig.Builder]] object with updated index name.
+     * @param indexName index name for the [[CoveringIndexConfig]].
+     * @return an [[CoveringIndexConfig.Builder]] object with updated index name.
      */
     def indexName(indexName: String): Builder = {
       if (!this.indexName.isEmpty) {
@@ -144,13 +145,13 @@ object IndexConfig {
     }
 
     /**
-     * Updates column names for [[IndexConfig]].
+     * Updates column names for [[CoveringIndexConfig]].
      *
      * Note: API signature supports passing one or more argument.
      *
-     * @param indexedColumn indexed column for the [[IndexConfig]].
-     * @param indexedColumns indexed columns for the [[IndexConfig]].
-     * @return an [[IndexConfig.Builder]] object with updated indexed columns.
+     * @param indexedColumn indexed column for the [[CoveringIndexConfig]].
+     * @param indexedColumns indexed columns for the [[CoveringIndexConfig]].
+     * @return an [[CoveringIndexConfig.Builder]] object with updated indexed columns.
      */
     def indexBy(indexedColumn: String, indexedColumns: String*): Builder = {
       if (this.indexedColumns.nonEmpty) {
@@ -162,13 +163,13 @@ object IndexConfig {
     }
 
     /**
-     * Updates included columns for [[IndexConfig]].
+     * Updates included columns for [[CoveringIndexConfig]].
      *
      * Note: API signature supports passing one or more argument.
      *
-     * @param includedColumn included column for [[IndexConfig]].
-     * @param includedColumns included columns for [[IndexConfig]].
-     * @return an [[IndexConfig.Builder]] object with updated included columns.
+     * @param includedColumn included column for [[CoveringIndexConfig]].
+     * @param includedColumns included columns for [[CoveringIndexConfig]].
+     * @return an [[CoveringIndexConfig.Builder]] object with updated included columns.
      */
     def include(includedColumn: String, includedColumns: String*): Builder = {
       if (this.includedColumns.nonEmpty) {
@@ -180,20 +181,20 @@ object IndexConfig {
     }
 
     /**
-     * Creates IndexConfig from supplied index name, indexed columns and included columns
-     * to [[IndexConfig.Builder]].
+     * Creates CoveringIndexConfig from supplied index name, indexed columns and included columns
+     * to [[CoveringIndexConfig.Builder]].
      *
-     * @return an [[IndexConfig]] object.
+     * @return an [[CoveringIndexConfig]] object.
      */
-    def create(): IndexConfig = {
-      IndexConfig(indexName, indexedColumns, includedColumns)
+    def create(): CoveringIndexConfig = {
+      CoveringIndexConfig(indexName, indexedColumns, includedColumns)
     }
   }
 
   /**
-   *  Creates new [[IndexConfig.Builder]] for constructing an [[IndexConfig]].
+   *  Creates new [[CoveringIndexConfig.Builder]] for constructing an [[CoveringIndexConfig]].
    *
-   * @return an [[IndexConfig.Builder]] object.
+   * @return an [[CoveringIndexConfig.Builder]] object.
    */
   def builder(): Builder = new Builder
 }

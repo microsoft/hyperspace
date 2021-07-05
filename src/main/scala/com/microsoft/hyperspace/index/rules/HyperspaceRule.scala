@@ -76,23 +76,3 @@ trait HyperspaceRule extends ActiveSparkSession {
     }
   }
 }
-
-/**
- * No-op rule for traversal.
- */
-object NoOpRule extends HyperspaceRule {
-
-  object FilterAll extends QueryPlanIndexFilter {
-    override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap =
-      Map.empty
-  }
-
-  override val filtersOnQueryPlan = FilterAll :: Nil
-
-  // As there's no applicable index after [[FilterAll]], indexRanker is not reachable.
-  override val indexRanker = null
-
-  override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = plan
-
-  override def score(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): Int = 0
-}

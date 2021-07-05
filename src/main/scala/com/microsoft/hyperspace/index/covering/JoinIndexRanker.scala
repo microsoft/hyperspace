@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rankers
+package com.microsoft.hyperspace.index.covering
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-import com.microsoft.hyperspace.index.{CoveringIndex, IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**

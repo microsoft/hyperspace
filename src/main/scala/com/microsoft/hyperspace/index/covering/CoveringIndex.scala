@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index
+package com.microsoft.hyperspace.index.covering
 
 import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
@@ -22,6 +22,7 @@ import org.apache.spark.sql.functions.{col, input_file_name}
 import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
 import org.apache.spark.sql.types.StructType
 
+import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.ResolverUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn

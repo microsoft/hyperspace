@@ -27,6 +27,7 @@ import org.mockito.Mockito.{mock, when}
 import com.microsoft.hyperspace.{HyperspaceException, SampleData}
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, CREATING}
 import com.microsoft.hyperspace.index._
+import com.microsoft.hyperspace.index.covering.CoveringIndex
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
 class RefreshActionTest extends HyperspaceSuite {

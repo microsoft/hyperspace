@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rankers
+package com.microsoft.hyperspace.index.covering
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -22,8 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
-import com.microsoft.hyperspace.index.{FileInfo, IndexConstants, IndexLogEntryTags}
-import com.microsoft.hyperspace.index.rules.HyperspaceRuleSuite
+import com.microsoft.hyperspace.index.{FileInfo, HyperspaceRuleSuite, IndexConstants}
 import com.microsoft.hyperspace.util.FileUtils
 
 class FilterIndexRankerTest extends HyperspaceRuleSuite {

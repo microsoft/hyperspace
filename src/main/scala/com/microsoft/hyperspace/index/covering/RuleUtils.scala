@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.rules
+package com.microsoft.hyperspace.index.covering
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
@@ -382,7 +382,7 @@ object RuleUtils {
    * @param plan Plan to be shuffled.
    * @return Transformed plan by injecting on-the-fly shuffle with given bucket specification.
    */
-  private[rules] def transformPlanToShuffleUsingBucketSpec(
+  private[covering] def transformPlanToShuffleUsingBucketSpec(
       bucketSpec: BucketSpec,
       plan: LogicalPlan): LogicalPlan = {
     // Extract top level plan including all required columns for shuffle in its output.
