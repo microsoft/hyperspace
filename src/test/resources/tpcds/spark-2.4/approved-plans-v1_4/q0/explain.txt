@@ -1,0 +1,14 @@
+== Physical Plan ==
+CollectLimit 100
++- *(5) Project [cs_bill_customer_sk#1, ss_customer_sk#2]
+   +- *(5) SortMergeJoin [cs_sold_date_sk#3], [ss_sold_date_sk#4], Inner
+      :- *(2) Sort [cs_sold_date_sk#3 ASC NULLS FIRST], false, 0
+      :  +- Exchange hashpartitioning(cs_sold_date_sk#3, 200)
+      :     +- *(1) Project [cs_sold_date_sk#3, cs_bill_customer_sk#1]
+      :        +- *(1) Filter isnotnull(cs_sold_date_sk#3)
+      :           +- *(1) FileScan parquet default.catalog_sales[cs_sold_date_sk#3,cs_bill_customer_sk#1] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/catalog_sales], PartitionFilters: [], PushedFilters: [IsNotNull(cs_sold_date_sk)], ReadSchema: struct<cs_sold_date_sk:int,cs_bill_customer_sk:int>
+      +- *(4) Sort [ss_sold_date_sk#4 ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(ss_sold_date_sk#4, 200)
+            +- *(3) Project [ss_sold_date_sk#4, ss_customer_sk#2]
+               +- *(3) Filter isnotnull(ss_sold_date_sk#4)
+                  +- *(3) FileScan parquet default.store_sales[ss_sold_date_sk#4,ss_customer_sk#2] Batched: true, Format: Parquet, Location [not included in comparison]/{warehouse_dir}/store_sales], PartitionFilters: [], PushedFilters: [IsNotNull(ss_sold_date_sk)], ReadSchema: struct<ss_sold_date_sk:int,ss_customer_sk:int>
