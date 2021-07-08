@@ -42,6 +42,20 @@ You can use the built-in sbt shell in IntelliJ without any problems. However, th
 
 Additionally, you might have to run `sbt buildInfo` if you encounter an error like `object BuildInfo is not a member of package com.microsoft.hyperspace` for the first build.
 
+To debug with the sbt shell in IntelliJ, run `set Test/fork := false` in the sbt shell so that the debugger attached to the sbt shell can work. Without this, breakpoints won't work.
+
+For a better IntelliJ and other IDE-like environment (e.g., coc.nvim) experience, try replacing symbolic links with hard links if you are in MacOS or Linux.
+
+```sh
+$ rm spark3.1/src
+$ mkdir spark3.1/src
+$ git update-index --assume-unchanged spark3.1/src
+$ sudo mount localhost:<absolute path to hyperspace repo>/src spark3.1/src # MacOS (NFS required)
+$ mount --bind src spark3.1/src # Linux
+```
+
+With this setup, just be cautious when you do Git operations in the repository. For example, `git checkout --` will wipe out every file in `src` because Git doesn't know that essentially you've made hard links. If you want to reset source files, do `git checkout -- src` instead.
+
 ## Inspiration and Special Thanks
 
 This project would not have been possible without the outstanding work from the following communities:
