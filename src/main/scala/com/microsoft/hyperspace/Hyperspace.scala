@@ -74,6 +74,15 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
+   * Delete old versions of the index
+   *
+   * @param indexName Name of the index to delete old versions
+   */
+  def deleteOldVersions(indexName: String): Unit = {
+    indexManager.deleteOldVersions(indexName)
+  }
+
+  /**
    * Update indexes for the latest version of the data.
    *
    * @param indexName Name of the index to refresh.

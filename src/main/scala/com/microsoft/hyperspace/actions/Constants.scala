@@ -21,6 +21,7 @@ object Constants {
     val ACTIVE = "ACTIVE"
     val CREATING = "CREATING"
     val DELETING = "DELETING"
+    val DELETINGOLD = "DELETINGOLD"
     val DELETED = "DELETED"
     val REFRESHING = "REFRESHING"
     val VACUUMING = "VACUUMING"

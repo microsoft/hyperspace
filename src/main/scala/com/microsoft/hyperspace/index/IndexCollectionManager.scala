@@ -70,6 +70,17 @@ class IndexCollectionManager(
     }
   }
 
+  override def deleteOldVersions(indexName: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
+      new DeleteOldVersionsAction(logManager, dataManager).run()
+    }
+  }
+
   override def refresh(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
       val hadoopConf = spark.sessionState.newHadoopConf()
