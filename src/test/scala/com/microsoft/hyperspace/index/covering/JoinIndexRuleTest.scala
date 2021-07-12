@@ -110,7 +110,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val indexes = if (allIndexes.isEmpty) {
       IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
     } else {
-      allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
+      allIndexes.foreach(_.setTagValue(IndexLogEntryTags.INDEX_PLAN_ANALYSIS_ENABLED, true))
       allIndexes
     }
     val candidateIndexes = CandidateIndexCollector(plan, indexes)
@@ -161,9 +161,10 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(msg.isDefined)
-      assert(msg.get.exists(_.contains("Not eligible Join - no join condition.")))
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
+      assert(msg.exists(_.contains("Not eligible Join - no join condition.")))
     }
   }
 
@@ -174,10 +175,11 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(msg.isDefined)
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
       assert(
-        msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+        msg.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
     }
   }
 
@@ -188,10 +190,11 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(msg.isDefined)
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
       assert(
-        msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+        msg.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
     }
   }
 
@@ -202,10 +205,11 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
     assert(updatedPlan.equals(originalPlan))
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(msg.isDefined)
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
       assert(
-        msg.get.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+        msg.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
     }
   }
 
@@ -230,26 +234,28 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       index.name match {
         case "t1i1" =>
           assert(
-            msg.get.toSet.equals(
-              Set(
-                "All join condition column should be the indexed columns. " +
-                  "Join columns: [t1c2], Indexed columns: [t1c1]",
-                "No available indexes for right subplan.")))
+            msg.get.toSet.equals(Set(
+              "All join condition column should be the indexed columns. " +
+                "Join columns: [t1c2], Indexed columns: [t1c1]",
+              "No available indexes for right subplan.")),
+            msg.get)
         case "t1i2" =>
           assert(
             msg.get.toSet.equals(Set(
               "All join condition column should be the indexed columns. " +
                 "Join columns: [t1c2], Indexed columns: [t1c1,t1c2]",
-              "No available indexes for right subplan.")))
+              "No available indexes for right subplan.")),
+            msg.get)
         case "t1i3" =>
-          assert(msg.get.toSet.equals(Set("No available indexes for right subplan.")))
+          assert(
+            msg.get.toSet
+              .equals(Set("No available indexes for right subplan.")))
         case "t2i1" =>
           assert(
-            msg.get.toSet.equals(
-              Set(
-                "All join condition column should be the indexed columns. " +
-                  "Join columns: [t2c2], Indexed columns: [t2c1]",
-                "No available indexes for right subplan.")))
+            msg.get.toSet.equals(Set(
+              "All join condition column should be the indexed columns. " +
+                "Join columns: [t2c2], Indexed columns: [t2c1]",
+              "No available indexes for right subplan.")))
         case "t2i2" =>
           assert(
             msg.get.toSet.equals(Set(
@@ -283,11 +289,11 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       index.name match {
         case "t1i1" =>
           assert(
-            msg.get.toSet.equals(
-              Set(
-                "Index does not contain all required columns. " +
-                  "Required columns: [t1c1,t1c4], Index columns: [t1c1,t1c3]",
-                "No available indexes for left subplan.")))
+            msg.get.toSet.equals(Set(
+              "Index does not contain all required columns. " +
+                "Required columns: [t1c1,t1c4], Index columns: [t1c1,t1c3]",
+              "No available indexes for left subplan.")),
+            msg.get)
         case "t2i1" =>
           assert(
             msg.get.toSet.equals(
@@ -437,13 +443,14 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan, allIndexes)
       assert(updatedPlan.equals(originalPlan))
       allIndexes.foreach { index =>
-        val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-        assert(msg.isDefined)
+        val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+        assert(reasons.isDefined)
+        val msg = reasons.get.map(_.verboseStr)
         assert(
-          msg.get.toSet.equals(
-            Set("Each join condition column should come from relations directly and attributes " +
-              "from left plan must exclusively have one-to-one mapping with attributes from " +
-              "right plan. E.g. join(A = B and A = D) is not eligible.")))
+          msg.size == 1 && msg.head.contains(
+            "Each join condition column should come from relations " +
+              "directly and attributes from left plan must exclusively have one-to-one mapping " +
+              "with attributes from right plan. E.g. join(A = B and A = D) is not eligible."))
       }
     }
     {

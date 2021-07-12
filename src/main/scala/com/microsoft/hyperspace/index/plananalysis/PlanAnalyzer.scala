@@ -125,6 +125,10 @@ object PlanAnalyzer {
         outputStream,
         spark)
       outputStream.writeLine()
+
+      buildHeader(outputStream, "Applicable indexes:")
+      outputStream.write(CandidateIndexAnalyzer.applicableIndexInfoString(spark, df))
+      outputStream.writeLine()
     }
 
     outputStream.withTag()

@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
+import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 
 /**
@@ -70,9 +71,21 @@ trait HyperspaceRule extends ActiveSparkSession {
 
     if (applicableIndexes.nonEmpty) {
       val selectedIndexes = indexRanker(plan, applicableIndexes)
+      selectedIndexes.values.toSeq.distinct.foreach(setApplicableIndexTag(plan, _))
       (applyIndex(plan, selectedIndexes), score(plan, selectedIndexes))
     } else {
       (plan, 0)
+    }
+  }
+
+  protected def setApplicableIndexTag(plan: LogicalPlan, index: IndexLogEntry): Unit = {
+    if (index.getTagValue(IndexLogEntryTags.INDEX_PLAN_ANALYSIS_ENABLED).getOrElse(false)) {
+      val prevRules =
+        index.getTagValue(plan, IndexLogEntryTags.APPLICABLE_INDEX_RULES).getOrElse(Nil)
+      index.setTagValue(
+        plan,
+        IndexLogEntryTags.APPLICABLE_INDEX_RULES,
+        prevRules :+ getClass.getSimpleName.split("\\$").last)
     }
   }
 }

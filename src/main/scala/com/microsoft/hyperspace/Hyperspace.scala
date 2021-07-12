@@ -20,7 +20,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.IndexConstants.{OPTIMIZE_MODE_QUICK, REFRESH_MODE_FULL}
-import com.microsoft.hyperspace.index.plananalysis.PlanAnalyzer
+import com.microsoft.hyperspace.index.plananalysis.{CandidateIndexAnalyzer, PlanAnalyzer}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
@@ -169,6 +169,17 @@ class Hyperspace(spark: SparkSession) {
    */
   def index(indexName: String): DataFrame = {
     indexManager.index(indexName)
+  }
+
+  def whyNot(df: DataFrame, indexName: String = "", extended: Boolean = false)(
+      implicit redirectFunc: String => Unit = print): Unit = {
+    withHyperspaceRuleDisabled {
+      if (indexName.nonEmpty) {
+        redirectFunc(CandidateIndexAnalyzer.whyNotIndexString(spark, df, indexName, extended))
+      } else {
+        redirectFunc(CandidateIndexAnalyzer.whyNotIndexesString(spark, df, extended))
+      }
+    }
   }
 
   private def withHyperspaceRuleDisabled(f: => Unit): Unit = {

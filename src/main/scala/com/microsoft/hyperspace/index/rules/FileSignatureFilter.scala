@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
+import com.microsoft.hyperspace.index.plananalysis.{FilterReasonCode, FilterReasons}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -62,7 +63,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
         withFilterReasonTag(
           plan,
           index,
-          s"Index signature does not match. Try Hybrid Scan or refreshIndex.") {
+          FilterReasons.apply(FilterReasonCode.SOURCE_DATA_CHANGE, Seq.empty)) {
           signatureValid(relation, index, signatureMap)
         }
       }
@@ -133,22 +134,40 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
 
         // Tag to original index log entry to check the reason string with the given log entry.
         lazy val hasLineageColumnCond =
-          withFilterReasonTag(relation.plan, index, "Index doesn't support deleted files.")(
-            entry.derivedDataset.canHandleDeletedFiles)
+          withFilterReasonTag(
+            relation.plan,
+            index,
+            FilterReasons.apply(FilterReasonCode.NO_DELETE_SUPPORT, Seq.empty)) {
+            entry.derivedDataset.canHandleDeletedFiles
+          }
         lazy val hasCommonFilesCond =
-          withFilterReasonTag(relation.plan, index, "No common files.")(commonCnt > 0)
+          withFilterReasonTag(
+            relation.plan,
+            index,
+            FilterReasons.apply(FilterReasonCode.NO_COMMON_FILES, Seq.empty)) {
+            commonCnt > 0
+          }
+
+        val hybridScanAppendThreshold = HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
+        val hybridScanDeleteThreshold = HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
         lazy val appendThresholdCond = withFilterReasonTag(
           relation.plan,
           index,
-          s"Appended bytes ratio ($appendedBytesRatio) is larger than " +
-            s"threshold config ${HyperspaceConf.hybridScanAppendedRatioThreshold(spark)}") {
-          appendedBytesRatio < HyperspaceConf.hybridScanAppendedRatioThreshold(spark)
+          FilterReasons.apply(
+            FilterReasonCode.TOO_MUCH_APPENDED,
+            Seq(
+              ("appendedRatio", appendedBytesRatio.toString),
+              ("hybridScanAppendThreshold", hybridScanAppendThreshold.toString)))) {
+          appendedBytesRatio < hybridScanAppendThreshold
         }
         lazy val deleteThresholdCond = withFilterReasonTag(
           relation.plan,
           index,
-          s"Deleted bytes ratio ($deletedBytesRatio) is larger than " +
-            s"threshold config ${HyperspaceConf.hybridScanDeletedRatioThreshold(spark)}") {
+          FilterReasons.apply(
+            FilterReasonCode.TOO_MUCH_DELETED,
+            Seq(
+              ("deletedRatio", deletedBytesRatio.toString),
+              ("hybridScanDeleteThreshold", hybridScanDeleteThreshold.toString)))) {
           deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
         }
 

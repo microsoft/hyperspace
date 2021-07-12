@@ -527,8 +527,21 @@ case class IndexLogEntry(
     tags.get((plan, tag)).map(_.asInstanceOf[T])
   }
 
+  def getTagValueForAllPlan[T](tag: IndexLogEntryTag[T]): Seq[(LogicalPlan, T)] = {
+    tags.filter(entry => entry._1._2.equals(tag)).toSeq.map { case (k, v) =>
+      (k._1, v.asInstanceOf[T])
+    }
+  }
+
   def unsetTagValue[T](plan: LogicalPlan, tag: IndexLogEntryTag[T]): Unit = {
     tags.remove((plan, tag))
+  }
+
+  def unsetTagValueForAllPlan[T](tag: IndexLogEntryTag[T]): Unit = {
+    val plansWithTag = tags.keys.filter(_._2.name.equals(tag.name)).map(_._1)
+    plansWithTag.foreach { plan =>
+      tags.remove((plan, tag))
+    }
   }
 
   def withCachedTag[T](plan: LogicalPlan, tag: IndexLogEntryTag[T])(f: => T): T = {
