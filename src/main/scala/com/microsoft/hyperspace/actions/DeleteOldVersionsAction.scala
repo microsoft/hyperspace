@@ -45,7 +45,7 @@ class DeleteOldVersionsAction(
     if (!logEntry.state.equalsIgnoreCase(ACTIVE)) {
       throw HyperspaceException(
         s"DeleteOldVersions is only supported in $ACTIVE state. " +
-          s"Current state is ${logEntry.state}")
+          s"Current state is ${logEntry.state}.")
     }
   }
 

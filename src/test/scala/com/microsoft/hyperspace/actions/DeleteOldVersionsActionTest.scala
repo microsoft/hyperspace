@@ -45,7 +45,7 @@ class DeleteOldVersionsActionTest extends SparkFunSuite with SparkInvolvedSuite 
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(TestLogEntry(CREATING)))
     val action = new DeleteOldVersionsAction(mockLogManager, mockDataManager)
     val ex = intercept[HyperspaceException](action.validate())
-    assert(ex.getMessage.contains("DeleteOldVersion is only supported in ACTIVE state"))
+    assert(ex.getMessage.contains("DeleteOldVersions is only supported in ACTIVE state. Current state is CREATING."))
   }
 
   test("op() calls index datamanager.delete() for all data folders except the latest one") {
