@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index
 
-import java.io.{File, FileNotFoundException}
+import java.io.File
 import java.nio.file
 import java.nio.file.{Files, Paths}
 
@@ -401,7 +401,7 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
   }
 
   test(
-    "Directory.fromDirectory and fromLeafFileswhere files are at same level but different" +
+    "Directory.fromDirectory and fromLeafFiles where files are at same level but different" +
       "dirs.") {
     // File Structure
     // testDir/temp/a/f1

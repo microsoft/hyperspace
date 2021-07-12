@@ -22,7 +22,7 @@ import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions._
-import com.microsoft.hyperspace.actions.Constants.States.DOESNOTEXIST
+import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, DOESNOTEXIST}
 import com.microsoft.hyperspace.index.IndexConstants.{REFRESH_MODE_FULL, REFRESH_MODE_INCREMENTAL, REFRESH_MODE_QUICK}
 
 class IndexCollectionManager(
@@ -60,13 +60,23 @@ class IndexCollectionManager(
   }
 
   override def vacuum(indexName: String): Unit = {
+    // Note that the behavior of vacuum index is different when the state is ACTIVE.
+    // The event that action creates is also different.
+
     withLogManager(indexName) { logManager =>
       val hadoopConf = spark.sessionState.newHadoopConf()
       val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
         .getIndexPath(indexName)
       val dataManager =
         indexDataManagerFactory.create(indexPath, hadoopConf)
-      new VacuumAction(logManager, dataManager).run()
+
+      logManager.getLatestLog() match {
+        case Some(index) if index.state == ACTIVE =>
+          // clean up only if state is ACTIVE.
+          new VacuumOutdatedAction(logManager, dataManager).run()
+        case _ =>
+          new VacuumAction(logManager, dataManager).run()
+      }
     }
   }
 

@@ -36,7 +36,11 @@ import com.microsoft.hyperspace.util.FileUtils
  *        f1.parquet
  */
 trait IndexDataManager {
+  def getAllFilePaths(): Seq[Path]
+
   def getLatestVersionId(): Option[Int]
+
+  def getAllVersionIds(): Seq[Int]
 
   def getPath(id: Int): Path
 
@@ -49,23 +53,53 @@ class IndexDataManagerImpl(indexPath: Path, configuration: Configuration)
   private lazy val fs: FileSystem = indexPath.getFileSystem(configuration)
 
   /**
-   * This method relies on the naming convention that directory name will be similar to hive
-   * partitioning scheme, i.e. "root/v__=value/f1.parquet" etc. Here the value represents the
-   * version id of the data.
+   * Get latest version id of the index data directory.
    */
   override def getLatestVersionId(): Option[Int] = {
-    if (!fs.exists(indexPath)) {
-      return None
-    }
-    val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
-    val ids = fs.listStatus(indexPath).collect {
-      case status
-          if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
-        status.getPath.getName.drop(prefixLength).toInt
-    }
+    val ids = getAllVersionIds()
     if (ids.isEmpty) None else Some(ids.max)
   }
 
+  /**
+   * This method relies on the naming convention that directory name will be similar to hive
+   * partitioning scheme, i.e. {{{"root/v__=value/f1.parquet"}}} etc. Here the value represents the
+   * version id of the data.
+   */
+  override def getAllVersionIds(): Seq[Int] = {
+    if (!fs.exists(indexPath)) {
+      return Nil
+    }
+    val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
+    fs.listStatus(indexPath)
+      .collect {
+        case status
+            if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
+          status.getPath.getName.drop(prefixLength).toInt
+      }
+  }
+
+  /**
+   * Get all file paths in the index directory.
+   */
+  override def getAllFilePaths(): Seq[Path] = {
+    if (!fs.exists(indexPath)) {
+      return Nil
+    }
+    val directories = fs.listStatus(indexPath).collect {
+      case status
+          if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
+        status.getPath
+    }
+    directories.flatMap { dir =>
+      fs.listStatus(dir).collect {
+        case status => status.getPath
+      }
+    }
+  }
+
+  /**
+   * Get directory path of the given id.
+   */
   override def getPath(id: Int): Path = {
     new Path(indexPath, s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=${id.toString}")
   }
