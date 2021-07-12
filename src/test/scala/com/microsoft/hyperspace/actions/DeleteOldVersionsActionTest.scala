@@ -25,7 +25,6 @@ import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States._
 import com.microsoft.hyperspace.index._
 
-
 class DeleteOldVersionsActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
   private val mockDataManager: IndexDataManager = mock(classOf[IndexDataManager])
@@ -56,7 +55,6 @@ class DeleteOldVersionsActionTest extends SparkFunSuite with SparkInvolvedSuite 
     action.op()
     verify(mockDataManager).delete(0)
     verify(mockDataManager).delete(1)
-    verify(mockDataManager, new Times(2)).delete
     verify(mockDataManager, new Times(0)).delete(2)
     verify(mockDataManager, new Times(0)).delete(3)
     verify(mockDataManager, new Times(0)).delete(-1)

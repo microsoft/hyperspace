@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.actions
 
 import com.microsoft.hyperspace.HyperspaceException
-import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, DELETINGOLD}
+import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, DELETINGOLDVERSIONS}
 import com.microsoft.hyperspace.index.{IndexDataManager, IndexLogEntry, IndexLogManager, LogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, DeleteOldVersionsActionEvent, HyperspaceEvent}
 
@@ -37,7 +37,7 @@ class DeleteOldVersionsAction(
     }
   }
 
-  override def transientState: String = DELETINGOLD
+  override def transientState: String = DELETINGOLDVERSIONS
 
   override def finalState: String = ACTIVE
 
