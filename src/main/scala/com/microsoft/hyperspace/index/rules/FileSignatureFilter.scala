@@ -63,7 +63,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
         withFilterReasonTag(
           plan,
           index,
-          FilterReasons.apply(FilterReasonCode.SOURCE_DATA_CHANGE, Seq.empty)) {
+          FilterReasons.apply(FilterReasonCode.SOURCE_DATA_CHANGED)) {
           signatureValid(relation, index, signatureMap)
         }
       }
@@ -137,14 +137,14 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
           withFilterReasonTag(
             relation.plan,
             index,
-            FilterReasons.apply(FilterReasonCode.NO_DELETE_SUPPORT, Seq.empty)) {
+            FilterReasons.apply(FilterReasonCode.NO_DELETE_SUPPORT)) {
             entry.derivedDataset.canHandleDeletedFiles
           }
         lazy val hasCommonFilesCond =
           withFilterReasonTag(
             relation.plan,
             index,
-            FilterReasons.apply(FilterReasonCode.NO_COMMON_FILES, Seq.empty)) {
+            FilterReasons.apply(FilterReasonCode.NO_COMMON_FILES)) {
             commonCnt > 0
           }
 
@@ -155,9 +155,8 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
           index,
           FilterReasons.apply(
             FilterReasonCode.TOO_MUCH_APPENDED,
-            Seq(
-              ("appendedRatio", appendedBytesRatio.toString),
-              ("hybridScanAppendThreshold", hybridScanAppendThreshold.toString)))) {
+            ("appendedRatio", appendedBytesRatio.toString),
+            ("hybridScanAppendThreshold", hybridScanAppendThreshold.toString))) {
           appendedBytesRatio < hybridScanAppendThreshold
         }
         lazy val deleteThresholdCond = withFilterReasonTag(
@@ -165,9 +164,8 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
           index,
           FilterReasons.apply(
             FilterReasonCode.TOO_MUCH_DELETED,
-            Seq(
-              ("deletedRatio", deletedBytesRatio.toString),
-              ("hybridScanDeleteThreshold", hybridScanDeleteThreshold.toString)))) {
+            ("deletedRatio", deletedBytesRatio.toString),
+            ("hybridScanDeleteThreshold", hybridScanDeleteThreshold.toString))) {
           deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
         }
 

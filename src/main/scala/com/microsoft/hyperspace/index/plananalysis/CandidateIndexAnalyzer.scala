@@ -162,7 +162,6 @@ object CandidateIndexAnalyzer extends Logging {
     stringBuilder.append(newLine)
     stringBuilder.append(planWithHyperspace.toString)
     stringBuilder.append(newLine)
-    stringBuilder.append(newLine)
 
     def printIndexNames(indexNames: Seq[String]): Unit = {
       indexNames.foreach { idxName =>
@@ -207,7 +206,7 @@ object CandidateIndexAnalyzer extends Logging {
                   subPlanLocStr,
                   index.name,
                   index.derivedDataset.kindAbbr,
-                  reason.code,
+                  reason.codeStr,
                   reason.argStr,
                   reason.verboseStr)
               }

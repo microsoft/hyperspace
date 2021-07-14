@@ -68,7 +68,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
           leftAndRightIndexes,
           FilterReasons.apply(
             FilterReasonCode.NOT_ELIGIBLE_JOIN,
-            Seq(("reason", "Non equi-join or has literal")))) {
+            ("reason", "Non equi-join or has literal"))) {
           isJoinConditionSupported(condition)
         }
 
@@ -78,7 +78,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
             leftAndRightIndexes,
             FilterReasons.apply(
               FilterReasonCode.NOT_ELIGIBLE_JOIN,
-              Seq(("reason", "Non linear left child plan")))) {
+              ("reason", "Non linear left child plan"))) {
             isPlanLinear(l)
           }
         val rightPlanLinearCond =
@@ -87,7 +87,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
             leftAndRightIndexes,
             FilterReasons.apply(
               FilterReasonCode.NOT_ELIGIBLE_JOIN,
-              Seq(("reason", "Non linear right child plan")))) {
+              ("reason", "Non linear right child plan"))) {
             isPlanLinear(r)
           }
 
@@ -110,7 +110,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
           candidateIndexes.values.flatten.toSeq,
           FilterReasons.apply(
             FilterReasonCode.NOT_ELIGIBLE_JOIN,
-            Seq(("reason", "No join condition"))))
+            ("reason", "No join condition")))
         Map.empty
       case _ =>
         Map.empty
@@ -180,7 +180,7 @@ object JoinAttributeFilter extends QueryPlanIndexFilter {
         candidateIndexes.head._2 ++ candidateIndexes.last._2,
         FilterReasons.apply(
           FilterReasonCode.NOT_ELIGIBLE_JOIN,
-          Seq(("reason", "incompatible left and right join columns")))) {
+          ("reason", "incompatible left and right join columns"))) {
         ensureAttributeRequirements(
           JoinIndexRule.leftRelation.get,
           JoinIndexRule.rightRelation.get,
@@ -365,15 +365,13 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         if (withFilterReasonTag(
             plan,
             candidateIndexes.head._2 ++ candidateIndexes.last._2,
-            FilterReasons.apply(
-              FilterReasonCode.NO_AVAIL_JOIN_INDEX_PAIR,
-              Seq(("child", "left"))))(lIndexes.nonEmpty) &&
+            FilterReasons.apply(FilterReasonCode.NO_AVAIL_JOIN_INDEX_PAIR, ("child", "left")))(
+            lIndexes.nonEmpty) &&
           withFilterReasonTag(
             plan,
             candidateIndexes.head._2 ++ candidateIndexes.last._2,
-            FilterReasons.apply(
-              FilterReasonCode.NO_AVAIL_JOIN_INDEX_PAIR,
-              Seq(("child", "right"))))(rIndexes.nonEmpty)) {
+            FilterReasons.apply(FilterReasonCode.NO_AVAIL_JOIN_INDEX_PAIR, ("child", "right")))(
+            rIndexes.nonEmpty)) {
           Map(leftRelation.plan -> lIndexes, rightRelation.plan -> rIndexes)
         } else {
           Map.empty
@@ -432,10 +430,9 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         idx,
         FilterReasons.apply(
           FilterReasonCode.NOT_ALL_JOIN_COL_INDEXED,
-          Seq(
-            ("child", leftOrRight),
-            ("joinCols", requiredIndexCols.mkString(", ")),
-            ("indexedCols", idx.indexedColumns.mkString(", "))))) {
+          ("child", leftOrRight),
+          ("joinCols", requiredIndexCols.mkString(", ")),
+          ("indexedCols", idx.indexedColumns.mkString(", ")))) {
         requiredIndexCols.toSet.equals(idx.indexedColumns.toSet)
       } &&
       withFilterReasonTag(
@@ -443,10 +440,9 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         idx,
         FilterReasons.apply(
           FilterReasonCode.MISSING_INDEXED_COL,
-          Seq(
-            ("child", leftOrRight),
-            ("requiredIndexedCols", allRequiredCols.mkString(", ")),
-            ("IndexedCols", idx.indexedColumns.mkString(", "))))) {
+          ("child", leftOrRight),
+          ("requiredIndexedCols", allRequiredCols.mkString(", ")),
+          ("IndexedCols", idx.indexedColumns.mkString(", ")))) {
         allRequiredCols.forall(allCols.contains)
       }
     }
@@ -530,7 +526,7 @@ object JoinRankFilter extends IndexRankFilter {
         setFilterReasonTag(
           plan,
           indexes.head._2 ++ indexes.last._2,
-          FilterReasons.apply(FilterReasonCode.NO_COMPATIBLE_JOIN_INDEX_PAIR, Seq.empty))
+          FilterReasons.apply(FilterReasonCode.NO_COMPATIBLE_JOIN_INDEX_PAIR))
         Map.empty
       }
   }

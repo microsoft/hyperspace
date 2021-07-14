@@ -99,9 +99,8 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
           index,
           FilterReasons.apply(
             FilterReasonCode.NO_FIRST_INDEXED_COL_COND,
-            Seq(
-              ("firstIndexedCol", index.derivedDataset.indexedColumns.head),
-              ("filterColumns", filterColumnNames.mkString(", "))))) {
+            ("firstIndexedCol", index.derivedDataset.indexedColumns.head),
+            ("filterColumns", filterColumnNames.mkString(", ")))) {
           ResolverUtils
             .resolve(spark, index.derivedDataset.indexedColumns.head, filterColumnNames)
             .isDefined
@@ -111,9 +110,8 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
           index,
           FilterReasons.apply(
             FilterReasonCode.MISSING_REQUIRED_COL,
-            Seq(
-              ("requiredCols", (filterColumnNames ++ projectColumnNames).toSet.mkString(",")),
-              ("indexCols", index.derivedDataset.referencedColumns.mkString(","))))) {
+            ("requiredCols", (filterColumnNames ++ projectColumnNames).toSet.mkString(",")),
+            ("indexCols", index.derivedDataset.referencedColumns.mkString(",")))) {
           ResolverUtils
             .resolve(
               spark,

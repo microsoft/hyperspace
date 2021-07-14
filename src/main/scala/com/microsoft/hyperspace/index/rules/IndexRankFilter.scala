@@ -54,7 +54,7 @@ trait IndexRankFilter extends IndexFilter {
         index,
         FilterReasons.apply(
           FilterReasonCode.ANOTHER_INDEX_APPLIED,
-          Seq(("appliedIndex", selectedIndex.name))))
+          ("appliedIndex", selectedIndex.name)))
     }
   }
 }
