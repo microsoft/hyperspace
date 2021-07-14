@@ -50,8 +50,18 @@ class DeleteOldVersionsAction(
   }
 
   final override def op(): Unit = {
-    dataManager.getLatestVersionId().foreach { value =>
-      (value - 1 to 0 by -1).foreach { id =>
+    // get versions used
+    val indexVersionsInUse: Set[Int] = logEntry match {
+      case indexLogEntry: IndexLogEntry =>
+        indexLogEntry.content.versionInfos
+      case other =>
+        throw HyperspaceException(
+          s"DeleteOldVersions is not defined with log entry class ${other.getClass.getName}")
+    }
+
+    // delete version not used
+    dataManager.getAllVersionIds().foreach { id =>
+      if (!indexVersionsInUse.contains(id)) {
         dataManager.delete(id)
       }
     }

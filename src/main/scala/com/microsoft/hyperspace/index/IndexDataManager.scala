@@ -38,6 +38,8 @@ import com.microsoft.hyperspace.util.FileUtils
 trait IndexDataManager {
   def getLatestVersionId(): Option[Int]
 
+  def getAllVersionIds(): Seq[Int]
+
   def getPath(id: Int): Path
 
   def delete(id: Int): Unit
@@ -48,22 +50,26 @@ class IndexDataManagerImpl(indexPath: Path, configuration: Configuration)
   // TODO: Investigate whether FileContext should be used instead of FileSystem for atomic renames.
   private lazy val fs: FileSystem = indexPath.getFileSystem(configuration)
 
+  override def getLatestVersionId(): Option[Int] = {
+    val ids = getAllVersionIds()
+    if (ids.isEmpty) None else Some(ids.max)
+  }
+
   /**
    * This method relies on the naming convention that directory name will be similar to hive
-   * partitioning scheme, i.e. "root/v__=value/f1.parquet" etc. Here the value represents the
+   * partitioning scheme, i.e. {{{"root/v__=value/f1.parquet"}}} etc. Here the value represents the
    * version id of the data.
    */
-  override def getLatestVersionId(): Option[Int] = {
+  override def getAllVersionIds(): Seq[Int] = {
     if (!fs.exists(indexPath)) {
-      return None
+      return Seq()
     }
     val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
-    val ids = fs.listStatus(indexPath).collect {
+    fs.listStatus(indexPath).collect {
       case status
           if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
         status.getPath.getName.drop(prefixLength).toInt
     }
-    if (ids.isEmpty) None else Some(ids.max)
   }
 
   override def getPath(id: Int): Path = {

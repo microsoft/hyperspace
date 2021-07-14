@@ -56,6 +56,16 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
         FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
   }
 
+  @JsonIgnore
+  lazy val versionInfos: Set[Int] = {
+    // get used versions using the filenames of contents
+    val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
+    fileInfos.map(file => new Path(file.name).getParent.getName).collect {
+      case name if name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
+        name.drop(prefixLength).toInt
+    }
+  }
+
   private def rec[T](
       prefixPath: Path,
       directory: Directory,
