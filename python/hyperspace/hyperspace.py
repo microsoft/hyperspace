@@ -103,6 +103,16 @@ class Hyperspace:
         """
         self.hyperspace.vacuumIndex(indexName)
 
+    def vacuumOutdatedDataIndex(self, indexName):
+        """
+        Vacuums outdated data with given index name.
+        :param indexName: index name
+
+        >>> hyperspace = Hyperspace(spark)
+        >>> hyperspace.vacuumOutdatedDataIndex("indexname")
+        """
+        self.hyperspace.vacuumOutdatedDataIndex(indexName)
+
     def refreshIndex(self, indexName, mode='full'):
         """
         Update indexes for the latest version of the data.
