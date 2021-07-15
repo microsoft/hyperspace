@@ -223,6 +223,41 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
     assert(actual.sourceFilesSizeInBytes == 200L)
   }
 
+  test("versionInfos gets correct version info.") {
+    val versions = Seq(4, 5)
+    val versionDirectory =
+      versions.map(
+        version =>
+          Directory(
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=${version}",
+            files = Seq(FileInfo(s"index_${version}", 0, 0, UNKNOWN_FILE_ID))))
+
+    val content = Content(
+      Directory(
+        "file:/",
+        subDirs = Seq(Directory(
+          "a",
+          files =
+            Seq(FileInfo("f1", 0, 0, UNKNOWN_FILE_ID), FileInfo("f2", 0, 0, UNKNOWN_FILE_ID)),
+          subDirs = Seq(
+            Directory(
+              "b",
+              files =
+                Seq(FileInfo("f3", 0, 0, UNKNOWN_FILE_ID), FileInfo("f4", 0, 0, UNKNOWN_FILE_ID)),
+              subDirs = versionDirectory))))))
+
+    val entry = IndexLogEntry.create(
+      "indexName",
+      CoveringIndex(Seq("col1"), Seq("col2", "col3"), null, 200, Map()),
+      content,
+      null,
+      Map())
+
+    val expected = versions.toSet
+    val actual = entry.versionInfos
+    assert(actual.equals(expected))
+  }
+
   test("Content.files api lists all files from Content object.") {
     val content = Content(
       Directory(
@@ -274,34 +309,6 @@ class IndexLogEntryTest extends HyperspaceSuite with SQLHelper {
 
     val actual = Content.fromDirectory(nestedDirPath, fileIdTracker, new Configuration)
     assert(contentEquals(actual, expected))
-  }
-
-  test("Content.versionInfos gets correct version info.") {
-    val versions = Seq(4, 5)
-    val versionDirectory =
-      versions.map(
-        version =>
-          Directory(
-            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=${version}",
-            files = Seq(FileInfo(s"index_${version}", 0, 0, UNKNOWN_FILE_ID))))
-
-    val content = Content(
-      Directory(
-        "file:/",
-        subDirs = Seq(Directory(
-          "a",
-          files =
-            Seq(FileInfo("f1", 0, 0, UNKNOWN_FILE_ID), FileInfo("f2", 0, 0, UNKNOWN_FILE_ID)),
-          subDirs = Seq(
-            Directory(
-              "b",
-              files =
-                Seq(FileInfo("f3", 0, 0, UNKNOWN_FILE_ID), FileInfo("f4", 0, 0, UNKNOWN_FILE_ID)),
-              subDirs = versionDirectory))))))
-
-    val expected = versions.toSet
-    val actual = content.versionInfos
-    assert(actual.equals(expected))
   }
 
   test("Directory.fromDirectory api creates the correct Directory object.") {

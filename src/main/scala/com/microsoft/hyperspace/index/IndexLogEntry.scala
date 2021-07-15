@@ -56,44 +56,6 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
         FileInfo(new Path(prefix, f.name).toString, f.size, f.modifiedTime, f.id)).toSet
   }
 
-  /**
-   * This function extracts paths to top-level directories paths which
-   * contain the latest version index files.
-   *
-   * @return List of directory paths containing index files for latest index version.
-   */
-  @JsonIgnore
-  def versionDirectories(): Seq[String] = {
-    var prefix = root.name
-    var directory = root
-    while (directory.subDirs.size == 1 &&
-      !directory.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
-      prefix += s"${directory.subDirs.head.name}/"
-      directory = directory.subDirs.head
-    }
-
-    directory.subDirs.map(d => s"$prefix${d.name}")
-  }
-
-  /**
-   * This function extracts latest versions of an index.
-   *
-   * @return List of directory paths containing index files for latest index version.
-   */
-  @JsonIgnore
-  lazy val versionInfos: Set[Int] = {
-    // get used versions using the filenames of contents
-    // length + 1 due to '=' between prefix and version
-    val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
-    versionDirectories()
-      .map(dirname => new Path(dirname).getName)
-      .collect {
-        case name if name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
-          name.drop(prefixLength).toInt
-      }
-      .toSet
-  }
-
   private def rec[T](
       prefixPath: Path,
       directory: Directory,
@@ -549,6 +511,43 @@ case class IndexLogEntry(
 
   override def hashCode(): Int = {
     (name, derivedDataset, signature, content).hashCode
+  }
+
+  /**
+   * This function extracts paths to top-level directories paths which
+   * contain the latest version index files.
+   *
+   * @return List of directory paths containing index files for latest index version.
+   */
+  def versionDirectories(): Seq[String] = {
+    var prefix = content.root.name
+    var directory = content.root
+    while (directory.subDirs.size == 1 &&
+      !directory.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
+      prefix += s"${directory.subDirs.head.name}/"
+      directory = directory.subDirs.head
+    }
+
+    directory.subDirs.map(d => s"$prefix${d.name}")
+  }
+
+  /**
+   * This function extracts latest versions of an index.
+   *
+   * @return List of directory paths containing index files for latest index version.
+   */
+  @JsonIgnore
+  lazy val versionInfos: Set[Int] = {
+    // get used versions using the filenames of contents
+    // length + 1 due to '=' between prefix and version
+    val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
+    versionDirectories()
+      .map(dirname => new Path(dirname).getName)
+      .collect {
+        case name if name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
+          name.drop(prefixLength).toInt
+      }
+      .toSet
   }
 
   /**

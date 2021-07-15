@@ -53,7 +53,7 @@ class DeleteOldVersionsAction(
     // get versions used
     val indexVersionsInUse: Set[Int] = logEntry match {
       case indexLogEntry: IndexLogEntry =>
-        indexLogEntry.content.versionInfos
+        indexLogEntry.versionInfos
       case other =>
         throw HyperspaceException(
           s"DeleteOldVersions is not defined with log entry class ${other.getClass.getName}")
