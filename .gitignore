@@ -26,7 +26,6 @@ tmp*
 temp*
 dist
 test-output
-build.log
 
 # other scm
 .svn
@@ -47,3 +46,6 @@ build.log
 /spark2.4/src/*
 /spark3.0/src/*
 /spark3.1/src/*
+
+# in case you have python venv
+/venv

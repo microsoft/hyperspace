@@ -61,11 +61,11 @@ trait IndexManager {
   def vacuum(indexName: String): Unit
 
   /**
-   * Does hard delete of old indexes. Once deleted, the old versions can't be 'restore'd.
+   * Does hard delete of outdated indexes. Once deleted, the outdated data can't be 'restore'd.
    *
    * @param indexName Name of the index.
    */
-  def deleteOldVersions(indexName: String): Unit
+  def vacuumOutdatedData(indexName: String): Unit
 
   /**
    * Update indexes for the latest version of the data.
