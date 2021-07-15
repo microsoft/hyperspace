@@ -25,7 +25,7 @@ import com.microsoft.hyperspace.telemetry.{AppInfo, DeleteOldVersionsActionEvent
  * Delete old versions of indexes.
  *
  * Algorithm:
- *  - Delete every version except the latest one.
+ *  - Delete every version except the latest versions.
  */
 class DeleteOldVersionsAction(
     final override protected val logManager: IndexLogManager,

@@ -83,6 +83,7 @@ case class Content(root: Directory, fingerprint: NoOpFingerprint = NoOpFingerpri
   @JsonIgnore
   lazy val versionInfos: Set[Int] = {
     // get used versions using the filenames of contents
+    // length + 1 due to '=' between prefix and version
     val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
     versionDirectories()
       .map(dirname => new Path(dirname).getName)
