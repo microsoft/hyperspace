@@ -72,7 +72,7 @@ class DeleteOldVersionsActionTest extends SparkFunSuite with SparkInvolvedSuite 
   test("op() calls index datamanager.delete() which deletes nothing") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testEntry(ACTIVE)))
 
-    when(mockDataManager.getAllVersionIds()).thenReturn(Seq(0, 1, 2))
+    when(mockDataManager.getAllVersionIds()).thenReturn(Set(0, 1, 2))
     when(mockContent.versionInfos).thenReturn(Set(0, 1, 2))
 
     val action = new DeleteOldVersionsAction(mockLogManager, mockDataManager)
@@ -87,7 +87,7 @@ class DeleteOldVersionsActionTest extends SparkFunSuite with SparkInvolvedSuite 
   test("op() calls index datamanager.delete() for all data folders except the used ones") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(testEntry(ACTIVE)))
 
-    when(mockDataManager.getAllVersionIds()).thenReturn(Seq(0, 1, 2, 3))
+    when(mockDataManager.getAllVersionIds()).thenReturn(Set(0, 1, 2, 3))
     when(mockContent.versionInfos).thenReturn(Set(2, 3))
 
     val action = new DeleteOldVersionsAction(mockLogManager, mockDataManager)

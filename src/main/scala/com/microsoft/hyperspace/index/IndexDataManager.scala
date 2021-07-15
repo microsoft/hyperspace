@@ -38,7 +38,7 @@ import com.microsoft.hyperspace.util.FileUtils
 trait IndexDataManager {
   def getLatestVersionId(): Option[Int]
 
-  def getAllVersionIds(): Seq[Int]
+  def getAllVersionIds(): Set[Int]
 
   def getPath(id: Int): Path
 
@@ -60,16 +60,18 @@ class IndexDataManagerImpl(indexPath: Path, configuration: Configuration)
    * partitioning scheme, i.e. {{{"root/v__=value/f1.parquet"}}} etc. Here the value represents the
    * version id of the data.
    */
-  override def getAllVersionIds(): Seq[Int] = {
+  override def getAllVersionIds(): Set[Int] = {
     if (!fs.exists(indexPath)) {
-      return Seq()
+      return Set()
     }
     val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
-    fs.listStatus(indexPath).collect {
-      case status
-          if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
-        status.getPath.getName.drop(prefixLength).toInt
-    }
+    fs.listStatus(indexPath)
+      .collect {
+        case status
+            if status.getPath.getName.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
+          status.getPath.getName.drop(prefixLength).toInt
+      }
+      .toSet
   }
 
   override def getPath(id: Int): Path = {
