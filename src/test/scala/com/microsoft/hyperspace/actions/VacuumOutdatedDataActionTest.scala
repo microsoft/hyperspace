@@ -35,7 +35,7 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
     when(mockLogManager.getLatestId()).thenReturn(None)
   }
 
-  test("validate() passes if old index logs are found with ACTIVE state") {
+  test("validate() passes if old index logs are found with ACTIVE state.") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(mockIndexLogEntry))
     when(mockIndexLogEntry.state).thenReturn(ACTIVE)
     val action = new VacuumOutdatedDataAction(mockLogManager, mockDataManager)
