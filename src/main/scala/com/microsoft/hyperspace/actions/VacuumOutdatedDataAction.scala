@@ -59,7 +59,7 @@ class VacuumOutdatedDataAction(
           s"VacuumOutdatedData is not defined with log entry class ${other.getClass.getName}")
     }
 
-    // delete version not used
+    // Delete versions not used.
     dataManager.getAllVersionIds().foreach { id =>
       if (!indexVersionsInUse.contains(id)) {
         dataManager.delete(id)
