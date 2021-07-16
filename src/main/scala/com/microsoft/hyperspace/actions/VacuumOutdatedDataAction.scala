@@ -56,7 +56,7 @@ class VacuumOutdatedDataAction(
         indexLogEntry.versionInfos
       case other =>
         throw HyperspaceException(
-          s"VacuumOutdatedData is not defined with log entry class ${other.getClass.getName}")
+          s"VacuumOutdatedData is not supported for log entry class ${other.getClass.getName}")
     }
 
     // Delete versions not used.
