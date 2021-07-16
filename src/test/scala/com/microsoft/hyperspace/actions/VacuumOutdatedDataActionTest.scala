@@ -62,8 +62,8 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
 
   test("op() calls which deletes nothing since every data is up-to-date") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(mockIndexLogEntry))
-    when(mockDataManager.getAllVersionIds()).thenReturn(Set(0, 1, 2))
-    when(mockIndexLogEntry.versionDirectories())
+    when(mockDataManager.getAllDataVersionIds()).thenReturn(Seq(0, 1, 2))
+    when(mockIndexLogEntry.indexDataDirectoryPaths())
       .thenReturn(versionDirectories(Seq(0, 1, 2)))
 
     val action = new VacuumOutdatedDataAction(mockLogManager, mockDataManager)
@@ -78,8 +78,8 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
   test("op() calls delete for all outdated data") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(mockIndexLogEntry))
 
-    when(mockDataManager.getAllVersionIds()).thenReturn(Set(0, 1, 2, 3))
-    when(mockIndexLogEntry.versionDirectories()).thenReturn(versionDirectories(Seq(2, 3)))
+    when(mockDataManager.getAllDataVersionIds()).thenReturn(Seq(0, 1, 2, 3))
+    when(mockIndexLogEntry.indexDataDirectoryPaths()).thenReturn(versionDirectories(Seq(2, 3)))
 
     val action = new VacuumOutdatedDataAction(mockLogManager, mockDataManager)
     action.op()
@@ -123,7 +123,7 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
       Map())
 
     val expected = versions.toSet
-    val actual = action.versionInfos(entry)
+    val actual = action.dataVersionInfos(entry)
     assert(actual.equals(expected))
   }
 

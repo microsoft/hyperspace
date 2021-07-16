@@ -55,7 +55,7 @@ class VacuumOutdatedDataAction(
     // Get versions used in the latest log entry.
     val indexVersionsInUse: Set[Int] = logEntry match {
       case indexLogEntry: IndexLogEntry =>
-        versionInfos(indexLogEntry)
+        dataVersionInfos(indexLogEntry)
       case other =>
         throw HyperspaceException(
           s"VacuumOutdatedData is not supported for log entry class ${other.getClass.getName}")
@@ -74,7 +74,7 @@ class VacuumOutdatedDataAction(
    *
    * @return List of directory paths containing index files for latest index version.
    */
-  private def versionInfos(entry: IndexLogEntry): Set[Int] = {
+  private[actions] def dataVersionInfos(entry: IndexLogEntry): Set[Int] = {
     // get used versions using the filenames of contents
     // length + 1 due to '=' between prefix and version
     val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
