@@ -74,7 +74,7 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
-   * Does hard deleted of outdated data of the index
+   * Vacuums outdated data with given index name.
    *
    * @param indexName Name of the index to vacuum outdated data
    */
