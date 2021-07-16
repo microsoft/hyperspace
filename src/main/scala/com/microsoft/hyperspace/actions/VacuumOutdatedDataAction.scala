@@ -62,7 +62,7 @@ class VacuumOutdatedDataAction(
     }
 
     // Delete versions not used.
-    dataManager.getAllVersionIds().foreach { id =>
+    dataManager.getAllDataVersionIds().foreach { id =>
       if (!indexVersionsInUse.contains(id)) {
         dataManager.delete(id)
       }
