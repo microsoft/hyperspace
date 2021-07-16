@@ -50,7 +50,7 @@ class VacuumOutdatedDataAction(
   }
 
   final override def op(): Unit = {
-    // get versions used
+    // Get versions used in the latest log entry.
     val indexVersionsInUse: Set[Int] = logEntry match {
       case indexLogEntry: IndexLogEntry =>
         indexLogEntry.versionInfos
