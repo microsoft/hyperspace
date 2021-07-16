@@ -139,7 +139,7 @@ private[hyperspace] object IndexStatistics {
    * @return List of directory paths containing index files for latest index version.
    */
   private def getIndexContentDirectoryPaths(entry: IndexLogEntry): Seq[String] = {
-    entry.versionDirectories()
+    entry.indexDataDirectoryPaths()
   }
 
   /**

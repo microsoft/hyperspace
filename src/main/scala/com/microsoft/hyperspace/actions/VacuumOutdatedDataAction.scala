@@ -16,9 +16,11 @@
 
 package com.microsoft.hyperspace.actions
 
+import org.apache.hadoop.fs.Path
+
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.actions.Constants.States.{ACTIVE, VACUUMINGOUTDATEDDATA}
-import com.microsoft.hyperspace.index.{IndexDataManager, IndexLogEntry, IndexLogManager, LogEntry}
+import com.microsoft.hyperspace.index.{IndexConstants, IndexDataManager, IndexLogEntry, IndexLogManager, LogEntry}
 import com.microsoft.hyperspace.telemetry.{AppInfo, HyperspaceEvent, VacuumOutdatedDataActionEvent}
 
 /**
@@ -53,7 +55,7 @@ class VacuumOutdatedDataAction(
     // Get versions used in the latest log entry.
     val indexVersionsInUse: Set[Int] = logEntry match {
       case indexLogEntry: IndexLogEntry =>
-        indexLogEntry.versionInfos
+        versionInfos(indexLogEntry)
       case other =>
         throw HyperspaceException(
           s"VacuumOutdatedData is not supported for log entry class ${other.getClass.getName}")
@@ -65,6 +67,25 @@ class VacuumOutdatedDataAction(
         dataManager.delete(id)
       }
     }
+  }
+
+  /**
+   * This function extracts latest versions of an index.
+   *
+   * @return List of directory paths containing index files for latest index version.
+   */
+  private def versionInfos(entry: IndexLogEntry): Set[Int] = {
+    // get used versions using the filenames of contents
+    // length + 1 due to '=' between prefix and version
+    val prefixLength = IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX.length + 1
+    entry
+      .indexDataDirectoryPaths()
+      .map(dirname => new Path(dirname).getName)
+      .collect {
+        case name if name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX) =>
+          name.drop(prefixLength).toInt
+      }
+      .toSet
   }
 
   override protected def event(appInfo: AppInfo, message: String): HyperspaceEvent = {

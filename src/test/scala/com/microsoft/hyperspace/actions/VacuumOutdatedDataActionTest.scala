@@ -23,7 +23,9 @@ import org.mockito.internal.verification.Times
 
 import com.microsoft.hyperspace.{HyperspaceException, SparkInvolvedSuite}
 import com.microsoft.hyperspace.actions.Constants.States._
-import com.microsoft.hyperspace.index.{IndexLogEntry, _}
+import com.microsoft.hyperspace.index.{Content, Directory, FileInfo, IndexConstants, IndexDataManager, IndexLogEntry, IndexLogManager}
+import com.microsoft.hyperspace.index.IndexConstants.UNKNOWN_FILE_ID
+import com.microsoft.hyperspace.index.covering.CoveringIndex
 
 class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite {
   private val mockLogManager: IndexLogManager = mock(classOf[IndexLogManager])
@@ -33,6 +35,11 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
   override def beforeAll(): Unit = {
     super.beforeAll()
     when(mockLogManager.getLatestId()).thenReturn(None)
+  }
+
+  def versionDirectories(versions: Seq[Int]): Seq[String] = {
+    versions.map(version =>
+      s"file:/a/b/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version")
   }
 
   test("validate() passes if old index logs are found with ACTIVE state.") {
@@ -56,7 +63,8 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
   test("op() calls which deletes nothing since every data is up-to-date") {
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(mockIndexLogEntry))
     when(mockDataManager.getAllVersionIds()).thenReturn(Set(0, 1, 2))
-    when(mockIndexLogEntry.versionInfos).thenReturn(Set(0, 1, 2))
+    when(mockIndexLogEntry.versionDirectories())
+      .thenReturn(versionDirectories(Seq(0, 1, 2)))
 
     val action = new VacuumOutdatedDataAction(mockLogManager, mockDataManager)
     action.op()
@@ -71,7 +79,7 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
     when(mockLogManager.getLog(anyInt)).thenReturn(Some(mockIndexLogEntry))
 
     when(mockDataManager.getAllVersionIds()).thenReturn(Set(0, 1, 2, 3))
-    when(mockIndexLogEntry.versionInfos).thenReturn(Set(2, 3))
+    when(mockIndexLogEntry.versionDirectories()).thenReturn(versionDirectories(Seq(2, 3)))
 
     val action = new VacuumOutdatedDataAction(mockLogManager, mockDataManager)
     action.op()
@@ -81,4 +89,42 @@ class VacuumOutdatedDataActionTest extends SparkFunSuite with SparkInvolvedSuite
     verify(mockDataManager, new Times(0)).delete(3)
     verify(mockDataManager, new Times(0)).delete(-1)
   }
+
+  test("versionInfos gets correct version info.") {
+    val versions = Seq(4, 5)
+
+    val action = new VacuumOutdatedDataAction(mockLogManager, mockDataManager)
+    val versionDirectory =
+      versions.map(
+        version =>
+          Directory(
+            s"${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=$version",
+            files = Seq(FileInfo(s"index_$version", 0, 0, UNKNOWN_FILE_ID))))
+
+    val content = Content(
+      Directory(
+        "file:/",
+        subDirs = Seq(Directory(
+          "a",
+          files =
+            Seq(FileInfo("f1", 0, 0, UNKNOWN_FILE_ID), FileInfo("f2", 0, 0, UNKNOWN_FILE_ID)),
+          subDirs = Seq(
+            Directory(
+              "b",
+              files =
+                Seq(FileInfo("f3", 0, 0, UNKNOWN_FILE_ID), FileInfo("f4", 0, 0, UNKNOWN_FILE_ID)),
+              subDirs = versionDirectory))))))
+
+    val entry = IndexLogEntry.create(
+      "indexName",
+      CoveringIndex(Seq("col1"), Seq("col2", "col3"), null, 200, Map()),
+      content,
+      null,
+      Map())
+
+    val expected = versions.toSet
+    val actual = action.versionInfos(entry)
+    assert(actual.equals(expected))
+  }
+
 }
