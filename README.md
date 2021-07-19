@@ -44,13 +44,13 @@ Additionally, you might have to run `sbt buildInfo` if you encounter an error li
 
 To debug with the sbt shell in IntelliJ, run `set Test/fork := false` in the sbt shell so that the debugger attached to the sbt shell can work. Without this, breakpoints won't work.
 
-For a better IntelliJ and other IDE-like environment (e.g., coc.nvim) experience, try replacing symbolic links with hard links if you are in MacOS or Linux.
+For a better IntelliJ and other IDE-like environment (e.g., coc.nvim) experience, try replacing symbolic links with hard links if you are in macOS or Linux.
 
 ```sh
 $ rm spark3.1/src
 $ mkdir spark3.1/src
 $ git update-index --assume-unchanged spark3.1/src
-$ sudo mount localhost:<absolute path to hyperspace repo>/src spark3.1/src # MacOS (NFS required)
+$ sudo mount localhost:<absolute path to hyperspace repo>/src spark3.1/src # macOS (NFS required)
 $ mount --bind src spark3.1/src # Linux
 ```
 
