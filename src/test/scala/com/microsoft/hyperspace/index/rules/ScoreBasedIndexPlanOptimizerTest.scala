@@ -108,14 +108,30 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
           assert(rightChildScore == 50)
           assert(!rightChildPlan.equals(plan.children.last))
 
-          hyperspace.whyNot(query(leftDf, rightDf)())
-          hyperspace.whyNot(query(leftDf, rightDf)(), "leftDfJoinIndex", extended = true)
-          hyperspace.explain(query(leftDf, rightDf)(), verbose = true)
-
           verifyIndexUsage(
             query(leftDf, rightDf),
             getIndexFilesPath(leftDfFilterIndexConfig.indexName) ++
               getIndexFilesPath(rightDfFilterIndexConfig.indexName))
+
+          def normalize(str: String): String = {
+            // Expression ids are removed before comparison since they can be different.
+            str.replaceAll("""#(\d+)|subquery(\d+)""", "#")
+          }
+
+          // Verify whyNot result.
+          hyperspace.whyNot(query(leftDf, rightDf)()) { o =>
+            val expectedOutput = getExpectedResult("whyNot_allIndex.txt")
+              .replace(System.lineSeparator(), "\n")
+            val actual = normalize(o.replace(System.lineSeparator(), "\n"))
+            assert(actual.equals(expectedOutput), actual)
+          }
+
+          hyperspace.whyNot(query(leftDf, rightDf)(), "leftDfJoinIndex", extended = true) { o =>
+            val expectedOutput = getExpectedResult("whyNot_indexName.txt")
+              .replace(System.lineSeparator(), "\n")
+            val actual = normalize(o.replace(System.lineSeparator(), "\n"))
+            assert(actual.equals(expectedOutput), actual)
+          }
         }
       }
     }

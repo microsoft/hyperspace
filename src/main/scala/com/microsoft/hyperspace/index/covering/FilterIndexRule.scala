@@ -99,7 +99,7 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
           index,
           FilterReasons.NoFirstIndexedColCond(
             index.derivedDataset.indexedColumns.head,
-            filterColumnNames.mkString(", "))) {
+            filterColumnNames.mkString(","))) {
           ResolverUtils
             .resolve(spark, index.derivedDataset.indexedColumns.head, filterColumnNames)
             .isDefined

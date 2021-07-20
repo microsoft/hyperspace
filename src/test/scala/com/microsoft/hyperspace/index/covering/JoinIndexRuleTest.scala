@@ -249,7 +249,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
             msg.toSet.equals(
               Set(
                 "All join condition column and indexed column should be the same. " +
-                  "Join columns: [t1c2], Indexed columns for left subplan: [t1c1, t1c2]",
+                  "Join columns: [t1c2], Indexed columns for left subplan: [t1c1,t1c2]",
                 "No available indexes for right subplan. " +
                   "Both left and right indexes are required for Join query.")),
             msg)
@@ -274,7 +274,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
             msg.toSet.equals(
               Set(
                 "All join condition column and indexed column should be the same. " +
-                  "Join columns: [t2c2], Indexed columns for right subplan: [t2c1, t2c2]",
+                  "Join columns: [t2c2], Indexed columns for right subplan: [t2c1,t2c2]",
                 "No available indexes for right subplan. " +
                   "Both left and right indexes are required for Join query.")),
             msg)
@@ -309,7 +309,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
             msg.toSet.equals(
               Set(
                 "Index does not contain required columns for left subplan. " +
-                  "Required indexed columns: [t1c1, t1c4], Indexed columns: [t1c1]",
+                  "Required indexed columns: [t1c1,t1c4], Indexed columns: [t1c1]",
                 "No available indexes for left subplan. " +
                   "Both left and right indexes are required for Join query.")),
             msg)
@@ -318,7 +318,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
             msg.toSet.equals(
               Set(
                 "Index does not contain required columns for right subplan. " +
-                  "Required indexed columns: [t2c1, t2c4], Indexed columns: [t2c1]",
+                  "Required indexed columns: [t2c1,t2c4], Indexed columns: [t2c1]",
                 "No available indexes for left subplan. " +
                   "Both left and right indexes are required for Join query.")),
             msg)

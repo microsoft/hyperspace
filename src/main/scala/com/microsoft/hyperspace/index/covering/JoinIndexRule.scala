@@ -431,8 +431,8 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         idx,
         FilterReasons.NotAllJoinColIndexed(
           leftOrRight,
-          requiredIndexCols.mkString(", "),
-          idx.indexedColumns.mkString(", "))) {
+          requiredIndexCols.mkString(","),
+          idx.indexedColumns.mkString(","))) {
         requiredIndexCols.toSet.equals(idx.indexedColumns.toSet)
       } &&
       withFilterReasonTag(
@@ -440,8 +440,8 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         idx,
         FilterReasons.MissingIndexedCol(
           leftOrRight,
-          allRequiredCols.mkString(", "),
-          idx.indexedColumns.mkString(", "))) {
+          allRequiredCols.mkString(","),
+          idx.indexedColumns.mkString(","))) {
         allRequiredCols.forall(allCols.contains)
       }
     }

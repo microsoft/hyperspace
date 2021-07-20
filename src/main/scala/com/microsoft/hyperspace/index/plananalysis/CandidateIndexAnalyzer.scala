@@ -119,7 +119,7 @@ object CandidateIndexAnalyzer extends Logging {
               }
           }
       }
-      .sortBy(r => (r._1, r._3))
+      .sortBy(r => (r._1, r._2, r._3, r._4))
       .distinct
 
     if (res.isEmpty) {
@@ -186,12 +186,14 @@ object CandidateIndexAnalyzer extends Logging {
         matchStr.group(1)
       }
       .toSeq
+      .distinct
+      .sorted
     printIndexNames(appliedIndexNames)
 
     stringBuilder.append("Applicable indexes, but not applied due to priority:")
     stringBuilder.append(newLine)
     val applicableButNotAppliedIndexNames =
-      applicableIndexes.map(_._1.name).distinct.filterNot(appliedIndexNames.contains(_))
+      applicableIndexes.map(_._1.name).distinct.sorted.filterNot(appliedIndexNames.contains(_))
     printIndexNames(applicableButNotAppliedIndexNames)
 
     // Covert reasons to Dataframe rows.
@@ -214,7 +216,7 @@ object CandidateIndexAnalyzer extends Logging {
               }
           }
       }
-      .sortBy(r => (r._1, r._3))
+      .sortBy(r => (r._1, r._2, r._3, r._4, r._5))
       .distinct
 
     import spark.implicits._
@@ -233,6 +235,7 @@ object CandidateIndexAnalyzer extends Logging {
       .filter(row => row._4.equals("SOURCE_DATA_CHANGE"))
       .map(_._2)
       .distinct
+      .sorted
       .filterNot(appliedIndexNames.contains(_))
       .filterNot(applicableButNotAppliedIndexNames.contains(_))
     printIndexNames(indexNamesForOutdated)
@@ -245,6 +248,7 @@ object CandidateIndexAnalyzer extends Logging {
         row._4.equals("COL_SCHEMA_MISMATCH") || row._4.equals("SOURCE_DATA_CHANGE"))
       .map(_._2)
       .distinct
+      .sorted
       .filterNot(appliedIndexNames.contains(_))
       .filterNot(applicableButNotAppliedIndexNames.contains(_))
     printIndexNames(indexNamesForNoApplicablePlan)

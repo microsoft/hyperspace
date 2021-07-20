@@ -34,8 +34,8 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
         plan,
         index,
         FilterReasons.ColSchemaMismatch(
-          relationColumnNames.mkString(", "),
-          index.derivedDataset.referencedColumns.mkString(", "))) {
+          relationColumnNames.mkString(","),
+          index.derivedDataset.referencedColumns.mkString(","))) {
         ResolverUtils
           .resolve(spark, index.derivedDataset.referencedColumns, relationColumnNames)
           .isDefined

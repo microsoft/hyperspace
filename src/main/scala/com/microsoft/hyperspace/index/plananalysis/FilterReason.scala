@@ -120,7 +120,7 @@ object FilterReasons {
     override val args = Seq(
       "child" -> leftOrRight,
       "requiredIndexedCols" -> requiredIndexedCols,
-      "IndexedCols" -> indexedCols)
+      "indexedCols" -> indexedCols)
     override def verboseStr: String =
       s"Index does not contain required columns for $leftOrRight subplan. " +
         s"Required indexed columns: [$requiredIndexedCols], " +
