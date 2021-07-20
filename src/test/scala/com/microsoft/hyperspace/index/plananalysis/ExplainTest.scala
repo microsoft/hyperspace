@@ -181,7 +181,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     def filterQuery(query: DataFrame): DataFrame = {
       query.filter("Col2 == 2").select("Col1")
     }
-    verifyExplainOutput(df, expectedOutput.toString, verbose = false) { filterQuery }
+    verifyExplainOutput(df, expectedOutput, verbose = false) { filterQuery }
   }
 
   private def getIndexRootPath(indexName: String): Path =

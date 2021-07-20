@@ -18,6 +18,8 @@ package com.microsoft.hyperspace.index
 
 import org.apache.spark.sql.execution.datasources.InMemoryFileIndex
 
+import com.microsoft.hyperspace.index.plananalysis.FilterReason
+
 object IndexLogEntryTags {
   // HYBRIDSCAN_REQUIRED indicates if Hybrid Scan is required for the index or not.
   val HYBRIDSCAN_REQUIRED: IndexLogEntryTag[Boolean] =
@@ -55,10 +57,15 @@ object IndexLogEntryTags {
     IndexLogEntryTag[InMemoryFileIndex]("inMemoryFileIndexHybridScanAppended")
 
   // FILTER_REASONS stores reason strings for disqualification.
-  val FILTER_REASONS: IndexLogEntryTag[Seq[String]] =
-    IndexLogEntryTag[Seq[String]]("filterReasons")
+  val FILTER_REASONS: IndexLogEntryTag[Seq[FilterReason]] =
+    IndexLogEntryTag[Seq[FilterReason]]("filterReasons")
+
+  // APPLIED_INDEX_RULES stores rule's names can apply the index to the plan.
+  val APPLICABLE_INDEX_RULES: IndexLogEntryTag[Seq[String]] =
+    IndexLogEntryTag[Seq[String]]("applicableIndexRules")
 
   // FILTER_REASONS_ENABLED indicates whether whyNotAPI is enabled or not.
-  val FILTER_REASONS_ENABLED: IndexLogEntryTag[Boolean] =
-    IndexLogEntryTag[Boolean]("filterReasonsEnabled")
+  // If it's enabled, FILTER_REASONS and APPLIED_INDEX_RULES info will be tagged.
+  val INDEX_PLAN_ANALYSIS_ENABLED: IndexLogEntryTag[Boolean] =
+    IndexLogEntryTag[Boolean]("indexPlanAnalysisEnabled")
 }

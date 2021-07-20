@@ -20,6 +20,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.ActiveSparkSession
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
+import com.microsoft.hyperspace.index.plananalysis.FilterReason
 
 trait IndexFilter extends ActiveSparkSession {
 
@@ -30,19 +31,22 @@ trait IndexFilter extends ActiveSparkSession {
    * @param condition Flag to append reason string
    * @param plan Query plan to tag
    * @param index Index to tag
-   * @param reasonString Informational message in case condition is false.
+   * @param filterReason Informational reason in case condition is false.
    */
   protected def setFilterReasonTag(
       condition: Boolean,
       plan: LogicalPlan,
       index: IndexLogEntry,
-      reasonString: => String): Unit = {
+      filterReason: => FilterReason): Unit = {
     if (!condition && index
-        .getTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED)
-        .getOrElse(false)) {
+          .getTagValue(IndexLogEntryTags.INDEX_PLAN_ANALYSIS_ENABLED)
+          .getOrElse(false)) {
       val prevReason =
         index.getTagValue(plan, IndexLogEntryTags.FILTER_REASONS).getOrElse(Nil)
-      index.setTagValue(plan, IndexLogEntryTags.FILTER_REASONS, prevReason :+ reasonString)
+      index.setTagValue(
+        plan,
+        IndexLogEntryTags.FILTER_REASONS,
+        prevReason :+ filterReason)
     }
   }
 
@@ -50,18 +54,18 @@ trait IndexFilter extends ActiveSparkSession {
    * Append the reason string to FILTER_REASONS tag for the given index
    * if the result of the function is false and FILTER_REASONS tag is set to the index.
    *
-   * @param reasonString Informational message in case condition is false.
    * @param plan Query plan to tag
    * @param index Index to tag
    * @param f Function for a condition
+   * @param filterReason Informational reason in case condition is false.
    * @return Result of the given function
    */
   protected def withFilterReasonTag(
       plan: LogicalPlan,
       index: IndexLogEntry,
-      reasonString: => String)(f: => Boolean): Boolean = {
+      filterReason: => FilterReason)(f: => Boolean): Boolean = {
     val ret = f
-    setFilterReasonTag(ret, plan, index, reasonString)
+    setFilterReasonTag(ret, plan, index, filterReason)
     ret
   }
 
@@ -71,17 +75,17 @@ trait IndexFilter extends ActiveSparkSession {
    *
    * @param plan Query plan to tag
    * @param indexes Indexes to tag
-   * @param reasonString Informational message in case condition is false.
+   * @param filterReason Informational reason in case condition is false.
    * @param f Function for a condition
    * @return Result of the given function
    */
   protected def withFilterReasonTag(
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry],
-      reasonString: => String)(f: => Boolean): Boolean = {
+      filterReason: => FilterReason)(f: => Boolean): Boolean = {
     val ret = f
     indexes.foreach { index =>
-      setFilterReasonTag(ret, plan, index, reasonString)
+      setFilterReasonTag(ret, plan, index, filterReason)
     }
     ret
   }
@@ -90,17 +94,17 @@ trait IndexFilter extends ActiveSparkSession {
    * Append the reason string to FILTER_REASONS tag for the given list of indexes
    * if FILTER_REASONS_ENABLED tag is set to the indexes.
    *
-   * @param reasonString Informational message in case condition is false.
    * @param plan Query plan to tag
    * @param indexes Indexes to tag
+   * @param filterReason Informational reason in case condition is false.
    * @return Result of the given function
    */
   protected def setFilterReasonTag(
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry],
-      reasonString: => String): Unit = {
+      filterReason: => FilterReason): Unit = {
     indexes.foreach { index =>
-      setFilterReasonTag(false, plan, index, reasonString)
+      setFilterReasonTag(false, plan, index, filterReason)
     }
   }
 }

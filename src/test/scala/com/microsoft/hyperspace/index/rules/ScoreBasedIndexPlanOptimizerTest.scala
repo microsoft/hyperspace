@@ -108,6 +108,10 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
           assert(rightChildScore == 50)
           assert(!rightChildPlan.equals(plan.children.last))
 
+          hyperspace.whyNot(query(leftDf, rightDf)())
+          hyperspace.whyNot(query(leftDf, rightDf)(), "leftDfJoinIndex", extended = true)
+          hyperspace.explain(query(leftDf, rightDf)(), verbose = true)
+
           verifyIndexUsage(
             query(leftDf, rightDf),
             getIndexFilesPath(leftDfFilterIndexConfig.indexName) ++
