@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.plananalysis.{FilterReasonCode, FilterReasons}
+import com.microsoft.hyperspace.index.plananalysis.FilterReasons
 import com.microsoft.hyperspace.util.ResolverUtils
 
 /**
@@ -33,10 +33,9 @@ object ColumnSchemaFilter extends SourcePlanIndexFilter {
       withFilterReasonTag(
         plan,
         index,
-        FilterReasons.apply(
-          FilterReasonCode.COL_SCHEMA_MISMATCH,
-          ("sourceColumns", relationColumnNames.mkString(", ")),
-          ("indexColumns", index.derivedDataset.referencedColumns.mkString(", ")))) {
+        FilterReasons.ColSchemaMismatch(
+          relationColumnNames.mkString(", "),
+          index.derivedDataset.referencedColumns.mkString(", "))) {
         ResolverUtils
           .resolve(spark, index.derivedDataset.referencedColumns, relationColumnNames)
           .isDefined

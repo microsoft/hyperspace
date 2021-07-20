@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.covering.JoinAttributeFilter.extractConditions
-import com.microsoft.hyperspace.index.plananalysis.{FilterReasonCode, FilterReasons}
+import com.microsoft.hyperspace.index.plananalysis.FilterReasons
 import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, QueryPlanIndexFilter}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
@@ -66,9 +66,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
         val joinConditionCond = withFilterReasonTag(
           plan,
           leftAndRightIndexes,
-          FilterReasons.apply(
-            FilterReasonCode.NOT_ELIGIBLE_JOIN,
-            ("reason", "Non equi-join or has literal"))) {
+          FilterReasons.NotEligibleJoin("Non equi-join or has literal")) {
           isJoinConditionSupported(condition)
         }
 
@@ -76,18 +74,14 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
           withFilterReasonTag(
             plan,
             leftAndRightIndexes,
-            FilterReasons.apply(
-              FilterReasonCode.NOT_ELIGIBLE_JOIN,
-              ("reason", "Non linear left child plan"))) {
+            FilterReasons.NotEligibleJoin("Non linear left child plan")) {
             isPlanLinear(l)
           }
         val rightPlanLinearCond =
           withFilterReasonTag(
             plan,
             leftAndRightIndexes,
-            FilterReasons.apply(
-              FilterReasonCode.NOT_ELIGIBLE_JOIN,
-              ("reason", "Non linear right child plan"))) {
+            FilterReasons.NotEligibleJoin("Non linear right child plan")) {
             isPlanLinear(r)
           }
 
@@ -108,9 +102,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
         setFilterReasonTag(
           plan,
           candidateIndexes.values.flatten.toSeq,
-          FilterReasons.apply(
-            FilterReasonCode.NOT_ELIGIBLE_JOIN,
-            ("reason", "No join condition")))
+          FilterReasons.NotEligibleJoin("No join condition"))
         Map.empty
       case _ =>
         Map.empty
@@ -178,9 +170,7 @@ object JoinAttributeFilter extends QueryPlanIndexFilter {
     if (withFilterReasonTag(
         plan,
         candidateIndexes.head._2 ++ candidateIndexes.last._2,
-        FilterReasons.apply(
-          FilterReasonCode.NOT_ELIGIBLE_JOIN,
-          ("reason", "incompatible left and right join columns"))) {
+        FilterReasons.NotEligibleJoin("incompatible left and right join columns")) {
         ensureAttributeRequirements(
           JoinIndexRule.leftRelation.get,
           JoinIndexRule.rightRelation.get,
@@ -365,13 +355,11 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         if (withFilterReasonTag(
             plan,
             candidateIndexes.head._2 ++ candidateIndexes.last._2,
-            FilterReasons.apply(FilterReasonCode.NO_AVAIL_JOIN_INDEX_PAIR, ("child", "left")))(
-            lIndexes.nonEmpty) &&
+            FilterReasons.NoAvailJoinIndexPair("left"))(lIndexes.nonEmpty) &&
           withFilterReasonTag(
             plan,
             candidateIndexes.head._2 ++ candidateIndexes.last._2,
-            FilterReasons.apply(FilterReasonCode.NO_AVAIL_JOIN_INDEX_PAIR, ("child", "right")))(
-            rIndexes.nonEmpty)) {
+            FilterReasons.NoAvailJoinIndexPair("right"))(rIndexes.nonEmpty)) {
           Map(leftRelation.plan -> lIndexes, rightRelation.plan -> rIndexes)
         } else {
           Map.empty
@@ -415,6 +403,19 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
     }.toMap
   }
 
+  /**
+   * Get usable indexes which satisfy indexed and included column requirements.
+   *
+   * Pre-requisite: the indexed and included columns required must be already resolved with their
+   * corresponding base relation columns at this point.
+   *
+   * @param plan Query plan
+   * @param indexes All available indexes for the logical plan
+   * @param requiredIndexCols required indexed columns resolved with their base relation column.
+   * @param allRequiredCols required included columns resolved with their base relation column.
+   * @return Indexes which satisfy the indexed and covering column requirements from the logical
+   *         plan and join condition
+   */
   private def getUsableIndexes(
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry],
@@ -428,21 +429,19 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
       withFilterReasonTag(
         plan,
         idx,
-        FilterReasons.apply(
-          FilterReasonCode.NOT_ALL_JOIN_COL_INDEXED,
-          ("child", leftOrRight),
-          ("joinCols", requiredIndexCols.mkString(", ")),
-          ("indexedCols", idx.indexedColumns.mkString(", ")))) {
+        FilterReasons.NotAllJoinColIndexed(
+          leftOrRight,
+          requiredIndexCols.mkString(", "),
+          idx.indexedColumns.mkString(", "))) {
         requiredIndexCols.toSet.equals(idx.indexedColumns.toSet)
       } &&
       withFilterReasonTag(
         plan,
         idx,
-        FilterReasons.apply(
-          FilterReasonCode.MISSING_INDEXED_COL,
-          ("child", leftOrRight),
-          ("requiredIndexedCols", allRequiredCols.mkString(", ")),
-          ("IndexedCols", idx.indexedColumns.mkString(", ")))) {
+        FilterReasons.MissingIndexedCol(
+          leftOrRight,
+          allRequiredCols.mkString(", "),
+          idx.indexedColumns.mkString(", "))) {
         allRequiredCols.forall(allCols.contains)
       }
     }
@@ -526,7 +525,7 @@ object JoinRankFilter extends IndexRankFilter {
         setFilterReasonTag(
           plan,
           indexes.head._2 ++ indexes.last._2,
-          FilterReasons.apply(FilterReasonCode.NO_COMPATIBLE_JOIN_INDEX_PAIR))
+          FilterReasons.NoCompatibleJoinIndexPair())
         Map.empty
       }
   }

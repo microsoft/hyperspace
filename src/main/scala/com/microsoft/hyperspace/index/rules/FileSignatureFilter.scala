@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags, LogicalPlanSignatureProvider}
 import com.microsoft.hyperspace.index.IndexLogEntryTags.{HYBRIDSCAN_RELATED_CONFIGS, IS_HYBRIDSCAN_CANDIDATE}
-import com.microsoft.hyperspace.index.plananalysis.{FilterReasonCode, FilterReasons}
+import com.microsoft.hyperspace.index.plananalysis.FilterReasons
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -60,10 +60,7 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
       // Map of a signature provider to a signature generated for the given plan.
       val signatureMap = mutable.Map[String, Option[String]]()
       indexes.filter { index =>
-        withFilterReasonTag(
-          plan,
-          index,
-          FilterReasons.apply(FilterReasonCode.SOURCE_DATA_CHANGED)) {
+        withFilterReasonTag(plan, index, FilterReasons.SourceDataChanged()) {
           signatureValid(relation, index, signatureMap)
         }
       }
@@ -134,17 +131,11 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
 
         // Tag to original index log entry to check the reason string with the given log entry.
         lazy val hasLineageColumnCond =
-          withFilterReasonTag(
-            relation.plan,
-            index,
-            FilterReasons.apply(FilterReasonCode.NO_DELETE_SUPPORT)) {
+          withFilterReasonTag(relation.plan, index, FilterReasons.NoDeleteSupport()) {
             entry.derivedDataset.canHandleDeletedFiles
           }
         lazy val hasCommonFilesCond =
-          withFilterReasonTag(
-            relation.plan,
-            index,
-            FilterReasons.apply(FilterReasonCode.NO_COMMON_FILES)) {
+          withFilterReasonTag(relation.plan, index, FilterReasons.NoCommonFiles()) {
             commonCnt > 0
           }
 
@@ -153,19 +144,17 @@ object FileSignatureFilter extends SourcePlanIndexFilter {
         lazy val appendThresholdCond = withFilterReasonTag(
           relation.plan,
           index,
-          FilterReasons.apply(
-            FilterReasonCode.TOO_MUCH_APPENDED,
-            ("appendedRatio", appendedBytesRatio.toString),
-            ("hybridScanAppendThreshold", hybridScanAppendThreshold.toString))) {
+          FilterReasons.TooMuchAppended(
+            appendedBytesRatio.toString,
+            hybridScanAppendThreshold.toString)) {
           appendedBytesRatio < hybridScanAppendThreshold
         }
         lazy val deleteThresholdCond = withFilterReasonTag(
           relation.plan,
           index,
-          FilterReasons.apply(
-            FilterReasonCode.TOO_MUCH_DELETED,
-            ("deletedRatio", deletedBytesRatio.toString),
-            ("hybridScanDeleteThreshold", hybridScanDeleteThreshold.toString))) {
+          FilterReasons.TooMuchDeleted(
+            deletedBytesRatio.toString,
+            hybridScanDeleteThreshold.toString)) {
           deletedBytesRatio < HyperspaceConf.hybridScanDeletedRatioThreshold(spark)
         }
 

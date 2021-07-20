@@ -164,7 +164,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       assert(reasons.isDefined)
       val msg = reasons.get.map(_.verboseStr)
-      assert(msg.exists(_.contains("Not eligible Join - no join condition.")))
+      assert(msg.exists(_.contains("Join condition is not eligible. Reason: No join condition")))
     }
   }
 
@@ -179,7 +179,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       assert(reasons.isDefined)
       val msg = reasons.get.map(_.verboseStr)
       assert(
-        msg.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+        msg.exists(
+          _.contains("Join condition is not eligible. Reason: Non equi-join or has literal")))
     }
   }
 
@@ -194,7 +195,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       assert(reasons.isDefined)
       val msg = reasons.get.map(_.verboseStr)
       assert(
-        msg.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+        msg.exists(
+          _.contains("Join condition is not eligible. Reason: Non equi-join or has literal")))
     }
   }
 
@@ -209,7 +211,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
       assert(reasons.isDefined)
       val msg = reasons.get.map(_.verboseStr)
       assert(
-        msg.exists(_.contains("Join condition is not eligible. Equi-Joins in simple CNF")))
+        msg.exists(
+          _.contains("Join condition is not eligible. Reason: Non equi-join or has literal")))
     }
   }
 
@@ -228,40 +231,53 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     assert(updatedPlan.equals(originalPlan))
 
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(msg.isDefined)
-
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
       index.name match {
         case "t1i1" =>
           assert(
-            msg.get.toSet.equals(Set(
-              "All join condition column should be the indexed columns. " +
-                "Join columns: [t1c2], Indexed columns: [t1c1]",
-              "No available indexes for right subplan.")),
-            msg.get)
+            msg.toSet.equals(
+              Set(
+                "All join condition column and indexed column should be the same. " +
+                  "Join columns: [t1c2], Indexed columns for left subplan: [t1c1]",
+                "No available indexes for right subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
         case "t1i2" =>
           assert(
-            msg.get.toSet.equals(Set(
-              "All join condition column should be the indexed columns. " +
-                "Join columns: [t1c2], Indexed columns: [t1c1,t1c2]",
-              "No available indexes for right subplan.")),
-            msg.get)
+            msg.toSet.equals(
+              Set(
+                "All join condition column and indexed column should be the same. " +
+                  "Join columns: [t1c2], Indexed columns for left subplan: [t1c1, t1c2]",
+                "No available indexes for right subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
         case "t1i3" =>
           assert(
-            msg.get.toSet
-              .equals(Set("No available indexes for right subplan.")))
+            msg.toSet
+              .equals(
+                Set("No available indexes for right subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
         case "t2i1" =>
           assert(
-            msg.get.toSet.equals(Set(
-              "All join condition column should be the indexed columns. " +
-                "Join columns: [t2c2], Indexed columns: [t2c1]",
-              "No available indexes for right subplan.")))
+            msg.toSet.equals(
+              Set(
+                "All join condition column and indexed column should be the same. " +
+                  "Join columns: [t2c2], Indexed columns for right subplan: [t2c1]",
+                "No available indexes for right subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
         case "t2i2" =>
           assert(
-            msg.get.toSet.equals(Set(
-              "All join condition column should be the indexed columns. " +
-                "Join columns: [t2c2], Indexed columns: [t2c1,t2c2]",
-              "No available indexes for right subplan.")))
+            msg.toSet.equals(
+              Set(
+                "All join condition column and indexed column should be the same. " +
+                  "Join columns: [t2c2], Indexed columns for right subplan: [t2c1, t2c2]",
+                "No available indexes for right subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
       }
     }
   }
@@ -283,24 +299,29 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
     assert(updatedPlan.equals(originalPlan))
 
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(msg.isDefined)
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
 
       index.name match {
         case "t1i1" =>
           assert(
-            msg.get.toSet.equals(Set(
-              "Index does not contain all required columns. " +
-                "Required columns: [t1c1,t1c4], Index columns: [t1c1,t1c3]",
-              "No available indexes for left subplan.")),
-            msg.get)
+            msg.toSet.equals(
+              Set(
+                "Index does not contain required columns for left subplan. " +
+                  "Required indexed columns: [t1c1, t1c4], Indexed columns: [t1c1]",
+                "No available indexes for left subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
         case "t2i1" =>
           assert(
-            msg.get.toSet.equals(
+            msg.toSet.equals(
               Set(
-                "Index does not contain all required columns. " +
-                  "Required columns: [t2c1,t2c4], Index columns: [t2c1,t2c3]",
-                "No available indexes for left subplan.")))
+                "Index does not contain required columns for right subplan. " +
+                  "Required indexed columns: [t2c1, t2c4], Indexed columns: [t2c1]",
+                "No available indexes for left subplan. " +
+                  "Both left and right indexes are required for Join query.")),
+            msg)
         case _ =>
       }
     }
@@ -448,9 +469,8 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
         val msg = reasons.get.map(_.verboseStr)
         assert(
           msg.size == 1 && msg.head.contains(
-            "Each join condition column should come from relations " +
-              "directly and attributes from left plan must exclusively have one-to-one mapping " +
-              "with attributes from right plan. E.g. join(A = B and A = D) is not eligible."))
+            "Join condition is not eligible. Reason: incompatible left and right join columns"),
+          msg)
       }
     }
     {

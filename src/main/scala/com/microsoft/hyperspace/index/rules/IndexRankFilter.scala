@@ -19,7 +19,7 @@ package com.microsoft.hyperspace.index.rules
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.index.IndexLogEntry
-import com.microsoft.hyperspace.index.plananalysis.{FilterReasonCode, FilterReasons}
+import com.microsoft.hyperspace.index.plananalysis.FilterReasons
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 
 /**
@@ -52,9 +52,7 @@ trait IndexRankFilter extends IndexFilter {
         selectedIndex.name.equals(index.name),
         plan,
         index,
-        FilterReasons.apply(
-          FilterReasonCode.ANOTHER_INDEX_APPLIED,
-          ("appliedIndex", selectedIndex.name)))
+        FilterReasons.AnotherIndexApplied(selectedIndex.name))
     }
   }
 }

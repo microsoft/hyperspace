@@ -129,12 +129,12 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
           assert(
             msg.exists(
               _.equals(
-                s"[$indexName1,FilterColumnFilter] Index does not contain required columns. " +
-                  "Required columns: [c3,c2,c4], Indexed & included columns: [c3,c2,c1]")))
+                s"Index does not contain required columns. " +
+                  "Required columns: [c3,c2,c4], Index columns: [c3,c2,c1]")))
         case `indexName2` | `indexName3` =>
           assert(
             msg.exists(
-              _.contains("The first indexed column should be in filter condition columns.")))
+              _.contains("The first indexed column should be used in filter conditions.")))
 
       }
     }
@@ -163,16 +163,16 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     verifyTransformedPlanWithIndex(transformedPlan, indexName2)
     allIndexes.foreach { index =>
       val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
-      assert(reasons.isDefined)
-      val msg = reasons.get.map(_.verboseStr)
       index.name match {
         case `indexName1` =>
+          val msg = reasons.get.map(_.verboseStr)
           assert(
             msg.exists(
-              _.contains("The first indexed column should be in filter condition columns.")))
+              _.contains("The first indexed column should be used in filter conditions.")))
         case `indexName2` =>
-          assert(msg.isEmpty)
+          assert(reasons.isEmpty)
         case `indexName3` =>
+          val msg = reasons.get.map(_.verboseStr)
           assert(msg.exists(_.contains(s"Another candidate index is applied: $indexName2")))
       }
     }

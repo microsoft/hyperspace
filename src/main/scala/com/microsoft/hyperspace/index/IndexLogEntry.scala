@@ -527,7 +527,7 @@ case class IndexLogEntry(
     tags.get((plan, tag)).map(_.asInstanceOf[T])
   }
 
-  def getTagValueForAllPlan[T](tag: IndexLogEntryTag[T]): Seq[(LogicalPlan, T)] = {
+  def getTagValuesForAllPlan[T](tag: IndexLogEntryTag[T]): Seq[(LogicalPlan, T)] = {
     tags.filter(entry => entry._1._2.equals(tag)).toSeq.map { case (k, v) =>
       (k._1, v.asInstanceOf[T])
     }

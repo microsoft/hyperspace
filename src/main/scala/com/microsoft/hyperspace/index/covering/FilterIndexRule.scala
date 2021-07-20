@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPla
 
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntryTags
-import com.microsoft.hyperspace.index.plananalysis.{FilterReasonCode, FilterReasons}
+import com.microsoft.hyperspace.index.plananalysis.FilterReasons
 import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, QueryPlanIndexFilter}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
@@ -97,10 +97,9 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
         withFilterReasonTag(
           plan,
           index,
-          FilterReasons.apply(
-            FilterReasonCode.NO_FIRST_INDEXED_COL_COND,
-            ("firstIndexedCol", index.derivedDataset.indexedColumns.head),
-            ("filterColumns", filterColumnNames.mkString(", ")))) {
+          FilterReasons.NoFirstIndexedColCond(
+            index.derivedDataset.indexedColumns.head,
+            filterColumnNames.mkString(", "))) {
           ResolverUtils
             .resolve(spark, index.derivedDataset.indexedColumns.head, filterColumnNames)
             .isDefined
@@ -108,10 +107,9 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
         withFilterReasonTag(
           plan,
           index,
-          FilterReasons.apply(
-            FilterReasonCode.MISSING_REQUIRED_COL,
-            ("requiredCols", (filterColumnNames ++ projectColumnNames).toSet.mkString(",")),
-            ("indexCols", index.derivedDataset.referencedColumns.mkString(",")))) {
+          FilterReasons.MissingRequiredCol(
+            (filterColumnNames ++ projectColumnNames).toSet.mkString(","),
+            index.derivedDataset.referencedColumns.mkString(","))) {
           ResolverUtils
             .resolve(
               spark,

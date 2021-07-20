@@ -104,16 +104,6 @@ object CandidateIndexAnalyzer extends Logging {
       applicableIndexes: Seq[(IndexLogEntry, Seq[(LogicalPlan, Seq[String])])]): String = {
     val stringBuilder = new StringBuilder
     val originalPlanString = planWithoutHyperspace.numberedTreeString.split('\n')
-    if (applicableIndexes.isEmpty) {
-      return "No applicable indexes. Try hyperspace.whyNot()"
-    }
-    val newLine = System.lineSeparator()
-    stringBuilder.append("Plan without Hyperspace:")
-    stringBuilder.append(newLine)
-    stringBuilder.append(newLine)
-    stringBuilder.append(originalPlanString.mkString(newLine))
-    stringBuilder.append(newLine)
-    stringBuilder.append(newLine)
 
     // to Dataframe
     // sub plan line number, index name, rule name
@@ -131,6 +121,18 @@ object CandidateIndexAnalyzer extends Logging {
       }
       .sortBy(r => (r._1, r._3))
       .distinct
+
+    if (res.isEmpty) {
+      return "No applicable indexes. Try hyperspace.whyNot()"
+    }
+    val newLine = System.lineSeparator()
+    stringBuilder.append("Plan without Hyperspace:")
+    stringBuilder.append(newLine)
+    stringBuilder.append(newLine)
+    stringBuilder.append(originalPlanString.mkString(newLine))
+    stringBuilder.append(newLine)
+    stringBuilder.append(newLine)
+
 
     import spark.implicits._
     val df = res.toDF("SubPlan", "IndexName", "IndexType", "RuleName")
@@ -192,7 +194,7 @@ object CandidateIndexAnalyzer extends Logging {
       applicableIndexes.map(_._1.name).distinct.filterNot(appliedIndexNames.contains(_))
     printIndexNames(applicableButNotAppliedIndexNames)
 
-    // Covert reasons to Dataframe rows
+    // Covert reasons to Dataframe rows.
     // (sub plan location string, index name, index type, reason code, arg strings, verbose string)
     val numberSpaces = originalPlanString.length.toString.length + 1
     val res = filterReasons
@@ -330,12 +332,11 @@ object CandidateIndexAnalyzer extends Logging {
         transformedPlan,
         indexes
           .filter(i => indexName.isEmpty || indexName.get.equals(i.name))
-          .map(i => (i, i.getTagValueForAllPlan(IndexLogEntryTags.FILTER_REASONS))),
+          .map(i => (i, i.getTagValuesForAllPlan(IndexLogEntryTags.FILTER_REASONS))),
         indexes
-          .map(i => (i, i.getTagValueForAllPlan(IndexLogEntryTags.APPLICABLE_INDEX_RULES))))
+          .map(i => (i, i.getTagValuesForAllPlan(IndexLogEntryTags.APPLICABLE_INDEX_RULES))))
     } finally {
       cleanupAnalysisTags(indexes)
     }
   }
-
 }

@@ -150,7 +150,7 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
-   * Explains how indexes will be applied to the given dataframe.
+   * Explain how indexes will be applied to the given dataframe.
    *
    * @param df dataFrame.
    * @param redirectFunc optional function to redirect output of explain.
@@ -171,6 +171,14 @@ class Hyperspace(spark: SparkSession) {
     indexManager.index(indexName)
   }
 
+  /**
+   * Explain why indexes are not applied to the given dataframe.
+   *
+   * @param df Dataframe
+   * @param indexName Optional index name to filter out the output
+   * @param extended If true, print more verbose messages.
+   * @param redirectFunc Optional function to redirect output
+   */
   def whyNot(df: DataFrame, indexName: String = "", extended: Boolean = false)(
       implicit redirectFunc: String => Unit = print): Unit = {
     withHyperspaceRuleDisabled {

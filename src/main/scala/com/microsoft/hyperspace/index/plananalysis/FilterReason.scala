@@ -21,7 +21,7 @@ trait FilterReason {
   def codeStr: String
   final def argStr: String = {
     // key1=[value1], key2=[value2]
-    args.map(kv => s"${kv._1}=[${kv._2}]").mkString(",")
+    args.map(kv => s"${kv._1}=[${kv._2}]").mkString(", ")
   }
   def verboseStr: String
 }
@@ -30,71 +30,14 @@ trait FilterReasonNoArg extends FilterReason {
   final override val args: Seq[(String, String)] = Seq.empty
 }
 
-object FilterReasonCode extends Enumeration {
-  type FilterReasonCode = Value
-
-  // Common
-  val COL_SCHEMA_MISMATCH = Value
-  val SOURCE_DATA_CHANGED = Value
-  val NO_DELETE_SUPPORT = Value
-  val NO_COMMON_FILES = Value
-  val TOO_MUCH_APPENDED = Value
-  val TOO_MUCH_DELETED = Value
-  val ANOTHER_INDEX_APPLIED = Value
-
-  // CoveringIndex - FilterIndexRule
-  val NO_FIRST_INDEXED_COL_COND = Value
-  val MISSING_REQUIRED_COL = Value
-
-  // CoveringIndex - JoinIndexRule
-  val NOT_ELIGIBLE_JOIN = Value
-  val NO_AVAIL_JOIN_INDEX_PAIR = Value
-  val NO_COMPATIBLE_JOIN_INDEX_PAIR = Value
-  val NOT_ALL_JOIN_COL_INDEXED = Value
-  val MISSING_INDEXED_COL = Value
-}
-
 object FilterReasons {
-  import com.microsoft.hyperspace.index.plananalysis.FilterReasonCode._
-  def apply(code: FilterReasonCode, args: (String, String)*): FilterReason = {
-    code match {
-      case COL_SCHEMA_MISMATCH =>
-        ColSchemaMismatch(args)
-      case SOURCE_DATA_CHANGED =>
-        SourceDataChanged()
-      case NO_DELETE_SUPPORT =>
-        NoDeleteSupport()
-      case NO_COMMON_FILES =>
-        NoCommonFiles()
-      case TOO_MUCH_APPENDED =>
-        TooMuchAppended(args)
-      case TOO_MUCH_DELETED =>
-        TooMuchDeleted(args)
-      case MISSING_REQUIRED_COL =>
-        MissingRequiredCol(args)
-      case NO_FIRST_INDEXED_COL_COND =>
-        NoFirstIndexedColCond(args)
-      case NOT_ELIGIBLE_JOIN =>
-        NotEligibleJoin(args)
-      case NO_AVAIL_JOIN_INDEX_PAIR =>
-        NoAvailJoinIndexPair(args)
-      case MISSING_INDEXED_COL =>
-        MissingIndexedCol(args)
-      case NOT_ALL_JOIN_COL_INDEXED =>
-        NotAllJoinColIndexed(args)
-      case NO_COMPATIBLE_JOIN_INDEX_PAIR =>
-        NoCompatibleJoinIndexPair()
-      case ANOTHER_INDEX_APPLIED =>
-        AnotherIndexApplied(args)
-    }
-  }
 
-  case class ColSchemaMismatch(override val args: Seq[(String, String)])
-      extends FilterReason {
+  case class ColSchemaMismatch(sourceColumns: String, indexColumns: String) extends FilterReason {
     override final val codeStr: String = "COL_SCHEMA_MISMATCH"
+    override val args = Seq("sourceColumns" -> sourceColumns, "indexColumns" -> indexColumns)
     override def verboseStr: String = {
-      "Column Schema does not match. Source data columns: [" + args(0)._2 +
-        "], Index columns: [" + args(1)._2
+      s"Column Schema does not match. Source data columns: [$sourceColumns], " +
+        s"Index columns: [$indexColumns]"
     }
   }
 
@@ -113,79 +56,96 @@ object FilterReasons {
     override def verboseStr: String = "No common files."
   }
 
-  case class TooMuchAppended(override val args: Seq[(String, String)])
+  case class TooMuchAppended(appendedRatio: String, hybridScanAppendThreshold: String)
       extends FilterReason {
-    override def codeStr: String = "TOO_MUCH_APPENDED"
+    override final def codeStr: String = "TOO_MUCH_APPENDED"
+    override val args = Seq(
+      "appendedRatio" -> appendedRatio,
+      "hybridScanAppendThreshold" -> hybridScanAppendThreshold)
     override def verboseStr: String =
-      s"Appended bytes ratio (${args(0)._2}) is larger than " +
-        s"threshold config ${args(1)._2}). "
+      s"Appended bytes ratio ($appendedRatio) is larger than " +
+        s"threshold config $hybridScanAppendThreshold). "
   }
 
-  case class TooMuchDeleted(override val args: Seq[(String, String)]) extends FilterReason {
-    override def codeStr: String = "TOO_MUCH_DELETED"
+  case class TooMuchDeleted(deletedRatio: String, hybridScanDeleteThreshold: String)
+      extends FilterReason {
+    override final def codeStr: String = "TOO_MUCH_DELETED"
+    override val args = Seq(
+      "deletedRatio" -> deletedRatio,
+      "hybridScanDeleteThreshold" -> hybridScanDeleteThreshold)
     override def verboseStr: String =
-      s"Deleted bytes ratio (${args(0)._2}) is larger than " +
-        s"threshold config ${args(1)._2}). "
+      s"Deleted bytes ratio ($deletedRatio) is larger than " +
+        s"threshold config $hybridScanDeleteThreshold). "
   }
 
-  case class MissingRequiredCol(override val args: Seq[(String, String)])
-      extends FilterReason {
-    override def codeStr: String = "MISSING_REQUIRED_COL"
+  case class MissingRequiredCol(requiredCols: String, indexCols: String) extends FilterReason {
+    override final def codeStr: String = "MISSING_REQUIRED_COL"
+    override val args = Seq("requiredCols" -> requiredCols, "indexCols" -> indexCols)
     override def verboseStr: String =
-      s"Index does not contain required column. Required columns: [${args(0)._2}], " +
-        s"Index columns: [${args(1)._2}]"
+      s"Index does not contain required columns. Required columns: [$requiredCols], " +
+        s"Index columns: [$indexCols]"
   }
 
-  case class NoFirstIndexedColCond(override val args: Seq[(String, String)])
+  case class NoFirstIndexedColCond(firstIndexedCol: String, filterCols: String)
       extends FilterReason {
-    override def codeStr: String = "NO_FIRST_INDEXED_COL_COND"
+    override final def codeStr: String = "NO_FIRST_INDEXED_COL_COND"
+    override val args = Seq("firstIndexedCol" -> firstIndexedCol, "filterCols" -> filterCols)
     override def verboseStr: String =
       "The first indexed column should be used in filter conditions. " +
-        s"The first indexed column: ${args(0)._2}, " +
-        s"Columns in filter condition: [${args(1)._2}]"
+        s"The first indexed column: $firstIndexedCol, " +
+        s"Columns in filter condition: [$filterCols]"
   }
 
-  case class NotEligibleJoin(override val args: Seq[(String, String)])
-      extends FilterReason {
-    override def codeStr: String = "NOT_ELIGIBLE_JOIN"
+  case class NotEligibleJoin(reason: String) extends FilterReason {
+    override final def codeStr: String = "NOT_ELIGIBLE_JOIN"
+    override val args = Seq("reason" -> reason)
     override def verboseStr: String =
-      s"Join condition is not eligible. Reason: ${args(0)._2}"
+      s"Join condition is not eligible. Reason: $reason"
   }
 
-  case class NoAvailJoinIndexPair(override val args: Seq[(String, String)])
-      extends FilterReason {
+  case class NoAvailJoinIndexPair(leftOrRight: String) extends FilterReason {
     override def codeStr: String = "NO_AVAIL_JOIN_INDEX_PAIR"
+    override val args = Seq("child" -> leftOrRight)
     override def verboseStr: String =
-      s"No available indexes for ${args(0)._2} subplan. " +
-        "Both left and right index are required for Join query"
+      s"No available indexes for $leftOrRight subplan. " +
+        "Both left and right indexes are required for Join query."
   }
 
-  case class MissingIndexedCol(override val args: Seq[(String, String)])
+  case class MissingIndexedCol(
+      leftOrRight: String,
+      requiredIndexedCols: String,
+      indexedCols: String)
       extends FilterReason {
-    override def codeStr: String = "MISSING_INDEXED_COL"
+    override final def codeStr: String = "MISSING_INDEXED_COL"
+    override val args = Seq(
+      "child" -> leftOrRight,
+      "requiredIndexedCols" -> requiredIndexedCols,
+      "IndexedCols" -> indexedCols)
     override def verboseStr: String =
-      s"Index does not contain required columns for ${args(0)._2} subplan. " +
-        s"Required indexed columns: [${args(1)._2}], " +
-        s"Indexed columns: [${args(2)._2}]"
+      s"Index does not contain required columns for $leftOrRight subplan. " +
+        s"Required indexed columns: [$requiredIndexedCols], " +
+        s"Indexed columns: [$indexedCols]"
   }
 
-  case class NotAllJoinColIndexed(override val args: Seq[(String, String)])
+  case class NotAllJoinColIndexed(leftOrRight: String, joinCols: String, indexedCols: String)
       extends FilterReason {
-    override def codeStr: String = "NOT_ALL_JOIN_COL_INDEXED"
+    override final def codeStr: String = "NOT_ALL_JOIN_COL_INDEXED"
+    override val args =
+      Seq("child" -> leftOrRight, "joinCols" -> joinCols, "indexedCols" -> indexedCols)
     override def verboseStr: String =
-      s"All join condition column should be the indexed columns. " +
-        s"Join columns: [${args(0)._2}], Indexed columns: [${args(1)._2}]"
+      s"All join condition column and indexed column should be the same. " +
+        s"Join columns: [$joinCols], Indexed columns for $leftOrRight subplan: [$indexedCols]"
   }
 
   case class NoCompatibleJoinIndexPair() extends FilterReasonNoArg {
-    override def codeStr: String = "NO_COMPATIBLE_JOIN_INDEX_PAIR"
+    override final def codeStr: String = "NO_COMPATIBLE_JOIN_INDEX_PAIR"
     override def verboseStr: String = "No compatible left and right index pair."
   }
 
-  case class AnotherIndexApplied(override val args: Seq[(String, String)])
-      extends FilterReason {
-    override def codeStr: String = "ANOTHER_INDEX_APPLIED"
+  case class AnotherIndexApplied(appliedIndex: String) extends FilterReason {
+    override final def codeStr: String = "ANOTHER_INDEX_APPLIED"
+    override val args = Seq("appliedIndex" -> appliedIndex)
     override def verboseStr: String =
-      s"Another candidate index is applied: ${args(0)._2}"
+      s"Another candidate index is applied: $appliedIndex"
   }
 }

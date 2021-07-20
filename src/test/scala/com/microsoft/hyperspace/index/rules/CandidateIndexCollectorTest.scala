@@ -368,7 +368,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
           assert(indexes.isEmpty)
 
           allIndexes.foreach { entry =>
-            val reasons = entry.getTagValue(plan1, IndexLogEntryTags.FILTER_REASONS)
+            val reasons = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
             assert(reasons.isDefined)
             val msg = reasons.get.map(_.verboseStr)
             entry.name match {
