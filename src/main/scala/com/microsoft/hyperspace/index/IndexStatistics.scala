@@ -139,15 +139,7 @@ private[hyperspace] object IndexStatistics {
    * @return List of directory paths containing index files for latest index version.
    */
   private def getIndexContentDirectoryPaths(entry: IndexLogEntry): Seq[String] = {
-    var root = entry.content.root
-    var prefix = entry.content.root.name
-    while (root.subDirs.size == 1 &&
-      !root.subDirs.head.name.startsWith(IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX)) {
-      prefix += s"${root.subDirs.head.name}/"
-      root = root.subDirs.head
-    }
-
-    root.subDirs.map(d => s"$prefix${d.name}")
+    entry.indexDataDirectoryPaths()
   }
 
   /**

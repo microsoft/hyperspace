@@ -74,6 +74,15 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
+   * Vacuums outdated data with given index name.
+   *
+   * @param indexName Name of the index to vacuum outdated data
+   */
+  def vacuumOutdatedDataIndex(indexName: String): Unit = {
+    indexManager.vacuumOutdatedData(indexName)
+  }
+
+  /**
    * Update indexes for the latest version of the data.
    *
    * @param indexName Name of the index to refresh.

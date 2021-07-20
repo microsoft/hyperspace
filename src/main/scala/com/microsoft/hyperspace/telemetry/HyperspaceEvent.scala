@@ -85,6 +85,16 @@ case class VacuumActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: St
     extends HyperspaceIndexCRUDEvent
 
 /**
+ * Deletion of old indexes event. Emitted when vacuumOutdatedData is called on an index.
+ *
+ * @param appInfo AppInfo for spark application.
+ * @param index Related index.
+ * @param message Message about event.
+ */
+case class VacuumOutdatedDataActionEvent(appInfo: AppInfo, index: IndexLogEntry, message: String)
+    extends HyperspaceIndexCRUDEvent
+
+/**
  * Index Refresh Event. Emitted when refresh is called on an index.
  *
  * @param appInfo AppInfo for spark application.

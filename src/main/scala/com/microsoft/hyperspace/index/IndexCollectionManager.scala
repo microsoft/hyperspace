@@ -70,6 +70,17 @@ class IndexCollectionManager(
     }
   }
 
+  override def vacuumOutdatedData(indexName: String): Unit = {
+    withLogManager(indexName) { logManager =>
+      val hadoopConf = spark.sessionState.newHadoopConf()
+      val indexPath = PathResolver(spark.sessionState.conf, hadoopConf)
+        .getIndexPath(indexName)
+      val dataManager =
+        indexDataManagerFactory.create(indexPath, hadoopConf)
+      new VacuumOutdatedDataAction(logManager, dataManager).run()
+    }
+  }
+
   override def refresh(indexName: String, mode: String): Unit = {
     withLogManager(indexName) { logManager =>
       val hadoopConf = spark.sessionState.newHadoopConf()
