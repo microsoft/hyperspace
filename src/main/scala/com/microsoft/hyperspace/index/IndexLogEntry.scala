@@ -514,7 +514,7 @@ case class IndexLogEntry(
   }
 
   /**
-   * This function extracts paths to top-level directories paths which
+   * Extracts paths to top-level directories paths which
    * contain the latest version index files.
    *
    * @return List of directory paths containing index files for latest index version.

@@ -62,7 +62,7 @@ class VacuumOutdatedDataAction(
     }
 
     // Delete versions not used.
-    dataManager.getAllDataVersionIds().foreach { id =>
+    dataManager.getAllVersionIds().foreach { id =>
       if (!indexVersionsInUse.contains(id)) {
         dataManager.delete(id)
       }
@@ -70,7 +70,7 @@ class VacuumOutdatedDataAction(
   }
 
   /**
-   * This function extracts latest versions of an index.
+   * Extracts latest versions of an index.
    *
    * @return List of directory paths containing index files for latest index version.
    */
