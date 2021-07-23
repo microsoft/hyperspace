@@ -55,11 +55,11 @@ Plan without Hyperspace:
 03 +- Filter isnotnull(Col1#)
 04    +- Relation[Col1#,Col2#] parquet
 
-+----------+---------+---------+---------------+
-|SubPlan   |IndexName|IndexType|RuleName       |
-+----------+---------+---------+---------------+
-|Filter @ 1|joinIndex|CI       |FilterIndexRule|
-|Filter @ 3|joinIndex|CI       |FilterIndexRule|
-|Join @ 0  |joinIndex|CI       |JoinIndexRule  |
-+----------+---------+---------+---------------+
++---------+---------+---------+---------------+
+|SubPlan  |IndexName|IndexType|RuleName       |
++---------+---------+---------+---------------+
+|Filter @1|joinIndex|CI       |FilterIndexRule|
+|Filter @3|joinIndex|CI       |FilterIndexRule|
+|Join @0  |joinIndex|CI       |JoinIndexRule  |
++---------+---------+---------+---------------+
 

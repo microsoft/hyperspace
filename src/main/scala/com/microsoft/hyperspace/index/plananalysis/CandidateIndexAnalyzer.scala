@@ -95,7 +95,7 @@ object CandidateIndexAnalyzer extends Logging {
     } else {
       -1
     }
-    s"${plan.nodeName} @ $startLineNumber"
+    s"${plan.nodeName} @$startLineNumber"
   }
 
   private def generateApplicableIndexInfoString(
