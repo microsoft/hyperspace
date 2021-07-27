@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions.{input_file_name, max, min}
+import org.apache.spark.sql.functions.{array_sort, collect_set, input_file_name, max, min}
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType}
 import org.apache.spark.util.sketch.BloomFilter
 
@@ -84,6 +84,19 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite with BloomFilterTest
       .groupBy(input_file_name().as(fileNameCol))
       .agg(min("A"), max("A"))
     checkAnswer(indexData, withFileId(expectedSketchValues))
+  }
+
+  test("createIndex works correctly with a ValueListSketch.") {
+    val sourceData =
+      createSourceData(spark.range(100).selectExpr("cast(id / 10 as int) as A").toDF)
+    val indexConfig = DataSkippingIndexConfig("MyIndex", ValueListSketch("A"))
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    assert(index.sketches === Seq(ValueListSketch("A", Some(IntegerType))))
+    val expectedSketchValues = sourceData
+      .groupBy(input_file_name().as(fileNameCol))
+      .agg(array_sort(collect_set("A")))
+    checkAnswer(indexData, withFileId(expectedSketchValues))
+    assert(indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "ValueList_A__0"))
   }
 
   test("createIndex works correctly with a BloomFilterSketch.") {
