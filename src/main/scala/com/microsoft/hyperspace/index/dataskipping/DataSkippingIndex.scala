@@ -21,6 +21,7 @@ import scala.collection.mutable
 import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.Literal.TrueLiteral
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
@@ -151,7 +152,7 @@ case class DataSkippingIndex(
     // by combining individual index predicates with And.
     // True is returned if there are no index predicates for the source predicate node.
     def toIndexPred(sourcePred: Expression): Expression = {
-      predMap.get(sourcePred).map(_.reduceLeft(And)).getOrElse(Literal.TrueLiteral)
+      predMap.get(sourcePred).map(_.reduceLeft(And)).getOrElse(TrueLiteral)
     }
 
     // Compose an index predicate visiting the source predicate tree recursively.
@@ -168,15 +169,15 @@ case class DataSkippingIndex(
     // This is a trimmed down version of the BooleanSimplification rule.
     // It's just enough to determine whether the index is applicable or not.
     val optimizePredicate: PartialFunction[Expression, Expression] = {
-      case And(Literal.TrueLiteral, right) => right
-      case And(left, Literal.TrueLiteral) => left
-      case Or(Literal.TrueLiteral, _) => Literal.TrueLiteral
-      case Or(_, Literal.TrueLiteral) => Literal.TrueLiteral
+      case And(TrueLiteral, right) => right
+      case And(left, TrueLiteral) => left
+      case Or(TrueLiteral, _) => TrueLiteral
+      case Or(_, TrueLiteral) => TrueLiteral
     }
     val optimizedIndexPredicate = indexPredicate.transformUp(optimizePredicate)
 
     // Return None if the index predicate is True - meaning no conversion can be done.
-    if (optimizedIndexPredicate == Literal.TrueLiteral) {
+    if (optimizedIndexPredicate == TrueLiteral) {
       None
     } else {
       Some(optimizedIndexPredicate)
@@ -321,7 +322,7 @@ object DataSkippingIndex {
       assert(aggrs.nonEmpty)
       aggrs.zipWithIndex.map {
         case (aggr, idx) =>
-          new Column(aggr).as(getNormalizeColumnName(s"${s}_$idx"))
+          new Column(aggr.toAggregateExpression).as(getNormalizeColumnName(s"${s}_$idx"))
       }
     }
   }
