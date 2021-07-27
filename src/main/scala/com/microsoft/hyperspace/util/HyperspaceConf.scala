@@ -122,6 +122,32 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  object ZOrderCovering {
+    def approxSourceBytesPerPartition(spark: SparkSession): Long = {
+      spark.conf
+        .get(
+          IndexConstants.INDEX_ZORDER_APPROX_SOURCE_BYTES_PER_PARTITION,
+          IndexConstants.INDEX_ZORDER_APPROX_SOURCE_BYTES_PER_PARTITION_DEFAULT)
+        .toLong
+    }
+
+    def quantileBasedZAddressEnabled(spark: SparkSession): Boolean = {
+      spark.conf
+        .get(
+          IndexConstants.INDEX_ZORDER_QUANTILE_ENABLED,
+          IndexConstants.INDEX_ZORDER_QUANTILE_ENABLED_DEFAULT)
+        .toBoolean
+    }
+
+    def quantileBasedZAddressRelativeError(spark: SparkSession): Double = {
+      spark.conf
+        .get(
+          IndexConstants.INDEX_ZORDER_QUANTILE_RELATIVE_ERROR,
+          IndexConstants.INDEX_ZORDER_QUANTILE_RELATIVE_ERROR_DEFAULT)
+        .toDouble
+    }
+  }
+
   object DataSkipping {
     def targetIndexDataFileSize(spark: SparkSession): Long = {
       // TODO: Consider using a systematic way to validate the config value

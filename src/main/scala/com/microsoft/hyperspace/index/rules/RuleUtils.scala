@@ -17,7 +17,9 @@
 package com.microsoft.hyperspace.index.rules
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.analysis.CleanupAliases
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.IndexConstants
@@ -50,6 +52,35 @@ object RuleUtils {
       Some(provider.getRelation(leaves.head))
     } else {
       None
+    }
+  }
+
+  /**
+   * Extract project and filter columns when the given plan is Project-Filter-Relation
+   * or Filter-Relation. Otherwise, return empty lists.
+   *
+   * @param plan Logical plan to extract project and filter columns.
+   * @return A pair of project column names and filter column names
+   */
+  def getProjectAndFilterColumns(plan: LogicalPlan): (Seq[String], Seq[String]) = {
+    plan match {
+      case project @ Project(_, _ @Filter(condition: Expression, ExtractRelation(relation)))
+          if !isIndexApplied(relation) =>
+        val projectColumnNames = CleanupAliases(project)
+          .asInstanceOf[Project]
+          .projectList
+          .map(_.references.map(_.asInstanceOf[AttributeReference].name))
+          .flatMap(_.toSeq)
+        val filterColumnNames = condition.references.map(_.name).toSeq
+        (projectColumnNames, filterColumnNames)
+
+      case Filter(condition: Expression, ExtractRelation(relation))
+          if !isIndexApplied(relation) =>
+        val relationColumnNames = relation.plan.output.map(_.name)
+        val filterColumnNames = condition.references.map(_.name).toSeq
+        (relationColumnNames, filterColumnNames)
+      case _ =>
+        (Seq(), Seq())
     }
   }
 }

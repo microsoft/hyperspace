@@ -100,7 +100,7 @@ object CoveringIndexRuleUtils {
       index: IndexLogEntry,
       plan: LogicalPlan,
       useBucketSpec: Boolean): LogicalPlan = {
-    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndexTrait]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     // Note that we transform *only* the base relation and not other portions of the plan
     // (e.g., filters). For instance, given the following input plan:
@@ -118,7 +118,7 @@ object CoveringIndexRuleUtils {
           location,
           new StructType(),
           StructType(ci.schema.filter(relation.schema.contains(_))),
-          if (useBucketSpec) Some(ci.bucketSpec) else None,
+          if (useBucketSpec) ci.bucketSpec else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
@@ -149,7 +149,7 @@ object CoveringIndexRuleUtils {
       plan: LogicalPlan,
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
-    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndexTrait]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     var unhandledAppendedFiles: Seq[Path] = Nil
     // Get transformed plan with index data and appended files if applicable.
@@ -233,7 +233,7 @@ object CoveringIndexRuleUtils {
           newLocation,
           new StructType(),
           newSchema,
-          if (useBucketSpec) Some(ci.bucketSpec) else None,
+          if (useBucketSpec) ci.bucketSpec else None,
           new ParquetFileFormat,
           Map(IndexConstants.INDEX_RELATION_IDENTIFIER))(spark, index)
 
@@ -271,7 +271,7 @@ object CoveringIndexRuleUtils {
         // Although only numBuckets of BucketSpec is used in BucketUnion*, bucketColumnNames
         // and sortColumnNames are shown in plan string. So remove sortColumnNames to avoid
         // misunderstanding.
-        val bucketSpec = ci.bucketSpec.copy(sortColumnNames = Nil)
+        val bucketSpec = ci.bucketSpec.get.copy(sortColumnNames = Nil)
 
         // Merge index plan & newly shuffled plan by using bucket-aware union.
         BucketUnion(
@@ -304,7 +304,7 @@ object CoveringIndexRuleUtils {
       index: IndexLogEntry,
       originalPlan: LogicalPlan,
       filesAppended: Seq[Path]): LogicalPlan = {
-    val ci = index.derivedDataset.asInstanceOf[CoveringIndex]
+    val ci = index.derivedDataset.asInstanceOf[CoveringIndexTrait]
     val provider = Hyperspace.getContext(spark).sourceProviderManager
     // Transform the relation node to include appended files.
     val planForAppended = originalPlan transformDown {

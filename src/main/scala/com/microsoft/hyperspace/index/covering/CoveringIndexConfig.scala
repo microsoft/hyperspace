@@ -24,26 +24,16 @@ import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.util.HyperspaceConf
 
-/**
- * CoveringIndexConfig specifies the configuration of a covering index.
- *
- * Use this class to create a covering index with [[Hyperspace.createIndex()]].
- *
- * Implementation note: This is an implementation of [[IndexConfigTrait]]
- * for the covering index. The name of this class might be changed in v1.0.
- *
- * @param indexName Index name.
- * @param indexedColumns Columns from which an index is created.
- * @param includedColumns Columns to be included in the index.
- */
-case class CoveringIndexConfig(
-    override val indexName: String,
-    indexedColumns: Seq[String],
-    includedColumns: Seq[String] = Seq())
-    extends IndexConfigTrait {
+trait CoveringIndexConfigTrait extends IndexConfigTrait {
+  val indexName: String
+  val indexedColumns: Seq[String]
+  val includedColumns: Seq[String]
+
   if (indexName.isEmpty || indexedColumns.isEmpty) {
     throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")
   }
+
+  protected def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
 
   val lowerCaseIndexedColumns = toLowerCase(indexedColumns)
   val lowerCaseIncludedColumns = toLowerCase(includedColumns)
@@ -85,9 +75,26 @@ case class CoveringIndexConfig(
       s"includedColumns: $includedColumnNames]"
   }
 
-  private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
-
   override def referencedColumns: Seq[String] = indexedColumns ++ includedColumns
+}
+
+/**
+ * CoveringIndexConfig specifies the configuration of a covering index.
+ *
+ * Use this class to create a covering index with [[Hyperspace.createIndex()]].
+ *
+ * Implementation note: This is an implementation of [[IndexConfigTrait]]
+ * for the covering index. The name of this class might be changed in v1.0.
+ *
+ * @param indexName Index name.
+ * @param indexedColumns Columns from which an index is created.
+ * @param includedColumns Columns to be included in the index.
+ */
+case class CoveringIndexConfig(
+    override val indexName: String,
+    indexedColumns: Seq[String],
+    includedColumns: Seq[String] = Seq())
+    extends CoveringIndexConfigTrait {
 
   override def createIndex(
       ctx: IndexerContext,
