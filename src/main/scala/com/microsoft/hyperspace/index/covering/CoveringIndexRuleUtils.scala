@@ -29,21 +29,10 @@ import org.apache.spark.sql.types.{LongType, StructType}
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.plans.logical.{BucketUnion, IndexHadoopFsRelation}
-import com.microsoft.hyperspace.index.sources.FileBasedRelation
+import com.microsoft.hyperspace.index.rules.RuleUtils
 import com.microsoft.hyperspace.util.HyperspaceConf
 
-object RuleUtils {
-
-  /**
-   * Check if an index was applied the given relation or not.
-   * This can be determined by an identifier in [[FileBasedRelation]]'s options.
-   *
-   * @param relation FileBasedRelation to check if an index is already applied.
-   * @return true if an index is applied to the given relation. Otherwise false.
-   */
-  def isIndexApplied(relation: FileBasedRelation): Boolean = {
-    relation.options.exists(_.equals(IndexConstants.INDEX_RELATION_IDENTIFIER))
-  }
+object CoveringIndexRuleUtils {
 
   /**
    * Transform the current plan to utilize the given index.
@@ -70,7 +59,7 @@ object RuleUtils {
       useBucketSpec: Boolean,
       useBucketUnionForAppended: Boolean): LogicalPlan = {
     // Check pre-requisite.
-    val relation = getRelation(spark, plan)
+    val relation = RuleUtils.getRelation(spark, plan)
     assert(relation.isDefined)
 
     // If there is no change in source data files, the index can be applied by
@@ -91,23 +80,6 @@ object RuleUtils {
     }
     assert(!transformed.equals(plan))
     transformed
-  }
-
-  /**
-   * Extract the relation node if the given logical plan is linear.
-   *
-   * @param plan Logical plan to extract a relation node from.
-   * @return If the plan is linear and the relation node is supported, the [[FileBasedRelation]]
-   *         object that wraps the relation node. Otherwise None.
-   */
-  def getRelation(spark: SparkSession, plan: LogicalPlan): Option[FileBasedRelation] = {
-    val provider = Hyperspace.getContext(spark).sourceProviderManager
-    val leaves = plan.collectLeaves()
-    if (leaves.size == 1 && provider.isSupportedRelation(leaves.head)) {
-      Some(provider.getRelation(leaves.head))
-    } else {
-      None
-    }
   }
 
   /**

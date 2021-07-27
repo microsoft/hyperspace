@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.covering.JoinAttributeFilter.extractConditions
-import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, QueryPlanIndexFilter}
+import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, IndexTypeFilter, QueryPlanIndexFilter, RuleUtils}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.shim.JoinWithoutHint
@@ -618,7 +618,11 @@ object JoinRankFilter extends IndexRankFilter {
 object JoinIndexRule extends HyperspaceRule with HyperspaceEventLogging {
 
   override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
-    CoveringIndexFilter :: JoinPlanNodeFilter :: JoinAttributeFilter :: JoinColumnFilter :: Nil
+    IndexTypeFilter[CoveringIndex]() ::
+      JoinPlanNodeFilter ::
+      JoinAttributeFilter ::
+      JoinColumnFilter ::
+      Nil
 
   override val indexRanker: IndexRankFilter = JoinRankFilter
 
@@ -641,13 +645,13 @@ object JoinIndexRule extends HyperspaceRule with HyperspaceEventLogging {
         val updatedPlan =
           join
             .copy(
-              left = RuleUtils.transformPlanToUseIndex(
+              left = CoveringIndexRuleUtils.transformPlanToUseIndex(
                 spark,
                 lIndex,
                 l,
                 useBucketSpec = true,
                 useBucketUnionForAppended = true),
-              right = RuleUtils.transformPlanToUseIndex(
+              right = CoveringIndexRuleUtils.transformPlanToUseIndex(
                 spark,
                 rIndex,
                 r,
