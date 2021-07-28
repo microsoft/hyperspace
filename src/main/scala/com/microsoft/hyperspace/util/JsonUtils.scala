@@ -41,6 +41,8 @@ object JsonUtils {
     new SimpleModule()
       .addSerializer(classOf[StructType], new StructTypeSerializer)
       .addDeserializer(classOf[StructType], new StructTypeDeserializer)
+      .addSerializer(classOf[DataType], new DataTypeSerializer)
+      .addDeserializer(classOf[DataType], new DataTypeDeserializer)
   }
 
   def toJson[T: Manifest](obj: T): String = {
@@ -67,6 +69,21 @@ object JsonUtils {
   private class StructTypeDeserializer extends StdDeserializer[StructType](classOf[StructType]) {
     override def deserialize(p: JsonParser, ctx: DeserializationContext): StructType = {
       DataType.fromJson(p.readValueAsTree().toString).asInstanceOf[StructType]
+    }
+  }
+
+  private class DataTypeSerializer extends StdSerializer[DataType](classOf[DataType]) {
+    override def serialize(
+        value: DataType,
+        gen: JsonGenerator,
+        provider: SerializerProvider): Unit = {
+      gen.writeRawValue(value.json)
+    }
+  }
+
+  private class DataTypeDeserializer extends StdDeserializer[DataType](classOf[DataType]) {
+    override def deserialize(p: JsonParser, ctx: DeserializationContext): DataType = {
+      DataType.fromJson(p.readValueAsTree().toString)
     }
   }
 }

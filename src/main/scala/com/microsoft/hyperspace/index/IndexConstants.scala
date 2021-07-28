@@ -117,4 +117,15 @@ object IndexConstants {
   // To provide multiple paths in the globbing pattern, separate them with commas, e.g.
   // "/temp/1/*, /temp/2/*"
   val GLOBBING_PATTERN_KEY = "spark.hyperspace.source.globbingPattern"
+
+  /**
+   * Minimum number of records per index data file for data skipping indexes.
+   *
+   * When optimizing data skipping indexes, if the number of records per index
+   * data file is lower than this value, the index data is repartitioned to
+   * make index data files larger.
+   */
+  val DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE =
+    "spark.hyperspace.index.dataskipping.minRecordsPerIndexDataFile"
+  val DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE_DEFAULT = "100000"
 }

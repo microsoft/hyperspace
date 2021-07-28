@@ -105,6 +105,16 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  object DataSkipping {
+    def minRecordsPerIndexDataFile(spark: SparkSession): Long = {
+      spark.conf
+        .get(
+          IndexConstants.DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE,
+          IndexConstants.DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE_DEFAULT)
+        .toLong
+    }
+  }
+
   /**
    * Returns the config value whose key matches the first key given multiple keys. If no keys are
    * matched, the given default value is returned.
