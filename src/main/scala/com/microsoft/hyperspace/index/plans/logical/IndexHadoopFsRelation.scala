@@ -45,6 +45,24 @@ class IndexHadoopFsRelation(
     s"Hyperspace(Type: ${index.derivedDataset.kindAbbr}, " +
       s"Name: ${index.name}, LogVersion: ${index.id})"
   }
+
+  def indexName: String = index.name
+
   override def toString(): String = indexPlanStr
 
+}
+
+object IndexHadoopFsRelation {
+  def apply(
+      rel: HadoopFsRelation,
+      spark: SparkSession,
+      index: IndexLogEntry): IndexHadoopFsRelation = {
+    new IndexHadoopFsRelation(
+      rel.location,
+      rel.partitionSchema,
+      rel.dataSchema,
+      rel.bucketSpec,
+      rel.fileFormat,
+      rel.options)(spark, index)
+  }
 }

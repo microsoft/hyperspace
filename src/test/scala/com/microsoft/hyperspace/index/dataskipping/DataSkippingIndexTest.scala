@@ -82,6 +82,14 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     checkAnswer(writtenIndexData, indexData)
   }
 
+  test("write throws an exception if the index data schema doesn't match.") {
+    val sourceData = createSourceData(spark.range(100).toDF("A"))
+    val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
+    val (index, _) = indexConfig.createIndex(ctx, sourceData, Map())
+    val ex = intercept[IllegalArgumentException](index.write(ctx, spark.range(10).toDF("B")))
+    assert(ex.getMessage.contains("Schema of the index data doesn't match the index schema"))
+  }
+
   test("optimize reduces the number of index data files.") {
     val targetIndexDataFileSize = 100000
     val expectedNumIndexDataFiles = 1

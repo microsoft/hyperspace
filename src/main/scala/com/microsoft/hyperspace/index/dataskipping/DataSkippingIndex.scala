@@ -16,8 +16,13 @@
 
 package com.microsoft.hyperspace.index.dataskipping
 
-import org.apache.spark.sql.{Column, DataFrame, SaveMode}
-import org.apache.spark.sql.functions.{input_file_name, min, spark_partition_id}
+import scala.collection.mutable
+
+import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
+import org.apache.spark.sql.catalyst.expressions.{And, Expression, Literal, NamedExpression, Or}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
 import org.apache.spark.sql.types.StructType
 
@@ -121,6 +126,60 @@ case class DataSkippingIndex(
 
   override def hashCode: Int = sketches.map(_.hashCode).sum
 
+  /**
+   * Translate the given filter/join condition for the source data to a
+   * predicate that can be used to filter out unnecessary source data files when
+   * applied to index data.
+   *
+   * For example, a filter condition "A = 1" can be translated into an index
+   * predicate "Min_A <= 1 && Max_A >= 1" to filter out files which cannot satisfy
+   * the condition for any rows in the file.
+   */
+  def translateFilterCondition(
+      spark: SparkSession,
+      condition: Expression,
+      source: LogicalPlan): Option[Expression] = {
+    val resolvedExprs =
+      ExpressionUtils.getResolvedExprs(spark, sketches, source).getOrElse { return None }
+    val predMap = buildPredicateMap(spark, condition, source, resolvedExprs)
+
+    // Create a single index predicate for a single source predicate node,
+    // by combining individual index predicates with And.
+    // True is returned if there are no index predicates for the source predicate node.
+    def toIndexPred(sourcePred: Expression): Expression = {
+      predMap.get(sourcePred).map(_.reduceLeft(And)).getOrElse(Literal.TrueLiteral)
+    }
+
+    // Compose an index predicate visiting the source predicate tree recursively.
+    def composeIndexPred(sourcePred: Expression): Expression =
+      sourcePred match {
+        case and: And => And(toIndexPred(and), and.mapChildren(composeIndexPred))
+        case or: Or => And(toIndexPred(or), or.mapChildren(composeIndexPred))
+        case leaf => toIndexPred(leaf)
+      }
+
+    val indexPredicate = composeIndexPred(condition)
+
+    // Apply constant folding to get the final predicate.
+    // This is a trimmed down version of the BooleanSimplification rule.
+    // It's just enough to determine whether the index is applicable or not.
+    val optimizePredicate: PartialFunction[Expression, Expression] = {
+      case And(Literal.TrueLiteral, right) => right
+      case And(left, Literal.TrueLiteral) => left
+      case And(a, And(b, c)) if a.deterministic && a == b => And(b, c)
+      case Or(t @ Literal.TrueLiteral, right) => t
+      case Or(left, t @ Literal.TrueLiteral) => t
+    }
+    val optimizedIndexPredicate = indexPredicate.transformUp(optimizePredicate)
+
+    // Return None if the index predicate is True - meaning no conversion can be done.
+    if (optimizedIndexPredicate == Literal.TrueLiteral) {
+      None
+    } else {
+      Some(optimizedIndexPredicate)
+    }
+  }
+
   private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
     // require instead of assert, as the condition can potentially be broken by
     // code which is external to dataskipping.
@@ -142,6 +201,50 @@ case class DataSkippingIndex(
     repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
     indexData.unpersist()
   }
+
+  /**
+   * Collects index predicates for each node in the source predicate.
+   */
+  private def buildPredicateMap(
+      spark: SparkSession,
+      predicate: Expression,
+      source: LogicalPlan,
+      resolvedExprs: Map[Sketch, Seq[Expression]])
+      : mutable.Map[Expression, mutable.Buffer[Expression]] = {
+    val predMap = mutable.Map[Expression, mutable.Buffer[Expression]]()
+    val sketchesWithIndex = sketches.zipWithIndex
+    predicate.foreachUp { sourcePred =>
+      val indexPreds = sketchesWithIndex.flatMap {
+        case (sketch, idx) =>
+          sketch.convertPredicate(
+            sourcePred,
+            resolvedExprs(sketch),
+            source.output.map(attr => attr.exprId -> attr.name).toMap,
+            aggrNames(idx).map(UnresolvedAttribute.quoted(_)))
+      }
+      if (indexPreds.nonEmpty) {
+        predMap.getOrElseUpdate(sourcePred, mutable.Buffer.empty) ++= indexPreds
+      }
+    }
+    predMap
+  }
+
+  private def aggrNames(i: Int): Seq[String] = {
+    aggregateFunctions
+      .slice(sketchOffsets(i), sketchOffsets(i + 1))
+      .map(_.expr.asInstanceOf[NamedExpression].name)
+  }
+
+  /**
+   * Sketch offsets are used to map each sketch to its corresponding columns
+   * in the dataframe.
+   */
+  @transient
+  private lazy val sketchOffsets: Seq[Int] =
+    sketches.map(_.aggregateFunctions.length).scanLeft(0)(_ + _)
+
+  @transient
+  private lazy val aggregateFunctions = DataSkippingIndex.getNamedAggregateFunctions(sketches)
 }
 
 object DataSkippingIndex {

@@ -63,4 +63,13 @@ object ApplyHyperspace
       }
     }
   }
+
+  def withHyperspaceRuleDisabled[T](f: => T): T = {
+    try {
+      disableForIndexMaintenance.set(true)
+      f
+    } finally {
+      disableForIndexMaintenance.set(false)
+    }
+  }
 }

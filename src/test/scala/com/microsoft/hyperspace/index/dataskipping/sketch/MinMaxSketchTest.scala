@@ -17,9 +17,13 @@
 package com.microsoft.hyperspace.index.dataskipping.sketch
 
 import org.apache.spark.sql.{Column, QueryTest}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.types._
 import org.mockito.Mockito.mock
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
+import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
 
 class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
   import spark.implicits._
@@ -62,5 +66,291 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
   test("hashCode is reasonably implemented.") {
     assert(MinMaxSketch("A").hashCode === MinMaxSketch("A").hashCode)
     assert(MinMaxSketch("A").hashCode !== MinMaxSketch("a").hashCode)
+  }
+
+  test("convertPredicate converts EqualTo(<col>, <lit>).") {
+    val sketch = MinMaxSketch("A")
+    val predicate = EqualTo(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(42)),
+          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts EqualTo(<lit>, <col>).") {
+    val sketch = MinMaxSketch("A")
+    val predicate = EqualTo(Literal(42), AttributeReference("A", IntegerType)(ExprId(0)))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(42)),
+          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts EqualTo(<struct field access>, <lit>).") {
+    val sketch = MinMaxSketch("A.C")
+    val structAccess = GetStructField(
+      AttributeReference("A", StructType(Seq(StructField("C", IntegerType))))(ExprId(0)),
+      0)
+    val predicate = EqualTo(structAccess, Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(structAccess.transformUp {
+        case attr: AttributeReference => attr.withExprId(ExpressionUtils.nullExprId)
+      }),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(42)),
+          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts EqualTo(<nested struct field access>, <lit>).") {
+    val sketch = MinMaxSketch("A.B.C")
+    val structAccess = GetStructField(
+      GetStructField(
+        AttributeReference(
+          "A",
+          StructType(Seq(StructField("B", StructType(Seq(StructField("C", IntegerType)))))))(
+          ExprId(0)),
+        0),
+      0)
+    val predicate = EqualTo(structAccess, Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(structAccess.transformUp {
+        case attr: AttributeReference => attr.withExprId(ExpressionUtils.nullExprId)
+      }),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(42)),
+          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts EqualTo(<col>, <lit>) - string type.") {
+    val sketch = MinMaxSketch("A")
+    val predicate =
+      EqualTo(AttributeReference("A", StringType)(ExprId(0)), Literal.create("hello", StringType))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal.create("hello", StringType)),
+          GreaterThanOrEqual(sketchValues(1), Literal.create("hello", StringType)))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts EqualTo(<col>, <lit>) - double type.") {
+    val sketch = MinMaxSketch("A")
+    val predicate =
+      EqualTo(AttributeReference("A", StringType)(ExprId(0)), Literal(3.14, DoubleType))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(3.14, DoubleType)),
+          GreaterThanOrEqual(sketchValues(1), Literal(3.14, DoubleType)))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts LessThan.") {
+    val sketch = MinMaxSketch("A")
+    val predicate = LessThan(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        LessThan(sketchValues(0), Literal(42))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts LessThan - string type.") {
+    val sketch = MinMaxSketch("A")
+    val predicate = LessThan(
+      AttributeReference("A", StringType)(ExprId(0)),
+      Literal.create("hello", StringType))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        LessThan(sketchValues(0), Literal.create("hello", StringType))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts LessThanOrEqual.") {
+    val sketch = MinMaxSketch("A")
+    val predicate = LessThanOrEqual(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected =
+      Some(
+        And(
+          And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+          LessThanOrEqual(sketchValues(0), Literal(42))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts GreaterThan.") {
+    val sketch = MinMaxSketch("A")
+    val predicate = GreaterThan(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected =
+      Some(
+        And(
+          And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+          GreaterThan(sketchValues(1), Literal(42))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts GreaterThanOrEqual.") {
+    val sketch = MinMaxSketch("A")
+    val predicate =
+      GreaterThanOrEqual(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected =
+      Some(
+        And(
+          And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+          GreaterThanOrEqual(sketchValues(1), Literal(42))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts In.") {
+    val sketch = MinMaxSketch("A")
+    val predicate =
+      In(AttributeReference("A", IntegerType)(ExprId(0)), Seq(Literal(42), Literal(23)))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        Or(
+          And(
+            LessThanOrEqual(sketchValues(0), Literal(42)),
+            GreaterThanOrEqual(sketchValues(1), Literal(42))),
+          And(
+            LessThanOrEqual(sketchValues(0), Literal(23)),
+            GreaterThanOrEqual(sketchValues(1), Literal(23))))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate converts In - string type.") {
+    val sketch = MinMaxSketch("A")
+    val predicate =
+      In(
+        AttributeReference("A", StringType)(ExprId(0)),
+        Seq(Literal.create("hello", StringType), Literal.create("world", StringType)))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = Some(
+      And(
+        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
+        Or(
+          And(
+            LessThanOrEqual(sketchValues(0), Literal.create("hello", StringType)),
+            GreaterThanOrEqual(sketchValues(1), Literal.create("hello", StringType))),
+          And(
+            LessThanOrEqual(sketchValues(0), Literal.create("world", StringType)),
+            GreaterThanOrEqual(sketchValues(1), Literal.create("world", StringType))))))
+    assert(result === expected)
+  }
+
+  test("convertPredicate does not convert Not(EqualTo(<col>, <lit>)).") {
+    val sketch = MinMaxSketch("A")
+    val predicate = Not(EqualTo(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42)))
+    val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
+    val exprIdColMap = Map(ExprId(0) -> "A")
+    val result = sketch.convertPredicate(
+      predicate,
+      Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
+      exprIdColMap,
+      sketchValues)
+    val expected = None
+    assert(result === expected)
   }
 }

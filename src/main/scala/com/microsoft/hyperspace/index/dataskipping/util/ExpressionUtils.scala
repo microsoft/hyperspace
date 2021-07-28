@@ -29,6 +29,7 @@ import org.apache.spark.sql.types.DataType
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexUtils
 import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace.withHyperspaceRuleDisabled
 
 object ExpressionUtils {
 
@@ -150,5 +151,53 @@ object ExpressionUtils {
         None
       }
     }
+  }
+
+  /**
+   * Returns sketch expressions that can be used to match indexed expressions
+   * and expressions in the filter condition. For example, when a user creates
+   * an index with MinMaxSketch("A"), we create an expression corresopnding to
+   * "A" here, and later we try to match expression nodes in a filter condition,
+   * say, EqualTo(AttributeReference("A"), Literal(1)), to the expression for
+   * "A".
+   *
+   * We need this step as the filter/join conditions are given to us as a tree
+   * of expressions in the Spark's optimizer, whereas the indexed expressions
+   * are provided and stored as strings.
+   */
+  def getResolvedExprs(
+      spark: SparkSession,
+      sketches: Seq[Sketch],
+      source: LogicalPlan): Option[Map[Sketch, Seq[Expression]]] = {
+    val resolvedExprs = sketches.map { s =>
+      val cond = PredicateWrapper(s.expressions.map {
+        case (expr, _) => spark.sessionState.sqlParser.parseExpression(expr)
+      })
+      val filter = withHyperspaceRuleDisabled {
+        spark.sessionState.optimizer
+          .execute(spark.sessionState.analyzer.execute(Filter(cond, source)))
+          .asInstanceOf[Filter]
+      }
+      val resolved = filter.condition.asInstanceOf[PredicateWrapper].children.map(normalize)
+      if (!s.expressions.map(_._2.get).zip(resolved).forall {
+          case (dataType, resolvedExpr) => dataType == resolvedExpr.dataType
+        }) {
+        return None
+      }
+      s -> resolved
+    }.toMap
+    Some(resolvedExprs)
+  }
+
+  // Used to preserve sketch expressions during optimization
+  private case class PredicateWrapper(override val children: Seq[Expression])
+      extends Expression
+      with Predicate {
+    // $COVERAGE-OFF$ code never used
+    override def nullable: Boolean = false
+    override def eval(input: InternalRow): Any = throw new NotImplementedError
+    override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode =
+      throw new NotImplementedError
+    // $COVERAGE-ON$
   }
 }

@@ -127,6 +127,9 @@ ThisBuild / Test / fork := true
 
 ThisBuild / Test / javaOptions += "-Xmx1024m"
 
+// Needed to test both non-codegen and codegen parts of expressions
+ThisBuild / Test / envVars += "SPARK_TESTING" -> "1"
+
 ThisBuild / coverageExcludedPackages := "com\\.fasterxml.*;com\\.microsoft\\.hyperspace\\.shim"
 
 /**

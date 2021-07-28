@@ -18,11 +18,11 @@ package com.microsoft.hyperspace.index.dataskipping
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexConfigTrait, IndexerContext}
-import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
+import com.microsoft.hyperspace.index.dataskipping.sketch.{PartitionSketch, Sketch}
 import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
 
 /**
@@ -59,10 +59,22 @@ case class DataSkippingIndexConfig(
       sourceData: DataFrame,
       properties: Map[String, String]): (DataSkippingIndex, DataFrame) = {
     val resolvedSketches = ExpressionUtils.resolve(ctx.spark, sketches, sourceData)
-    checkDuplicateSketches(resolvedSketches)
-    val indexData = DataSkippingIndex.createIndexData(ctx, resolvedSketches, sourceData)
-    val index = DataSkippingIndex(resolvedSketches, indexData.schema, properties)
+    val partitionSketches = getPartitionSketches(ctx.spark, sourceData)
+    val finalSketches = partitionSketches ++ resolvedSketches
+    checkDuplicateSketches(finalSketches)
+    val indexData = DataSkippingIndex.createIndexData(ctx, finalSketches, sourceData)
+    val index = DataSkippingIndex(finalSketches, indexData.schema, properties)
     (index, indexData)
+  }
+
+  private def getPartitionSketches(
+      spark: SparkSession,
+      sourceData: DataFrame): Seq[PartitionSketch] = {
+    val relation = Hyperspace
+      .getContext(spark)
+      .sourceProviderManager
+      .getRelation(sourceData.queryExecution.optimizedPlan)
+    relation.partitionSchema.map(f => PartitionSketch(f.name, Some(f.dataType)))
   }
 
   private def checkDuplicateSketches(sketches: Seq[Sketch]): Unit = {

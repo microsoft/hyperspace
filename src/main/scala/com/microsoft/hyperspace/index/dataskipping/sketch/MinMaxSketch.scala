@@ -16,9 +16,12 @@
 
 package com.microsoft.hyperspace.index.dataskipping.sketch
 
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Max, Min}
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.catalyst.util.{ArrayData, TypeUtils}
+import org.apache.spark.sql.types.{ArrayType, DataType}
+
+import com.microsoft.hyperspace.index.dataskipping.util._
 
 /**
  * Sketch based on minimum and maximum values for a given expression.
@@ -40,4 +43,54 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
 
   override def aggregateFunctions: Seq[Expression] =
     Min(parsedExpr).toAggregateExpression() :: Max(parsedExpr).toAggregateExpression() :: Nil
+
+  override def convertPredicate(
+      predicate: Expression,
+      resolvedExprs: Seq[Expression],
+      nameMap: Map[ExprId, String],
+      sketchValues: Seq[Expression]): Option[Expression] = {
+    val min = sketchValues(0)
+    val max = sketchValues(1)
+    // TODO: Add third sketch value "hasNull" of type bool
+    // true if the expr can be null in the file, false if otherwise
+    // to optimize IsNull (can skip files with hasNull = false)
+    // This can be also done as a separate sketch, e.g. HasNullSketch
+    // Should evaluate which way is better
+    val resolvedExpr = resolvedExprs.head
+    val dataType = resolvedExpr.dataType
+    val exprMatcher = NormalizedExprMatcher(resolvedExpr, nameMap)
+    val ExprIsTrue = IsTrueExtractor(exprMatcher)
+    val ExprIsFalse = IsFalseExtractor(exprMatcher)
+    val ExprIsNotNull = IsNotNullExtractor(exprMatcher)
+    val ExprEqualTo = EqualToExtractor(exprMatcher)
+    val ExprLessThan = LessThanExtractor(exprMatcher)
+    val ExprLessThanOrEqualTo = LessThanOrEqualToExtractor(exprMatcher)
+    val ExprGreaterThan = GreaterThanExtractor(exprMatcher)
+    val ExprGreaterThanOrEqualTo = GreaterThanOrEqualToExtractor(exprMatcher)
+    val ExprIn = InExtractor(exprMatcher)
+    val ExprInSet = InSetExtractor(exprMatcher)
+    Option(predicate)
+      .collect {
+        case ExprIsTrue() => max
+        case ExprIsFalse() => Not(min)
+        case ExprIsNotNull() => Literal(true)
+        case ExprEqualTo(v) => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))
+        case ExprLessThan(v) => LessThan(min, v)
+        case ExprLessThanOrEqualTo(v) => LessThanOrEqual(min, v)
+        case ExprGreaterThan(v) => GreaterThan(max, v)
+        case ExprGreaterThanOrEqualTo(v) => GreaterThanOrEqual(max, v)
+        case ExprIn(vs) =>
+          vs.map(v => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))).reduceLeft(Or)
+        case ExprInSet(vs) =>
+          val sortedValues = Literal(
+            ArrayData.toArrayData(
+              ArrayUtils.toArray(
+                vs.filter(_ != null).toArray.sorted(TypeUtils.getInterpretedOrdering(dataType)),
+                dataType)),
+            ArrayType(dataType, containsNull = false))
+          LessThanOrEqual(ElementAt(sortedValues, SortedArrayLowerBound(sortedValues, min)), max)
+        // TODO: StartsWith, Like with constant prefix
+      }
+      .map(p => And(And(IsNotNull(min), IsNotNull(max)), p))
+  }
 }

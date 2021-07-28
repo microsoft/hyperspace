@@ -16,7 +16,7 @@
 
 package com.microsoft.hyperspace.index.sources
 
-import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -104,6 +104,11 @@ trait FileBasedRelation extends SourceRelation {
    * The optional partition base path of the current relation.
    */
   def partitionBasePath: Option[String]
+
+  /**
+   * Returns [[FileIndex]] for the current relation.
+   */
+  def getOrCreateFileIndex(spark: SparkSession): FileIndex
 
   /**
    * Creates [[HadoopFsRelation]] based on the current relation.
