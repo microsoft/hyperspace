@@ -22,6 +22,13 @@ import org.apache.spark.sql.types.DataType
 
 /**
  * Sketch based on minimum and maximum values for a given expression.
+ *
+ * @param expr Expression from which min/max values are calculated
+ * @param dataType Optional data type to specify the expected data type of the
+ *         expression. If not specified, it is deduced automatically.
+ *         If the actual data type of the expression is different from this,
+ *         an error is thrown. Users are recommended to leave this parameter to
+ *         None.
  */
 case class MinMaxSketch(override val expr: String, override val dataType: Option[DataType] = None)
     extends SingleExprSketch[MinMaxSketch](expr, dataType) {

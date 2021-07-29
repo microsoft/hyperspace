@@ -36,21 +36,28 @@ object ExpressionUtils {
    */
   def resolve(spark: SparkSession, sketches: Seq[Sketch], sourceData: DataFrame): Seq[Sketch] = {
     sketches.map { s =>
-      val exprs = s.expressions.map(_._1)
-      val dataTypes = checkExprs(exprs, sourceData)
+      val dataTypes = checkExprs(s.expressions, sourceData)
       val oldColumns = s.referencedColumns
       val newColumns = IndexUtils.resolveColumns(sourceData, oldColumns).map(_.name)
       val columnMapping = oldColumns.zip(newColumns).toMap
-      val newExprs = exprs.map(spark.sessionState.sqlParser.parseExpression).map { parsedExpr =>
-        parsedExpr.transformUp {
-          case attr: UnresolvedAttribute => QuotedAttribute(columnMapping(attr.name))
-        }.sql
+      val newExprs = s.expressions.map {
+        case (expr, _) =>
+          spark.sessionState.sqlParser
+            .parseExpression(expr)
+            .transformUp {
+              case attr: UnresolvedAttribute => QuotedAttribute(columnMapping(attr.name))
+            }
+            .sql
       }
       s.withNewExpressions(newExprs.zip(dataTypes.map(Some(_))))
     }
   }
 
-  private def checkExprs(exprs: Seq[String], sourceData: DataFrame): Seq[DataType] = {
+  private def checkExprs(
+      exprWithExpectedDataTypes: Seq[(String, Option[DataType])],
+      sourceData: DataFrame): Seq[DataType] = {
+    val (exprs, expectedDataTypes) =
+      (exprWithExpectedDataTypes.map(_._1), exprWithExpectedDataTypes.map(_._2))
     def throwNotSupportedIf(cond: Boolean, msg: => String) = {
       if (cond) {
         throw HyperspaceException(s"DataSkippingIndex does not support indexing $msg")
@@ -64,8 +71,8 @@ object ExpressionUtils {
       plan.find(_.isInstanceOf[Window]).nonEmpty,
       "window functions: " + exprs.mkString(", "))
     val analyzedExprs = plan.asInstanceOf[Project].projectList
-    exprs.zip(analyzedExprs).map {
-      case (expr, analyzedExpr) =>
+    exprWithExpectedDataTypes.zip(analyzedExprs).map {
+      case ((expr, expectedDataType), analyzedExpr) =>
         val e = analyzedExpr match {
           case Alias(child, _) => child
           case e => e
@@ -78,6 +85,11 @@ object ExpressionUtils {
         throwNotSupportedIf(
           e.find(_.isInstanceOf[AttributeReference]).isEmpty,
           s"an expression which does not reference source columns: $expr")
+        if (expectedDataType.nonEmpty && expectedDataType.get != analyzedExpr.dataType) {
+          throw HyperspaceException(
+            "Specified and analyzed data types differ: " +
+              s"expr=$expr, specified=${expectedDataType.get}, analyzed=${analyzedExpr.dataType}")
+        }
         analyzedExpr.dataType
     }
   }

@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.spark.sql.functions.{input_file_name, max, min}
-import org.apache.spark.sql.types.LongType
+import org.apache.spark.sql.types.{LongType, StringType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexConstants
@@ -68,10 +68,22 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
       indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "MinMax_A__0", "MinMax_A__1"))
   }
 
-  test("createIndex resolves column names.") {
+  test("createIndex resolves column name and data types.") {
     val sourceData = createSourceData(spark.range(10).toDF("Foo"))
     val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("foO"))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
     assert(index.sketches === Seq(MinMaxSketch("Foo")))
+    assert(index.sketches.head.expressions === Seq(("Foo", Some(LongType))))
+  }
+
+  test("createIndex throws an error if the data type is wrong.") {
+    val sourceData = createSourceData(spark.range(10).toDF("Foo"))
+    val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("foO", Some(StringType)))
+    val ex = intercept[HyperspaceException] {
+      indexConfig.createIndex(ctx, sourceData, Map())
+    }
+    assert(
+      ex.getMessage.contains("Specified and analyzed data types differ: " +
+        "expr=foO, specified=StringType, analyzed=LongType"))
   }
 }
