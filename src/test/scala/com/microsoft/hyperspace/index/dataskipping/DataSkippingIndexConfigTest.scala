@@ -69,16 +69,15 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
       indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "MinMax_A__0", "MinMax_A__1"))
   }
 
-  if (!Path.WINDOWS) {
-    test("createIndex works correctly with file paths with special characters.") {
-      val sourceData = createSourceData(spark.range(100).toDF("A"), "table ,.;'`~!@#$%^&()_+|\"<>")
-      val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("A"))
-      val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
-      val expectedSketchValues = sourceData
-        .groupBy(input_file_name().as(fileNameCol))
-        .agg(min("A"), max("A"))
-      checkAnswer(indexData, withFileId(expectedSketchValues))
-    }
+  test("createIndex works correctly with file paths with special characters.") {
+    assume(!Path.WINDOWS)
+    val sourceData = createSourceData(spark.range(100).toDF("A"), "table ,.;'`~!@#$%^&()_+|\"<>")
+    val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("A"))
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    val expectedSketchValues = sourceData
+      .groupBy(input_file_name().as(fileNameCol))
+      .agg(min("A"), max("A"))
+    checkAnswer(indexData, withFileId(expectedSketchValues))
   }
 
   test("createIndex resolves column name and data types.") {
