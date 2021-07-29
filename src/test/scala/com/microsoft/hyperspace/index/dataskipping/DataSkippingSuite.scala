@@ -81,9 +81,13 @@ trait DataSkippingSuite extends QueryTest with HyperspaceSuite {
     val fileIdDf = fileIdTracker
       .getIdToFileMapping(_.replace("file:/", "file:///"))
       .toDF(IndexConstants.DATA_FILE_NAME_ID, fileNameCol)
-    val indexDataWithFileId = indexData.join(fileIdDf, fileNameCol).drop(fileNameCol)
-    val cols = indexDataWithFileId.columns
-    indexDataWithFileId.select(cols.last, cols.dropRight(1): _*)
+    indexData
+      .join(
+        fileIdDf,
+        IndexUtils.decodeInputFileName(indexData(fileNameCol)) === fileIdDf(fileNameCol))
+      .select(
+        IndexConstants.DATA_FILE_NAME_ID,
+        indexData.columns.filterNot(_ == fileNameCol).map(c => s"`$c`"): _*)
   }
 
   def listFiles(paths: Path*): Seq[FileStatus] = {

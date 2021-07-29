@@ -152,11 +152,13 @@ case class DataSkippingIndex(
     // Drop the file name column and reorder the columns
     // so that the file id column comes first.
     indexDataWithFileName
-      .join(fileIdDf.hint("broadcast"), fileNameCol)
+      .join(
+        fileIdDf.hint("broadcast"),
+        IndexUtils.decodeInputFileName(indexDataWithFileName(fileNameCol)) ===
+          fileIdDf(fileNameCol))
       .select(
         IndexConstants.DATA_FILE_NAME_ID,
-        indexDataWithFileName.columns.map(c => s"`$c`"): _*)
-      .drop(fileNameCol)
+        indexDataWithFileName.columns.filterNot(_ == fileNameCol).map(c => s"`$c`"): _*)
   }
 
   /**
