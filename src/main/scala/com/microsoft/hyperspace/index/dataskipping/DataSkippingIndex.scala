@@ -37,16 +37,6 @@ case class DataSkippingIndex(
     extends Index {
   assert(sketches.nonEmpty, "At least one sketch is required.")
 
-  @transient
-  lazy val aggregateFunctions = sketches.flatMap { s =>
-    val aggrs = s.aggregateFunctions
-    assert(aggrs.nonEmpty)
-    aggrs.zipWithIndex.map {
-      case (aggr, idx) =>
-        new Column(aggr).as(getNormalizeColumnName(s"${s}_$idx"))
-    }
-  }
-
   override def kind: String = DataSkippingIndex.kind
 
   override def kindAbbr: String = DataSkippingIndex.kindAbbr
@@ -67,27 +57,6 @@ case class DataSkippingIndex(
 
   override def write(ctx: IndexerContext, indexData: DataFrame): Unit = {
     writeImpl(ctx, indexData, SaveMode.Overwrite)
-  }
-
-  private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
-    indexData.cache()
-    val minRowCountPerFileData = indexData
-      .groupBy(spark_partition_id())
-      .count()
-      .agg(min("count"))
-      .collect()
-    val minRowCountPerFileConfig =
-      HyperspaceConf.DataSkipping.minRecordsPerIndexDataFile(ctx.spark)
-    val repartitionedIndexData =
-      if (minRowCountPerFileData.nonEmpty &&
-        !minRowCountPerFileData.head.isNullAt(0) &&
-        minRowCountPerFileData.head.getLong(0) < minRowCountPerFileConfig) {
-        val numFiles = math.max(1, indexData.count() / minRowCountPerFileConfig)
-        indexData.repartition(numFiles.toInt)
-      } else {
-        indexData
-      }
-    repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
   }
 
   override def optimize(ctx: IndexerContext, indexDataFilesToOptimize: Seq[FileInfo]): Unit = {
@@ -132,6 +101,14 @@ case class DataSkippingIndex(
     (updatedIndex, updatedIndex.index(ctx, sourceData))
   }
 
+  override def equals(that: Any): Boolean =
+    that match {
+      case DataSkippingIndex(thatSketches, _) => sketches.toSet == thatSketches.toSet
+      case _ => false
+    }
+
+  override def hashCode: Int = sketches.map(_.hashCode).sum
+
   /**
    * Creates index data for the given source data.
    */
@@ -161,6 +138,27 @@ case class DataSkippingIndex(
         indexDataWithFileName.columns.filterNot(_ == fileNameCol).map(c => s"`$c`"): _*)
   }
 
+  private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
+    indexData.cache()
+    val minRowCountPerFileData = indexData
+      .groupBy(spark_partition_id())
+      .count()
+      .agg(min("count"))
+      .collect()
+    val minRowCountPerFileConfig =
+      HyperspaceConf.DataSkipping.minRecordsPerIndexDataFile(ctx.spark)
+    val repartitionedIndexData =
+      if (minRowCountPerFileData.nonEmpty &&
+        !minRowCountPerFileData.head.isNullAt(0) &&
+        minRowCountPerFileData.head.getLong(0) < minRowCountPerFileConfig) {
+        val numFiles = math.max(1, indexData.count() / minRowCountPerFileConfig)
+        indexData.repartition(numFiles.toInt)
+      } else {
+        indexData
+      }
+    repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
+  }
+
   /**
    * Returns a normalized column name valid for a Parquet format.
    */
@@ -168,13 +166,15 @@ case class DataSkippingIndex(
     name.replaceAll("[ ,;{}()\n\t=]", "_")
   }
 
-  override def equals(that: Any): Boolean =
-    that match {
-      case DataSkippingIndex(thatSketches, _) => sketches.toSet == thatSketches.toSet
-      case _ => false
+  @transient
+  private lazy val aggregateFunctions = sketches.flatMap { s =>
+    val aggrs = s.aggregateFunctions
+    assert(aggrs.nonEmpty)
+    aggrs.zipWithIndex.map {
+      case (aggr, idx) =>
+        new Column(aggr).as(getNormalizeColumnName(s"${s}_$idx"))
     }
-
-  override def hashCode: Int = sketches.map(_.hashCode).sum
+  }
 }
 
 object DataSkippingIndex {
