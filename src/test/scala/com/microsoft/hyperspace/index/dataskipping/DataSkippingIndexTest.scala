@@ -37,6 +37,16 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     assert(index.kindAbbr === "DS")
   }
 
+  test("indexedColumns returns indexed columns of sketches.") {
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    assert(index.indexedColumns === Seq("A", "B"))
+  }
+
+  test("referencedColumns returns indexed columns of sketches.") {
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    assert(index.referencedColumns === Seq("A", "B"))
+  }
+
   test(
     "withNewProperties returns a new index which copies the original index except the " +
       "properties.") {
@@ -44,6 +54,11 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     val newIndex = index.withNewProperties(Map("foo" -> "bar"))
     assert(newIndex.properties === Map("foo" -> "bar"))
     assert(newIndex.sketches === index.sketches)
+  }
+
+  test("statistics returns a string-formatted list of sketches.") {
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    assert(index.statistics() === Map("sketches" -> "MinMax(A), MinMax(B)"))
   }
 
   test("canHandleDeletedFiles returns true.") {
@@ -212,6 +227,13 @@ class DataSkippingIndexTest extends DataSkippingSuite {
   test("At least one sketch must be specified.") {
     val ex = intercept[AssertionError](DataSkippingIndex(Nil))
     assert(ex.getMessage().contains("At least one sketch is required"))
+  }
+
+  test("Indexes are equal if they have the same sketches and data types.") {
+    val ds1 = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    val ds2 = DataSkippingIndex(Seq(MinMaxSketch("B"), MinMaxSketch("A")))
+    assert(ds1 === ds2)
+    assert(ds1.hashCode === ds2.hashCode)
   }
 
   test("Indexes are not equal to objects which are not indexes.") {

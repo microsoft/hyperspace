@@ -77,4 +77,15 @@ class DataSkippingIndexIntegrationTest extends DataSkippingSuite {
       ex.msg.contains("DataSkippingIndex does not support indexing window functions: " +
         "min(a) over (rows between 1 preceding and 1 following)"))
   }
+
+  test("Expression not referencing the source column is blocked.") {
+    val df = createSourceData(spark.range(100).toDF("A"))
+    val f = spark.udf.register("myfunc", () => 1)
+    val ex = intercept[HyperspaceException](
+      hs.createIndex(df, DataSkippingIndexConfig("myind", MinMaxSketch("myfunc()"))))
+    assert(
+      ex.msg.contains(
+        "DataSkippingIndex does not support indexing an expression which does not " +
+          "reference source columns: myfunc()"))
+  }
 }

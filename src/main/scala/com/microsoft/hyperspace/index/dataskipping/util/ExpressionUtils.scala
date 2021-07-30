@@ -97,13 +97,15 @@ object ExpressionUtils {
   /**
    * Used to workaround the issue where UnresolvedAttribute.sql() doesn't work as expected.
    */
-  case class QuotedAttribute(name: String) extends LeafExpression {
+  private case class QuotedAttribute(name: String) extends LeafExpression {
     override def sql: String = name
 
+    // $COVERAGE-OFF$ code never used
     override def nullable: Boolean = throw new NotImplementedError
     override def eval(input: InternalRow): Any = throw new NotImplementedError
     override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode =
       throw new NotImplementedError
     override def dataType: DataType = throw new NotImplementedError
+    // $COVERAGE-ON$
   }
 }

@@ -178,6 +178,8 @@ case class DataSkippingIndex(
 }
 
 object DataSkippingIndex {
+  // $COVERAGE-OFF$ https://github.com/scoverage/scalac-scoverage-plugin/issues/125
   final val kind = "DataSkippingIndex"
   final val kindAbbr = "DS"
+  // $COVERAGE-ON$
 }
