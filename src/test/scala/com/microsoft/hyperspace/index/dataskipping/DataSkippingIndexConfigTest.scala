@@ -35,6 +35,11 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
     assert(indexConfig.sketches === Seq(MinMaxSketch("A")))
   }
 
+  test("sketches returns multiple sketches.") {
+    val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("B"))
+    assert(indexConfig.sketches === Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+  }
+
   test("Duplicate sketches are not allowed.") {
     val exception = intercept[HyperspaceException] {
       DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("A"))
@@ -80,12 +85,11 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
     checkAnswer(indexData, withFileId(expectedSketchValues))
   }
 
-  test("createIndex resolves column name and data types.") {
+  test("createIndex resolves column names and data types.") {
     val sourceData = createSourceData(spark.range(10).toDF("Foo"))
     val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("foO"))
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
-    assert(index.sketches === Seq(MinMaxSketch("Foo")))
-    assert(index.sketches.head.expressions === Seq(("Foo", Some(LongType))))
+    assert(index.sketches === Seq(MinMaxSketch("Foo", Some(LongType))))
   }
 
   test("createIndex throws an error if the data type is wrong.") {

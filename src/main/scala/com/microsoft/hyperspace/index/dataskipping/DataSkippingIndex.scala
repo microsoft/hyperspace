@@ -126,8 +126,6 @@ case class DataSkippingIndex(
       .getIdToFileMapping(relation.pathNormalizer)
       .toDF(IndexConstants.DATA_FILE_NAME_ID, fileNameCol)
 
-    // Drop the file name column and reorder the columns
-    // so that the file id column comes first.
     indexDataWithFileName
       .join(
         fileIdDf.hint("broadcast"),

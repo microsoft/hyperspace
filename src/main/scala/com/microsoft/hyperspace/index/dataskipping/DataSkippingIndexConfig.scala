@@ -29,9 +29,9 @@ import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
  * DataSkippingIndexConfig is used to create a [[DataSkippingIndex]] via
  * [[Hyperspace.createIndex]].
  *
- * A sketch is a set of values for a file that contains aggregated information
- * about columns to be indexed. For example, a MinMax sketch on a column X
- * stores two values per file, min(X) and max(X) for each file.
+ * A sketch is a set of values for a source data file that contains aggregated
+ * information about columns to be indexed. For example, a MinMax sketch on a
+ * column X stores two values per file, min(X) and max(X) for each file.
  *
  * @param indexName Name of the index to create
  * @param firstSketch Sketch to be used for the index

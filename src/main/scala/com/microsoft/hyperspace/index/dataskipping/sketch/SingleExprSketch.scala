@@ -73,7 +73,7 @@ abstract class SingleExprSketch[T <: SingleExprSketch[T]](
 
   final override def equals(that: Any): Boolean =
     that match {
-      case other: T => expr == other.expr
+      case other: T => expr == other.expr && dataType == other.dataType
       case _ => false
     }
 
