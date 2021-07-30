@@ -17,6 +17,7 @@
 package com.microsoft.hyperspace.index.dataskipping.sketch
 
 import org.apache.spark.sql.{Column, QueryTest}
+import org.mockito.Mockito.mock
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
 
@@ -50,6 +51,12 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     assert(MinMaxSketch("A") !== MinMaxSketch("a"))
     assert(MinMaxSketch("b") !== MinMaxSketch("B"))
     assert(MinMaxSketch("B") === MinMaxSketch("B"))
+  }
+
+  test("MinMaxSketch is different from other sketches.") {
+    val s1 = MinMaxSketch("A")
+    val s2 = mock(classOf[Sketch])
+    assert(s1 !== s2)
   }
 
   test("hashCode is reasonably implemented.") {

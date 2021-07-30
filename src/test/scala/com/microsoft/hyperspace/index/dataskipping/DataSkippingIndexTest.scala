@@ -20,9 +20,11 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions.{input_file_name, max, min}
+import org.apache.spark.sql.types.IntegerType
 
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index, IndexConstants}
 import com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch
+import com.microsoft.hyperspace.util.JsonUtils
 
 class DataSkippingIndexTest extends DataSkippingSuite {
   override val numParallelism: Int = 3
@@ -239,5 +241,41 @@ class DataSkippingIndexTest extends DataSkippingSuite {
   test("Indexes are not equal to objects which are not indexes.") {
     val ds = DataSkippingIndex(Seq(MinMaxSketch("A")))
     assert(ds !== "ds")
+  }
+
+  test("Index can be serialized.") {
+    val ds = DataSkippingIndex(Seq(MinMaxSketch("A", Some(IntegerType))), Map("a" -> "b"))
+    val json = JsonUtils.toJson(ds)
+    assert(
+      json ===
+        """|{
+           |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
+           |  "sketches" : [ {
+           |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch",
+           |    "expr" : "A",
+           |    "dataType" : "integer"
+           |  } ],
+           |  "properties" : {
+           |    "a" : "b"
+           |  }
+           |}""".stripMargin)
+  }
+
+  test("Index can be deserialized.") {
+    val json =
+      """|{
+         |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
+         |  "sketches" : [ {
+         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch",
+         |    "expr" : "A",
+         |    "dataType" : "integer"
+         |  } ],
+         |  "properties" : {
+         |    "a" : "b"
+         |  }
+         |}""".stripMargin
+    val ds = JsonUtils.fromJson[DataSkippingIndex](json)
+    assert(ds === DataSkippingIndex(Seq(MinMaxSketch("A", Some(IntegerType)))))
+    assert(ds.properties === Map("a" -> "b"))
   }
 }
