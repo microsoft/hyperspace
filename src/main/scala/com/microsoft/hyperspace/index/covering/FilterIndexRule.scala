@@ -18,14 +18,12 @@ package com.microsoft.hyperspace.index.covering
 
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 
-import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.index.IndexLogEntryTags
 import com.microsoft.hyperspace.index.plananalysis.FilterReasons
-import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, QueryPlanIndexFilter}
+import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
-import com.microsoft.hyperspace.index.sources.FileBasedRelation
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
@@ -142,17 +140,6 @@ object FilterRankFilter extends IndexRankFilter {
   }
 }
 
-object ExtractRelation extends ActiveSparkSession {
-  def unapply(plan: LeafNode): Option[FileBasedRelation] = {
-    val provider = Hyperspace.getContext(spark).sourceProviderManager
-    if (provider.isSupportedRelation(plan)) {
-      Some(provider.getRelation(plan))
-    } else {
-      None
-    }
-  }
-}
-
 /**
  * FilterIndexRule looks for opportunities in a logical plan to replace
  * a relation with an available hash partitioned index according to columns in
@@ -160,7 +147,7 @@ object ExtractRelation extends ActiveSparkSession {
  */
 object FilterIndexRule extends HyperspaceRule {
   override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
-    CoveringIndexFilter :: FilterPlanNodeFilter :: FilterColumnFilter :: Nil
+    IndexTypeFilter[CoveringIndex]() :: FilterPlanNodeFilter :: FilterColumnFilter :: Nil
 
   override val indexRanker: IndexRankFilter = FilterRankFilter
 
@@ -172,7 +159,7 @@ object FilterIndexRule extends HyperspaceRule {
     // As FilterIndexRule is not intended to support bucketed scan, we set
     // useBucketUnionForAppended as false. If it's true, Hybrid Scan can cause
     // unnecessary shuffle for appended data to apply BucketUnion for merging data.
-    RuleUtils.transformPlanToUseIndex(
+    CoveringIndexRuleUtils.transformPlanToUseIndex(
       spark,
       indexes.head._2,
       plan,

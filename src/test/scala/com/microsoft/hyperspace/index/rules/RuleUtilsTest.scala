@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.covering
+package com.microsoft.hyperspace.index.rules
 
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, IsNotNull}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, IsNotNull}
 import org.apache.spark.sql.catalyst.plans.{JoinType, SQLHelper}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFileIndex, LogicalRelation, NoopCache}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 import com.microsoft.hyperspace.index.HyperspaceRuleSuite
-import com.microsoft.hyperspace.shim.{JoinWithoutHint, RepartitionByExpressionWithOptionalNumPartitions}
+import com.microsoft.hyperspace.shim.JoinWithoutHint
 
 class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
   override val indexLocationDirName = "ruleUtilsTest"
@@ -97,71 +96,6 @@ class RuleUtilsTest extends HyperspaceRuleSuite with SQLHelper {
     val joinNode = JoinWithoutHint(t1ProjectNode, t2ProjectNode, JoinType("inner"), None)
     val r = RuleUtils.getRelation(spark, Project(Seq(t1c3, t2c3), joinNode))
     assert(r.isEmpty)
-  }
-
-  test("Verify the location of injected shuffle for Hybrid Scan.") {
-    withTempPath { tempPath =>
-      val dataPath = tempPath.getAbsolutePath
-      import spark.implicits._
-      Seq((1, "name1", 12), (2, "name2", 10))
-        .toDF("id", "name", "age")
-        .write
-        .mode("overwrite")
-        .parquet(dataPath)
-
-      val df = spark.read.parquet(dataPath)
-      val query = df.filter(df("id") >= 3).select("id", "name")
-      val bucketSpec = BucketSpec(100, Seq("id"), Seq())
-      val shuffled = RuleUtils.transformPlanToShuffleUsingBucketSpec(
-        bucketSpec,
-        query.queryExecution.optimizedPlan)
-
-      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
-      // should be transformed to:
-      //   Shuffle ("id") -> Project("id", "name") -> Filter ("id") -> Relation
-      assert(shuffled.collect {
-        case RepartitionByExpressionWithOptionalNumPartitions(
-              attrs,
-              p: Project,
-              Some(numBuckets)) =>
-          assert(numBuckets == 100)
-          assert(attrs.size == 1)
-          assert(attrs.head.asInstanceOf[Attribute].name.contains("id"))
-          assert(
-            p.projectList.exists(_.name.equals("id")) && p.projectList.exists(
-              _.name.equals("name")))
-          true
-      }.length == 1)
-
-      // Check if the shuffle node should be injected where all bucket columns
-      // are available as its input.
-      // For example,
-      // Plan: Project ("id", "name") -> Filter ("id") -> Relation
-      // should be transformed:
-      //   Project ("id", "name") -> Shuffle ("age") -> Filter ("id") -> Relation
-      // , NOT:
-      //   Shuffle ("age") -> Project("id", "name") -> Filter ("id") -> Relation
-      // since Project doesn't include "age" column; Shuffle will be RoundRobinPartitioning
-
-      val bucketSpec2 = BucketSpec(100, Seq("age"), Seq())
-      val query2 = df.filter(df("id") <= 3).select("id", "name")
-      val shuffled2 =
-        RuleUtils.transformPlanToShuffleUsingBucketSpec(
-          bucketSpec2,
-          query2.queryExecution.optimizedPlan)
-      assert(shuffled2.collect {
-        case Project(
-              _,
-              RepartitionByExpressionWithOptionalNumPartitions(
-                attrs,
-                _: Filter,
-                Some(numBuckets))) =>
-          assert(numBuckets == 100)
-          assert(attrs.size == 1)
-          assert(attrs.head.asInstanceOf[Attribute].name.contains("age"))
-          true
-      }.length == 1)
-    }
   }
 
   private def validateLogicalRelation(plan: LogicalPlan, expected: LogicalRelation): Unit = {

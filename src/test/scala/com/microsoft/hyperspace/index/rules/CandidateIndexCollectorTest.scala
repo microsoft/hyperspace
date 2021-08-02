@@ -26,7 +26,6 @@ import org.apache.spark.sql.types.{IntegerType, StringType}
 import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{HyperspaceRuleSuite, IndexCollectionManager, IndexConfig, IndexConstants, IndexLogEntryTags}
-import com.microsoft.hyperspace.index.covering.RuleUtils
 import com.microsoft.hyperspace.util.FileUtils
 
 class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {

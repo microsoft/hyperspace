@@ -80,16 +80,6 @@ jobs:
           sparkVersionUnderBar: "3_0"
           scalaVersion: "2.12.8"
 
-  - job: Build_Spark3_1_2_12_WIN
-    displayName: 'Build sources and run unit tests for Spark 3.1 / Scala 2.12 on Windows'
-    pool:
-      vmImage: 'windows-2019'
-    steps:
-      - template: 'ci/windows_test.yml'
-        parameters:
-          sparkVersionUnderBar: "3_1"
-          scalaVersion: "2.12.8"
-
   - job: PythonTest
     displayName: 'Run Python tests'
     pool:
