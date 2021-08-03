@@ -1,0 +1,48 @@
+
+=============================================================
+Plan with Hyperspace & Summary:
+=============================================================
+Join Inner, (c3# = c3#)
+:- Project [c4#, c3#]
+:  +- Filter ((isnotnull(c4#) && (c4# = 2)) && isnotnull(c3#))
+:     +- Relation[c3#,c4#] Hyperspace(Type: CI, Name: leftDfFilterIndex, LogVersion: 1)
++- Project [c5#, c3#]
+   +- Filter ((isnotnull(c5#) && (c5# = 3000)) && isnotnull(c3#))
+      +- Relation[c3#,c5#] Hyperspace(Type: CI, Name: rightDfFilterIndex, LogVersion: 1)
+
+Applied indexes:
+- leftDfFilterIndex
+- rightDfFilterIndex
+
+Applicable indexes, but not applied due to priority:
+- leftDfJoinIndex
+- rightDfJoinIndex
+
+Non-applicable indexes - index is outdated:
+- No such index found.
+
+Non-applicable indexes - no applicable query plan:
+- No such index found.
+
+For more information, please visit: https://microsoft.github.io/hyperspace/docs/why-not-result-analysis
+
+=============================================================
+Plan without Hyperspace & WhyNot reasons:
+=============================================================
+00 Join Inner, (c3# = c3#)
+01 :- Project [c4#, c3#]
+02 :  +- Filter ((isnotnull(c4#) && (c4# = 2)) && isnotnull(c3#))
+03 :     +- Relation[c1#,c2#,c3#,c4#,c5#] parquet
+04 +- Project [c5#, c3#]
+05    +- Filter ((isnotnull(c5#) && (c5# = 3000)) && isnotnull(c3#))
+06       +- Relation[c1#,c2#,c3#,c4#,c5#] parquet
+
++----------+---------------+---------+---------------------+------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------+
+|SubPlan   |IndexName      |IndexType|Reason               |Message                                                     |VerboseMessage                                                                                                     |
++----------+---------------+---------+---------------------+------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------+
+|Filter @2 |leftDfJoinIndex|CI       |MISSING_REQUIRED_COL |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c3,c4]            |Index does not contain required columns. Required columns: [c3,c4,c5,c2,c1], Index columns: [c3,c4]                |
+|Filter @5 |leftDfJoinIndex|CI       |MISSING_REQUIRED_COL |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c3,c4]            |Index does not contain required columns. Required columns: [c3,c4,c5,c2,c1], Index columns: [c3,c4]                |
+|Join @0   |leftDfJoinIndex|CI       |MISSING_INDEXED_COL  |child=[right], requiredIndexedCols=[c5,c3], indexedCols=[c3]|Index does not contain required columns for right subplan. Required indexed columns: [c5,c3], Indexed columns: [c3]|
+|Project @1|leftDfJoinIndex|CI       |ANOTHER_INDEX_APPLIED|appliedIndex=[leftDfFilterIndex]                            |Another candidate index is applied: leftDfFilterIndex                                                              |
+|Project @4|leftDfJoinIndex|CI       |MISSING_REQUIRED_COL |requiredCols=[c5,c3], indexCols=[c3,c4]                     |Index does not contain required columns. Required columns: [c5,c3], Index columns: [c3,c4]                         |
++----------+---------------+---------+---------------------+------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------+

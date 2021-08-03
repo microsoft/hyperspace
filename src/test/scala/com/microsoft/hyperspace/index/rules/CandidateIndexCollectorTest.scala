@@ -329,7 +329,7 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
         }
 
         val allIndexes = indexList.map(indexName => latestIndexLogEntry(systemPath, indexName))
-        allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
+        allIndexes.foreach(_.setTagValue(IndexLogEntryTags.INDEX_PLAN_ANALYSIS_ENABLED, true))
 
         val plan1 =
           spark.read.parquet(dataPath).select("id", "name").queryExecution.optimizedPlan
@@ -340,16 +340,17 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
         assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
 
         allIndexes.foreach { entry =>
-          val msg = entry.getTagValue(plan1, IndexLogEntryTags.FILTER_REASONS)
+          val reasons = entry.getTagValue(plan1, IndexLogEntryTags.FILTER_REASONS)
           if (filtered.contains(entry.name)) {
-            assert(msg.isEmpty)
+            assert(reasons.isEmpty)
           } else {
-            assert(msg.isDefined)
+            assert(reasons.isDefined)
+            val msg = reasons.get.map(_.verboseStr)
             entry.name match {
               case "index_differentColumn" =>
-                assert(msg.get.exists(_.contains("Column Schema does not match")))
+                assert(msg.exists(_.contains("Column Schema does not match")))
               case "index_noCommonFiles" =>
-                assert(msg.get.exists(_.contains("Index signature does not match")))
+                assert(msg.exists(_.contains("Index signature does not match")))
             }
           }
 
@@ -366,15 +367,16 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
           assert(indexes.isEmpty)
 
           allIndexes.foreach { entry =>
-            val msg = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
-            assert(msg.isDefined)
+            val reasons = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
+            assert(reasons.isDefined)
+            val msg = reasons.get.map(_.verboseStr)
             entry.name match {
               case "index_differentColumn" =>
-                assert(msg.get.exists(_.contains("Column Schema does not match")))
+                assert(msg.exists(_.contains("Column Schema does not match")))
               case "index_noCommonFiles" =>
-                assert(msg.get.exists(_.contains("No common files.")))
+                assert(msg.exists(_.contains("No common files.")))
               case _ =>
-                assert(msg.get.exists(_.contains("Appended bytes ratio")))
+                assert(msg.exists(_.contains("Appended bytes ratio")))
             }
 
             // Unset for next test.
@@ -389,16 +391,17 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
               assert(filtered.toSet.equals(Set("index_ok", "index_noLineage")))
 
               allIndexes.foreach { entry =>
-                val msg = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
+                val reasons = entry.getTagValue(plan2, IndexLogEntryTags.FILTER_REASONS)
                 if (filtered.contains(entry.name)) {
-                  assert(msg.isEmpty)
+                  assert(reasons.isEmpty)
                 } else {
-                  assert(msg.isDefined)
+                  assert(reasons.isDefined)
+                  val msg = reasons.get.map(_.verboseStr)
                   entry.name match {
                     case "index_differentColumn" =>
-                      assert(msg.get.exists(_.contains("Column Schema does not match")))
+                      assert(msg.exists(_.contains("Column Schema does not match")))
                     case "index_noCommonFiles" =>
-                      assert(msg.get.exists(_.contains("No common files.")))
+                      assert(msg.exists(_.contains("No common files.")))
                   }
                 }
 
@@ -420,17 +423,19 @@ class CandidateIndexCollectorTest extends HyperspaceRuleSuite with SQLHelper {
                 assert(indexes.isEmpty)
 
                 allIndexes.foreach { entry =>
-                  val msg = entry.getTagValue(plan3, IndexLogEntryTags.FILTER_REASONS)
-                  assert(msg.isDefined)
+                  val reasons = entry.getTagValue(plan3, IndexLogEntryTags.FILTER_REASONS)
+                  assert(reasons.isDefined)
+                  val msg = reasons.get.map(_.verboseStr)
+
                   entry.name match {
                     case "index_differentColumn" =>
-                      assert(msg.get.exists(_.contains("Column Schema does not match")))
+                      assert(msg.exists(_.contains("Column Schema does not match")))
                     case "index_noCommonFiles" =>
-                      assert(msg.get.exists(_.contains("No common files.")))
+                      assert(msg.exists(_.contains("No common files.")))
                     case "index_noLineage" =>
-                      assert(msg.get.exists(_.contains("Index doesn't support deleted files.")))
+                      assert(msg.exists(_.contains("Index doesn't support deleted files.")))
                     case "index_ok" =>
-                      assert(msg.get.exists(_.contains("Deleted bytes ratio")))
+                      assert(msg.exists(_.contains("Deleted bytes ratio")))
                   }
 
                   entry.unsetTagValue(plan3, IndexLogEntryTags.FILTER_REASONS)

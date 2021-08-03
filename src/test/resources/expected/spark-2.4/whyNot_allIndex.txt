@@ -1,0 +1,63 @@
+
+=============================================================
+Plan with Hyperspace & Summary:
+=============================================================
+Join Inner, (c3# = c3#)
+:- Project [c4#, c3#]
+:  +- Filter ((isnotnull(c4#) && (c4# = 2)) && isnotnull(c3#))
+:     +- Relation[c3#,c4#] Hyperspace(Type: CI, Name: leftDfFilterIndex, LogVersion: 1)
++- Project [c5#, c3#]
+   +- Filter ((isnotnull(c5#) && (c5# = 3000)) && isnotnull(c3#))
+      +- Relation[c3#,c5#] Hyperspace(Type: CI, Name: rightDfFilterIndex, LogVersion: 1)
+
+Applied indexes:
+- leftDfFilterIndex
+- rightDfFilterIndex
+
+Applicable indexes, but not applied due to priority:
+- leftDfJoinIndex
+- rightDfJoinIndex
+
+Non-applicable indexes - index is outdated:
+- No such index found.
+
+Non-applicable indexes - no applicable query plan:
+- No such index found.
+
+For more information, please visit: https://microsoft.github.io/hyperspace/docs/why-not-result-analysis
+
+=============================================================
+Plan without Hyperspace & WhyNot reasons:
+=============================================================
+00 Join Inner, (c3# = c3#)
+01 :- Project [c4#, c3#]
+02 :  +- Filter ((isnotnull(c4#) && (c4# = 2)) && isnotnull(c3#))
+03 :     +- Relation[c1#,c2#,c3#,c4#,c5#] parquet
+04 +- Project [c5#, c3#]
+05    +- Filter ((isnotnull(c5#) && (c5# = 3000)) && isnotnull(c3#))
+06       +- Relation[c1#,c2#,c3#,c4#,c5#] parquet
+
++----------+------------------+---------+-------------------------+------------------------------------------------------------+
+|SubPlan   |IndexName         |IndexType|Reason                   |Message                                                     |
++----------+------------------+---------+-------------------------+------------------------------------------------------------+
+|Filter @2 |leftDfFilterIndex |CI       |MISSING_REQUIRED_COL     |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c4,c3]            |
+|Filter @2 |leftDfJoinIndex   |CI       |MISSING_REQUIRED_COL     |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c3,c4]            |
+|Filter @2 |rightDfFilterIndex|CI       |NO_FIRST_INDEXED_COL_COND|firstIndexedCol=[c5], filterCols=[c4,c3]                    |
+|Filter @2 |rightDfJoinIndex  |CI       |MISSING_REQUIRED_COL     |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c3,c5]            |
+|Filter @5 |leftDfFilterIndex |CI       |NO_FIRST_INDEXED_COL_COND|firstIndexedCol=[c4], filterCols=[c5,c3]                    |
+|Filter @5 |leftDfJoinIndex   |CI       |MISSING_REQUIRED_COL     |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c3,c4]            |
+|Filter @5 |rightDfFilterIndex|CI       |MISSING_REQUIRED_COL     |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c5,c3]            |
+|Filter @5 |rightDfJoinIndex  |CI       |MISSING_REQUIRED_COL     |requiredCols=[c3,c4,c5,c2,c1], indexCols=[c3,c5]            |
+|Join @0   |leftDfFilterIndex |CI       |NOT_ALL_JOIN_COL_INDEXED |child=[left], joinCols=[c3], indexedCols=[c4]               |
+|Join @0   |leftDfFilterIndex |CI       |NOT_ALL_JOIN_COL_INDEXED |child=[right], joinCols=[c3], indexedCols=[c4]              |
+|Join @0   |leftDfJoinIndex   |CI       |MISSING_INDEXED_COL      |child=[right], requiredIndexedCols=[c5,c3], indexedCols=[c3]|
+|Join @0   |rightDfFilterIndex|CI       |NOT_ALL_JOIN_COL_INDEXED |child=[left], joinCols=[c3], indexedCols=[c5]               |
+|Join @0   |rightDfFilterIndex|CI       |NOT_ALL_JOIN_COL_INDEXED |child=[right], joinCols=[c3], indexedCols=[c5]              |
+|Join @0   |rightDfJoinIndex  |CI       |MISSING_INDEXED_COL      |child=[left], requiredIndexedCols=[c4,c3], indexedCols=[c3] |
+|Project @1|leftDfJoinIndex   |CI       |ANOTHER_INDEX_APPLIED    |appliedIndex=[leftDfFilterIndex]                            |
+|Project @1|rightDfFilterIndex|CI       |NO_FIRST_INDEXED_COL_COND|firstIndexedCol=[c5], filterCols=[c4,c3]                    |
+|Project @1|rightDfJoinIndex  |CI       |MISSING_REQUIRED_COL     |requiredCols=[c4,c3], indexCols=[c3,c5]                     |
+|Project @4|leftDfFilterIndex |CI       |NO_FIRST_INDEXED_COL_COND|firstIndexedCol=[c4], filterCols=[c5,c3]                    |
+|Project @4|leftDfJoinIndex   |CI       |MISSING_REQUIRED_COL     |requiredCols=[c5,c3], indexCols=[c3,c4]                     |
+|Project @4|rightDfJoinIndex  |CI       |ANOTHER_INDEX_APPLIED    |appliedIndex=[rightDfFilterIndex]                           |
++----------+------------------+---------+-------------------------+------------------------------------------------------------+

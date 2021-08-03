@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.covering.JoinAttributeFilter.extractConditions
+import com.microsoft.hyperspace.index.plananalysis.FilterReasons
 import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, IndexTypeFilter, QueryPlanIndexFilter, RuleUtils}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.sources.FileBasedRelation
@@ -65,17 +66,22 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
         val joinConditionCond = withFilterReasonTag(
           plan,
           leftAndRightIndexes,
-          "Join condition is not eligible. Equi-Joins in simple CNF form are supported. " +
-            "Literal is not supported.") {
+          FilterReasons.NotEligibleJoin("Non equi-join or has literal")) {
           isJoinConditionSupported(condition)
         }
 
         val leftPlanLinearCond =
-          withFilterReasonTag(plan, leftAndRightIndexes, "Left child is not a linear plan.") {
+          withFilterReasonTag(
+            plan,
+            leftAndRightIndexes,
+            FilterReasons.NotEligibleJoin("Non linear left child plan")) {
             isPlanLinear(l)
           }
         val rightPlanLinearCond =
-          withFilterReasonTag(plan, leftAndRightIndexes, "Right child is not a linear plan.") {
+          withFilterReasonTag(
+            plan,
+            leftAndRightIndexes,
+            FilterReasons.NotEligibleJoin("Non linear right child plan")) {
             isPlanLinear(r)
           }
 
@@ -96,7 +102,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
         setFilterReasonTag(
           plan,
           candidateIndexes.values.flatten.toSeq,
-          "Not eligible Join - no join condition.")
+          FilterReasons.NotEligibleJoin("No join condition"))
         Map.empty
       case _ =>
         Map.empty
@@ -164,10 +170,7 @@ object JoinAttributeFilter extends QueryPlanIndexFilter {
     if (withFilterReasonTag(
         plan,
         candidateIndexes.head._2 ++ candidateIndexes.last._2,
-        "Each join condition column should come from " +
-          "relations directly and attributes from left plan must exclusively have " +
-          "one-to-one mapping with attributes from right plan. " +
-          "E.g. join(A = B and A = D) is not eligible.") {
+        FilterReasons.NotEligibleJoin("incompatible left and right join columns")) {
         ensureAttributeRequirements(
           JoinIndexRule.leftRelation.get,
           JoinIndexRule.rightRelation.get,
@@ -329,39 +332,35 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
         val lRequiredAllCols = resolve(spark, allRequiredCols(l), lBaseAttrs).get
         val rRequiredAllCols = resolve(spark, allRequiredCols(r), rBaseAttrs).get
 
+        // Make sure required indexed columns are subset of all required columns.
+        assert(
+          resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined &&
+            resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined)
+
+        val lIndexes =
+          getUsableIndexes(
+            plan,
+            candidateIndexes.getOrElse(leftRelation.plan, Nil),
+            lRequiredIndexedCols,
+            lRequiredAllCols,
+            "left")
+        val rIndexes =
+          getUsableIndexes(
+            plan,
+            candidateIndexes.getOrElse(rightRelation.plan, Nil),
+            rRequiredIndexedCols,
+            rRequiredAllCols,
+            "right")
+
         if (withFilterReasonTag(
             plan,
             candidateIndexes.head._2 ++ candidateIndexes.last._2,
-            "Invalid query plan.") {
-            // Make sure required indexed columns are subset of all required columns.
-            resolve(spark, lRequiredIndexedCols, lRequiredAllCols).isDefined &&
-            resolve(spark, rRequiredIndexedCols, rRequiredAllCols).isDefined
-          }) {
-          val lIndexes =
-            getUsableIndexes(
-              plan,
-              candidateIndexes.getOrElse(leftRelation.plan, Nil),
-              lRequiredIndexedCols,
-              lRequiredAllCols)
-          val rIndexes =
-            getUsableIndexes(
-              plan,
-              candidateIndexes.getOrElse(rightRelation.plan, Nil),
-              rRequiredIndexedCols,
-              rRequiredAllCols)
-
-          if (withFilterReasonTag(
-              plan,
-              candidateIndexes.head._2 ++ candidateIndexes.last._2,
-              "No available indexes for left subplan.")(lIndexes.nonEmpty) &&
-            withFilterReasonTag(
-              plan,
-              candidateIndexes.head._2 ++ candidateIndexes.last._2,
-              "No available indexes for right subplan.")(rIndexes.nonEmpty)) {
-            Map(leftRelation.plan -> lIndexes, rightRelation.plan -> rIndexes)
-          } else {
-            Map.empty
-          }
+            FilterReasons.NoAvailJoinIndexPair("left"))(lIndexes.nonEmpty) &&
+          withFilterReasonTag(
+            plan,
+            candidateIndexes.head._2 ++ candidateIndexes.last._2,
+            FilterReasons.NoAvailJoinIndexPair("right"))(rIndexes.nonEmpty)) {
+          Map(leftRelation.plan -> lIndexes, rightRelation.plan -> rIndexes)
         } else {
           Map.empty
         }
@@ -421,7 +420,8 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry],
       requiredIndexCols: Seq[String],
-      allRequiredCols: Seq[String]): Seq[IndexLogEntry] = {
+      allRequiredCols: Seq[String],
+      leftOrRight: String): Seq[IndexLogEntry] = {
     indexes.filter { idx =>
       val allCols = idx.derivedDataset.referencedColumns
       // All required index columns should match one-to-one with all indexed columns and
@@ -429,17 +429,19 @@ object JoinColumnFilter extends QueryPlanIndexFilter {
       withFilterReasonTag(
         plan,
         idx,
-        s"All join condition column should be the indexed columns. " +
-          s"Join columns: [${requiredIndexCols
-            .mkString(",")}], Indexed columns: [${idx.indexedColumns.mkString(",")}]") {
+        FilterReasons.NotAllJoinColIndexed(
+          leftOrRight,
+          requiredIndexCols.mkString(","),
+          idx.indexedColumns.mkString(","))) {
         requiredIndexCols.toSet.equals(idx.indexedColumns.toSet)
       } &&
       withFilterReasonTag(
         plan,
         idx,
-        s"Index does not contain all required columns. " +
-          s"Required columns: [${allRequiredCols.mkString(",")}], " +
-          s"Index columns: [${(idx.derivedDataset.referencedColumns).mkString(",")}]") {
+        FilterReasons.MissingIndexedCol(
+          leftOrRight,
+          allRequiredCols.mkString(","),
+          idx.indexedColumns.mkString(","))) {
         allRequiredCols.forall(allCols.contains)
       }
     }
@@ -523,7 +525,7 @@ object JoinRankFilter extends IndexRankFilter {
         setFilterReasonTag(
           plan,
           indexes.head._2 ++ indexes.last._2,
-          "No compatible left and right index pair.")
+          FilterReasons.NoCompatibleJoinIndexPair())
         Map.empty
       }
   }
