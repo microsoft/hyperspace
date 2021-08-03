@@ -48,3 +48,22 @@ Physical operator stats:
 |                                     WholeStageCodegen (3)|                  1|                 1|         0|
 +----------------------------------------------------------+-------------------+------------------+----------+
 
+=============================================================
+Applicable indexes:
+=============================================================
+Plan without Hyperspace:
+
+00 Join Inner, (Col1# = Col1#)
+01 :- Filter isnotnull(Col1#)
+02 :  +- RelationV2[Col1#, Col2#] $icebergPath
+03 +- Filter isnotnull(Col1#)
+04    +- RelationV2[Col1#, Col2#] $icebergPath
+
++---------+---------+---------+---------------+
+|SubPlan  |IndexName|IndexType|RuleName       |
++---------+---------+---------+---------------+
+|Filter @1|joinIndex|CI       |FilterIndexRule|
+|Filter @3|joinIndex|CI       |FilterIndexRule|
+|Join @0  |joinIndex|CI       |JoinIndexRule  |
++---------+---------+---------+---------------+
+

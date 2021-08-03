@@ -112,6 +112,26 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
             query(leftDf, rightDf),
             getIndexFilesPath(leftDfFilterIndexConfig.indexName) ++
               getIndexFilesPath(rightDfFilterIndexConfig.indexName))
+
+          def normalize(str: String): String = {
+            // Expression ids are removed before comparison since they can be different.
+            str.replaceAll("""#(\d+)|subquery(\d+)""", "#")
+          }
+
+          // Verify whyNot result.
+          hyperspace.whyNot(query(leftDf, rightDf)()) { o =>
+            val expectedOutput = getExpectedResult("whyNot_allIndex.txt")
+              .replace(System.lineSeparator(), "\n")
+            val actual = normalize(o.replace(System.lineSeparator(), "\n"))
+            assert(actual.equals(expectedOutput), actual)
+          }
+
+          hyperspace.whyNot(query(leftDf, rightDf)(), "leftDfJoinIndex", extended = true) { o =>
+            val expectedOutput = getExpectedResult("whyNot_indexName.txt")
+              .replace(System.lineSeparator(), "\n")
+            val actual = normalize(o.replace(System.lineSeparator(), "\n"))
+            assert(actual.equals(expectedOutput), actual)
+          }
         }
       }
     }

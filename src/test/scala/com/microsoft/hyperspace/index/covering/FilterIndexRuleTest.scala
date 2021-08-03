@@ -117,23 +117,24 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
 
     val originalPlan = Project(Seq(c2, c3, c4), filterNode) // c4 is not covered by index
     val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
+    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.INDEX_PLAN_ANALYSIS_ENABLED, true))
     val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(transformedPlan.equals(originalPlan), "Plan should not transform.")
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      assert(reasons.isDefined)
+      val msg = reasons.get.map(_.verboseStr)
       index.name match {
         case `indexName1` =>
-          assert(msg.isDefined)
           assert(
-            msg.get.exists(
-              _.equals("Index does not contain required columns. Required columns: " +
-                "[c3,c2,c3,c4], Indexed & included columns: [c3,c2,c1]")))
+            msg.exists(
+              _.equals(
+                s"Index does not contain required columns. " +
+                  "Required columns: [c3,c2,c4], Index columns: [c3,c2,c1]")))
         case `indexName2` | `indexName3` =>
-          assert(msg.isDefined)
           assert(
-            msg.get.exists(
-              _.contains("The first indexed column should be in filter condition columns.")))
+            msg.exists(
+              _.contains("The first indexed column should be used in filter conditions.")))
 
       }
     }
@@ -156,23 +157,23 @@ class FilterIndexRuleTest extends HyperspaceRuleSuite {
     val originalPlan = Filter(filterCondition, scanNode)
 
     val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.FILTER_REASONS_ENABLED, true))
+    allIndexes.foreach(_.setTagValue(IndexLogEntryTags.INDEX_PLAN_ANALYSIS_ENABLED, true))
     val (transformedPlan, score) = applyFilterIndexRuleHelper(originalPlan, allIndexes)
     assert(!transformedPlan.equals(originalPlan), "No plan transformation.")
     verifyTransformedPlanWithIndex(transformedPlan, indexName2)
     allIndexes.foreach { index =>
-      val msg = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
+      val reasons = index.getTagValue(originalPlan, IndexLogEntryTags.FILTER_REASONS)
       index.name match {
         case `indexName1` =>
-          assert(msg.isDefined)
+          val msg = reasons.get.map(_.verboseStr)
           assert(
-            msg.get.exists(
-              _.contains("The first indexed column should be in filter condition columns.")))
+            msg.exists(
+              _.contains("The first indexed column should be used in filter conditions.")))
         case `indexName2` =>
-          assert(msg.isEmpty)
+          assert(reasons.isEmpty)
         case `indexName3` =>
-          assert(msg.isDefined)
-          assert(msg.get.exists(_.contains(s"Another candidate index is applied: $indexName2")))
+          val msg = reasons.get.map(_.verboseStr)
+          assert(msg.exists(_.contains(s"Another candidate index is applied: $indexName2")))
       }
     }
   }
