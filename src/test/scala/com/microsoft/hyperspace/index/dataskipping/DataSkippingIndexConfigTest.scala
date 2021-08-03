@@ -42,9 +42,9 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
 
   test("Duplicate sketches are not allowed.") {
     val exception = intercept[HyperspaceException] {
-      DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("A"))
+      DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("B"), MinMaxSketch("A"))
     }
-    assert(exception.getMessage.contains("MinMax(A) is specified multiple times."))
+    assert(exception.getMessage.contains("Some sketches are specified multiple times: MinMax(A)"))
   }
 
   test("Duplicate sketches are not allowed after the column resolution.") {
@@ -53,7 +53,7 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
       val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"), MinMaxSketch("a"))
       indexConfig.createIndex(ctx, sourceData, Map())
     }
-    assert(exception.getMessage.contains("MinMax(A) is specified multiple times."))
+    assert(exception.getMessage.contains("Some sketches are specified multiple times: MinMax(A)"))
   }
 
   test("referencedColumns returns referenced columns of sketches.") {

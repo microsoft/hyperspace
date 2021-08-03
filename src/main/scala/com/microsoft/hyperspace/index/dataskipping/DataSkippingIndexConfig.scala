@@ -65,12 +65,12 @@ case class DataSkippingIndexConfig(
   }
 
   private def checkDuplicateSketches(sketches: Seq[Sketch]): Unit = {
-    val uniqueSketches = mutable.Set[Sketch]()
-    sketches.foreach { sketch =>
-      if (uniqueSketches.contains(sketch)) {
-        throw HyperspaceException(s"$sketch is specified multiple times.")
-      }
-      uniqueSketches.add(sketch)
+    val uniqueSketches = sketches.toSet
+    if (uniqueSketches.size != sketches.size) {
+      val duplicateSketches = uniqueSketches.filter(s => sketches.count(_ == s) > 1)
+      throw HyperspaceException(
+        "Some sketches are specified multiple times: " +
+          s"${duplicateSketches.mkString(", ")}")
     }
   }
 }
