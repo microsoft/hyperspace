@@ -22,6 +22,12 @@ import org.apache.spark.sql.types.DataType
 
 /**
  * Represents a sketch specification for data skipping indexes.
+ *
+ * Sketch implementations should support serialization with Jackson.
+ * Normally this should be done automatically without any special handling.
+ * When serialized as JSON objects, a special field called "type" is used
+ * to store the class name of the implementation. Therefore, the implementation
+ * must not have a field named "type".
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 trait Sketch {

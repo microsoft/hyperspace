@@ -76,7 +76,7 @@ case class DataSkippingIndex(
       val spark = ctx.spark
       import spark.implicits._
       val deletedFileIds = deletedSourceDataFiles.map(_.id).toDF(IndexConstants.DATA_FILE_NAME_ID)
-      val updatedIndexData = ctx.spark.read
+      val updatedIndexData = spark.read
         .parquet(indexContent.files.map(_.toString): _*)
         .join(deletedFileIds, Seq(IndexConstants.DATA_FILE_NAME_ID), "left_anti")
       val writeMode = if (appendedSourceData.nonEmpty) {
@@ -155,6 +155,7 @@ case class DataSkippingIndex(
         indexData
       }
     repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
+    indexData.unpersist()
   }
 
   /**
