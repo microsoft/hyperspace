@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.index.dataskipping
 
+import java.lang.Math.toIntExact
+
 import org.apache.spark.sql.{Column, DataFrame, SaveMode}
 import org.apache.spark.sql.functions.{input_file_name, min, spark_partition_id}
 
@@ -138,22 +140,10 @@ case class DataSkippingIndex(
 
   private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
     indexData.cache()
-    val minRowCountPerFileData = indexData
-      .groupBy(spark_partition_id())
-      .count()
-      .agg(min("count"))
-      .collect()
     val minRowCountPerFileConfig =
       HyperspaceConf.DataSkipping.minRecordsPerIndexDataFile(ctx.spark)
-    val repartitionedIndexData =
-      if (minRowCountPerFileData.nonEmpty &&
-        !minRowCountPerFileData.head.isNullAt(0) &&
-        minRowCountPerFileData.head.getLong(0) < minRowCountPerFileConfig) {
-        val numFiles = math.max(1, indexData.count() / minRowCountPerFileConfig)
-        indexData.repartition(numFiles.toInt)
-      } else {
-        indexData
-      }
+    val maxNumFiles = toIntExact(math.max(1, indexData.count() / minRowCountPerFileConfig))
+    val repartitionedIndexData = indexData.coalesce(maxNumFiles)
     repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
     indexData.unpersist()
   }
