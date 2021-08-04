@@ -19,6 +19,7 @@ package com.microsoft.hyperspace.index.dataskipping
 import org.apache.spark.sql.{Column, DataFrame, SaveMode}
 import org.apache.spark.sql.functions.{input_file_name, min, spark_partition_id}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
 import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
@@ -138,24 +139,19 @@ case class DataSkippingIndex(
 
   private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
     indexData.cache()
-    val minRowCountPerFileData = indexData
-      .groupBy(spark_partition_id())
-      .count()
-      .agg(min("count"))
-      .collect()
-    val minRowCountPerFileConfig =
-      HyperspaceConf.DataSkipping.minRecordsPerIndexDataFile(ctx.spark)
-    val repartitionedIndexData =
-      if (minRowCountPerFileData.nonEmpty &&
-        !minRowCountPerFileData.head.isNullAt(0) &&
-        minRowCountPerFileData.head.getLong(0) < minRowCountPerFileConfig) {
-        val numFiles = math.max(1, indexData.count() / minRowCountPerFileConfig)
-        indexData.repartition(numFiles.toInt)
-      } else {
-        indexData
-      }
-    repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
+    indexData.count() // force cache
+    // Note: the actual index data size can be smaller due to compression.
+    val indexDataSize = indexData.queryExecution.optimizedPlan.stats.sizeInBytes
     indexData.unpersist()
+    val targetIndexDataFileSize = HyperspaceConf.DataSkipping.targetIndexDataFileSize(ctx.spark)
+    val numFiles = indexDataSize / targetIndexDataFileSize
+    if (!numFiles.isValidInt) {
+      throw HyperspaceException(
+        "Could not create index data files due to too many files: " +
+          s"indexDataSize=$indexDataSize, targetIndexDataFileSize=$targetIndexDataFileSize")
+    }
+    val repartitionedIndexData = indexData.repartition(math.max(1, numFiles.toInt))
+    repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
   }
 
   /**

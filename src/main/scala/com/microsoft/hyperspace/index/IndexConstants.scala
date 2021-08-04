@@ -119,13 +119,13 @@ object IndexConstants {
   val GLOBBING_PATTERN_KEY = "spark.hyperspace.source.globbingPattern"
 
   /**
-   * Minimum number of records per index data file for data skipping indexes.
+   * Target size for an index data file for data skipping indexes.
    *
-   * When optimizing data skipping indexes, if the number of records per index
-   * data file is lower than this value, the index data is repartitioned to
-   * make index data files larger.
+   * Data skipping index application starts with filtering the index data with
+   * a translated predicate. Usually it's I/O bound and it's important to have
+   * index data distributed uniformly over files in terms of data size.
    */
-  val DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE =
-    "spark.hyperspace.index.dataskipping.minRecordsPerIndexDataFile"
-  val DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE_DEFAULT = "100000"
+  val DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE =
+    "spark.hyperspace.index.dataskipping.targetIndexDataFileSize"
+  val DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE_DEFAULT = "268435456" // 256 MiB
 }

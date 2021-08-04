@@ -18,10 +18,14 @@ package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
 import org.apache.spark.sql.functions.{input_file_name, max, min}
+import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.types.IntegerType
+import org.mockito.Mockito.{mock, when}
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index, IndexConstants}
 import com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch
 import com.microsoft.hyperspace.util.JsonUtils
@@ -86,13 +90,13 @@ class DataSkippingIndexTest extends DataSkippingSuite {
   test(
     "optimize reduces the number of index data files to 2 " +
       "if minimum records per index data file is 5.") {
-    testOptimize(5, 2)
+    testOptimize(50, 5)
   }
 
-  def testOptimize(minRecordsPerIndexDataFile: Long, expectedNumIndexDataFiles: Long): Unit = {
+  def testOptimize(targetIndexDataFileSize: Long, expectedNumIndexDataFiles: Long): Unit = {
     withSQLConf(
-      IndexConstants.DATASKIPPING_MIN_RECORDS_PER_INDEX_DATA_FILE ->
-        minRecordsPerIndexDataFile.toString) {
+      IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE ->
+        targetIndexDataFileSize.toString) {
       val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
       val sourceData = createSourceData(spark.range(100).toDF("A"))
       val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
@@ -118,6 +122,28 @@ class DataSkippingIndexTest extends DataSkippingSuite {
 
       val optimizedIndexDataFiles = listFiles(indexDataPathVar).filter(isParquet)
       assert(optimizedIndexDataFiles.length === expectedNumIndexDataFiles)
+    }
+  }
+
+  test("write throws an exception if target index data file size is too small.") {
+    withSQLConf(IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE -> "1") {
+      val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
+      val sourceData = createSourceData(spark.range(100).toDF("A"))
+      val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+
+      val mockIndexData = mock(classOf[DataFrame])
+      val mockQueryExecution = mock(classOf[QueryExecution])
+      val mockLogicalPlan = mock(classOf[LogicalPlan])
+      val mockStatistics = mock(classOf[Statistics])
+      when(mockIndexData.queryExecution).thenReturn(mockQueryExecution)
+      when(mockQueryExecution.optimizedPlan).thenReturn(mockLogicalPlan)
+      when(mockLogicalPlan.stats).thenReturn(mockStatistics)
+      when(mockStatistics.sizeInBytes).thenReturn(4000000000L)
+
+      val ex = intercept[HyperspaceException](index.write(ctx, mockIndexData))
+      assert(
+        ex.getMessage.contains("Could not create index data files due to too many files: " +
+          "indexDataSize=4000000000, targetIndexDataFileSize=1"))
     }
   }
 
