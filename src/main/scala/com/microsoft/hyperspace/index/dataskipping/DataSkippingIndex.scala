@@ -22,7 +22,7 @@ import org.apache.spark.sql.functions.{input_file_name, min, spark_partition_id}
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
-import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.util.{DataFrameUtils, ExpressionUtils}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
@@ -138,11 +138,7 @@ case class DataSkippingIndex(
   }
 
   private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
-    indexData.cache()
-    indexData.count() // force cache
-    // Note: the actual index data size can be smaller due to compression.
-    val indexDataSize = indexData.queryExecution.optimizedPlan.stats.sizeInBytes
-    indexData.unpersist()
+    val indexDataSize = DataFrameUtils.getSizeInBytes(indexData)
     val targetIndexDataFileSize = HyperspaceConf.DataSkipping.targetIndexDataFileSize(ctx.spark)
     val numFiles = indexDataSize / targetIndexDataFileSize
     if (!numFiles.isValidInt) {
