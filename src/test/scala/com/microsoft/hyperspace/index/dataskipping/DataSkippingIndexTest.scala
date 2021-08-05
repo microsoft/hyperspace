@@ -78,19 +78,9 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     checkAnswer(writtenIndexData, indexData)
   }
 
-  test(
-    "optimize reduces the number of index data files to 1 " +
-      "if minimum records per index data file is 10000.") {
-    testOptimize(10000, 1)
-  }
-
-  test(
-    "optimize reduces the number of index data files to 3 " +
-      "if minimum records per index data file is 400.") {
-    testOptimize(400, 3)
-  }
-
-  def testOptimize(targetIndexDataFileSize: Long, expectedNumIndexDataFiles: Long): Unit = {
+  test("optimize reduces the number of index data files.") {
+    val targetIndexDataFileSize = 100000
+    val expectedNumIndexDataFiles = 1
     withSQLConf(
       IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE ->
         targetIndexDataFileSize.toString) {
