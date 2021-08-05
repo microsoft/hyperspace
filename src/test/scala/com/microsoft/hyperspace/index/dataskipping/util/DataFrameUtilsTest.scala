@@ -22,14 +22,17 @@ import com.microsoft.hyperspace.index.dataskipping.DataSkippingSuite
 
 class DataFrameUtilsTest extends DataSkippingSuite {
   test("getSizeInBytes returns an estimated size of the dataframe in bytes.") {
-    val df10 = spark
+    val df = spark
       .range(100000000)
       .selectExpr("id as A", "cast(id / 100 as int) as B")
       .groupBy("B")
       .agg(count("A").as("count"), min("A").as("min"), max("A").as("max"))
-    val estimate = DataFrameUtils.getSizeInBytes(df10)
-    df10.repartition(1).write.parquet(dataPath("T10").toString)
-    val real = listFiles(dataPath("T10")).filter(isParquet).map(_.getLen).sum
+    df.cache()
+    df.count() // force cache
+    val estimate = DataFrameUtils.getSizeInBytes(df)
+    df.repartition(1).write.parquet(dataPath().toString)
+    df.unpersist()
+    val real = listFiles(dataPath()).filter(isParquet).map(_.getLen).sum
     assert(real / 2 <= estimate && estimate <= real * 2)
   }
 }

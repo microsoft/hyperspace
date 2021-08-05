@@ -22,25 +22,24 @@ import org.apache.spark.sql.DataFrame
 object DataFrameUtils {
 
   /**
-   * Returns an estimated size of the dataframe in bytes.
+   * Returns an estimated size of a cached dataframe in bytes.
    *
-   * DataFrame.rdd is a lazy val and doesn't change once set, but `cache()`
-   * creates new RDDs when a dataframe is unpersisted and then cached again.
-   * Therefore, you shouldn't call this function with a dataframe that has been
-   * cached before.
+   * The dataframe should have been fully cached to get an accurate result.
+   *
+   * This method relies on the RDD of the dataframe. DataFrame.rdd is a lazy
+   * val and doesn't change once set, but `cache()` creates new RDDs when a
+   * dataframe is unpersisted and then cached again. Therefore, you shouldn't
+   * call this function with a dataframe that has been unpersisted and cached
+   * again.
    */
   def getSizeInBytes(df: DataFrame): Long = {
-    df.cache()
-    df.count() // force cache
     def dependencies(rdd: RDD[_]): Seq[Int] = {
       rdd.id +: rdd.dependencies.flatMap(d => dependencies(d.rdd))
     }
     val deps = dependencies(df.rdd).toSet
-    val size = df.rdd.context.getRDDStorageInfo
+    df.rdd.context.getRDDStorageInfo
       .filter(info => deps.contains(info.id))
       .map(info => info.memSize + info.diskSize)
       .sum
-    df.unpersist()
-    size
   }
 }

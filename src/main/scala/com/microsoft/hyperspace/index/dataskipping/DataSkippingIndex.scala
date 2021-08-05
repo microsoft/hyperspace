@@ -138,6 +138,8 @@ case class DataSkippingIndex(
   }
 
   private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
+    indexData.cache()
+    indexData.count() // force cache
     val indexDataSize = DataFrameUtils.getSizeInBytes(indexData)
     val targetIndexDataFileSize = HyperspaceConf.DataSkipping.targetIndexDataFileSize(ctx.spark)
     val numFiles = indexDataSize / targetIndexDataFileSize
@@ -148,6 +150,7 @@ case class DataSkippingIndex(
     }
     val repartitionedIndexData = indexData.repartition(math.max(1, numFiles.toInt))
     repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
+    indexData.unpersist()
   }
 
   /**
