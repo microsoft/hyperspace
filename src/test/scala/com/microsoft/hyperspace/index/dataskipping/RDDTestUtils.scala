@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-// To access package-private methods of RDD
-package org.apache.spark.hyperspace
+package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}

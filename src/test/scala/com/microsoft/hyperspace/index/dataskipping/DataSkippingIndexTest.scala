@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.hyperspace.RDDTestUtils
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions.{input_file_name, max, min}
 import org.apache.spark.sql.types.IntegerType
