@@ -117,4 +117,15 @@ object IndexConstants {
   // To provide multiple paths in the globbing pattern, separate them with commas, e.g.
   // "/temp/1/*, /temp/2/*"
   val GLOBBING_PATTERN_KEY = "spark.hyperspace.source.globbingPattern"
+
+  /**
+   * Target size for an index data file for data skipping indexes.
+   *
+   * Data skipping index application starts with filtering the index data with
+   * a translated predicate. Usually it's I/O bound and it's important to have
+   * index data distributed uniformly over files in terms of data size.
+   */
+  val DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE =
+    "spark.hyperspace.index.dataskipping.targetIndexDataFileSize"
+  val DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE_DEFAULT = "268435456" // 256 MiB
 }

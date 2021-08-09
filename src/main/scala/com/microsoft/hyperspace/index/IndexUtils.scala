@@ -16,7 +16,10 @@
 
 package com.microsoft.hyperspace.index
 
+import java.net.URLDecoder
+
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.udf
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.util.ResolverUtils
@@ -55,4 +58,10 @@ object IndexUtils {
             s"from available source columns:\n${df.schema.treeString}")
     }
   }
+
+  /**
+   * Spark UDF to decode the URL-encoded string returned by input_file_name().
+   */
+  lazy val decodeInputFileName = udf(
+    (p: String) => URLDecoder.decode(p.replace("+", "%2B"), "UTF-8"))
 }

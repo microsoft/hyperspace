@@ -127,6 +127,8 @@ ThisBuild / Test / fork := true
 
 ThisBuild / Test / javaOptions += "-Xmx1024m"
 
+ThisBuild / coverageExcludedPackages := "com\\.fasterxml.*;com\\.microsoft\\.hyperspace\\.shim"
+
 /**
  * Release configurations
  */

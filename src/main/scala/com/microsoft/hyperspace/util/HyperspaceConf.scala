@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.util
 
 import org.apache.spark.sql.SparkSession
 
+import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexConstants
 
 /**
@@ -103,6 +104,32 @@ object HyperspaceConf {
         IndexConstants.DEV_NESTED_COLUMN_ENABLED,
         IndexConstants.DEV_NESTED_COLUMN_ENABLED_DEFAULT)
       .toBoolean
+  }
+
+  object DataSkipping {
+    def targetIndexDataFileSize(spark: SparkSession): Long = {
+      // TODO: Consider using a systematic way to validate the config value
+      // like Spark's ConfigBuilder
+      val value = spark.conf
+        .get(
+          IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE,
+          IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE_DEFAULT)
+      val longValue =
+        try {
+          value.toLong
+        } catch {
+          case e: NumberFormatException =>
+            throw HyperspaceException(
+              s"${IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE} " +
+                s"should be long, but was $value")
+        }
+      if (longValue <= 0) {
+        throw HyperspaceException(
+          s"${IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE} " +
+            s"should be a positive number.")
+      }
+      longValue
+    }
   }
 
   /**
