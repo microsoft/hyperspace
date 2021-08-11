@@ -117,7 +117,7 @@ object FileUtils {
     val fileInputStream = fileSystem.open(path)
     val len = fileSystem.getFileStatus(path).getLen
     val bytes = new Array[Byte](len.toInt)
-    fileInputStream.read(bytes)
+    fileInputStream.readFully(bytes)
     fileInputStream.close()
     bytes
   }
