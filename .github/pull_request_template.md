@@ -1,7 +1,7 @@
 <!--
 Thanks for sending a pull request! Here are some tips for you:
-  1. If this is your first time, please read our contributor guidelines: https://github.com/microsoft/hyperspace/blob/master/docs/contributing.md
-  2. Ensure you have added or run the appropriate tests for your PR: https://github.com/microsoft/hyperspace/blob/master/docs/developer.md
+  1. If this is your first time, please read our contributor guidelines: https://github.com/microsoft/hyperspace/blob/master/CONTRIBUTING.md
+  2. Ensure you have added or run the appropriate tests for your PR.
   3. If the PR is unfinished, add '[WIP]' in your PR title, e.g., '[WIP] Your PR title ...'.
   4. Be sure to keep the PR description updated to reflect all changes.
   5. Please write your PR title to summarize what this PR proposes.
