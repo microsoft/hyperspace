@@ -18,16 +18,21 @@ package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.storage.RDDInfo
 import org.mockito.Mockito.{mock, spy, when}
 
 object RDDTestUtils {
-  def getMockDataFrameWithFakeSize(spark: SparkSession, size: Long): DataFrame = {
+  def getMockDataFrameWithFakeSize(
+      spark: SparkSession,
+      size: Long,
+      schema: StructType): DataFrame = {
     val df = spy(spark.emptyDataFrame)
     val rdd = spy(df.rdd)
     val mockSparkContext = mock(classOf[SparkContext])
     val mockRddStorageInfo = mock(classOf[RDDInfo])
     when(df.rdd).thenReturn(rdd)
+    when(df.schema).thenReturn(schema)
     when(rdd.id).thenReturn(42)
     when(rdd.context).thenReturn(mockSparkContext)
     when(mockSparkContext.getRDDStorageInfo).thenReturn(Array[RDDInfo](mockRddStorageInfo))

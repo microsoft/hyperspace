@@ -18,6 +18,8 @@ package com.microsoft.hyperspace.index.dataskipping
 
 import org.apache.spark.sql.{Column, DataFrame, SaveMode}
 import org.apache.spark.sql.functions.{input_file_name, min, spark_partition_id}
+import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
+import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
@@ -30,10 +32,12 @@ import com.microsoft.hyperspace.util.HyperspaceConf
  * files in relations using sketches.
  *
  * @param sketches List of sketches for this index
+ * @param schema Index data schema
  * @param properties Properties for this index; see [[Index.properties]] for details.
  */
 case class DataSkippingIndex(
     sketches: Seq[Sketch],
+    schema: StructType,
     override val properties: Map[String, String] = Map.empty)
     extends Index {
   assert(sketches.nonEmpty, "At least one sketch is required.")
@@ -61,7 +65,8 @@ case class DataSkippingIndex(
   }
 
   override def optimize(ctx: IndexerContext, indexDataFilesToOptimize: Seq[FileInfo]): Unit = {
-    val indexData = ctx.spark.read.parquet(indexDataFilesToOptimize.map(_.name): _*)
+    val indexData =
+      ctx.spark.read.schema(schema).parquet(indexDataFilesToOptimize.map(_.name): _*)
     writeImpl(ctx, indexData, SaveMode.Overwrite)
   }
 
@@ -71,7 +76,10 @@ case class DataSkippingIndex(
       deletedSourceDataFiles: Seq[FileInfo],
       indexContent: Content): (Index, Index.UpdateMode) = {
     if (appendedSourceData.nonEmpty) {
-      writeImpl(ctx, index(ctx, appendedSourceData.get), SaveMode.Overwrite)
+      writeImpl(
+        ctx,
+        DataSkippingIndex.createIndexData(ctx, sketches, appendedSourceData.get),
+        SaveMode.Overwrite)
     }
     if (deletedSourceDataFiles.nonEmpty) {
       val spark = ctx.spark
@@ -98,23 +106,59 @@ case class DataSkippingIndex(
   override def refreshFull(
       ctx: IndexerContext,
       sourceData: DataFrame): (DataSkippingIndex, DataFrame) = {
-    val updatedIndex = copy(sketches = ExpressionUtils.resolve(ctx.spark, sketches, sourceData))
-    (updatedIndex, updatedIndex.index(ctx, sourceData))
+    val resolvedSketches = ExpressionUtils.resolve(ctx.spark, sketches, sourceData)
+    val indexData = DataSkippingIndex.createIndexData(ctx, resolvedSketches, sourceData)
+    val updatedIndex = copy(sketches = resolvedSketches, schema = indexData.schema)
+    (updatedIndex, indexData)
   }
 
   override def equals(that: Any): Boolean =
     that match {
-      case DataSkippingIndex(thatSketches, _) => sketches.toSet == thatSketches.toSet
+      case DataSkippingIndex(thatSketches, thatSchema, _) =>
+        sketches.toSet == thatSketches.toSet && schema == thatSchema
       case _ => false
     }
 
   override def hashCode: Int = sketches.map(_.hashCode).sum
 
+  private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
+    // require instead of assert, as the condition can potentially be broken by
+    // code which is external to dataskipping.
+    require(
+      indexData.schema.sameType(schema),
+      "Schema of the index data doesn't match the index schema: " +
+        s"index data schema = ${indexData.schema.toDDL}, index schema = ${schema.toDDL}")
+    indexData.cache()
+    indexData.count() // force cache
+    val indexDataSize = DataFrameUtils.getSizeInBytes(indexData)
+    val targetIndexDataFileSize = HyperspaceConf.DataSkipping.targetIndexDataFileSize(ctx.spark)
+    val numFiles = indexDataSize / targetIndexDataFileSize
+    if (!numFiles.isValidInt) {
+      throw HyperspaceException(
+        "Could not create index data files due to too many files: " +
+          s"indexDataSize=$indexDataSize, targetIndexDataFileSize=$targetIndexDataFileSize")
+    }
+    val repartitionedIndexData = indexData.repartition(math.max(1, numFiles.toInt))
+    repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
+    indexData.unpersist()
+  }
+}
+
+object DataSkippingIndex {
+  // $COVERAGE-OFF$ https://github.com/scoverage/scalac-scoverage-plugin/issues/125
+  final val kind = "DataSkippingIndex"
+  final val kindAbbr = "DS"
+  // $COVERAGE-ON$
+
   /**
    * Creates index data for the given source data.
    */
-  def index(ctx: IndexerContext, sourceData: DataFrame): DataFrame = {
+  def createIndexData(
+      ctx: IndexerContext,
+      sketches: Seq[Sketch],
+      sourceData: DataFrame): DataFrame = {
     val fileNameCol = "input_file_name"
+    val aggregateFunctions = getNamedAggregateFunctions(sketches)
     val indexDataWithFileName = sourceData
       .groupBy(input_file_name().as(fileNameCol))
       .agg(aggregateFunctions.head, aggregateFunctions.tail: _*)
@@ -137,20 +181,15 @@ case class DataSkippingIndex(
         indexDataWithFileName.columns.filterNot(_ == fileNameCol).map(c => s"`$c`"): _*)
   }
 
-  private def writeImpl(ctx: IndexerContext, indexData: DataFrame, writeMode: SaveMode): Unit = {
-    indexData.cache()
-    indexData.count() // force cache
-    val indexDataSize = DataFrameUtils.getSizeInBytes(indexData)
-    val targetIndexDataFileSize = HyperspaceConf.DataSkipping.targetIndexDataFileSize(ctx.spark)
-    val numFiles = indexDataSize / targetIndexDataFileSize
-    if (!numFiles.isValidInt) {
-      throw HyperspaceException(
-        "Could not create index data files due to too many files: " +
-          s"indexDataSize=$indexDataSize, targetIndexDataFileSize=$targetIndexDataFileSize")
+  def getNamedAggregateFunctions(sketches: Seq[Sketch]): Seq[Column] = {
+    sketches.flatMap { s =>
+      val aggrs = s.aggregateFunctions
+      assert(aggrs.nonEmpty)
+      aggrs.zipWithIndex.map {
+        case (aggr, idx) =>
+          new Column(aggr).as(getNormalizeColumnName(s"${s}_$idx"))
+      }
     }
-    val repartitionedIndexData = indexData.repartition(math.max(1, numFiles.toInt))
-    repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
-    indexData.unpersist()
   }
 
   /**
@@ -159,21 +198,4 @@ case class DataSkippingIndex(
   private def getNormalizeColumnName(name: String): String = {
     name.replaceAll("[ ,;{}()\n\t=]", "_")
   }
-
-  @transient
-  private lazy val aggregateFunctions = sketches.flatMap { s =>
-    val aggrs = s.aggregateFunctions
-    assert(aggrs.nonEmpty)
-    aggrs.zipWithIndex.map {
-      case (aggr, idx) =>
-        new Column(aggr).as(getNormalizeColumnName(s"${s}_$idx"))
-    }
-  }
-}
-
-object DataSkippingIndex {
-  // $COVERAGE-OFF$ https://github.com/scoverage/scalac-scoverage-plugin/issues/125
-  final val kind = "DataSkippingIndex"
-  final val kindAbbr = "DS"
-  // $COVERAGE-ON$
 }

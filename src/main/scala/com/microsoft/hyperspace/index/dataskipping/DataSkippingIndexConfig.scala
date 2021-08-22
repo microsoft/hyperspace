@@ -60,8 +60,9 @@ case class DataSkippingIndexConfig(
       properties: Map[String, String]): (DataSkippingIndex, DataFrame) = {
     val resolvedSketches = ExpressionUtils.resolve(ctx.spark, sketches, sourceData)
     checkDuplicateSketches(resolvedSketches)
-    val index = DataSkippingIndex(resolvedSketches, properties)
-    (index, index.index(ctx, sourceData))
+    val indexData = DataSkippingIndex.createIndexData(ctx, resolvedSketches, sourceData)
+    val index = DataSkippingIndex(resolvedSketches, indexData.schema, properties)
+    (index, indexData)
   }
 
   private def checkDuplicateSketches(sketches: Seq[Sketch]): Unit = {
