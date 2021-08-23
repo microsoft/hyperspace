@@ -123,14 +123,6 @@ object ExpressionUtils {
     expr.transformUp {
       case a: AttributeReference => a.withExprId(nullExprId).withQualifier(Nil)
       case g @ GetStructField(child, ordinal, _) => g.copy(child, ordinal, None)
-      // Undo HandleNullInputsForUDF
-      case If(
-            ExtractIsNullDisjunction(args1),
-            // ReplaceNullWithFalseInPredicate can change null to false
-            Literal(null | false, dataType1),
-            udf @ ExtractScalaUDF(dataType2, ExtractKnownNotNullArgs(args2)))
-          if args1 == args2 && dataType1 == dataType2 =>
-        udf.copy(children = args2)
     }
   }
 

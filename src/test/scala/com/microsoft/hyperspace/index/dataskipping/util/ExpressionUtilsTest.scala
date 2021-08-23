@@ -37,22 +37,6 @@ class ExpressionUtilsTest extends HyperspaceSuite {
     assert(ExpressionUtils.normalize(expr) === expected)
   }
 
-  test("normalize removes expressions inserted for UDF.") {
-    val arg = AttributeReference("A", IntegerType)(ExprId(42), Seq("t"))
-    val func = (x: Int) => x + 1
-    val expr = If(
-      IsNull(arg),
-      Literal(null, IntegerType),
-      ScalaUDF(func, IntegerType, Seq(KnownNotNull(arg)), Nil))
-    val expected =
-      ScalaUDF(
-        func,
-        IntegerType,
-        Seq(arg.withExprId(ExpressionUtils.nullExprId).withQualifier(Nil)),
-        Nil)
-    assert(ExpressionUtils.normalize(expr) === expected)
-  }
-
   test("ExtractIsNullDisjunction matches IsNull.") {
     val expr = IsNull(Literal(null))
     val args = expr match {
