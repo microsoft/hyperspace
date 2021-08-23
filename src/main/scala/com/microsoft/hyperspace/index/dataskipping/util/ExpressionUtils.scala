@@ -16,12 +16,14 @@
 
 package com.microsoft.hyperspace.index.dataskipping.util
 
+import java.util.UUID
+
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Project, Window}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, LogicalPlan, Project, Window}
 import org.apache.spark.sql.types.DataType
 
 import com.microsoft.hyperspace.HyperspaceException
@@ -29,6 +31,8 @@ import com.microsoft.hyperspace.index.IndexUtils
 import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
 
 object ExpressionUtils {
+
+  val nullExprId = ExprId(0, new UUID(0, 0))
 
   /**
    * Returns copies of the given sketches with the indexed columns replaced by
@@ -107,5 +111,44 @@ object ExpressionUtils {
       throw new NotImplementedError
     override def dataType: DataType = throw new NotImplementedError
     // $COVERAGE-ON$
+  }
+
+  /**
+   * Returns a normalized expression so that the indexed expression and an
+   * expression in the filter condition can be matched. For example,
+   * expressions in the filter condition can have different ExprIds for every
+   * execution, whereas the indexed expression is fixed.
+   */
+  def normalize(expr: Expression): Expression = {
+    expr.transformUp {
+      case a: AttributeReference => a.withExprId(nullExprId).withQualifier(Nil)
+      case g @ GetStructField(child, ordinal, _) => g.copy(child, ordinal, None)
+    }
+  }
+
+  // Needed because ScalaUDF has a different number of arguments depending on Spark versions.
+  private[dataskipping] object ExtractScalaUDF {
+    def unapply(e: ScalaUDF): Option[(DataType, Seq[Expression])] = {
+      Some((e.dataType, e.children))
+    }
+  }
+
+  private[dataskipping] object ExtractIsNullDisjunction {
+    def unapply(pred: Expression): Option[Seq[Expression]] =
+      pred match {
+        case IsNull(arg) => Some(Seq(arg))
+        case Or(IsNull(arg), ExtractIsNullDisjunction(args)) => Some(arg +: args)
+        case _ => None
+      }
+  }
+
+  private[dataskipping] object ExtractKnownNotNullArgs {
+    def unapply(args: Seq[Expression]): Option[Seq[Expression]] = {
+      if (args.forall(_.isInstanceOf[KnownNotNull])) {
+        Some(args.map(_.asInstanceOf[KnownNotNull].child))
+      } else {
+        None
+      }
+    }
   }
 }
