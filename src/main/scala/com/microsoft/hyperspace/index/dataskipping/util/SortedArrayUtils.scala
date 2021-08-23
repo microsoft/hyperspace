@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, CodeGe
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types.DataType
 
-private[hyperspace] object SortedArrayUtils {
+private[dataskipping] object SortedArrayUtils {
 
   /**
    * Returns true and the index of the element in the array if the value is
@@ -29,8 +29,9 @@ private[hyperspace] object SortedArrayUtils {
    * If the value is not found, then false and the index of the first element
    * which is greater than the value are returned.
    *
-   * The array must not contain nulls and duplicate elements.
-   * The value to compare the elements to must not be null.
+   * Preconditions (unchecked):
+   *   - The array must not contain nulls and duplicate elements.
+   *   - The value to compare the elements to must not be null.
    */
   def binarySearch(
       arr: ArrayData,

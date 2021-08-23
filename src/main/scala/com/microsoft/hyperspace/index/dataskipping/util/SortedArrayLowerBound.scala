@@ -28,13 +28,14 @@ import org.apache.spark.sql.types.IntegerType
  * than (greater than or equal to) the value (right), or null if there is no such
  * element.
  *
- * The array must not be null.
- * Elements in the array must be in ascending order.
- * The array must not contain null elements.
- * The array must not contain duplicate elements.
- * The value must not be null.
+ * Preconditions (unchecked):
+ *   - The array must not be null.
+ *   - Elements in the array must be in ascending order.
+ *   - The array must not contain null elements.
+ *   - The array must not contain duplicate elements.
+ *   - The value must not be null.
  */
-private[hyperspace] case class SortedArrayLowerBound(left: Expression, right: Expression)
+private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: Expression)
     extends BinaryExpression {
 
   override def prettyName: String = "sorted_array_lower_bound"
