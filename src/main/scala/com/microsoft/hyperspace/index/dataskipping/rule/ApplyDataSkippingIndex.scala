@@ -35,7 +35,7 @@ object ApplyDataSkippingIndex extends HyperspaceRule {
   protected override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
     IndexTypeFilter[DataSkippingIndex]() :: FilterPlanNodeFilter :: FilterConditionFilter :: Nil
 
-  protected override val indexRanker: IndexRankFilter = FilterRankFilter
+  protected override val indexRanker: IndexRankFilter = DataSkippingIndexRanker
 
   override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = {
     if (indexes.isEmpty) {

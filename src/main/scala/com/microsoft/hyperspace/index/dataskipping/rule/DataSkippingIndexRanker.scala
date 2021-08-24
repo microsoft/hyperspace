@@ -21,7 +21,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.rules.IndexRankFilter
 
-object FilterRankFilter extends IndexRankFilter {
+object DataSkippingIndexRanker extends IndexRankFilter {
   override def apply(
       plan: LogicalPlan,
       applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
