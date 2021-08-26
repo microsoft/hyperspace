@@ -127,32 +127,6 @@ object ExpressionUtils {
     }
   }
 
-  // Needed because ScalaUDF has a different number of arguments depending on Spark versions.
-  private[dataskipping] object ExtractScalaUDF {
-    def unapply(e: ScalaUDF): Option[(DataType, Seq[Expression])] = {
-      Some((e.dataType, e.children))
-    }
-  }
-
-  private[dataskipping] object ExtractIsNullDisjunction {
-    def unapply(pred: Expression): Option[Seq[Expression]] =
-      pred match {
-        case IsNull(arg) => Some(Seq(arg))
-        case Or(IsNull(arg), ExtractIsNullDisjunction(args)) => Some(arg +: args)
-        case _ => None
-      }
-  }
-
-  private[dataskipping] object ExtractKnownNotNullArgs {
-    def unapply(args: Seq[Expression]): Option[Seq[Expression]] = {
-      if (args.forall(_.isInstanceOf[KnownNotNull])) {
-        Some(args.map(_.asInstanceOf[KnownNotNull].child))
-      } else {
-        None
-      }
-    }
-  }
-
   /**
    * Returns sketch expressions that can be used to match indexed expressions
    * and expressions in the filter condition. For example, when a user creates
