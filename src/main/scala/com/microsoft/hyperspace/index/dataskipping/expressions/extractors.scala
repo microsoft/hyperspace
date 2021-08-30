@@ -175,7 +175,7 @@ case class IsFalseExtractor(matcher: ExprMatcher) {
  * spark.sql.optimizer.inSetConversionThreshold.
  */
 case class InExtractor(matcher: ExprMatcher) {
-  def unapply(p: Expression): Option[(Seq[Literal])] =
+  def unapply(p: Expression): Option[Seq[Literal]] =
     p match {
       case In(e, vs) if vs.nonEmpty && vs.forall(v => v.isInstanceOf[Literal]) && matcher(e) =>
         Some(vs.map(_.asInstanceOf[Literal]).filter(_.value != null))
@@ -191,7 +191,7 @@ case class InExtractor(matcher: ExprMatcher) {
  * spark.sql.optimizer.inSetConversionThreshold.
  */
 case class InSetExtractor(matcher: ExprMatcher) {
-  def unapply(p: Expression): Option[(Set[Any])] =
+  def unapply(p: Expression): Option[Set[Any]] =
     p match {
       case InSet(e, vs) if matcher(e) => Some(vs)
       case _ => None

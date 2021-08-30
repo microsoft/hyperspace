@@ -142,7 +142,7 @@ case class DataSkippingIndex(
       source: LogicalPlan): Option[Expression] = {
     val resolvedExprs =
       ExpressionUtils.getResolvedExprs(spark, sketches, source).getOrElse { return None }
-    val predMap = buildPredicateMap(spark, condition, source, resolvedExprs)
+    val predMap = buildPredicateMap(condition, source, resolvedExprs)
 
     // Create a single index predicate for a single source predicate node,
     // by combining individual index predicates with And.
@@ -168,8 +168,8 @@ case class DataSkippingIndex(
       case And(Literal.TrueLiteral, right) => right
       case And(left, Literal.TrueLiteral) => left
       case And(a, And(b, c)) if a.deterministic && a == b => And(b, c)
-      case Or(t @ Literal.TrueLiteral, right) => t
-      case Or(left, t @ Literal.TrueLiteral) => t
+      case Or(t @ Literal.TrueLiteral, _) => t
+      case Or(_, t @ Literal.TrueLiteral) => t
     }
     val optimizedIndexPredicate = indexPredicate.transformUp(optimizePredicate)
 
@@ -206,7 +206,6 @@ case class DataSkippingIndex(
    * Collects index predicates for each node in the source predicate.
    */
   private def buildPredicateMap(
-      spark: SparkSession,
       predicate: Expression,
       source: LogicalPlan,
       resolvedExprs: Map[Sketch, Seq[Expression]])
@@ -220,7 +219,7 @@ case class DataSkippingIndex(
             sourcePred,
             resolvedExprs(sketch),
             source.output.map(attr => attr.exprId -> attr.name).toMap,
-            aggrNames(idx).map(UnresolvedAttribute.quoted(_)))
+            aggrNames(idx).map(UnresolvedAttribute.quoted))
       }
       if (indexPreds.nonEmpty) {
         predMap.getOrElseUpdate(sourcePred, mutable.Buffer.empty) ++= indexPreds

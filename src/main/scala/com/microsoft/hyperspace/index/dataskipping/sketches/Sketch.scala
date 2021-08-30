@@ -103,7 +103,6 @@ trait Sketch {
    *          Min(A) and Max(A) in the index data. If the predicate is
    *          convertible, the implementation should return a predicate
    *          composed of these sketch values.
-   * @param indexSchema Schema of the index data
    * @return Converted predicate for index data
    */
   def convertPredicate(

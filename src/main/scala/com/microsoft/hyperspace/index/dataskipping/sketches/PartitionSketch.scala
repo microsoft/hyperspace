@@ -51,7 +51,7 @@ private[dataskipping] case class PartitionSketch(
       resolvedExprs: Seq[Expression],
       nameMap: Map[ExprId, String],
       sketchValues: Seq[Expression]): Option[Expression] = {
-    val value = sketchValues(0)
+    val value = sketchValues.head
     val exprMatcher = NormalizedExprMatcher(resolvedExprs.head, nameMap)
     predicate match {
       case _: And => None

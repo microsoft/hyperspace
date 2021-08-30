@@ -33,7 +33,7 @@ import com.microsoft.hyperspace.index.rules.ApplyHyperspace.withHyperspaceRuleDi
 
 object ExpressionUtils {
 
-  val nullExprId = ExprId(0, new UUID(0, 0))
+  val nullExprId: ExprId = ExprId(0, new UUID(0, 0))
 
   /**
    * Returns copies of the given sketches with the indexed columns replaced by
@@ -61,9 +61,8 @@ object ExpressionUtils {
   private def checkExprs(
       exprWithExpectedDataTypes: Seq[(String, Option[DataType])],
       sourceData: DataFrame): Seq[DataType] = {
-    val (exprs, expectedDataTypes) =
-      (exprWithExpectedDataTypes.map(_._1), exprWithExpectedDataTypes.map(_._2))
-    def throwNotSupportedIf(cond: Boolean, msg: => String) = {
+    val exprs = exprWithExpectedDataTypes.map(_._1)
+    def throwNotSupportedIf(cond: Boolean, msg: => String): Unit = {
       if (cond) {
         throw HyperspaceException(s"DataSkippingIndex does not support indexing $msg")
       }
@@ -130,7 +129,7 @@ object ExpressionUtils {
   /**
    * Returns sketch expressions that can be used to match indexed expressions
    * and expressions in the filter condition. For example, when a user creates
-   * an index with MinMaxSketch("A"), we create an expression corresopnding to
+   * an index with MinMaxSketch("A"), we create an expression corresponding to
    * "A" here, and later we try to match expression nodes in a filter condition,
    * say, EqualTo(AttributeReference("A"), Literal(1)), to the expression for
    * "A".

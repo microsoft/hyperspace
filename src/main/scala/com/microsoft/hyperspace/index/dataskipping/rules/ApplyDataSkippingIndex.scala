@@ -95,7 +95,7 @@ object ApplyDataSkippingIndex extends HyperspaceRule {
           FileStatusCache.getOrCreate(spark))
       }
     LogicalRelation(
-      new HadoopFsRelation(
+      HadoopFsRelation(
         indexDataLoc,
         StructType(Nil),
         indexDataSchema,
