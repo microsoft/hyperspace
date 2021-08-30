@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.rule
+package com.microsoft.hyperspace.index.dataskipping.rules
 
 import com.microsoft.hyperspace.index.dataskipping._
-import com.microsoft.hyperspace.index.dataskipping.sketch._
+import com.microsoft.hyperspace.index.dataskipping.sketches._
 
 class FilterPlanNodeFilterTest extends DataSkippingSuite {
   test("apply returns an empty map if there are no candidate indexes.") {

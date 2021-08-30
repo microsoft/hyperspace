@@ -14,23 +14,26 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
 
-class NormalizedExprMatcherTest extends HyperspaceSuite {
-  val matcher = NormalizedExprMatcher(
-    AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId, Nil),
-    Map(ExprId(42) -> "A"))
+class ExpressionUtilsTest extends HyperspaceSuite {
+  import ExpressionUtils._
 
-  test("apply returns true if the expression matches.") {
-    assert(matcher(AttributeReference("a", IntegerType)(ExprId(42), Nil)) === true)
+  test("normalize removes ExprId and qualifiers for AttributeReference.") {
+    val expr = AttributeReference("A", IntegerType)(ExprId(42), Seq("t"))
+    val expected = AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId, Nil)
+    assert(ExpressionUtils.normalize(expr) === expected)
   }
 
-  test("apply returns false if the expression does not match") {
-    assert(matcher(Literal(42)) === false)
+  test("normalize removes name for GetStructField.") {
+    val structType = StructType(StructField("b", IntegerType) :: Nil)
+    val expr = GetStructField(Literal(null, structType), 0, Some("b"))
+    val expected = GetStructField(Literal(null, structType), 0)
+    assert(ExpressionUtils.normalize(expr) === expected)
   }
 }

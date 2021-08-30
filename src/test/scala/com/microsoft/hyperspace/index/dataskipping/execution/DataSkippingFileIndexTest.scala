@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.execution
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
@@ -25,7 +25,7 @@ import org.apache.spark.sql.types._
 import org.mockito.Mockito.{mock, verify, when}
 
 import com.microsoft.hyperspace.index.dataskipping._
-import com.microsoft.hyperspace.index.dataskipping.sketch._
+import com.microsoft.hyperspace.index.dataskipping.sketches._
 
 class DataSkippingFileIndexTest extends DataSkippingSuite {
   test("DataSkippingFileIndex delegates methods to the FileIndex it is based on.") {

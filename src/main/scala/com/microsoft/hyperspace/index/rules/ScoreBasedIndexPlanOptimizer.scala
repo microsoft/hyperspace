@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.index.covering.{FilterIndexRule, JoinIndexRule}
-import com.microsoft.hyperspace.index.dataskipping.rule.ApplyDataSkippingIndex
+import com.microsoft.hyperspace.index.dataskipping.rules.ApplyDataSkippingIndex
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
 
 /**

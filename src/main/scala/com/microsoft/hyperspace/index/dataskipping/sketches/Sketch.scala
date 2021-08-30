@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExprId}

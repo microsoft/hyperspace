@@ -28,8 +28,9 @@ import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
-import com.microsoft.hyperspace.index.dataskipping.util.{DataFrameUtils, ExpressionUtils}
+import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.sketches.Sketch
+import com.microsoft.hyperspace.index.dataskipping.util.DataFrameUtils
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
@@ -194,7 +195,7 @@ case class DataSkippingIndex(
     val maxIndexDataFileCount = HyperspaceConf.DataSkipping.maxIndexDataFileCount(ctx.spark)
     val numFiles = {
       val n = indexDataSize / targetIndexDataFileSize
-      if (n.isValidInt) math.max(1, n.toInt) else maxIndexDataFileCount
+      math.min(math.max(1, n), maxIndexDataFileCount).toInt
     }
     val repartitionedIndexData = indexData.repartition(numFiles)
     repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.rule
+package com.microsoft.hyperspace.index.dataskipping.rules
 
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -23,8 +23,8 @@ import org.apache.spark.sql.hyperspace.utils.logicalPlanToDataFrame
 
 import com.microsoft.hyperspace.index._
 import com.microsoft.hyperspace.index.dataskipping._
-import com.microsoft.hyperspace.index.dataskipping.sketch._
-import com.microsoft.hyperspace.index.dataskipping.util._
+import com.microsoft.hyperspace.index.dataskipping.execution.DataSkippingFileIndex
+import com.microsoft.hyperspace.index.dataskipping.sketches._
 
 class ApplyDataSkippingIndexTest extends DataSkippingSuite {
   import spark.implicits._

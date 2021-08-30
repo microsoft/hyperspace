@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression}

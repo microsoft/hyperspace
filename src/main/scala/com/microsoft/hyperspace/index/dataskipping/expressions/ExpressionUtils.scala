@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import java.util.UUID
 
@@ -28,7 +28,7 @@ import org.apache.spark.sql.types.DataType
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexUtils
-import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
+import com.microsoft.hyperspace.index.dataskipping.sketches.Sketch
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.withHyperspaceRuleDisabled
 
 object ExpressionUtils {

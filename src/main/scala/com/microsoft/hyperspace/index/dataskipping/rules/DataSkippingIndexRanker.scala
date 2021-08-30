@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.rule
+package com.microsoft.hyperspace.index.dataskipping.rules
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 

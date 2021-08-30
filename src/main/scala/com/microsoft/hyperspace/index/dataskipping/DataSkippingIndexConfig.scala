@@ -22,8 +22,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexConfigTrait, IndexerContext}
-import com.microsoft.hyperspace.index.dataskipping.sketch.{PartitionSketch, Sketch}
-import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.sketches.{PartitionSketch, Sketch}
 import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**

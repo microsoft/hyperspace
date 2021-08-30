@@ -25,7 +25,7 @@ import org.apache.spark.sql.types._
 import com.microsoft.hyperspace._
 import com.microsoft.hyperspace.index.IndexConstants
 import com.microsoft.hyperspace.index.covering.CoveringIndexConfig
-import com.microsoft.hyperspace.index.dataskipping.sketch._
+import com.microsoft.hyperspace.index.dataskipping.sketches._
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.shim.ExtractFileSourceScanExecRelation
 

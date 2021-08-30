@@ -26,11 +26,11 @@ import org.apache.spark.sql.types.{IntegerType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index, IndexConstants}
-import com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch
+import com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch
 import com.microsoft.hyperspace.util.JsonUtils
 
 class DataSkippingIndexTest extends DataSkippingSuite {
-  override val numParallelism: Int = 3
+  override val numParallelism: Int = 10
 
   val emptyStructType = new StructType()
 
@@ -127,12 +127,12 @@ class DataSkippingIndexTest extends DataSkippingSuite {
   test("write does not create more files than maxIndexDataFileCount.") {
     withSQLConf(
       IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE -> "1",
-      IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT -> "4") {
+      IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT -> "3") {
       val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
-      val sourceData = createSourceData(spark.range(100).toDF("A"))
+      val sourceData = createSourceData(spark.range(10000).toDF("A"))
       val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
       index.write(ctx, indexData)
-      assert(listFiles(indexDataPath).filter(isParquet).length === 4)
+      assert(listFiles(indexDataPath).filter(isParquet).length === 3)
     }
   }
 
@@ -268,7 +268,7 @@ class DataSkippingIndexTest extends DataSkippingSuite {
       """|{
          |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
          |  "sketches" : [ {
-         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch",
+         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch",
          |    "expr" : "A",
          |    "dataType" : "integer"
          |  } ],
@@ -288,7 +288,7 @@ class DataSkippingIndexTest extends DataSkippingSuite {
       """|{
          |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
          |  "sketches" : [ {
-         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch",
+         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch",
          |    "expr" : "A",
          |    "dataType" : "integer"
          |  } ],

@@ -22,7 +22,7 @@ import org.apache.spark.sql.types.{IntegerType, LongType, StringType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexConstants
-import com.microsoft.hyperspace.index.dataskipping.sketch._
+import com.microsoft.hyperspace.index.dataskipping.sketches._
 
 class DataSkippingIndexConfigTest extends DataSkippingSuite {
   test("indexName returns the index name.") {

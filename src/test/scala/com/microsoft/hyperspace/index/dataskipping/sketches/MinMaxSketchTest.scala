@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.{Column, QueryTest}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
@@ -23,7 +23,7 @@ import org.apache.spark.sql.types._
 import org.mockito.Mockito.mock
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
-import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionUtils
 
 class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
   import spark.implicits._

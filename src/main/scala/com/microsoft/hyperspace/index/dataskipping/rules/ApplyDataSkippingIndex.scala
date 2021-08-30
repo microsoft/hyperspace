@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.rule
+package com.microsoft.hyperspace.index.dataskipping.rules
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
 import com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex
-import com.microsoft.hyperspace.index.dataskipping.util.DataSkippingFileIndex
+import com.microsoft.hyperspace.index.dataskipping.execution.DataSkippingFileIndex
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.index.rules._
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToSelectedIndexMap

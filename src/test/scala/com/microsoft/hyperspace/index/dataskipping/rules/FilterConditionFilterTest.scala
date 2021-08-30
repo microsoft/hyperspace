@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.rule
+package com.microsoft.hyperspace.index.dataskipping.rules
 
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
 import org.apache.spark.sql.catalyst.expressions._
 
 import com.microsoft.hyperspace.index.IndexLogEntryTags
 import com.microsoft.hyperspace.index.dataskipping._
-import com.microsoft.hyperspace.index.dataskipping.sketch._
+import com.microsoft.hyperspace.index.dataskipping.sketches._
 import com.microsoft.hyperspace.index.plananalysis.FilterReasons.IneligibleFilterCondition
 
 class FilterConditionFilterTest extends DataSkippingSuite {

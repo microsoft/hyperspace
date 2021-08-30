@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types.DataType
 
-import com.microsoft.hyperspace.index.dataskipping.util._
+import com.microsoft.hyperspace.index.dataskipping.expressions._
 import com.microsoft.hyperspace.shim.FirstNullSafe
 
 /**

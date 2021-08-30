@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Max, Min}
 import org.apache.spark.sql.catalyst.util.{ArrayData, TypeUtils}
 import org.apache.spark.sql.types.{ArrayType, DataType}
 
-import com.microsoft.hyperspace.index.dataskipping.util._
+import com.microsoft.hyperspace.index.dataskipping.expressions._
+import com.microsoft.hyperspace.index.dataskipping.util.ArrayUtils
 
 /**
  * Sketch based on minimum and maximum values for a given expression.
