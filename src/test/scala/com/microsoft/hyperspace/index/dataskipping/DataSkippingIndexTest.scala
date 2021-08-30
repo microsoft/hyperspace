@@ -124,17 +124,15 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     }
   }
 
-  test("write throws an exception if target index data file size is too small.") {
-    withSQLConf(IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE -> "1") {
+  test("write does not create more files than maxIndexDataFileCount.") {
+    withSQLConf(
+      IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE -> "1",
+      IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT -> "4") {
       val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
       val sourceData = createSourceData(spark.range(100).toDF("A"))
       val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
-      val mockIndexData =
-        RDDTestUtils.getMockDataFrameWithFakeSize(spark, 4000000000L, indexData.schema)
-      val ex = intercept[HyperspaceException](index.write(ctx, mockIndexData))
-      assert(
-        ex.getMessage.contains("Could not create index data files due to too many files: " +
-          "indexDataSize=4000000000, targetIndexDataFileSize=1"))
+      index.write(ctx, indexData)
+      assert(listFiles(indexDataPath).filter(isParquet).length === 4)
     }
   }
 
