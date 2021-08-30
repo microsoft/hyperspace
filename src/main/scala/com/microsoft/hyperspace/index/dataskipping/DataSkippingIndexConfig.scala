@@ -24,6 +24,7 @@ import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexConfigTrait, IndexerContext}
 import com.microsoft.hyperspace.index.dataskipping.sketch.{PartitionSketch, Sketch}
 import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
  * DataSkippingIndexConfig is used to create a [[DataSkippingIndex]] via
@@ -59,7 +60,10 @@ case class DataSkippingIndexConfig(
       sourceData: DataFrame,
       properties: Map[String, String]): (DataSkippingIndex, DataFrame) = {
     val resolvedSketches = ExpressionUtils.resolve(ctx.spark, sketches, sourceData)
-    val partitionSketches = getPartitionSketches(ctx.spark, sourceData)
+    val autoPartitionSketch = HyperspaceConf.DataSkipping.autoPartitionSketch(ctx.spark)
+    val partitionSketches =
+      if (autoPartitionSketch) getPartitionSketches(ctx.spark, sourceData)
+      else Nil
     val finalSketches = partitionSketches ++ resolvedSketches
     checkDuplicateSketches(finalSketches)
     val indexData = DataSkippingIndex.createIndexData(ctx, finalSketches, sourceData)

@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.dataskipping.rule
 
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
+import com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.index.rules.IndexRankFilter
 
@@ -28,6 +29,10 @@ object DataSkippingIndexRanker extends IndexRankFilter {
     // TODO: Multiple data skipping index can be applied to the same plan node,
     // although the effectiveness decreases as more indexes are applied.
     // The framework should be updated to allow multiple indexes.
-    applicableIndexes.collect { case (plan, indexes) if indexes.nonEmpty => plan -> indexes.head }
+    // For now, simply choose the index with most sketches.
+    applicableIndexes.collect {
+      case (plan, indexes) if indexes.nonEmpty =>
+        plan -> indexes.maxBy(_.derivedDataset.asInstanceOf[DataSkippingIndex].sketches.length)
+    }
   }
 }

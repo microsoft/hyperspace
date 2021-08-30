@@ -191,13 +191,12 @@ case class DataSkippingIndex(
     indexData.count() // force cache
     val indexDataSize = DataFrameUtils.getSizeInBytes(indexData)
     val targetIndexDataFileSize = HyperspaceConf.DataSkipping.targetIndexDataFileSize(ctx.spark)
-    val numFiles = indexDataSize / targetIndexDataFileSize
-    if (!numFiles.isValidInt) {
-      throw HyperspaceException(
-        "Could not create index data files due to too many files: " +
-          s"indexDataSize=$indexDataSize, targetIndexDataFileSize=$targetIndexDataFileSize")
+    val maxIndexDataFileCount = HyperspaceConf.DataSkipping.maxIndexDataFileCount(ctx.spark)
+    val numFiles = {
+      val n = indexDataSize / targetIndexDataFileSize
+      if (n.isValidInt) math.max(1, n.toInt) else maxIndexDataFileCount
     }
-    val repartitionedIndexData = indexData.repartition(math.max(1, numFiles.toInt))
+    val repartitionedIndexData = indexData.repartition(numFiles)
     repartitionedIndexData.write.mode(writeMode).parquet(ctx.indexDataPath.toString)
     indexData.unpersist()
   }
@@ -210,7 +209,7 @@ case class DataSkippingIndex(
       predicate: Expression,
       source: LogicalPlan,
       resolvedExprs: Map[Sketch, Seq[Expression]])
-      : mutable.Map[Expression, mutable.Buffer[Expression]] = {
+      : scala.collection.Map[Expression, Seq[Expression]] = {
     val predMap = mutable.Map[Expression, mutable.Buffer[Expression]]()
     val sketchesWithIndex = sketches.zipWithIndex
     predicate.foreachUp { sourcePred =>
