@@ -128,4 +128,22 @@ object IndexConstants {
   val DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE =
     "spark.hyperspace.index.dataskipping.targetIndexDataFileSize"
   val DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE_DEFAULT = "268435456" // 256 MiB
+
+  /**
+   * Maximum number of index data files.
+   *
+   * The number of index data files determined by targetIndexFileSize is
+   * capped by this value.
+   */
+  val DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT =
+    "spark.hyperspace.index.dataskipping.maxIndexDataFileCount"
+  val DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT_DEFAULT = "10000"
+
+  /**
+   * If set to true, partition sketches for partition columns are included when
+   * creating data skipping indexes. This does not affect existing indexes.
+   */
+  val DATASKIPPING_AUTO_PARTITION_SKETCH =
+    "spark.hyperspace.index.dataskipping.autoPartitionSketch"
+  val DATASKIPPING_AUTO_PARTITION_SKETCH_DEFAULT = "true"
 }

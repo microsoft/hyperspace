@@ -88,6 +88,13 @@ class DefaultFileBasedRelation(spark: SparkSession, override val plan: LogicalRe
       case _ => None
     }
 
+  override def getOrCreateFileIndex(spark: SparkSession): FileIndex = {
+    plan.relation match {
+      case HadoopFsRelation(location: FileIndex, _, _, _, _, _) =>
+        location
+    }
+  }
+
   /**
    * Creates [[HadoopFsRelation]] based on the current relation.
    *

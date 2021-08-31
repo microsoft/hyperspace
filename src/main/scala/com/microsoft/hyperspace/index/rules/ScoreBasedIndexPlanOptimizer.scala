@@ -21,13 +21,15 @@ import scala.collection.mutable
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.index.covering.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.dataskipping.rules.ApplyDataSkippingIndex
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.PlanToIndexesMap
 
 /**
  * Apply Hyperspace indexes based on the score of each index application.
  */
 class ScoreBasedIndexPlanOptimizer {
-  private val rules: Seq[HyperspaceRule] = FilterIndexRule :: JoinIndexRule :: NoOpRule :: Nil
+  private val rules: Seq[HyperspaceRule] =
+    Seq(FilterIndexRule, JoinIndexRule, ApplyDataSkippingIndex, NoOpRule)
 
   // Map for memoization. The key is the logical plan before applying [[HyperspaceRule]]s
   // and its value is a pair of best transformed plan and its score.

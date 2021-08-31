@@ -130,6 +130,49 @@ object HyperspaceConf {
       }
       longValue
     }
+
+    def maxIndexDataFileCount(spark: SparkSession): Int = {
+      // TODO: Consider using a systematic way to validate the config value
+      // like Spark's ConfigBuilder
+      val value = spark.conf
+        .get(
+          IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT,
+          IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT_DEFAULT)
+      val intValue =
+        try {
+          value.toInt
+        } catch {
+          case e: NumberFormatException =>
+            throw HyperspaceException(
+              s"${IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT} " +
+                s"should be int, but was $value")
+        }
+      if (intValue <= 0) {
+        throw HyperspaceException(
+          s"${IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT} " +
+            s"should be a positive number.")
+      }
+      intValue
+    }
+
+    def autoPartitionSketch(spark: SparkSession): Boolean = {
+      // TODO: Consider using a systematic way to validate the config value
+      // like Spark's ConfigBuilder
+      val value = spark.conf
+        .get(
+          IndexConstants.DATASKIPPING_AUTO_PARTITION_SKETCH,
+          IndexConstants.DATASKIPPING_AUTO_PARTITION_SKETCH_DEFAULT)
+      val booleanValue =
+        try {
+          value.toBoolean
+        } catch {
+          case e: IllegalArgumentException =>
+            throw HyperspaceException(
+              s"${IndexConstants.DATASKIPPING_AUTO_PARTITION_SKETCH} " +
+                s"should be boolean, but was $value")
+        }
+      booleanValue
+    }
   }
 
   /**

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
@@ -34,6 +34,22 @@ class ExpressionUtilsTest extends HyperspaceSuite {
     val structType = StructType(StructField("b", IntegerType) :: Nil)
     val expr = GetStructField(Literal(null, structType), 0, Some("b"))
     val expected = GetStructField(Literal(null, structType), 0)
+    assert(ExpressionUtils.normalize(expr) === expected)
+  }
+
+  test("normalize removes expressions inserted for UDF.") {
+    val arg = AttributeReference("A", IntegerType)(ExprId(42), Seq("t"))
+    val func = (x: Int) => x + 1
+    val expr = If(
+      IsNull(arg),
+      Literal(null, IntegerType),
+      ScalaUDF(func, IntegerType, Seq(KnownNotNull(arg)), Nil))
+    val expected =
+      ScalaUDF(
+        func,
+        IntegerType,
+        Seq(arg.withExprId(ExpressionUtils.nullExprId).withQualifier(Nil)),
+        Nil)
     assert(ExpressionUtils.normalize(expr) === expected)
   }
 

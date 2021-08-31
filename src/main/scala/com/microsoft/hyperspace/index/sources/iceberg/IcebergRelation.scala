@@ -18,12 +18,12 @@ package com.microsoft.hyperspace.index.sources.iceberg
 
 import collection.JavaConverters._
 import org.apache.hadoop.fs.{FileStatus, Path}
-import org.apache.iceberg.{FileScanTask, Schema, Table}
+import org.apache.iceberg.{FileScanTask, Schema, Table, TableScan}
 import org.apache.iceberg.spark.SparkSchemaUtil
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.types.StructType
 
@@ -70,7 +70,7 @@ class IcebergRelation(
    * All the files that the current Iceberg table uses for read.
    */
   override lazy val allFiles: Seq[FileStatus] = {
-    table.newScan().planFiles().iterator().asScala.toSeq.map(toFileStatus)
+    fileScanTasks.map(toFileStatus)
   }
 
   /**
@@ -160,6 +160,33 @@ class IcebergRelation(
     SparkSchemaUtil.convert(schema)
   }
 
+  override def getOrCreateFileIndex(spark: SparkSession): InMemoryFileIndex = {
+    val rootPaths = if (snapshotId.isEmpty) {
+      if (table.spec().isUnpartitioned) {
+        Seq(PathUtils.makeAbsolute(table.location(), spark.sessionState.newHadoopConf()))
+      } else {
+        // We'd like to use a single root path here, but
+        // then the partition discovery fails
+        // because there is a directory called "metadata"
+        // under the root path.
+        fileScanTasks.map(t => toPath(t).getParent).distinct
+      }
+    } else {
+      // Listing all files with InMemoryFileIndex should be avoided,
+      // but there is no other way as there is no FileIndex implementation
+      // for Iceberg that supports snapshots.
+      fileScanTasks.map(toPath)
+    }
+    new InMemoryFileIndex(
+      spark,
+      rootPaths,
+      partitionBasePath
+        .map(PartitioningAwareFileIndex.BASE_PATH_PARAM -> _)
+        .toMap,
+      Some(schema),
+      FileStatusCache.getOrCreate(spark))
+  }
+
   /**
    * Creates [[HadoopFsRelation]] based on the current relation.
    *
@@ -191,10 +218,26 @@ class IcebergRelation(
     new LogicalRelation(hadoopFsRelation, updatedOutput, None, false)
   }
 
-  private def toFileStatus(fileScanTask: FileScanTask): FileStatus = {
-    val path = PathUtils.makeAbsolute(
+  private def newScan(): TableScan = {
+    if (snapshotId.isDefined) {
+      table.newScan().useSnapshot(snapshotId.get)
+    } else {
+      table.newScan()
+    }
+  }
+
+  private def fileScanTasks: Seq[FileScanTask] = {
+    newScan().planFiles().iterator().asScala.toSeq
+  }
+
+  private def toPath(fileScanTask: FileScanTask): Path = {
+    PathUtils.makeAbsolute(
       new Path(fileScanTask.file().path().toString),
       spark.sessionState.newHadoopConf())
+  }
+
+  private def toFileStatus(fileScanTask: FileScanTask): FileStatus = {
+    val path = toPath(fileScanTask)
     val fs = path.getFileSystem(spark.sessionState.newHadoopConf())
     val fullPath = if (!path.isAbsolute) {
       new Path(s"${fs.getWorkingDirectory.toString}/${path.toString}")

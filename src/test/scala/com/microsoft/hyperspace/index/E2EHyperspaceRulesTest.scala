@@ -30,7 +30,7 @@ import com.microsoft.hyperspace.index.IndexConstants.{GLOBBING_PATTERN_KEY, REFR
 import com.microsoft.hyperspace.index.IndexLogEntryTags._
 import com.microsoft.hyperspace.index.covering.JoinIndexRule
 import com.microsoft.hyperspace.index.dataskipping.DataSkippingIndexConfig
-import com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch
+import com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector}
 import com.microsoft.hyperspace.util.PathUtils

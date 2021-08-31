@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen._
@@ -83,5 +83,11 @@ class SortedArrayLowerBoundTest
     checkEvaluation(expr(IntegerType, Seq(1), 2), null)
     checkEvaluation(expr(IntegerType, Seq(1, 3), 4), null)
     checkEvaluation(expr(IntegerType, Seq(1, 3, 5), 6), null)
+  }
+
+  test("SortedArrayLowerBound returns null if the value is null.") {
+    checkEvaluation(expr(IntegerType, Seq(1), null), null)
+    checkEvaluation(expr(IntegerType, Seq(1, 3), null), null)
+    checkEvaluation(expr(IntegerType, Seq(1, 3, 5), null), null)
   }
 }

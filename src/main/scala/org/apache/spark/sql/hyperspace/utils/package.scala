@@ -34,5 +34,6 @@ package object utils {
   implicit class StructTypeUtils(st: StructType) {
     // Expose package-private method
     def merge(that: StructType): StructType = st.merge(that)
+    def sameType(that: StructType): Boolean = st.sameType(that)
   }
 }

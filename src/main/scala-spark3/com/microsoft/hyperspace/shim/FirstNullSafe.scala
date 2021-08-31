@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.shim
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, ExprId}
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.aggregate.First
 
-case class NormalizedExprMatcher(expr: Expression, nameMap: Map[ExprId, String])
-    extends ExprMatcher {
-  def apply(e: Expression): Boolean = {
-    val renamed = e.transformUp {
-      case a: AttributeReference => a.withName(nameMap(a.exprId))
-    }
-    val normalized = ExpressionUtils.normalize(renamed)
-    expr == normalized
-  }
+object FirstNullSafe {
+  def apply(child: Expression): First = First(child, false)
 }

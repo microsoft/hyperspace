@@ -16,14 +16,13 @@
 
 package com.microsoft.hyperspace.index.dataskipping
 
-import scala.collection.mutable
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import org.apache.spark.sql.DataFrame
-
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.index.{IndexConfigTrait, IndexerContext}
-import com.microsoft.hyperspace.index.dataskipping.sketch.Sketch
-import com.microsoft.hyperspace.index.dataskipping.util.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.sketches.{PartitionSketch, Sketch}
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
  * DataSkippingIndexConfig is used to create a [[DataSkippingIndex]] via
@@ -59,9 +58,29 @@ case class DataSkippingIndexConfig(
       sourceData: DataFrame,
       properties: Map[String, String]): (DataSkippingIndex, DataFrame) = {
     val resolvedSketches = ExpressionUtils.resolve(ctx.spark, sketches, sourceData)
-    checkDuplicateSketches(resolvedSketches)
-    val index = DataSkippingIndex(resolvedSketches, properties)
-    (index, index.index(ctx, sourceData))
+    val autoPartitionSketch = HyperspaceConf.DataSkipping.autoPartitionSketch(ctx.spark)
+    val partitionSketchOpt =
+      if (autoPartitionSketch) getPartitionSketch(ctx.spark, sourceData)
+      else None
+    val finalSketches = partitionSketchOpt.toSeq ++ resolvedSketches
+    checkDuplicateSketches(finalSketches)
+    val indexData = DataSkippingIndex.createIndexData(ctx, finalSketches, sourceData)
+    val index = DataSkippingIndex(finalSketches, indexData.schema, properties)
+    (index, indexData)
+  }
+
+  private def getPartitionSketch(
+      spark: SparkSession,
+      sourceData: DataFrame): Option[PartitionSketch] = {
+    val relation = Hyperspace
+      .getContext(spark)
+      .sourceProviderManager
+      .getRelation(sourceData.queryExecution.optimizedPlan)
+    if (relation.partitionSchema.nonEmpty) {
+      Some(PartitionSketch(relation.partitionSchema.map(f => (f.name, Some(f.dataType)))))
+    } else {
+      None
+    }
   }
 
   private def checkDuplicateSketches(sketches: Seq[Sketch]): Unit = {

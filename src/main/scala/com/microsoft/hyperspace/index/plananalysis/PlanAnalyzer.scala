@@ -28,6 +28,7 @@ import org.apache.spark.sql.hyperspace.utils.logicalPlanToDataFrame
 
 import com.microsoft.hyperspace.{HyperspaceException, Implicits}
 import com.microsoft.hyperspace.index.IndexConstants
+import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.shim.ExtractFileSourceScanExecRelation
 
 /**
@@ -212,7 +213,13 @@ object PlanAnalyzer {
       plan: SparkPlan,
       indexes: DataFrame,
       bufferStream: BufferStream): Unit = {
-    val usedIndexes = indexes.filter(indexes("indexLocation").isin(getPaths(plan): _*))
+    val usedIndexNames = plan.collect {
+      case ExtractFileSourceScanExecRelation(rel: IndexHadoopFsRelation) =>
+        rel.indexName
+    }
+    val usedIndexes = indexes.filter(
+      indexes("indexLocation").isin(getPaths(plan): _*) ||
+        indexes("name").isin(usedIndexNames: _*))
     usedIndexes.collect().foreach { row =>
       bufferStream
         .write(row.getAs("name").toString)

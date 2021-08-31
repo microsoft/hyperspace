@@ -14,23 +14,25 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.util
+package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
 
-class NormalizedExprMatcherTest extends HyperspaceSuite {
-  val matcher = NormalizedExprMatcher(
+class NormalizedExprExtractorTest extends HyperspaceSuite {
+  val extractor = NormalizedExprExtractor(
     AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId, Nil),
     Map(ExprId(42) -> "A"))
 
   test("apply returns true if the expression matches.") {
-    assert(matcher(AttributeReference("a", IntegerType)(ExprId(42), Nil)) === true)
+    assert(
+      extractor.unapply(AttributeReference("a", IntegerType)(ExprId(42), Nil)) ===
+        Some(extractor.expr))
   }
 
   test("apply returns false if the expression does not match") {
-    assert(matcher(Literal(42)) === false)
+    assert(extractor.unapply(Literal(42)) === None)
   }
 }

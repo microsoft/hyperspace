@@ -16,56 +16,60 @@
 
 package com.microsoft.hyperspace.index.dataskipping
 
+import scala.util.parsing.json.JSON
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions.{input_file_name, max, min}
-import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.types.{IntegerType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index, IndexConstants}
-import com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch
+import com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch
 import com.microsoft.hyperspace.util.JsonUtils
 
 class DataSkippingIndexTest extends DataSkippingSuite {
-  override val numParallelism: Int = 3
+  override val numParallelism: Int = 10
+
+  val emptyStructType = new StructType()
 
   test("""kind returns "DataSkippingIndex".""") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     assert(index.kind === "DataSkippingIndex")
   }
 
   test("""kindAbbr returns "DS".""") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     assert(index.kindAbbr === "DS")
   }
 
   test("indexedColumns returns indexed columns of sketches.") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")), emptyStructType)
     assert(index.indexedColumns === Seq("A", "B"))
   }
 
   test("referencedColumns returns indexed columns of sketches.") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")), emptyStructType)
     assert(index.referencedColumns === Seq("A", "B"))
   }
 
   test(
     "withNewProperties returns a new index which copies the original index except the " +
       "properties.") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     val newIndex = index.withNewProperties(Map("foo" -> "bar"))
     assert(newIndex.properties === Map("foo" -> "bar"))
     assert(newIndex.sketches === index.sketches)
   }
 
   test("statistics returns a string-formatted list of sketches.") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")), emptyStructType)
     assert(index.statistics() === Map("sketches" -> "MinMax(A), MinMax(B)"))
   }
 
   test("canHandleDeletedFiles returns true.") {
-    val index = DataSkippingIndex(Seq(MinMaxSketch("A")))
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     assert(index.canHandleDeletedFiles === true)
   }
 
@@ -76,6 +80,14 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     index.write(ctx, indexData)
     val writtenIndexData = spark.read.parquet(indexDataPath.toString)
     checkAnswer(writtenIndexData, indexData)
+  }
+
+  test("write throws an exception if the index data schema doesn't match.") {
+    val sourceData = createSourceData(spark.range(100).toDF("A"))
+    val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
+    val (index, _) = indexConfig.createIndex(ctx, sourceData, Map())
+    val ex = intercept[IllegalArgumentException](index.write(ctx, spark.range(10).toDF("B")))
+    assert(ex.getMessage.contains("Schema of the index data doesn't match the index schema"))
   }
 
   test("optimize reduces the number of index data files.") {
@@ -112,16 +124,15 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     }
   }
 
-  test("write throws an exception if target index data file size is too small.") {
-    withSQLConf(IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE -> "1") {
+  test("write does not create more files than maxIndexDataFileCount.") {
+    withSQLConf(
+      IndexConstants.DATASKIPPING_TARGET_INDEX_DATA_FILE_SIZE -> "1",
+      IndexConstants.DATASKIPPING_MAX_INDEX_DATA_FILE_COUNT -> "3") {
       val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
-      val sourceData = createSourceData(spark.range(100).toDF("A"))
+      val sourceData = createSourceData(spark.range(10000).toDF("A"))
       val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
-      val mockIndexData = RDDTestUtils.getMockDataFrameWithFakeSize(spark, 4000000000L)
-      val ex = intercept[HyperspaceException](index.write(ctx, mockIndexData))
-      assert(
-        ex.getMessage.contains("Could not create index data files due to too many files: " +
-          "indexDataSize=4000000000, targetIndexDataFileSize=1"))
+      index.write(ctx, indexData)
+      assert(listFiles(indexDataPath).filter(isParquet).length === 3)
     }
   }
 
@@ -231,38 +242,45 @@ class DataSkippingIndexTest extends DataSkippingSuite {
   }
 
   test("At least one sketch must be specified.") {
-    val ex = intercept[AssertionError](DataSkippingIndex(Nil))
+    val ex = intercept[AssertionError](DataSkippingIndex(Nil, emptyStructType))
     assert(ex.getMessage().contains("At least one sketch is required"))
   }
 
   test("Indexes are equal if they have the same sketches and data types.") {
-    val ds1 = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")))
-    val ds2 = DataSkippingIndex(Seq(MinMaxSketch("B"), MinMaxSketch("A")))
+    val ds1 = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")), emptyStructType)
+    val ds2 = DataSkippingIndex(Seq(MinMaxSketch("B"), MinMaxSketch("A")), emptyStructType)
     assert(ds1 === ds2)
     assert(ds1.hashCode === ds2.hashCode)
   }
 
   test("Indexes are not equal to objects which are not indexes.") {
-    val ds = DataSkippingIndex(Seq(MinMaxSketch("A")))
+    val ds = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     assert(ds !== "ds")
   }
 
   test("Index can be serialized.") {
-    val ds = DataSkippingIndex(Seq(MinMaxSketch("A", Some(IntegerType))), Map("a" -> "b"))
+    val ds = DataSkippingIndex(
+      Seq(MinMaxSketch("A", Some(IntegerType))),
+      emptyStructType,
+      Map("a" -> "b"))
     val json = JsonUtils.toJson(ds)
-    assert(
-      json ===
-        """|{
-           |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
-           |  "sketches" : [ {
-           |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch",
-           |    "expr" : "A",
-           |    "dataType" : "integer"
-           |  } ],
-           |  "properties" : {
-           |    "a" : "b"
-           |  }
-           |}""".stripMargin)
+    val expectedJson =
+      """|{
+         |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
+         |  "sketches" : [ {
+         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch",
+         |    "expr" : "A",
+         |    "dataType" : "integer"
+         |  } ],
+         |  "schema" : {
+         |    "type" : "struct",
+         |    "fields" : [ ]
+         |  },
+         |  "properties" : {
+         |    "a" : "b"
+         |  }
+         |}""".stripMargin
+    assert(JSON.parseFull(json) === JSON.parseFull(expectedJson))
   }
 
   test("Index can be deserialized.") {
@@ -270,16 +288,20 @@ class DataSkippingIndexTest extends DataSkippingSuite {
       """|{
          |  "type" : "com.microsoft.hyperspace.index.dataskipping.DataSkippingIndex",
          |  "sketches" : [ {
-         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketch.MinMaxSketch",
+         |    "type" : "com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch",
          |    "expr" : "A",
          |    "dataType" : "integer"
          |  } ],
+         |  "schema" : {
+         |    "type" : "struct",
+         |    "fields" : [ ]
+         |  },
          |  "properties" : {
          |    "a" : "b"
          |  }
          |}""".stripMargin
     val ds = JsonUtils.fromJson[DataSkippingIndex](json)
-    assert(ds === DataSkippingIndex(Seq(MinMaxSketch("A", Some(IntegerType)))))
+    assert(ds === DataSkippingIndex(Seq(MinMaxSketch("A", Some(IntegerType))), emptyStructType))
     assert(ds.properties === Map("a" -> "b"))
   }
 }
