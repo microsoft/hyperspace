@@ -18,8 +18,8 @@ package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types.{BooleanType, IntegerType}
-import org.mockito.Mockito.{mock, when}
 import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.{mock, when}
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
 
