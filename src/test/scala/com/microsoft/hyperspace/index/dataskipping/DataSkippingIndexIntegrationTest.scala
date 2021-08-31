@@ -360,6 +360,39 @@ class DataSkippingIndexIntegrationTest extends DataSkippingSuite with IcebergTes
     }
   }
 
+  test("DataSkippingIndex works correctly with partitioned data.") {
+    val df = createPartitionedSourceData(
+      spark.range(1000).selectExpr("cast(id/10 as int) as A", "id as B"),
+      Seq("A"))
+    hs.createIndex(df, DataSkippingIndexConfig("myind", MinMaxSketch("B")))
+    def query: DataFrame = df.filter("A = 1 or B = 100")
+    checkIndexApplied(query, 2)
+  }
+
+  test(
+    "DataSkippingIndex works correctly with partitioned data " +
+      "with multiple partition columns.") {
+    val df = createPartitionedSourceData(
+      spark
+        .range(1000)
+        .selectExpr("cast(id/100 as int) as A", "cast(id/10 as int) as B", "id as C"),
+      Seq("A", "B"))
+    hs.createIndex(df, DataSkippingIndexConfig("myind", MinMaxSketch("C")))
+    def query: DataFrame = df.filter("A = 1 or B = 1 or C = 1")
+    checkIndexApplied(query, 12)
+  }
+
+  test(
+    "DataSkippingIndex works correctly with partitioned data " +
+      "with a different filter condition.") {
+    val df = createPartitionedSourceData(
+      spark.range(1000).selectExpr("cast(id/200 as int)*200 as A", "id as B"),
+      Seq("A"))
+    hs.createIndex(df, DataSkippingIndexConfig("myind", MinMaxSketch("B")))
+    def query: DataFrame = df.filter("A = B")
+    checkIndexApplied(query, 5)
+  }
+
   test("DataSkippingIndex works correctly with Delta Lake tables.") {
     withSQLConf(
       "spark.hyperspace.index.sources.fileBasedBuilders" ->

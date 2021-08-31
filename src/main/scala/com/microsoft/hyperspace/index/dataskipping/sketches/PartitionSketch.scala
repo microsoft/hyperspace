@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace.index.dataskipping.sketches
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types.DataType
 
@@ -34,40 +35,39 @@ import com.microsoft.hyperspace.shim.FirstNullSafe
  * partitioning column.
  */
 private[dataskipping] case class PartitionSketch(
-    override val expr: String,
-    override val dataType: Option[DataType] = None)
-    extends SingleExprSketch[PartitionSketch](expr, dataType) {
-  override def name: String = "Partition"
+    override val expressions: Seq[(String, Option[DataType])])
+    extends Sketch {
 
-  override def withNewExpression(newExpr: (String, Option[DataType])): PartitionSketch = {
-    copy(expr = newExpr._1, dataType = newExpr._2)
+  override def indexedColumns: Seq[String] = exprStrings
+
+  override def referencedColumns: Seq[String] = exprStrings
+
+  override def withNewExpressions(
+      newExpressions: Seq[(String, Option[DataType])]): PartitionSketch = {
+    copy(expressions = newExpressions)
   }
 
-  override def aggregateFunctions: Seq[Expression] =
-    FirstNullSafe(parsedExpr).toAggregateExpression() :: Nil
+  override def aggregateFunctions: Seq[Expression] = {
+    val parser = SparkSession.getActiveSession.get.sessionState.sqlParser
+    exprStrings.map { e =>
+      FirstNullSafe(parser.parseExpression(e)).toAggregateExpression()
+    }
+  }
+
+  override def toString: String = s"Partition(${exprStrings.mkString(", ")})"
 
   override def convertPredicate(
       predicate: Expression,
       resolvedExprs: Seq[Expression],
+      sketchValues: Seq[Expression],
       nameMap: Map[ExprId, String],
-      sketchValues: Seq[Expression]): Option[Expression] = {
-    val value = sketchValues.head
-    val exprMatcher = NormalizedExprMatcher(resolvedExprs.head, nameMap)
+      valueExtractor: ExpressionExtractor): Option[Expression] = {
     predicate match {
-      case _: And => None
-      case _: Or => None
-      case _ =>
-        if (hasMatchingExpr(predicate, exprMatcher) &&
-          !SubqueryExpression.hasSubquery(predicate) &&
-          predicate.deterministic) {
-          Some(predicate.transform { case a: AttributeReference if exprMatcher(a) => value })
-        } else {
-          None
-        }
+      case And(_, _) | Or(_, _) => None
+      case valueExtractor(v) if (predicate.references.nonEmpty) => Some(v)
+      case _ => None
     }
   }
 
-  private def hasMatchingExpr(expr: Expression, exprMatcher: ExprMatcher): Boolean = {
-    expr.find(e => e.isInstanceOf[AttributeReference] && exprMatcher(e)).isDefined
-  }
+  private def exprStrings: Seq[String] = expressions.map(_._1)
 }

@@ -16,15 +16,13 @@
 
 package com.microsoft.hyperspace.index.dataskipping.expressions
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, ExprId}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, ExprId}
 
-case class NormalizedExprMatcher(expr: Expression, nameMap: Map[ExprId, String])
-    extends ExprMatcher {
-  def apply(e: Expression): Boolean = {
-    val renamed = e.transformUp {
-      case a: AttributeReference => a.withName(nameMap(a.exprId))
-    }
+case class NormalizedExprExtractor(expr: Expression, nameMap: Map[ExprId, String])
+    extends ExpressionExtractor {
+  def unapply(e: Expression): Option[Expression] = {
+    val renamed = e.transformUp { case a: Attribute => a.withName(nameMap(a.exprId)) }
     val normalized = ExpressionUtils.normalize(renamed)
-    expr == normalized
+    if (expr == normalized) Some(expr) else None
   }
 }

@@ -48,8 +48,9 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
   override def convertPredicate(
       predicate: Expression,
       resolvedExprs: Seq[Expression],
+      sketchValues: Seq[Expression],
       nameMap: Map[ExprId, String],
-      sketchValues: Seq[Expression]): Option[Expression] = {
+      valueExtractor: ExpressionExtractor): Option[Expression] = {
     val min = sketchValues(0)
     val max = sketchValues(1)
     // TODO: Add third sketch value "hasNull" of type bool
@@ -59,30 +60,33 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
     // Should evaluate which way is better
     val resolvedExpr = resolvedExprs.head
     val dataType = resolvedExpr.dataType
-    val exprMatcher = NormalizedExprMatcher(resolvedExpr, nameMap)
-    val ExprIsTrue = IsTrueExtractor(exprMatcher)
-    val ExprIsFalse = IsFalseExtractor(exprMatcher)
-    val ExprIsNotNull = IsNotNullExtractor(exprMatcher)
-    val ExprEqualTo = EqualToExtractor(exprMatcher)
-    val ExprLessThan = LessThanExtractor(exprMatcher)
-    val ExprLessThanOrEqualTo = LessThanOrEqualToExtractor(exprMatcher)
-    val ExprGreaterThan = GreaterThanExtractor(exprMatcher)
-    val ExprGreaterThanOrEqualTo = GreaterThanOrEqualToExtractor(exprMatcher)
-    val ExprIn = InExtractor(exprMatcher)
-    val ExprInSet = InSetExtractor(exprMatcher)
+    val exprExtractor = NormalizedExprExtractor(resolvedExpr, nameMap)
+    val ExprIsTrue = IsTrueExtractor(exprExtractor)
+    val ExprIsFalse = IsFalseExtractor(exprExtractor)
+    val ExprIsNotNull = IsNotNullExtractor(exprExtractor)
+    val ExprEqualTo = EqualToExtractor(exprExtractor, valueExtractor)
+    val ExprEqualNullSafe = EqualNullSafeExtractor(exprExtractor, valueExtractor)
+    val ExprLessThan = LessThanExtractor(exprExtractor, valueExtractor)
+    val ExprLessThanOrEqualTo = LessThanOrEqualExtractor(exprExtractor, valueExtractor)
+    val ExprGreaterThan = LessThanExtractor(valueExtractor, exprExtractor)
+    val ExprGreaterThanOrEqualTo = LessThanOrEqualExtractor(valueExtractor, exprExtractor)
+    val ExprIn = InExtractor(exprExtractor, valueExtractor)
+    val ExprInSet = InSetExtractor(exprExtractor)
     Option(predicate)
       .collect {
-        case ExprIsTrue() => max
-        case ExprIsFalse() => Not(min)
-        case ExprIsNotNull() => Literal(true)
-        case ExprEqualTo(v) => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))
-        case ExprLessThan(v) => LessThan(min, v)
-        case ExprLessThanOrEqualTo(v) => LessThanOrEqual(min, v)
-        case ExprGreaterThan(v) => GreaterThan(max, v)
-        case ExprGreaterThanOrEqualTo(v) => GreaterThanOrEqual(max, v)
-        case ExprIn(vs) =>
+        case ExprIsTrue(_) => max
+        case ExprIsFalse(_) => Not(min)
+        case ExprIsNotNull(_) => IsNotNull(min)
+        case ExprEqualTo(_, v) => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))
+        case ExprEqualNullSafe(_, v) =>
+          Or(IsNull(v), And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v)))
+        case ExprLessThan(_, v) => LessThan(min, v)
+        case ExprLessThanOrEqualTo(_, v) => LessThanOrEqual(min, v)
+        case ExprGreaterThan(v, _) => GreaterThan(max, v)
+        case ExprGreaterThanOrEqualTo(v, _) => GreaterThanOrEqual(max, v)
+        case ExprIn(_, vs) =>
           vs.map(v => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))).reduceLeft(Or)
-        case ExprInSet(vs) =>
+        case ExprInSet(_, vs) =>
           val sortedValues = Literal(
             ArrayData.toArrayData(
               ArrayUtils.toArray(
@@ -92,6 +96,5 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
           LessThanOrEqual(ElementAt(sortedValues, SortedArrayLowerBound(sortedValues, min)), max)
         // TODO: StartsWith, Like with constant prefix
       }
-      .map(p => And(And(IsNotNull(min), IsNotNull(max)), p))
   }
 }

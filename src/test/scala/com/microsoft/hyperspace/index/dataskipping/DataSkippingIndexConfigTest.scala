@@ -99,8 +99,23 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
     val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
     assert(
       index.sketches === Seq(
-        PartitionSketch("A", Some(IntegerType)),
+        PartitionSketch(Seq(("A", Some(IntegerType)))),
         MinMaxSketch("B", Some(LongType))))
+  }
+
+  test(
+    "createIndex creates partition sketches for partitioned source data " +
+      "with multiple partition columns.") {
+    val sourceData =
+      createPartitionedSourceData(
+        spark.range(10).selectExpr("id as A", "id as B", "id * 2 as C"),
+        Seq("A", "B"))
+    val indexConfig = DataSkippingIndexConfig("MyIndex", MinMaxSketch("C"))
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    assert(
+      index.sketches === Seq(
+        PartitionSketch(Seq(("A", Some(IntegerType)), ("B", Some(IntegerType)))),
+        MinMaxSketch("C", Some(LongType))))
   }
 
   test(

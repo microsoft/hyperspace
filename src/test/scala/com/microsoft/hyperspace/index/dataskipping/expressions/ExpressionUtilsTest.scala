@@ -36,4 +36,70 @@ class ExpressionUtilsTest extends HyperspaceSuite {
     val expected = GetStructField(Literal(null, structType), 0)
     assert(ExpressionUtils.normalize(expr) === expected)
   }
+
+  test("normalize removes expressions inserted for UDF.") {
+    val arg = AttributeReference("A", IntegerType)(ExprId(42), Seq("t"))
+    val func = (x: Int) => x + 1
+    val expr = If(
+      IsNull(arg),
+      Literal(null, IntegerType),
+      ScalaUDF(func, IntegerType, Seq(KnownNotNull(arg)), Nil))
+    val expected =
+      ScalaUDF(
+        func,
+        IntegerType,
+        Seq(arg.withExprId(ExpressionUtils.nullExprId).withQualifier(Nil)),
+        Nil)
+    assert(ExpressionUtils.normalize(expr) === expected)
+  }
+
+  test("ExtractIsNullDisjunction matches IsNull.") {
+    val expr = IsNull(Literal(null))
+    val args = expr match {
+      case ExtractIsNullDisjunction(args) => args
+    }
+    assert(args === Seq(Literal(null)))
+  }
+
+  test("ExtractIsNullDisjunction matches Or(IsNull, IsNull).") {
+    val expr = Or(IsNull(Literal(null)), IsNull(Literal(42)))
+    val args = expr match {
+      case ExtractIsNullDisjunction(args) => args
+    }
+    assert(args === Seq(Literal(null), Literal(42)))
+  }
+
+  test("ExtractIsNullDisjunction matches Or(IsNull, Or(IsNull, IsNull)).") {
+    val expr = Or(IsNull(Literal(null)), Or(IsNull(Literal(42)), IsNull(Literal(23))))
+    val args = expr match {
+      case ExtractIsNullDisjunction(args) => args
+    }
+    assert(args === Seq(Literal(null), Literal(42), Literal(23)))
+  }
+
+  test("ExtractIsNullDisjunction does not match other expressions.") {
+    val expr = IsNotNull(Literal(null))
+    val args = expr match {
+      case ExtractIsNullDisjunction(args) => args
+      case _ => Nil
+    }
+    assert(args === Nil)
+  }
+
+  test("ExtractKnownNotNullArgs matches Seq(KnownNotNull*).") {
+    val exprs = Seq(KnownNotNull(Literal(1)), KnownNotNull(Literal(42)))
+    val args = exprs match {
+      case ExtractKnownNotNullArgs(args) => args
+    }
+    assert(args === Seq(Literal(1), Literal(42)))
+  }
+
+  test("ExtractKnownNotNullArgs does not match other expressions.") {
+    val exprs = Seq(KnownNotNull(Literal(1)), Literal(42))
+    val args = exprs match {
+      case ExtractKnownNotNullArgs(args) => args
+      case _ => Nil
+    }
+    assert(args === Nil)
+  }
 }

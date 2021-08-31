@@ -20,16 +20,15 @@ import scala.collection.mutable
 
 import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
-import org.apache.spark.sql.catalyst.expressions.{And, Expression, Literal, NamedExpression, Or}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.functions.input_file_name
 import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
 import org.apache.spark.sql.types.StructType
 
-import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionUtils
-import com.microsoft.hyperspace.index.dataskipping.sketches.Sketch
+import com.microsoft.hyperspace.index.dataskipping.expressions._
+import com.microsoft.hyperspace.index.dataskipping.sketches.{PartitionSketch, Sketch}
 import com.microsoft.hyperspace.index.dataskipping.util.DataFrameUtils
 import com.microsoft.hyperspace.util.HyperspaceConf
 
@@ -129,12 +128,16 @@ case class DataSkippingIndex(
 
   /**
    * Translate the given filter/join condition for the source data to a
-   * predicate that can be used to filter out unnecessary source data files when
-   * applied to index data.
+   * predicate that can be used to filter out unnecessary source data files
+   * when applied to index data.
    *
    * For example, a filter condition "A = 1" can be translated into an index
-   * predicate "Min_A <= 1 && Max_A >= 1" to filter out files which cannot satisfy
-   * the condition for any rows in the file.
+   * predicate "Min_A <= 1 && Max_A >= 1" to filter out files which cannot
+   * satisfy the condition for any rows in the file.
+   *
+   * It is assumed that the condition is in negation normal form. If it is not,
+   * then it may fail to translate the condition which would have been possible
+   * otherwise. This is a valid assumption for Spark 2.4 and later.
    */
   def translateFilterCondition(
       spark: SparkSession,
@@ -167,9 +170,8 @@ case class DataSkippingIndex(
     val optimizePredicate: PartialFunction[Expression, Expression] = {
       case And(Literal.TrueLiteral, right) => right
       case And(left, Literal.TrueLiteral) => left
-      case And(a, And(b, c)) if a.deterministic && a == b => And(b, c)
-      case Or(t @ Literal.TrueLiteral, _) => t
-      case Or(_, t @ Literal.TrueLiteral) => t
+      case Or(Literal.TrueLiteral, _) => Literal.TrueLiteral
+      case Or(_, Literal.TrueLiteral) => Literal.TrueLiteral
     }
     val optimizedIndexPredicate = indexPredicate.transformUp(optimizePredicate)
 
@@ -212,20 +214,50 @@ case class DataSkippingIndex(
       : scala.collection.Map[Expression, Seq[Expression]] = {
     val predMap = mutable.Map[Expression, mutable.Buffer[Expression]]()
     val sketchesWithIndex = sketches.zipWithIndex
-    predicate.foreachUp { sourcePred =>
+    val nameMap = source.output.map(attr => attr.exprId -> attr.name).toMap
+    val attrMap = buildAttrMap(predicate, resolvedExprs, nameMap)
+    val valueExtractor = AttrValueExtractor(attrMap)
+    def updatePredMap(sourcePred: Expression): Unit = {
       val indexPreds = sketchesWithIndex.flatMap {
         case (sketch, idx) =>
           sketch.convertPredicate(
             sourcePred,
             resolvedExprs(sketch),
-            source.output.map(attr => attr.exprId -> attr.name).toMap,
-            aggrNames(idx).map(UnresolvedAttribute.quoted))
+            aggrNames(idx).map(UnresolvedAttribute.quoted),
+            nameMap,
+            valueExtractor)
       }
       if (indexPreds.nonEmpty) {
         predMap.getOrElseUpdate(sourcePred, mutable.Buffer.empty) ++= indexPreds
       }
     }
+    def forEachTerm(p: Expression, f: Expression => Unit): Unit = {
+      f(p)
+      p match {
+        case And(_, _) | Or(_, _) => p.children.foreach(forEachTerm(_, f))
+        case _ =>
+      }
+    }
+    forEachTerm(predicate, updatePredMap)
     predMap
+  }
+
+  private def buildAttrMap(
+      predicate: Expression,
+      resolvedExprs: Map[Sketch, Seq[Expression]],
+      nameMap: Map[ExprId, String]): Map[Attribute, Expression] = {
+    val partitionSketchIdx = sketches.indexWhere(_.isInstanceOf[PartitionSketch])
+    if (partitionSketchIdx != -1) {
+      val partitionSketch = sketches(partitionSketchIdx)
+      val sketchValues = aggrNames(partitionSketchIdx).map(UnresolvedAttribute.quoted)
+      val exprExtractors = resolvedExprs(partitionSketch).map(NormalizedExprExtractor(_, nameMap))
+      val exprsAndValues = exprExtractors.zip(sketchValues)
+      predicate.references
+        .flatMap(a => exprsAndValues.find(_._1.unapply(a).isDefined).map(a -> _._2))
+        .toMap
+    } else {
+      Map.empty
+    }
   }
 
   private def aggrNames(i: Int): Seq[String] = {
@@ -270,14 +302,14 @@ object DataSkippingIndex {
     val relation = RelationUtils.getRelation(spark, sourceData.queryExecution.optimizedPlan)
     import spark.implicits._
     val fileIdDf = ctx.fileIdTracker
-      .getIdToFileMapping(relation.pathNormalizer)
+      .getIdToFileMapping()
       .toDF(IndexConstants.DATA_FILE_NAME_ID, fileNameCol)
 
     indexDataWithFileName
       .join(
         fileIdDf.hint("broadcast"),
-        IndexUtils.decodeInputFileName(indexDataWithFileName(fileNameCol)) ===
-          fileIdDf(fileNameCol))
+        IndexUtils.getPath(IndexUtils.decodeInputFileName(indexDataWithFileName(fileNameCol))) ===
+          IndexUtils.getPath(fileIdDf(fileNameCol)))
       .select(
         IndexConstants.DATA_FILE_NAME_ID,
         indexDataWithFileName.columns.filterNot(_ == fileNameCol).map(c => s"`$c`"): _*)

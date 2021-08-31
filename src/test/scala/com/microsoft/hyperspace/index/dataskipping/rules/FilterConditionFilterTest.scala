@@ -49,9 +49,7 @@ class FilterConditionFilterTest extends DataSkippingSuite {
       indexLogEntry.getTagValue(plan, IndexLogEntryTags.DATASKIPPING_INDEX_PREDICATE)
     assert(
       indexDataPredOpt === Some(Some(And(
-        And(
-          IsNotNull(UnresolvedAttribute("MinMax_A__0")),
-          IsNotNull(UnresolvedAttribute("MinMax_A__1"))),
+        IsNotNull(UnresolvedAttribute("MinMax_A__0")),
         And(
           LessThanOrEqual(UnresolvedAttribute("MinMax_A__0"), Literal(1L)),
           GreaterThanOrEqual(UnresolvedAttribute("MinMax_A__1"), Literal(1L)))))))

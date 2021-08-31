@@ -18,7 +18,7 @@ package com.microsoft.hyperspace.index.dataskipping.expressions
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression}
-import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, CodeGenerator, ExprCode, FalseLiteral}
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, CodeGenerator, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.codegen.Block._
 import org.apache.spark.sql.catalyst.util.{ArrayData, TypeUtils}
 import org.apache.spark.sql.types.IntegerType
@@ -28,12 +28,13 @@ import org.apache.spark.sql.types.IntegerType
  * than (greater than or equal to) the value (right), or null if there is no such
  * element.
  *
+ * If the value (right) is null, null is returned.
+ *
  * Preconditions (unchecked):
  *   - The array must not be null.
  *   - Elements in the array must be in ascending order.
  *   - The array must not contain null elements.
  *   - The array must not contain duplicate elements.
- *   - The value must not be null.
  */
 private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: Expression)
     extends BinaryExpression {
@@ -47,15 +48,17 @@ private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: 
   override def eval(input: InternalRow): Any = {
     val arr = left.eval(input).asInstanceOf[ArrayData]
     val value = right.eval(input)
-    val dt = right.dataType
-    val n = arr.numElements()
-    if (n > 0) {
-      if (ordering.lteq(value, arr.get(0, dt))) {
-        return 1
-      }
-      if (ordering.lteq(value, arr.get(n - 1, dt))) {
-        val (_, index) = SortedArrayUtils.binarySearch(arr, dt, ordering, 0, n, value)
-        return index + 1
+    if (value != null) {
+      val dt = right.dataType
+      val n = arr.numElements()
+      if (n > 0) {
+        if (ordering.lteq(value, arr.get(0, dt))) {
+          return 1
+        }
+        if (ordering.lteq(value, arr.get(n - 1, dt))) {
+          val (_, index) = SortedArrayUtils.binarySearch(arr, dt, ordering, 0, n, value)
+          return index + 1
+        }
       }
     }
     null
@@ -73,14 +76,16 @@ private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: 
     val binarySearch = SortedArrayUtils.binarySearchCodeGen(ctx, dt)
     val resultCode =
       s"""
-         |int $n = $arr.numElements();
-         |if ($n > 0) {
-         |  if (!(${ctx.genGreater(dt, value, firstValueInArr)})) {
-         |    ${ev.isNull} = false;
-         |    ${ev.value} = 1;
-         |  } else if (!(${ctx.genGreater(dt, value, lastValueInArr)})) {
-         |    ${ev.isNull} = false;
-         |    ${ev.value} = $binarySearch($arr, 0, $n, $value).index() + 1;
+         |if (!(${rightGen.isNull})) {
+         |  int $n = $arr.numElements();
+         |  if ($n > 0) {
+         |    if (!(${ctx.genGreater(dt, value, firstValueInArr)})) {
+         |      ${ev.isNull} = false;
+         |      ${ev.value} = 1;
+         |    } else if (!(${ctx.genGreater(dt, value, lastValueInArr)})) {
+         |      ${ev.isNull} = false;
+         |      ${ev.value} = $binarySearch($arr, 0, $n, $value).index() + 1;
+         |    }
          |  }
          |}
        """.stripMargin

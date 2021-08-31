@@ -16,21 +16,20 @@
 
 package com.microsoft.hyperspace.index.dataskipping.expressions
 
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, SubqueryExpression}
 
-import com.microsoft.hyperspace.index.HyperspaceSuite
-
-class NormalizedExprMatcherTest extends HyperspaceSuite {
-  val matcher = NormalizedExprMatcher(
-    AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId, Nil),
-    Map(ExprId(42) -> "A"))
-
-  test("apply returns true if the expression matches.") {
-    assert(matcher(AttributeReference("a", IntegerType)(ExprId(42), Nil)) === true)
+case class AttrValueExtractor(attrMap: Map[Attribute, Expression]) extends ExpressionExtractor {
+  override def unapply(e: Expression): Option[Expression] = {
+    if (canTransform(e)) Some(transform(e)) else None
   }
 
-  test("apply returns false if the expression does not match") {
-    assert(matcher(Literal(42)) === false)
+  private def canTransform(e: Expression): Boolean = {
+    e.deterministic &&
+    e.references.forall(attrMap.contains) &&
+    !SubqueryExpression.hasSubquery(e)
+  }
+
+  private def transform(e: Expression): Expression = {
+    e.transform { case a: Attribute => attrMap(a) }
   }
 }

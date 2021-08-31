@@ -239,7 +239,7 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
     Param(dataS, "A < 'foo'", MinMaxSketch("A"), 1),
     Param(dataI, "a = 10", MinMaxSketch("A"), 1),
     Param(dataI, "A = 10", MinMaxSketch("a"), 1),
-    Param(dataI, "A in (1, 2, 3, 10)", MinMaxSketch("A"), 2),
+    Param(dataI, "A in (1, 2, 3, null, 10)", MinMaxSketch("A"), 2),
     Param(dataI, "A in (10,9,8,7,6,5,4,3,2,1,50,49,48,47,46,45)", MinMaxSketch("A"), 4),
     Param(dataS, "A in ('foo1', 'foo5', 'foo9')", MinMaxSketch("A"), 3),
     Param(
@@ -259,6 +259,7 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
     Param(dataI, "IF(A=1,2,3)=2", MinMaxSketch("A"), 10),
     Param(dataII, "A = 10 OR B = 50", Seq(MinMaxSketch("A"), MinMaxSketch("B")), 2),
     Param(dataII, "A = 10 or B = 50", Seq(MinMaxSketch("A")), 10),
+    Param(dataII, "B = 50 or A = 10", Seq(MinMaxSketch("A")), 10),
     Param(dataII, "A = 10 and B = 20", MinMaxSketch("A"), 1),
     Param(dataII, "a = 10 AND b = 20", Seq(MinMaxSketch("A"), MinMaxSketch("B")), 1),
     Param(dataII, "A < 30 and B > 20", MinMaxSketch("A"), 3),
@@ -361,11 +362,11 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
                 _,
                 _)) =>
           assert(location.indexDataPred === indexDataPred.get)
-          val optimizedDf = logicalPlanToDataFrame(spark, optimizedPlan)
-          checkAnswer(optimizedDf, query)
-          assert(numAccessedFiles(optimizedDf) === numExpectedFiles)
         case _ => fail(s"unexpected optimizedPlan: $optimizedPlan")
       }
     }
+    val optimizedDf = logicalPlanToDataFrame(spark, optimizedPlan)
+    checkAnswer(optimizedDf, query)
+    assert(numAccessedFiles(optimizedDf) === numExpectedFiles)
   }
 }

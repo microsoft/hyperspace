@@ -23,10 +23,12 @@ import org.apache.spark.sql.types._
 import org.mockito.Mockito.mock
 
 import com.microsoft.hyperspace.index.HyperspaceSuite
-import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionUtils
+import com.microsoft.hyperspace.index.dataskipping.expressions._
 
 class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
   import spark.implicits._
+
+  val valueExtractor = AttrValueExtractor(Map.empty)
 
   test("indexedColumns returns the indexed column.") {
     val sketch = MinMaxSketch("A")
@@ -72,18 +74,17 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val sketch = MinMaxSketch("A")
     val predicate = EqualTo(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
       And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        And(
-          LessThanOrEqual(sketchValues(0), Literal(42)),
-          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+        LessThanOrEqual(sketchValues(0), Literal(42)),
+        GreaterThanOrEqual(sketchValues(1), Literal(42))))
     assert(result === expected)
   }
 
@@ -91,18 +92,17 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val sketch = MinMaxSketch("A")
     val predicate = EqualTo(Literal(42), AttributeReference("A", IntegerType)(ExprId(0)))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
       And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        And(
-          LessThanOrEqual(sketchValues(0), Literal(42)),
-          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+        LessThanOrEqual(sketchValues(0), Literal(42)),
+        GreaterThanOrEqual(sketchValues(1), Literal(42))))
     assert(result === expected)
   }
 
@@ -113,20 +113,19 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
       0)
     val predicate = EqualTo(structAccess, Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(structAccess.transformUp {
         case attr: AttributeReference => attr.withExprId(ExpressionUtils.nullExprId)
       }),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
       And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        And(
-          LessThanOrEqual(sketchValues(0), Literal(42)),
-          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+        LessThanOrEqual(sketchValues(0), Literal(42)),
+        GreaterThanOrEqual(sketchValues(1), Literal(42))))
     assert(result === expected)
   }
 
@@ -142,20 +141,19 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
       0)
     val predicate = EqualTo(structAccess, Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(structAccess.transformUp {
         case attr: AttributeReference => attr.withExprId(ExpressionUtils.nullExprId)
       }),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
       And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        And(
-          LessThanOrEqual(sketchValues(0), Literal(42)),
-          GreaterThanOrEqual(sketchValues(1), Literal(42)))))
+        LessThanOrEqual(sketchValues(0), Literal(42)),
+        GreaterThanOrEqual(sketchValues(1), Literal(42))))
     assert(result === expected)
   }
 
@@ -164,18 +162,17 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val predicate =
       EqualTo(AttributeReference("A", StringType)(ExprId(0)), Literal.create("hello", StringType))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
       And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        And(
-          LessThanOrEqual(sketchValues(0), Literal.create("hello", StringType)),
-          GreaterThanOrEqual(sketchValues(1), Literal.create("hello", StringType)))))
+        LessThanOrEqual(sketchValues(0), Literal.create("hello", StringType)),
+        GreaterThanOrEqual(sketchValues(1), Literal.create("hello", StringType))))
     assert(result === expected)
   }
 
@@ -184,18 +181,17 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val predicate =
       EqualTo(AttributeReference("A", StringType)(ExprId(0)), Literal(3.14, DoubleType))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
       And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        And(
-          LessThanOrEqual(sketchValues(0), Literal(3.14, DoubleType)),
-          GreaterThanOrEqual(sketchValues(1), Literal(3.14, DoubleType)))))
+        LessThanOrEqual(sketchValues(0), Literal(3.14, DoubleType)),
+        GreaterThanOrEqual(sketchValues(1), Literal(3.14, DoubleType))))
     assert(result === expected)
   }
 
@@ -203,16 +199,14 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val sketch = MinMaxSketch("A")
     val predicate = LessThan(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
-    val expected = Some(
-      And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        LessThan(sketchValues(0), Literal(42))))
+      sketchValues,
+      nameMap,
+      valueExtractor)
+    val expected = Some(LessThan(sketchValues(0), Literal(42)))
     assert(result === expected)
   }
 
@@ -222,16 +216,14 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
       AttributeReference("A", StringType)(ExprId(0)),
       Literal.create("hello", StringType))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
-    val expected = Some(
-      And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        LessThan(sketchValues(0), Literal.create("hello", StringType))))
+      sketchValues,
+      nameMap,
+      valueExtractor)
+    val expected = Some(LessThan(sketchValues(0), Literal.create("hello", StringType)))
     assert(result === expected)
   }
 
@@ -239,17 +231,14 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val sketch = MinMaxSketch("A")
     val predicate = LessThanOrEqual(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
-    val expected =
-      Some(
-        And(
-          And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-          LessThanOrEqual(sketchValues(0), Literal(42))))
+      sketchValues,
+      nameMap,
+      valueExtractor)
+    val expected = Some(LessThanOrEqual(sketchValues(0), Literal(42)))
     assert(result === expected)
   }
 
@@ -257,17 +246,14 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val sketch = MinMaxSketch("A")
     val predicate = GreaterThan(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
-    val expected =
-      Some(
-        And(
-          And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-          GreaterThan(sketchValues(1), Literal(42))))
+      sketchValues,
+      nameMap,
+      valueExtractor)
+    val expected = Some(GreaterThan(sketchValues(1), Literal(42)))
     assert(result === expected)
   }
 
@@ -276,17 +262,14 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val predicate =
       GreaterThanOrEqual(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
-    val expected =
-      Some(
-        And(
-          And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-          GreaterThanOrEqual(sketchValues(1), Literal(42))))
+      sketchValues,
+      nameMap,
+      valueExtractor)
+    val expected = Some(GreaterThanOrEqual(sketchValues(1), Literal(42)))
     assert(result === expected)
   }
 
@@ -295,22 +278,21 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val predicate =
       In(AttributeReference("A", IntegerType)(ExprId(0)), Seq(Literal(42), Literal(23)))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
-      And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        Or(
-          And(
-            LessThanOrEqual(sketchValues(0), Literal(42)),
-            GreaterThanOrEqual(sketchValues(1), Literal(42))),
-          And(
-            LessThanOrEqual(sketchValues(0), Literal(23)),
-            GreaterThanOrEqual(sketchValues(1), Literal(23))))))
+      Or(
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(42)),
+          GreaterThanOrEqual(sketchValues(1), Literal(42))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal(23)),
+          GreaterThanOrEqual(sketchValues(1), Literal(23)))))
     assert(result === expected)
   }
 
@@ -321,22 +303,21 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
         AttributeReference("A", StringType)(ExprId(0)),
         Seq(Literal.create("hello", StringType), Literal.create("world", StringType)))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", StringType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = Some(
-      And(
-        And(IsNotNull(sketchValues(0)), IsNotNull(sketchValues(1))),
-        Or(
-          And(
-            LessThanOrEqual(sketchValues(0), Literal.create("hello", StringType)),
-            GreaterThanOrEqual(sketchValues(1), Literal.create("hello", StringType))),
-          And(
-            LessThanOrEqual(sketchValues(0), Literal.create("world", StringType)),
-            GreaterThanOrEqual(sketchValues(1), Literal.create("world", StringType))))))
+      Or(
+        And(
+          LessThanOrEqual(sketchValues(0), Literal.create("hello", StringType)),
+          GreaterThanOrEqual(sketchValues(1), Literal.create("hello", StringType))),
+        And(
+          LessThanOrEqual(sketchValues(0), Literal.create("world", StringType)),
+          GreaterThanOrEqual(sketchValues(1), Literal.create("world", StringType)))))
     assert(result === expected)
   }
 
@@ -344,12 +325,13 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
     val sketch = MinMaxSketch("A")
     val predicate = Not(EqualTo(AttributeReference("A", IntegerType)(ExprId(0)), Literal(42)))
     val sketchValues = Seq(UnresolvedAttribute("min"), UnresolvedAttribute("max"))
-    val exprIdColMap = Map(ExprId(0) -> "A")
+    val nameMap = Map(ExprId(0) -> "A")
     val result = sketch.convertPredicate(
       predicate,
       Seq(AttributeReference("A", IntegerType)(ExpressionUtils.nullExprId)),
-      exprIdColMap,
-      sketchValues)
+      sketchValues,
+      nameMap,
+      valueExtractor)
     val expected = None
     assert(result === expected)
   }

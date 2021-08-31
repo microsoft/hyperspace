@@ -16,7 +16,6 @@
 
 package com.microsoft.hyperspace.index.dataskipping.rules
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
 import org.apache.spark.sql.execution.datasources._

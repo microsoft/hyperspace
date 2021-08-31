@@ -17,8 +17,10 @@
 package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import org.apache.spark.sql.catalyst.expressions.{Expression, ExprId}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, ExprId}
 import org.apache.spark.sql.types.DataType
+
+import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionExtractor
 
 /**
  * Represents a sketch specification for data skipping indexes.
@@ -82,8 +84,10 @@ trait Sketch {
    * index data.
    *
    * The returned predicate should evaluate to true for an index data row
-   * if the corresponding source data file cannot be excluded, and false if
-   * the source data file can safely skipped.
+   * if the corresponding source data file cannot be excluded. The returned
+   * predicate should be used only to find files that cannot be skipped. In
+   * other words, it must not be negated to find files that can be skipped,
+   * because it can evaluate to null.
    *
    * The implementation should consider the given predicate as a single node,
    * not a tree that must be traversed recursively, because that part is
@@ -94,20 +98,21 @@ trait Sketch {
    *          expressions in the source predicate; for example,
    *          MinMaxSketch("A") will be given an expression corresponding to
    *          "A".
-   * @param nameMap Map used to normalize attribute references in the source
-   *          predicate by looking up the attribute name with ExprId; this is
-   *          needed because the attribute name in the predicate may have
-   *          different cases (lower/upper cases).
    * @param sketchValues Sketch value references in index data; for example,
    *          MinMaxSketch("A") will be given two expressions corresponding to
    *          Min(A) and Max(A) in the index data. If the predicate is
    *          convertible, the implementation should return a predicate
    *          composed of these sketch values.
+   * @param nameMap Map used to normalize attributes in the source predicate by
+   *          looking up the attribute name with ExprId; this is needed because
+   *          the attribute name in the predicate may have different cases
+   *          (lower/upper cases).
    * @return Converted predicate for index data
    */
   def convertPredicate(
       predicate: Expression,
       resolvedExprs: Seq[Expression],
+      sketchValues: Seq[Expression],
       nameMap: Map[ExprId, String],
-      sketchValues: Seq[Expression]): Option[Expression]
+      valueExtractor: ExpressionExtractor): Option[Expression]
 }
