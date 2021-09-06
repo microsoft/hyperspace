@@ -47,7 +47,7 @@ trait IndexRankFilter extends IndexFilter {
       plan: LogicalPlan,
       indexes: Seq[IndexLogEntry],
       selectedIndex: IndexLogEntry): Unit = {
-    indexes.foreach { index =>
+    indexes.filterNot(_.name.equals(selectedIndex.name)).foreach { index =>
       setFilterReasonTag(
         selectedIndex.name.equals(index.name),
         plan,

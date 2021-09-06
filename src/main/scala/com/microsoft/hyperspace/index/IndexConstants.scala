@@ -52,6 +52,10 @@ object IndexConstants {
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC = "spark.hyperspace.index.filterRule.useBucketSpec"
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT = "false"
 
+  // Config used to enable join v2 rule.
+  val INDEX_JOIN_V2_RULE_ENABLED = "spark.hyperspace.index.joinv2.enabled"
+  val INDEX_JOIN_V2_RULE_ENABLED_DEFAULT = "false"
+
   // TODO: Remove dev config when nested column is fully supported.
   val DEV_NESTED_COLUMN_ENABLED = "spark.hyperspace.dev.index.nestedColumn.enabled"
   val DEV_NESTED_COLUMN_ENABLED_DEFAULT = "false"

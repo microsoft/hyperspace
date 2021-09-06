@@ -23,7 +23,10 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
+import com.microsoft.hyperspace.index.covering.{FilterIndexRule, JoinIndexRule, JoinIndexV2Rule}
+import com.microsoft.hyperspace.index.dataskipping.rules.ApplyDataSkippingIndex
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
  * Transform the given plan to use Hyperspace indexes.
@@ -40,6 +43,17 @@ object ApplyHyperspace
   // Flag to disable ApplyHyperspace rule during index maintenance jobs such as createIndex,
   // refreshIndex and optimizeIndex.
   private[hyperspace] val disableForIndexMaintenance = new ThreadLocal[Boolean]
+  private val rules: Seq[HyperspaceRule] =
+    Seq(FilterIndexRule, JoinIndexRule, ApplyDataSkippingIndex, NoOpRule)
+
+  def availableRules: Seq[HyperspaceRule] = {
+    val optionalRules = if (HyperspaceConf.joinV2RuleEnabled(spark)) {
+      JoinIndexV2Rule :: Nil
+    } else {
+      Nil
+    }
+    rules ++ optionalRules
+  }
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
     if (disableForIndexMaintenance.get) {
@@ -55,7 +69,7 @@ object ApplyHyperspace
     } else {
       try {
         val candidateIndexes = CandidateIndexCollector(plan, allIndexes)
-        new ScoreBasedIndexPlanOptimizer().apply(plan, candidateIndexes)
+        new ScoreBasedIndexPlanOptimizer(availableRules).apply(plan, candidateIndexes)
       } catch {
         case e: Exception =>
           logWarning("Cannot apply Hyperspace indexes: " + e.getMessage)

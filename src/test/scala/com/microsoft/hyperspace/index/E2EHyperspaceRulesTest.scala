@@ -46,6 +46,7 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
     super.beforeAll()
 
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+    spark.conf.set(IndexConstants.INDEX_JOIN_V2_RULE_ENABLED, "true")
     hyperspace = new Hyperspace(spark)
     fileSystem.delete(new Path(testDir), true)
 
@@ -226,16 +227,78 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         getIndexFilesPath(rightDfIndexConfig.indexName))
   }
 
-  test("E2E test for join query with alias columns is not supported.") {
-    def verifyNoChange(f: () => DataFrame): Unit = {
-      spark.enableHyperspace()
-      val plan = f().queryExecution.optimizedPlan
-      val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
-      val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
-      val (updatedPlan, score) = JoinIndexRule.apply(plan, candidateIndexes)
-      assert(updatedPlan.equals(plan))
-      assert(score == 0)
+  test("Check v2 rule can be applied with one side of index.") {
+    val leftDf = spark.read.parquet(nonPartitionedDataPath)
+
+    val rightDf = spark.read.parquet(nonPartitionedDataPath)
+    val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c3"), Seq("C4"))
+    hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+    def query(): DataFrame = {
+      leftDf.join(rightDf, leftDf("c3") === rightDf("C3")).select(leftDf("C1"), rightDf("c4"))
     }
+
+    withSQLConf(IndexConstants.INDEX_JOIN_V2_RULE_ENABLED -> "true") {
+      verifyIndexUsage(
+        query,
+        getAllRootPaths(leftDf.queryExecution.optimizedPlan) ++ getIndexFilesPath(
+          rightDfIndexConfig.indexName))
+    }
+  }
+
+  test("If join v2 rule applied for a child, filter rule is applied for another if eligible.") {
+    val leftDf = spark.read.parquet(nonPartitionedDataPath)
+    val leftDfIndexConfig = IndexConfig("leftIndex", Seq("c3", "c4"), Seq("C5"))
+    hyperspace.createIndex(leftDf, leftDfIndexConfig)
+
+    val rightDf = spark.read.parquet(nonPartitionedDataPath)
+    val rightDfIndexConfig = IndexConfig("rightIndex", Seq("c4", "c3"), Seq("C1"))
+    hyperspace.createIndex(rightDf, rightDfIndexConfig)
+
+    def query(): DataFrame = {
+      leftDf.join(rightDf, Seq("c4", "c3")).select(leftDf("C5"), rightDf("c1"))
+    }
+
+    verifyNoChange(query)
+
+    withSQLConf(
+      IndexConstants.INDEX_JOIN_V2_RULE_ENABLED -> "true",
+      "spark.sql.legacy.bucketedTableScan.outputOrdering" -> "true") {
+      verifyIndexUsage(
+        query,
+        getIndexFilesPath(leftDfIndexConfig.indexName) ++ getIndexFilesPath(
+          rightDfIndexConfig.indexName))
+
+      // Check number of exchange & sort nodes.
+      {
+        spark.disableHyperspace()
+        val dfWithHyperspaceDisabled = query()
+        val shuffleNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+          case s: ShuffleExchangeExec => s
+        }
+        assert(shuffleNodes.size == 2)
+        val sortNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+          case s: SortExec => s
+        }
+        assert(sortNodes.size == 2)
+      }
+
+      {
+        spark.enableHyperspace()
+        val dfWithHyperspaceEnabled = query()
+        val shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+          case s: ShuffleExchangeExec => s
+        }
+        assert(shuffleNodes.size == 1)
+        val sortNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+          case s: SortExec => s
+        }
+        assert(sortNodes.size == 1)
+      }
+    }
+  }
+
+  test("E2E test for join query with alias columns is not supported.") {
 
     withView("t1", "t2") {
       val leftDf = spark.read.parquet(nonPartitionedDataPath)
@@ -1059,6 +1122,16 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
           new Configuration)
         .files
     }
+  }
+
+  private def verifyNoChange(f: () => DataFrame): Unit = {
+    spark.enableHyperspace()
+    val plan = f().queryExecution.optimizedPlan
+    val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+    val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
+    val (updatedPlan, score) = JoinIndexRule.apply(plan, candidateIndexes)
+    assert(updatedPlan.equals(plan))
+    assert(score == 0)
   }
 
   /**
