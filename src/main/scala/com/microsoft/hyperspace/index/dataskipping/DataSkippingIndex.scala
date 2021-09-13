@@ -322,7 +322,7 @@ object DataSkippingIndex {
       assert(aggrs.nonEmpty)
       aggrs.zipWithIndex.map {
         case (aggr, idx) =>
-          new Column(aggr.toAggregateExpression).as(getNormalizeColumnName(s"${s}_$idx"))
+          new Column(aggr).as(getNormalizeColumnName(s"${s}_$idx"))
       }
     }
   }

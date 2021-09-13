@@ -18,7 +18,6 @@ package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, ExprId}
-import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.types.DataType
 
 import com.microsoft.hyperspace.index.dataskipping.expressions.ExpressionExtractor
@@ -59,7 +58,7 @@ trait Sketch {
    * Returns aggregate functions that can be used to compute the actual sketch
    * values from source data.
    */
-  def aggregateFunctions: Seq[AggregateFunction]
+  def aggregateFunctions: Seq[Expression]
 
   /**
    * Returns a human-readable string describing this sketch.

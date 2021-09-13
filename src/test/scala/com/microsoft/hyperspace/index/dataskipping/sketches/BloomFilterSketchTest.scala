@@ -45,7 +45,7 @@ class BloomFilterSketchTest extends QueryTest with HyperspaceSuite with BloomFil
   test(
     "aggregateFunctions returns an aggregation function that collects values in a bloom filter.") {
     val sketch = BloomFilterSketch("A", 0.01, 100)
-    val aggrs = sketch.aggregateFunctions.map(f => new Column(f.toAggregateExpression))
+    val aggrs = sketch.aggregateFunctions.map(new Column(_))
     assert(aggrs.length === 1)
     val data = Seq(1, -1, 10, 2, 4, 2, 0, 10)
     val bf = BloomFilter.create(100, 0.01)

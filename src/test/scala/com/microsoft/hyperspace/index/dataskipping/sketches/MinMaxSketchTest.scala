@@ -42,7 +42,7 @@ class MinMaxSketchTest extends QueryTest with HyperspaceSuite {
 
   test("aggregateFunctions returns min and max aggregation functions.") {
     val sketch = MinMaxSketch("A")
-    val aggrs = sketch.aggregateFunctions.map(f => new Column(f.toAggregateExpression))
+    val aggrs = sketch.aggregateFunctions.map(new Column(_))
     val data = Seq(1, -1, 10, 2, 4).toDF("A")
     checkAnswer(data.select(aggrs: _*), Seq((-1, 10)).toDF)
   }

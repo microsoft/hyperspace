@@ -17,7 +17,6 @@
 package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.types.DataType
 
 import com.microsoft.hyperspace.index.dataskipping.expressions._
@@ -58,8 +57,8 @@ case class BloomFilterSketch(
     copy(expr = newExpr._1, dataType = newExpr._2)
   }
 
-  override def aggregateFunctions: Seq[AggregateFunction] = {
-    BloomFilterAgg(parsedExpr, expectedDistinctCountPerFile, fpp) :: Nil
+  override def aggregateFunctions: Seq[Expression] = {
+    BloomFilterAgg(parsedExpr, expectedDistinctCountPerFile, fpp).toAggregateExpression :: Nil
   }
 
   override def convertPredicate(

@@ -40,7 +40,7 @@ class PartitionSketchTest extends QueryTest with HyperspaceSuite {
 
   test("aggregateFunctions returns first aggregation function.") {
     val sketch = PartitionSketch(Seq(("A", None)))
-    val aggrs = sketch.aggregateFunctions.map(f => new Column(f.toAggregateExpression))
+    val aggrs = sketch.aggregateFunctions.map(new Column(_))
     val data = Seq(1, 1, 1, 1, 1).toDF("A")
     checkAnswer(data.select(aggrs: _*), Seq(1).toDF)
   }
