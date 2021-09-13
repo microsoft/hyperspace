@@ -22,6 +22,11 @@ import org.apache.spark.util.sketch.BloomFilter
 
 import com.microsoft.hyperspace.HyperspaceException
 
+// TODO: Support more types.
+// Currently we are relying on org.apache.spark.util.sketch.BloomFilter and
+// supported types are restricted by the implementation. To support more types
+// without changing the underlying implementation, we can convert Spark values
+// to and from byte arrays.
 private[dataskipping] object BloomFilterUtils {
   def put(bf: BloomFilter, value: Any, dataType: DataType): Boolean =
     dataType match {

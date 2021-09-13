@@ -26,10 +26,11 @@ import org.apache.spark.util.sketch.BloomFilter
 /**
  * Returns true if the bloom filter (child) might contain one of the values.
  *
- * The bloom filter must not be null.
- * The values must be an array without nulls.
- * If the element type can be represented as a primitive type in Scala,
- * then the array must be an array of the primitive type.
+ * Preconditions (unchecked):
+ *   - The bloom filter must not be null.
+ *   - The values must be an array without nulls.
+ *   - If the element type can be represented as a primitive type in Scala,
+ *     then the array must be an array of the primitive type.
  */
 private[dataskipping] case class BloomFilterMightContainAny(
     child: Expression,

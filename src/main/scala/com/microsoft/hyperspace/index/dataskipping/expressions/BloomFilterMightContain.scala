@@ -26,7 +26,8 @@ import org.apache.spark.sql.catalyst.expressions.codegen.Block._
  *
  * If the value (right) is null, null is returned.
  *
- * The bloom filter must not be null.
+ * Preconditions (unchecked):
+ *   - The bloom filter must not be null.
  */
 private[dataskipping] case class BloomFilterMightContain(left: Expression, right: Expression)
     extends BinaryExpression
