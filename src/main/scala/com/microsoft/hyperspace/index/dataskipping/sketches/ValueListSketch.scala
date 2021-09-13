@@ -17,34 +17,32 @@
 package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.{Max, Min}
-import org.apache.spark.sql.catalyst.util.{ArrayData, TypeUtils}
+import org.apache.spark.sql.catalyst.expressions.aggregate.CollectSet
+import org.apache.spark.sql.catalyst.util.TypeUtils
 import org.apache.spark.sql.types.{ArrayType, DataType}
 
 import com.microsoft.hyperspace.index.dataskipping.expressions._
 import com.microsoft.hyperspace.index.dataskipping.util.ArrayUtils
 
 /**
- * Sketch based on minimum and maximum values for a given expression.
+ * Sketch based on distinct values for a given expression.
  *
- * @param expr Expression from which min/max values are calculated
- * @param dataType Optional data type to specify the expected data type of the
- *         expression. If not specified, it is deduced automatically.
- *         If the actual data type of the expression is different from this,
- *         an error is thrown. Users are recommended to leave this parameter to
- *         None.
+ * This is not really a sketch, as it stores all distinct values for a given
+ * expression. It can be useful when the number of distinct values is expected to
+ * be small and each file tends to store only a subset of the values.
  */
-case class MinMaxSketch(override val expr: String, override val dataType: Option[DataType] = None)
-    extends SingleExprSketch[MinMaxSketch](expr, dataType) {
-  override def name: String = "MinMax"
+case class ValueListSketch(
+    override val expr: String,
+    override val dataType: Option[DataType] = None)
+    extends SingleExprSketch[ValueListSketch](expr, dataType) {
+  override def name: String = "ValueList"
 
-  override def withNewExpression(newExpr: (String, Option[DataType])): MinMaxSketch = {
+  override def withNewExpression(newExpr: (String, Option[DataType])): ValueListSketch = {
     copy(expr = newExpr._1, dataType = newExpr._2)
   }
 
-  override def aggregateFunctions: Seq[Expression] = {
-    Seq(Min(parsedExpr), Max(parsedExpr)).map(_.toAggregateExpression)
-  }
+  override def aggregateFunctions: Seq[Expression] =
+    new ArraySort(CollectSet(parsedExpr).toAggregateExpression()) :: Nil
 
   override def convertPredicate(
       predicate: Expression,
@@ -52,13 +50,13 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
       sketchValues: Seq[Expression],
       nameMap: Map[ExprId, String],
       valueExtractor: ExpressionExtractor): Option[Expression] = {
-    val min = sketchValues(0)
-    val max = sketchValues(1)
-    // TODO: Add third sketch value "hasNull" of type bool
-    // true if the expr can be null in the file, false if otherwise
-    // to optimize IsNull (can skip files with hasNull = false)
-    // This can be also done as a separate sketch, e.g. HasNullSketch
-    // Should evaluate which way is better
+    val valueList = sketchValues.head
+    val min = ElementAt(valueList, Literal(1))
+    val max = ElementAt(valueList, Literal(-1))
+    // TODO: Consider shared sketches
+    // HasNullSketch as described in MinMaxSketch.convertPredicate
+    // can be useful for ValueListSketch too, as it can be used to
+    // to optimize Not(EqualTo) as well as IsNull.
     val resolvedExpr = resolvedExprs.head
     val dataType = resolvedExpr.dataType
     val exprExtractor = NormalizedExprExtractor(resolvedExpr, nameMap)
@@ -73,27 +71,32 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
     val ExprGreaterThanOrEqualTo = GreaterThanOrEqualExtractor(exprExtractor, valueExtractor)
     val ExprIn = InExtractor(exprExtractor, valueExtractor)
     val ExprInSet = InSetExtractor(exprExtractor)
+    def Empty(arr: Expression) = EqualTo(Size(arr), Literal(0))
     Option(predicate).collect {
-      case ExprIsTrue(_) => max
-      case ExprIsFalse(_) => Not(min)
-      case ExprIsNotNull(_) => IsNotNull(min)
-      case ExprEqualTo(_, v) => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))
-      case ExprEqualNullSafe(_, v) =>
-        Or(IsNull(v), And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v)))
+      case ExprIsTrue(_) => ArrayContains(valueList, Literal(true))
+      case ExprIsFalse(_) => ArrayContains(valueList, Literal(false))
+      case ExprIsNotNull(_) => Not(Empty(valueList))
+      case ExprEqualTo(_, v) => SortedArrayContains(valueList, v)
+      case ExprEqualNullSafe(_, v) => Or(IsNull(v), SortedArrayContains(valueList, v))
+      case Not(ExprEqualTo(_, v)) =>
+        And(
+          IsNotNull(v),
+          Or(
+            GreaterThan(Size(valueList), Literal(1)),
+            Not(EqualTo(ElementAt(valueList, Literal(1)), v))))
       case ExprLessThan(_, v) => LessThan(min, v)
       case ExprLessThanOrEqualTo(_, v) => LessThanOrEqual(min, v)
       case ExprGreaterThan(_, v) => GreaterThan(max, v)
       case ExprGreaterThanOrEqualTo(_, v) => GreaterThanOrEqual(max, v)
       case ExprIn(_, vs) =>
-        vs.map(v => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))).reduceLeft(Or)
+        vs.map(v => SortedArrayContains(valueList, v)).reduceLeft(Or)
       case ExprInSet(_, vs) =>
-        val sortedValues = Literal(
-          ArrayData.toArrayData(
-            ArrayUtils.toArray(
-              vs.filter(_ != null).toArray.sorted(TypeUtils.getInterpretedOrdering(dataType)),
-              dataType)),
-          ArrayType(dataType, containsNull = false))
-        LessThanOrEqual(ElementAt(sortedValues, SortedArrayLowerBound(sortedValues, min)), max)
+        SortedArrayContainsAny(
+          valueList,
+          ArrayUtils.toArray(
+            vs.filter(_ != null).toArray.sorted(TypeUtils.getInterpretedOrdering(dataType)),
+            dataType),
+          dataType)
       // TODO: StartsWith, Like with constant prefix
     }
   }

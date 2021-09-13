@@ -26,7 +26,7 @@ import org.apache.spark.sql.types.{IntegerType, StructType}
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.{Content, FileInfo, Index, IndexConstants}
-import com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch
+import com.microsoft.hyperspace.index.dataskipping.sketches.{MinMaxSketch, ValueListSketch}
 import com.microsoft.hyperspace.util.JsonUtils
 
 class DataSkippingIndexTest extends DataSkippingSuite {
@@ -49,8 +49,24 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     assert(index.indexedColumns === Seq("A", "B"))
   }
 
+  test("indexedColumns returns indexed columns of sketches (mixed sketch types).") {
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")), emptyStructType)
+    assert(index.indexedColumns === Seq("A", "B"))
+  }
+
+  test("indexedColumns returns indexed columns without duplicates.") {
+    val index =
+      DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("A")), emptyStructType)
+    assert(index.indexedColumns === Seq("A"))
+  }
+
   test("referencedColumns returns indexed columns of sketches.") {
     val index = DataSkippingIndex(Seq(MinMaxSketch("A"), MinMaxSketch("B")), emptyStructType)
+    assert(index.referencedColumns === Seq("A", "B"))
+  }
+
+  test("referencedColumns returns indexed columns of sketches (mixed sketch types).") {
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")), emptyStructType)
     assert(index.referencedColumns === Seq("A", "B"))
   }
 
@@ -68,9 +84,20 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     assert(index.statistics() === Map("sketches" -> "MinMax(A), MinMax(B)"))
   }
 
+  test("statistics returns a string-formatted list of sketches (mixed sketch types).") {
+    val index = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")), emptyStructType)
+    assert(index.statistics() === Map("sketches" -> "MinMax(A), ValueList(B)"))
+  }
+
   test("canHandleDeletedFiles returns true.") {
     val index = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     assert(index.canHandleDeletedFiles === true)
+  }
+
+  test("Two indexes are equal if they have the same set of sketches.") {
+    val index1 = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")), emptyStructType)
+    val index2 = DataSkippingIndex(Seq(ValueListSketch("B"), MinMaxSketch("A")), emptyStructType)
+    assert(index1 === index2)
   }
 
   test("write writes the index data in a Parquet format.") {
@@ -253,9 +280,23 @@ class DataSkippingIndexTest extends DataSkippingSuite {
     assert(ds1.hashCode === ds2.hashCode)
   }
 
+  test("Indexes are equal if they have the same sketches and data types (mixed sketch types).") {
+    val ds1 = DataSkippingIndex(Seq(MinMaxSketch("A"), ValueListSketch("B")), emptyStructType)
+    val ds2 = DataSkippingIndex(Seq(ValueListSketch("B"), MinMaxSketch("A")), emptyStructType)
+    assert(ds1 === ds2)
+    assert(ds1.hashCode === ds2.hashCode)
+  }
+
   test("Indexes are not equal to objects which are not indexes.") {
     val ds = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
     assert(ds !== "ds")
+  }
+
+  test("Indexes are not equal if they don't have the same sketches.") {
+    val ds1 = DataSkippingIndex(Seq(MinMaxSketch("A")), emptyStructType)
+    val ds2 = DataSkippingIndex(Seq(ValueListSketch("A")), emptyStructType)
+    assert(ds1 !== ds2)
+    assert(ds1.hashCode !== ds2.hashCode)
   }
 
   test("Index can be serialized.") {

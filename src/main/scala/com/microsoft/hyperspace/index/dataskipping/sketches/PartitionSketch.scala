@@ -50,7 +50,7 @@ private[dataskipping] case class PartitionSketch(
   override def aggregateFunctions: Seq[Expression] = {
     val parser = SparkSession.getActiveSession.get.sessionState.sqlParser
     exprStrings.map { e =>
-      FirstNullSafe(parser.parseExpression(e)).toAggregateExpression()
+      FirstNullSafe(parser.parseExpression(e)).toAggregateExpression
     }
   }
 

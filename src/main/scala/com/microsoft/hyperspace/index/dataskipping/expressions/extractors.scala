@@ -19,8 +19,13 @@ package com.microsoft.hyperspace.index.dataskipping.expressions
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types.BooleanType
 
-case class EqualToExtractor(left: ExpressionExtractor, right: ExpressionExtractor) {
-  def unapply(p: Expression): Option[(Expression, Expression)] =
+trait BinaryExpressionExtractor {
+  def unapply(p: Expression): Option[(Expression, Expression)]
+}
+
+case class EqualToExtractor(left: ExpressionExtractor, right: ExpressionExtractor)
+    extends BinaryExpressionExtractor {
+  override def unapply(p: Expression): Option[(Expression, Expression)] =
     p match {
       case EqualTo(left(l), right(r)) => Some((l, r))
       case EqualTo(right(r), left(l)) => Some((l, r))
@@ -28,8 +33,9 @@ case class EqualToExtractor(left: ExpressionExtractor, right: ExpressionExtracto
     }
 }
 
-case class EqualNullSafeExtractor(left: ExpressionExtractor, right: ExpressionExtractor) {
-  def unapply(p: Expression): Option[(Expression, Expression)] =
+case class EqualNullSafeExtractor(left: ExpressionExtractor, right: ExpressionExtractor)
+    extends BinaryExpressionExtractor {
+  override def unapply(p: Expression): Option[(Expression, Expression)] =
     p match {
       case EqualNullSafe(left(l), right(r)) => Some((l, r))
       case EqualNullSafe(right(r), left(l)) => Some((l, r))
@@ -37,8 +43,9 @@ case class EqualNullSafeExtractor(left: ExpressionExtractor, right: ExpressionEx
     }
 }
 
-case class LessThanExtractor(left: ExpressionExtractor, right: ExpressionExtractor) {
-  def unapply(p: Expression): Option[(Expression, Expression)] =
+case class LessThanExtractor(left: ExpressionExtractor, right: ExpressionExtractor)
+    extends BinaryExpressionExtractor {
+  override def unapply(p: Expression): Option[(Expression, Expression)] =
     p match {
       case LessThan(left(l), right(r)) => Some((l, r))
       case GreaterThan(right(r), left(l)) => Some((l, r))
@@ -46,13 +53,36 @@ case class LessThanExtractor(left: ExpressionExtractor, right: ExpressionExtract
     }
 }
 
-case class LessThanOrEqualExtractor(left: ExpressionExtractor, right: ExpressionExtractor) {
-  def unapply(p: Expression): Option[(Expression, Expression)] =
+case class LessThanOrEqualExtractor(left: ExpressionExtractor, right: ExpressionExtractor)
+    extends BinaryExpressionExtractor {
+  override def unapply(p: Expression): Option[(Expression, Expression)] =
     p match {
       case LessThanOrEqual(left(l), right(r)) => Some((l, r))
       case GreaterThanOrEqual(right(r), left(l)) => Some((l, r))
       case _ => None
     }
+}
+
+case class SwitchLeftRight(extractor: BinaryExpressionExtractor)
+    extends BinaryExpressionExtractor {
+  override def unapply(p: Expression): Option[(Expression, Expression)] = {
+    extractor.unapply(p) match {
+      case Some((a, b)) => Some((b, a))
+      case None => None
+    }
+  }
+}
+
+object GreaterThanExtractor {
+  def apply(left: ExpressionExtractor, right: ExpressionExtractor): BinaryExpressionExtractor = {
+    SwitchLeftRight(LessThanExtractor(right, left))
+  }
+}
+
+object GreaterThanOrEqualExtractor {
+  def apply(left: ExpressionExtractor, right: ExpressionExtractor): BinaryExpressionExtractor = {
+    SwitchLeftRight(LessThanOrEqualExtractor(right, left))
+  }
 }
 
 case class IsNullExtractor(expr: ExpressionExtractor) {

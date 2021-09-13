@@ -106,6 +106,9 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
             17, null, 19, 20).toDF("A")),
       "source [A:Int] with nulls")
 
+  def dataIS: SourceData =
+    SourceData(() => createSourceData(spark.range(10).toDF("A")), "source [A:Int] small")
+
   def dataIIP: SourceData =
     SourceData(
       () =>
@@ -217,6 +220,7 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
     Param(dataI, "A is not null", MinMaxSketch("A"), 10),
     Param(dataI, "!(A is not null)", MinMaxSketch("A"), 10),
     Param(dataI, "A <=> 10", MinMaxSketch("A"), 1),
+    Param(dataI, "A <=> 10", ValueListSketch("A"), 1),
     Param(dataI, "10 <=> A", MinMaxSketch("A"), 1),
     Param(dataI, "A <=> null", MinMaxSketch("A"), 10),
     Param(dataI, "A <25", MinMaxSketch("A"), 3),
@@ -237,9 +241,43 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
     Param(dataI, "!(A < 20)", MinMaxSketch("A"), 8),
     Param(dataI, "not (A not in (1, 2, 3))", MinMaxSketch("A"), 1),
     Param(dataS, "A < 'foo'", MinMaxSketch("A"), 1),
+    Param(dataS, "A in ('foo1', 'foo9')", ValueListSketch("A"), 2),
+    Param(dataS, "A in ('foo1', 'foo5', 'foo9')", BloomFilterSketch("A", 0.01, 10), 3),
+    Param(
+      dataS,
+      "A in ('foo1','goo1','hoo1','i1','j','k','l','m','n','o','p')",
+      BloomFilterSketch("A", 0.01, 10),
+      1),
+    Param(dataI, "A = 10", ValueListSketch("A"), 1),
+    Param(dataI, "10 = A", ValueListSketch("a"), 1),
+    Param(dataIS, "A != 5", ValueListSketch("A"), 9),
+    Param(dataIS, "5 != A", ValueListSketch("A"), 9),
+    Param(dataIN, "a!=9", ValueListSketch("a"), 6),
+    Param(dataIN, "9 != A", ValueListSketch("A"), 6),
+    Param(dataI, "A != 5", ValueListSketch("A"), 10),
+    Param(dataI, "A < 34", ValueListSketch("A"), 4),
+    Param(dataI, "34 > A", ValueListSketch("A"), 4),
+    Param(dataIN, "A < 9", ValueListSketch("a"), 2),
+    Param(dataIN, "9 > A", ValueListSketch("A"), 2),
+    Param(dataI, "A = 10", BloomFilterSketch("A", 0.01, 10), 1),
+    Param(dataI, "A <=> 20", BloomFilterSketch("A", 0.01, 10), 1),
+    Param(dataI, "A <=> null", BloomFilterSketch("A", 0.01, 10), 10),
+    Param(dataI, "A in (2, 3, 5, 7, 11, 13, 17, 19)", BloomFilterSketch("A", 0.001, 10), 2),
+    Param(
+      dataI,
+      "A in (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20)",
+      BloomFilterSketch("A", 0.001, 10),
+      3),
+    Param(
+      dataIN,
+      "A in (0,1,10,100,1000,10000,100000,1000000,-1,-2,-3,-4,-5,-6,-7,-8,null)",
+      BloomFilterSketch("A", 0.001, 10),
+      1),
+    Param(dataI, "A != 10", BloomFilterSketch("A", 0.001, 10), 10),
     Param(dataI, "a = 10", MinMaxSketch("A"), 1),
     Param(dataI, "A = 10", MinMaxSketch("a"), 1),
     Param(dataI, "A in (1, 2, 3, null, 10)", MinMaxSketch("A"), 2),
+    Param(dataI, "A in (2, 3, 10, 99)", ValueListSketch("a"), 3),
     Param(dataI, "A in (10,9,8,7,6,5,4,3,2,1,50,49,48,47,46,45)", MinMaxSketch("A"), 4),
     Param(dataS, "A in ('foo1', 'foo5', 'foo9')", MinMaxSketch("A"), 3),
     Param(
@@ -255,6 +293,21 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
       "A in (x'00',x'01',x'02',x'03',x'04',x'05',x'06',x'07',x'08',x'09',x'0a',x'20202020')",
       MinMaxSketch("A"),
       1),
+    Param(dataI, "A in (10,9,8,7,6,5,4,3,2,1,50,49,48,47,46,45)", ValueListSketch("A"), 4),
+    Param(dataS, "A in ('foo1', 'foo5', 'foo9')", ValueListSketch("A"), 3),
+    Param(
+      dataS,
+      "A in ('foo1','a','b','c','d','e','f','g','h','i','j','k')",
+      ValueListSketch("A"),
+      1),
+    Param(dataD, "A in (1,2,3,15,16,17)", ValueListSketch("A"), 2),
+    Param(dataD, "A in (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)", ValueListSketch("A"), 2),
+    Param(dataB, "A in (x'00000000', x'0001', x'0002', x'05060708')", ValueListSketch("A"), 2),
+    Param(
+      dataB,
+      "A in (x'00',x'01',x'02',x'03',x'04',x'05',x'06',x'07',x'08',x'09',x'0a',x'20202020')",
+      ValueListSketch("A"),
+      1),
     Param(dataI, "A BETWEEN 27 AND 51", MinMaxSketch("A"), 4),
     Param(dataI, "IF(A=1,2,3)=2", MinMaxSketch("A"), 10),
     Param(dataII, "A = 10 OR B = 50", Seq(MinMaxSketch("A"), MinMaxSketch("B")), 2),
@@ -265,6 +318,11 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
     Param(dataII, "A < 30 and B > 20", MinMaxSketch("A"), 3),
     Param(dataII, "A < 30 and b > 40", Seq(MinMaxSketch("a"), MinMaxSketch("B")), 1),
     Param(dataII, "A = 10 and B = 90", Seq(MinMaxSketch("A"), MinMaxSketch("B")), 0),
+    Param(
+      dataII,
+      "A < 31 and B in (1, 2, 11, 12, 21, 22)",
+      Seq(MinMaxSketch("A"), BloomFilterSketch("B", 0.001, 10)),
+      2),
     Param(dataIN, "A is not null", MinMaxSketch("A"), 7),
     Param(dataIN, "!(A <=> null)", MinMaxSketch("A"), 7),
     Param(dataIN, "A = 2", MinMaxSketch("A"), 1),
@@ -300,6 +358,12 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
       8,
       () => spark.udf.register("is_less_than_23", (a: Int) => a < 23)),
     Param(
+      dataI,
+      "!is_less_than_23(A)",
+      ValueListSketch("is_less_than_23(A)"),
+      8,
+      () => spark.udf.register("is_less_than_23", (a: Int) => a < 23)),
+    Param(
       dataII,
       "A < 50 and F(A,B) < 20",
       Seq(MinMaxSketch("A"), MinMaxSketch("F(A,B)")),
@@ -316,7 +380,13 @@ class ApplyDataSkippingIndexTest extends DataSkippingSuite {
       "IF(A IS NULL,NULL,F(A))=2",
       MinMaxSketch("A"),
       10,
-      () => spark.udf.register("F", (a: Int) => a * 2))).foreach {
+      () => spark.udf.register("F", (a: Int) => a * 2)),
+    Param(
+      dataB,
+      "F(A)",
+      ValueListSketch("f(A)"),
+      4,
+      () => spark.udf.register("F", (a: Array[Byte]) => a.sum == 0))).foreach {
     case Param(sourceData, filter, sketches, numExpectedFiles, setup) =>
       test(
         s"applyIndex works as expected for ${sourceData.description}: " +
