@@ -69,33 +69,32 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
     val ExprEqualNullSafe = EqualNullSafeExtractor(exprExtractor, valueExtractor)
     val ExprLessThan = LessThanExtractor(exprExtractor, valueExtractor)
     val ExprLessThanOrEqualTo = LessThanOrEqualExtractor(exprExtractor, valueExtractor)
-    val ExprGreaterThan = LessThanExtractor(valueExtractor, exprExtractor)
-    val ExprGreaterThanOrEqualTo = LessThanOrEqualExtractor(valueExtractor, exprExtractor)
+    val ExprGreaterThan = GreaterThanExtractor(exprExtractor, valueExtractor)
+    val ExprGreaterThanOrEqualTo = GreaterThanOrEqualExtractor(exprExtractor, valueExtractor)
     val ExprIn = InExtractor(exprExtractor, valueExtractor)
     val ExprInSet = InSetExtractor(exprExtractor)
-    Option(predicate)
-      .collect {
-        case ExprIsTrue(_) => max
-        case ExprIsFalse(_) => Not(min)
-        case ExprIsNotNull(_) => IsNotNull(min)
-        case ExprEqualTo(_, v) => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))
-        case ExprEqualNullSafe(_, v) =>
-          Or(IsNull(v), And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v)))
-        case ExprLessThan(_, v) => LessThan(min, v)
-        case ExprLessThanOrEqualTo(_, v) => LessThanOrEqual(min, v)
-        case ExprGreaterThan(v, _) => GreaterThan(max, v)
-        case ExprGreaterThanOrEqualTo(v, _) => GreaterThanOrEqual(max, v)
-        case ExprIn(_, vs) =>
-          vs.map(v => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))).reduceLeft(Or)
-        case ExprInSet(_, vs) =>
-          val sortedValues = Literal(
-            ArrayData.toArrayData(
-              ArrayUtils.toArray(
-                vs.filter(_ != null).toArray.sorted(TypeUtils.getInterpretedOrdering(dataType)),
-                dataType)),
-            ArrayType(dataType, containsNull = false))
-          LessThanOrEqual(ElementAt(sortedValues, SortedArrayLowerBound(sortedValues, min)), max)
-        // TODO: StartsWith, Like with constant prefix
-      }
+    Option(predicate).collect {
+      case ExprIsTrue(_) => max
+      case ExprIsFalse(_) => Not(min)
+      case ExprIsNotNull(_) => IsNotNull(min)
+      case ExprEqualTo(_, v) => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))
+      case ExprEqualNullSafe(_, v) =>
+        Or(IsNull(v), And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v)))
+      case ExprLessThan(_, v) => LessThan(min, v)
+      case ExprLessThanOrEqualTo(_, v) => LessThanOrEqual(min, v)
+      case ExprGreaterThan(_, v) => GreaterThan(max, v)
+      case ExprGreaterThanOrEqualTo(_, v) => GreaterThanOrEqual(max, v)
+      case ExprIn(_, vs) =>
+        vs.map(v => And(LessThanOrEqual(min, v), GreaterThanOrEqual(max, v))).reduceLeft(Or)
+      case ExprInSet(_, vs) =>
+        val sortedValues = Literal(
+          ArrayData.toArrayData(
+            ArrayUtils.toArray(
+              vs.filter(_ != null).toArray.sorted(TypeUtils.getInterpretedOrdering(dataType)),
+              dataType)),
+          ArrayType(dataType, containsNull = false))
+        LessThanOrEqual(ElementAt(sortedValues, SortedArrayLowerBound(sortedValues, min)), max)
+      // TODO: StartsWith, Like with constant prefix
+    }
   }
 }
