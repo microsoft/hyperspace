@@ -27,7 +27,6 @@ import com.microsoft.hyperspace.index.IndexConstants
 import com.microsoft.hyperspace.index.covering.CoveringIndexConfig
 import com.microsoft.hyperspace.index.dataskipping.sketches._
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
-import com.microsoft.hyperspace.shim.ExtractFileSourceScanExecRelation
 
 class DataSkippingIndexIntegrationTest extends DataSkippingSuite with IcebergTestUtils {
   import spark.implicits._
@@ -182,6 +181,59 @@ class DataSkippingIndexIntegrationTest extends DataSkippingSuite with IcebergTes
     checkIndexApplied(query, numParallelism + 1)
   }
 
+  test("BloomFilter index is applied for a filter query (EqualTo).") {
+    withAndWithoutCodegen {
+      withIndex("myind") {
+        val df = createSourceData(spark.range(100).toDF("A"))
+        hs.createIndex(df, DataSkippingIndexConfig("myind", BloomFilterSketch("A", 0.01, 10)))
+        def query: DataFrame = df.filter("A = 1")
+        checkIndexApplied(query, 1)
+      }
+    }
+  }
+
+  test(
+    "BloomFilter index is applied for a filter query (EqualTo) " +
+      "where some source data files has only null values.") {
+    withAndWithoutCodegen {
+      withIndex("myind") {
+        val df = createSourceData(Seq[Integer](1, 2, 3, null, 5, null, 7, 8, 9, null).toDF("A"))
+        hs.createIndex(df, DataSkippingIndexConfig("myind", BloomFilterSketch("A", 0.01, 10)))
+        def query: DataFrame = df.filter("A = 1")
+        checkIndexApplied(query, 1)
+      }
+    }
+  }
+
+  test("BloomFilter index is applied for a filter query (In).") {
+    withAndWithoutCodegen {
+      withIndex("myind") {
+        val df = createSourceData(spark.range(100).toDF("A"))
+        hs.createIndex(df, DataSkippingIndexConfig("myind", BloomFilterSketch("A", 0.01, 10)))
+        def query: DataFrame = df.filter("A in (1, 11, 19)")
+        checkIndexApplied(query, 2)
+      }
+    }
+  }
+
+  test("BloomFilter index support string type.") {
+    withAndWithoutCodegen {
+      withIndex("myind") {
+        val df = createSourceData(('a' to 'z').map(_.toString).toDF("A"))
+        hs.createIndex(df, DataSkippingIndexConfig("myind", BloomFilterSketch("A", 0.01, 10)))
+        def query: DataFrame = df.filter("A = 'a'")
+        checkIndexApplied(query, 1)
+      }
+    }
+  }
+
+  test("BloomFilter index does not support double type.") {
+    val df = createSourceData((0 until 10).map(_.toDouble).toDF("A"))
+    val ex = intercept[SparkException](
+      hs.createIndex(df, DataSkippingIndexConfig("myind", BloomFilterSketch("A", 0.01, 10))))
+    assert(ex.getCause().getMessage().contains("BloomFilter does not support DoubleType"))
+  }
+
   test(
     "DataSkippingIndex works correctly for CSV where the same source data files can be " +
       "interpreted differently.") {
@@ -272,6 +324,20 @@ class DataSkippingIndexIntegrationTest extends DataSkippingSuite with IcebergTes
       createSourceData(spark.range(100, 200).toDF("A"), saveMode = SaveMode.Append)
       def query: DataFrame = spark.read.parquet(dataPath().toString).filter("A = 1 OR A = 123")
       checkIndexApplied(query, 11)
+    }
+  }
+
+  test(
+    "BloomFilter index can be applied without refresh when source files are deleted " +
+      "if hybrid scan is enabled.") {
+    withSQLConf(
+      IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
+      IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "1") {
+      val df = createSourceData(spark.range(100).toDF("A"))
+      hs.createIndex(df, DataSkippingIndexConfig("myind", BloomFilterSketch("A", 0.001, 10)))
+      deleteFile(listFiles(dataPath()).filter(isParquet).head.getPath)
+      def query: DataFrame = spark.read.parquet(dataPath().toString).filter("A in (25, 50, 75)")
+      checkIndexApplied(query, 3)
     }
   }
 

@@ -46,9 +46,9 @@ private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: 
   override def nullable: Boolean = true
 
   override def eval(input: InternalRow): Any = {
-    val arr = left.eval(input).asInstanceOf[ArrayData]
     val value = right.eval(input)
     if (value != null) {
+      val arr = left.eval(input).asInstanceOf[ArrayData]
       val dt = right.dataType
       val n = arr.numElements()
       if (n > 0) {
@@ -77,6 +77,7 @@ private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: 
     val resultCode =
       s"""
          |if (!(${rightGen.isNull})) {
+         |  ${leftGen.code}
          |  int $n = $arr.numElements();
          |  if ($n > 0) {
          |    if (!(${ctx.genGreater(dt, value, firstValueInArr)})) {
@@ -90,7 +91,6 @@ private[dataskipping] case class SortedArrayLowerBound(left: Expression, right: 
          |}
        """.stripMargin
     ev.copy(code = code"""
-      ${leftGen.code}
       ${rightGen.code}
       boolean ${ev.isNull} = true;
       int ${ev.value} = 0;

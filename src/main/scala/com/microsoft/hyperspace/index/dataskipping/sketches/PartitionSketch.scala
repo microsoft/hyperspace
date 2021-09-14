@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.types.DataType
 
 import com.microsoft.hyperspace.index.dataskipping.expressions._
@@ -47,10 +48,10 @@ private[dataskipping] case class PartitionSketch(
     copy(expressions = newExpressions)
   }
 
-  override def aggregateFunctions: Seq[Expression] = {
+  override def aggregateFunctions: Seq[AggregateFunction] = {
     val parser = SparkSession.getActiveSession.get.sessionState.sqlParser
     exprStrings.map { e =>
-      FirstNullSafe(parser.parseExpression(e)).toAggregateExpression()
+      FirstNullSafe(parser.parseExpression(e))
     }
   }
 

@@ -19,12 +19,13 @@ package com.microsoft.hyperspace.index.dataskipping
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{input_file_name, max, min}
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType}
+import org.apache.spark.util.sketch.BloomFilter
 
 import com.microsoft.hyperspace.HyperspaceException
 import com.microsoft.hyperspace.index.IndexConstants
 import com.microsoft.hyperspace.index.dataskipping.sketches._
 
-class DataSkippingIndexConfigTest extends DataSkippingSuite {
+class DataSkippingIndexConfigTest extends DataSkippingSuite with BloomFilterTestUtils {
   test("indexName returns the index name.") {
     val indexConfig = DataSkippingIndexConfig("myIndex", MinMaxSketch("A"))
     assert(indexConfig.indexName === "myIndex")
@@ -83,6 +84,30 @@ class DataSkippingIndexConfigTest extends DataSkippingSuite {
       .groupBy(input_file_name().as(fileNameCol))
       .agg(min("A"), max("A"))
     checkAnswer(indexData, withFileId(expectedSketchValues))
+  }
+
+  test("createIndex works correctly with a BloomFilterSketch.") {
+    val sourceData = createSourceData(spark.range(100).toDF("A"))
+    val indexConfig = DataSkippingIndexConfig("MyIndex", BloomFilterSketch("A", 0.001, 20))
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    assert(index.sketches === Seq(BloomFilterSketch("A", 0.001, 20, Some(LongType))))
+    val valuesAndBloomFilters = indexData
+      .collect()
+      .map { row =>
+        val fileId = row.getAs[Long](IndexConstants.DATA_FILE_NAME_ID)
+        val filePath = fileIdTracker.getIdToFileMapping().toMap.apply(fileId)
+        val values = spark.read.parquet(filePath).collect().toSeq.map(_.getLong(0))
+        val bfData = row.getAs[Any]("BloomFilter_A__0.001__20__0")
+        (values, bfData)
+      }
+    valuesAndBloomFilters.foreach {
+      case (values, bfData) =>
+        val bf = BloomFilter.create(20, 0.001)
+        values.foreach(bf.put)
+        assert(bfData === encodeExternal(bf))
+    }
+    assert(
+      indexData.columns === Seq(IndexConstants.DATA_FILE_NAME_ID, "BloomFilter_A__0.001__20__0"))
   }
 
   test("createIndex resolves column names and data types.") {

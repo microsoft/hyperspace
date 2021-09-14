@@ -17,7 +17,7 @@
 package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.{Max, Min}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateFunction, Max, Min}
 import org.apache.spark.sql.catalyst.util.{ArrayData, TypeUtils}
 import org.apache.spark.sql.types.{ArrayType, DataType}
 
@@ -42,8 +42,9 @@ case class MinMaxSketch(override val expr: String, override val dataType: Option
     copy(expr = newExpr._1, dataType = newExpr._2)
   }
 
-  override def aggregateFunctions: Seq[Expression] =
-    Min(parsedExpr).toAggregateExpression() :: Max(parsedExpr).toAggregateExpression() :: Nil
+  override def aggregateFunctions: Seq[AggregateFunction] = {
+    Min(parsedExpr) :: Max(parsedExpr) :: Nil
+  }
 
   override def convertPredicate(
       predicate: Expression,
