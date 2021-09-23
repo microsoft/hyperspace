@@ -148,4 +148,11 @@ object FilterReasons {
     override def verboseStr: String =
       s"Another candidate index is applied: $appliedIndex"
   }
+
+  case class IneligibleFilterCondition(condition: String) extends FilterReason {
+    override final def codeStr: String = "INELIGIBLE_FILTER_CONDITION"
+    override val args = Seq("condition" -> condition)
+    override def verboseStr: String =
+      s"Ineligible filter condition: $condition"
+  }
 }

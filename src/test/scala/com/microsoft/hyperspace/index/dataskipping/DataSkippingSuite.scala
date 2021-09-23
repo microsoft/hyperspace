@@ -21,6 +21,9 @@ import scala.collection.AbstractIterator
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path, RemoteIterator}
 import org.apache.spark.sql.{DataFrame, QueryTest, SaveMode, SparkSession}
+import org.apache.spark.sql.execution.DataSourceScanExec
+import org.apache.spark.sql.execution.datasources.FilePartition
+import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index._
@@ -52,6 +55,7 @@ trait DataSkippingSuite extends QueryTest with HyperspaceSuite {
 
   after {
     FileUtils.delete(tempDir)
+    spark.catalog.clearCache()
   }
 
   def dataPath(path: String = "T"): Path = new Path(dataPathRoot, path)
@@ -60,16 +64,43 @@ trait DataSkippingSuite extends QueryTest with HyperspaceSuite {
       originalData: DataFrame,
       path: String = "T",
       saveMode: SaveMode = SaveMode.Overwrite,
-      appendedDataOnly: Boolean = false): DataFrame = {
+      appendedDataOnly: Boolean = false,
+      format: String = "parquet"): DataFrame = {
     val p = dataPath(path)
     val oldFiles = listFiles(p).toSet
-    originalData.write.mode(saveMode).parquet(p.toString)
+    originalData.write.mode(saveMode).format(format).save(p.toString)
     updateFileIdTracker(p)
     if (appendedDataOnly) {
       val newFiles = listFiles(p).filterNot(oldFiles.contains)
-      spark.read.parquet(newFiles.map(_.getPath.toString): _*)
+      spark.read.format(format).load(newFiles.map(_.getPath.toString): _*)
     } else {
-      spark.read.parquet(p.toString)
+      spark.read.format(format).load(p.toString)
+    }
+  }
+
+  def createPartitionedSourceData(
+      originalData: DataFrame,
+      partitioningColumns: Seq[String],
+      path: String = "T",
+      saveMode: SaveMode = SaveMode.Overwrite,
+      appendedDataOnly: Boolean = false,
+      format: String = "parquet"): DataFrame = {
+    val p = dataPath(path)
+    val oldFiles = listFiles(p).toSet
+    originalData.write
+      .partitionBy(partitioningColumns: _*)
+      .mode(saveMode)
+      .format(format)
+      .save(p.toString)
+    updateFileIdTracker(p)
+    if (appendedDataOnly) {
+      val newFiles = listFiles(p).filterNot(oldFiles.contains)
+      spark.read
+        .option("basePath", p.toString)
+        .format(format)
+        .load(newFiles.map(_.getPath.toString): _*)
+    } else {
+      spark.read.format(format).load(p.toString)
     }
   }
 
@@ -110,5 +141,55 @@ trait DataSkippingSuite extends QueryTest with HyperspaceSuite {
     fs.delete(path, true)
   }
 
+  def createFile(path: Path, data: Array[Byte]): Unit = {
+    val fs = path.getFileSystem(new Configuration)
+    val out = fs.create(path)
+    out.write(data)
+    out.close()
+  }
+
   def isParquet: FileStatus => Boolean = _.getPath.getName.endsWith(".parquet")
+
+  def withAndWithoutCodegen(testFun: => Unit): Unit = {
+    import org.apache.spark.sql.catalyst.expressions.CodegenObjectFactoryMode._
+    Seq(false, true).foreach { codegenEnabled =>
+      withClue(s"codegenEnabled = $codegenEnabled") {
+        val mode = if (codegenEnabled) CODEGEN_ONLY else NO_CODEGEN
+        withSQLConf(
+          SQLConf.CODEGEN_FACTORY_MODE.key -> mode.toString,
+          SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> codegenEnabled.toString) {
+          testFun
+        }
+      }
+    }
+  }
+
+  def createIndexLogEntry(indexConfig: IndexConfigTrait, sourceData: DataFrame): IndexLogEntry = {
+    val (index, indexData) = indexConfig.createIndex(ctx, sourceData, Map())
+    index.write(ctx, indexData)
+    IndexLogEntry(
+      indexConfig.indexName,
+      index,
+      Content.fromDirectory(indexDataPath, fileIdTracker, new Configuration),
+      Source(
+        SparkPlan(SparkPlan.Properties(
+          Seq(RelationUtils
+            .getRelation(spark, sourceData.queryExecution.optimizedPlan)
+            .createRelationMetadata(fileIdTracker)),
+          null,
+          null,
+          LogicalPlanFingerprint(
+            LogicalPlanFingerprint.Properties(Seq(Signature("sp", "sig"))))))),
+      Map.empty)
+  }
+
+  def numAccessedFiles(df: DataFrame): Int = {
+    df.queryExecution.executedPlan.collect {
+      case scan: DataSourceScanExec =>
+        val files = scan.inputRDDs
+          .flatMap(
+            _.partitions.flatMap(_.asInstanceOf[FilePartition].files.map(_.filePath).toSet))
+        files.length
+    }.sum
+  }
 }

@@ -16,6 +16,8 @@
 
 package com.microsoft.hyperspace.util
 
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.trees.TreeNode
 import org.apache.spark.sql.execution.SimpleMode
@@ -32,5 +34,9 @@ object SparkTestShims {
     def apply(logicalPlan: LogicalPlan): ExplainCommand = {
       ExplainCommand(logicalPlan, SimpleMode)
     }
+  }
+
+  def fromRow[T](encoder: ExpressionEncoder[T], row: InternalRow): T = {
+    encoder.createDeserializer().apply(row)
   }
 }

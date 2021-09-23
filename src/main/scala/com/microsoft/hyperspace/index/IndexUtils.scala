@@ -18,6 +18,7 @@ package com.microsoft.hyperspace.index
 
 import java.net.URLDecoder
 
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.udf
 
@@ -64,4 +65,12 @@ object IndexUtils {
    */
   lazy val decodeInputFileName = udf(
     (p: String) => URLDecoder.decode(p.replace("+", "%2B"), "UTF-8"))
+
+  /**
+   * Returns the path part of the URI-like string.
+   *
+   * This can be used to compare the results of input_file_name() and the paths
+   * stored in FileIdTracker.
+   */
+  lazy val getPath = udf((p: String) => new Path(p).toUri.getPath)
 }

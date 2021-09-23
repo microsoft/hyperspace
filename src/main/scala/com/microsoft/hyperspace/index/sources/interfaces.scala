@@ -106,6 +106,11 @@ trait FileBasedRelation extends SourceRelation {
   def partitionBasePath: Option[String]
 
   /**
+   * Returns [[FileIndex]] for the current relation.
+   */
+  def getOrCreateFileIndex(spark: SparkSession): FileIndex
+
+  /**
    * Creates [[HadoopFsRelation]] based on the current relation.
    *
    * This is mainly used in conjunction with [[createLogicalRelation]].

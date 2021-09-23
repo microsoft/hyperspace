@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.dataskipping.sketch
+package com.microsoft.hyperspace.index.dataskipping.sketches
 
 import scala.reflect.ClassTag
 
