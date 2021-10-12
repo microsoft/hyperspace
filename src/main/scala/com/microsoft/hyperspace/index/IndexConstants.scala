@@ -19,6 +19,10 @@ package com.microsoft.hyperspace.index
 import org.apache.spark.sql.internal.SQLConf
 
 object IndexConstants {
+  // If it is set as false, Hyperspace will not be applied.
+  val HYPERSPACE_APPLY_ENABLED = "spark.hyperspace.apply.enabled"
+  val HYPERSPACE_APPLY_ENABLED_DEFAULT = "true"
+
   val INDEXES_DIR = "indexes"
 
   // Config used for setting the system path, which is considered as a "root" path for Hyperspace;

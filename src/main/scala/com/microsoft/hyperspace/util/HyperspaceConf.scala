@@ -25,6 +25,22 @@ import com.microsoft.hyperspace.index.IndexConstants
  * Helper class to extract Hyperspace-related configs from SparkSession.
  */
 object HyperspaceConf {
+
+  /**
+   * Returns the config value whether hyperspace is enabled or not.
+   */
+  def hyperspaceApplyEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.HYPERSPACE_APPLY_ENABLED,
+        IndexConstants.HYPERSPACE_APPLY_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
+  def setHyperspaceApplyEnabled(spark: SparkSession, apply: Boolean): Unit = {
+    spark.conf.set(IndexConstants.HYPERSPACE_APPLY_ENABLED, apply.toString)
+  }
+
   def hybridScanEnabled(spark: SparkSession): Boolean = {
     spark.conf
       .get(

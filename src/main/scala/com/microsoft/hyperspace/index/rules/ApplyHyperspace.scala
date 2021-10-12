@@ -24,6 +24,7 @@ import com.microsoft.hyperspace.{ActiveSparkSession, Hyperspace}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.IndexLogEntry
 import com.microsoft.hyperspace.telemetry.HyperspaceEventLogging
+import com.microsoft.hyperspace.util.HyperspaceConf
 
 /**
  * Transform the given plan to use Hyperspace indexes.
@@ -42,10 +43,13 @@ object ApplyHyperspace
   private[hyperspace] val disableForIndexMaintenance = new ThreadLocal[Boolean]
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
-    if (disableForIndexMaintenance.get) {
+    if (!HyperspaceConf.hyperspaceApplyEnabled(spark)) {
       return plan
     }
 
+    if (disableForIndexMaintenance.get) {
+      return plan
+    }
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
