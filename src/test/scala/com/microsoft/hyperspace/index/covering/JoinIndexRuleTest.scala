@@ -68,6 +68,7 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
    */
   override def beforeAll(): Unit = {
     super.beforeAll()
+    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
 
     val t1Location =
       new InMemoryFileIndex(spark, Seq(new Path("t1")), Map.empty, Some(t1Schema), NoopCache)
@@ -125,6 +126,16 @@ class JoinIndexRuleTest extends HyperspaceRuleSuite with SQLHelper {
 
     val indexPaths = Seq(getIndexDataFilesPaths("t1i1"), getIndexDataFilesPaths("t2i1")).flatten
     verifyUpdatedIndex(originalPlan, updatedPlan, indexPaths)
+  }
+
+  test("Join rule doesn't update plan if it's broadcast join.") {
+    withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "10241024") {
+      val joinCondition = EqualTo(t1c1, t2c1)
+      val originalPlan =
+        Join(t1ProjectNode, t2ProjectNode, JoinType("inner"), Some(joinCondition))
+      val (updatedPlan, _) = applyJoinIndexRuleHelper(originalPlan)
+      assert(updatedPlan.equals(originalPlan))
+    }
   }
 
   test("Join rule works if indexes exist for case insensitive index and query.") {
