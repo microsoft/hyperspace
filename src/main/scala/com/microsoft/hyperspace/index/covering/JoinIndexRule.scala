@@ -22,6 +22,8 @@ import scala.util.Try
 import org.apache.spark.sql.catalyst.analysis.CleanupAliases
 import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, EqualTo, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan}
+import org.apache.spark.sql.execution.joins.SortMergeJoinExec
+import org.apache.spark.sql.hyperspace.shim.SparkPlannerShim
 
 import com.microsoft.hyperspace.Hyperspace
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
@@ -70,6 +72,13 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
           isJoinConditionSupported(condition)
         }
 
+        val sortMergeJoinCond = withFilterReasonTag(
+          plan,
+          leftAndRightIndexes,
+          FilterReasons.NotEligibleJoin("Not SortMergeJoin")) {
+          isSortMergeJoin(plan)
+        }
+
         val leftPlanLinearCond =
           withFilterReasonTag(
             plan,
@@ -77,6 +86,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
             FilterReasons.NotEligibleJoin("Non linear left child plan")) {
             isPlanLinear(l)
           }
+
         val rightPlanLinearCond =
           withFilterReasonTag(
             plan,
@@ -85,7 +95,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
             isPlanLinear(r)
           }
 
-        if (joinConditionCond && leftPlanLinearCond && rightPlanLinearCond) {
+        if (sortMergeJoinCond && joinConditionCond && leftPlanLinearCond && rightPlanLinearCond) {
           // Set join query context.
           JoinIndexRule.leftRelation.set(left.get)
           JoinIndexRule.rightRelation.set(right.get)
@@ -107,6 +117,11 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
       case _ =>
         Map.empty
     }
+  }
+
+  private def isSortMergeJoin(join: LogicalPlan): Boolean = {
+    val execJoin = new SparkPlannerShim(spark).JoinSelection(join)
+    execJoin.head.isInstanceOf[SortMergeJoinExec]
   }
 
   /**
