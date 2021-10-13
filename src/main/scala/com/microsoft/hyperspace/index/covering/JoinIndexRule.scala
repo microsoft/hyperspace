@@ -121,7 +121,7 @@ object JoinPlanNodeFilter extends QueryPlanIndexFilter {
 
   private def isSortMergeJoin(join: LogicalPlan): Boolean = {
     val execJoin = new SparkPlannerShim(spark).JoinSelection(join)
-    execJoin.seq.head.isInstanceOf[SortMergeJoinExec]
+    execJoin.head.isInstanceOf[SortMergeJoinExec]
   }
 
   /**
