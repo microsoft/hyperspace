@@ -38,44 +38,50 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         idx_config = IndexConfig('idx2', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx2" and state = "ACTIVE" """).count(), 1)
+            """name = "idx2" and state = "ACTIVE" """).count(), 1)
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx2" and state = "DELETED" """).count(), 0)
+            """name = "idx2" and state = "DELETED" """).count(), 0)
         self.hyperspace.deleteIndex("idx2")
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx2" and state = "DELETED" """).count(), 1)
+            """name = "idx2" and state = "DELETED" """).count(), 1)
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx2" and state = "ACTIVE" """).count(), 0)
+            """name = "idx2" and state = "ACTIVE" """).count(), 0)
 
     def test_index_restore(self):
         idx_config = IndexConfig('idx3', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
         self.hyperspace.deleteIndex("idx3")
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx3" and state = "DELETED" """).count(), 1)
+            """name = "idx3" and state = "DELETED" """).count(), 1)
         self.hyperspace.restoreIndex("idx3")
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx3" and state = "ACTIVE" """).count(), 1)
+            """name = "idx3" and state = "ACTIVE" """).count(), 1)
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx3" and state = "DELETED" """).count(), 0)
+            """name = "idx3" and state = "DELETED" """).count(), 0)
 
     def test_index_vacuum(self):
         idx_config = IndexConfig('idx4', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
         self.hyperspace.deleteIndex("idx4")
         self.assertEqual(self.hyperspace.indexes().filter(
-                         """name = "idx4" and state = "DELETED" """).count(), 1)
+            """name = "idx4" and state = "DELETED" """).count(), 1)
         self.hyperspace.vacuumIndex("idx4")
         self.assertEqual(self.hyperspace.indexes().filter("""name = "idx4" """).count(), 0)
 
-    def test_index_refresh(self):
+        # vacuuming of active index leaves the index as active
+        idx_config = IndexConfig('idx5', ['name'], ['age'])
+        self.hyperspace.createIndex(self.df, idx_config)
+        self.assertEqual(self.hyperspace.indexes().filter(
+            """name = "idx5" and state = "ACTIVE" """).count(), 1)
+
+    def test_index_refresh_incremental(self):
         idx_config = IndexConfig('idx1', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
         # Test the inter-op works fine for refreshIndex.
         self.hyperspace.refreshIndex('idx1')
         self.hyperspace.refreshIndex('idx1', 'incremental')
 
-    def test_index_refresh(self):
+    def test_index_refresh_full(self):
         idx_config = IndexConfig('idx1', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)
         # Test the inter-op works fine for optimizeIndex.
@@ -88,6 +94,7 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         # Test the inter-op works fine for "index" API.
         df = self.hyperspace.index('idx1')
         df.show()
+
 
 hyperspace_test = unittest.TestLoader().loadTestsFromTestCase(HyperspaceIndexManagementTests)
 result = unittest.TextTestRunner(verbosity=3).run(hyperspace_test)

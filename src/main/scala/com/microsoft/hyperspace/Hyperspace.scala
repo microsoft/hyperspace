@@ -65,9 +65,10 @@ class Hyperspace(spark: SparkSession) {
   }
 
   /**
-   * Does hard delete of indexes marked as `DELETED`.
+   * Does hard delete of the entire indexes if it is marked as `DELETED`.
+   * Does clean up index (hard delete of the old indexes) if the index is 'ACTIVE'.
    *
-   * @param indexName Name of the index to restore.
+   * @param indexName Name of the index to vacuum.
    */
   def vacuumIndex(indexName: String): Unit = {
     indexManager.vacuum(indexName)

@@ -112,7 +112,7 @@ class IndexLogManagerImplTest extends HyperspaceSuite {
     // find position to insert \0
     val jsonContent = JsonUtils.toJson(sampleIndexLogEntry)
     val sourceIndex = jsonContent.indexOf("\"source\"")
-    val damagedJsonContent = jsonContent.substring(0, sourceIndex + 8) + "\0" + jsonContent
+    val damagedJsonContent = jsonContent.substring(0, sourceIndex + 8) + "\u0000" + jsonContent
       .substring(sourceIndex + 8);
 
     FileUtils.createFile(

@@ -21,6 +21,7 @@ import java.sql.Timestamp
 import scala.collection.mutable
 
 import io.delta.tables.DeltaTable
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, QueryTest}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -28,11 +29,12 @@ import org.apache.spark.sql.delta.files.TahoeLogFileIndex
 import org.apache.spark.sql.execution.datasources._
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
-import com.microsoft.hyperspace.TestUtils.latestIndexLogEntry
+import com.microsoft.hyperspace.TestUtils.{getFileIdTracker, latestIndexLogEntry}
 import com.microsoft.hyperspace.index.IndexConstants.REFRESH_MODE_QUICK
 import com.microsoft.hyperspace.index.plans.logical.IndexHadoopFsRelation
 import com.microsoft.hyperspace.index.sources.delta.DeltaLakeRelation
 import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
 
 class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
   override val indexLocationDirName = "deltaLakeIntegrationTest"
@@ -457,6 +459,100 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
     }
   }
 
+  test("Verify time travel query works well with VacuumIndex.") {
+    withTempPathAsString { path =>
+      import spark.implicits._
+      val df = sampleData.toDF("Date", "RGUID", "Query", "imprs", "clicks")
+      df.write.format("delta").save(path)
+
+      val tsMap = mutable.Map[Long, String]()
+      tsMap.put(0, getSparkFormattedTimestamps(System.currentTimeMillis).head)
+
+      val indexName = "deltaIndex3"
+      val deltaDf = spark.read.format("delta").load(path)
+
+      appendAndRefresh(df, path, indexName, None, tsMap) // delta version 1
+      appendAndRefresh(df, path, indexName, None, tsMap) // delta version 2
+      val indexConfig = IndexConfig(indexName, Seq("clicks"), Seq("Query"))
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        hyperspace.createIndex(deltaDf, indexConfig)
+      }
+
+      withIndex(indexName) {
+        checkExpectedIndexUsed(indexName, path, None, 1)
+
+        withSQLConf(TestConfig.HybridScanEnabled: _*) {
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 3, index log version 1.
+          appendAndRefresh(df, path, indexName, Some("incremental"), tsMap)
+          // delta version 4, index log version 3 (refresh).
+
+          // Without delta table version, the latest log version should be applied.
+          checkExpectedIndexUsed(indexName, path, None, 3)
+          // For delta table version 0, candidate log version is 1.
+          checkExpectedIndexUsed(indexName, path, Some(0, tsMap(1)), 1)
+
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 5, index log version 3.
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 6, index log version 3.
+          appendAndRefresh(df, path, indexName, Some("incremental"), tsMap)
+          // delta version 7, index log version 5 (refresh).
+          hyperspace.optimizeIndex(indexName)
+          // delta version 7, index log version 7 (optimize).
+          appendAndRefresh(df, path, indexName, Some("incremental"), tsMap)
+          // delta version 8, index log version 9 (refresh).
+          hyperspace.optimizeIndex(indexName)
+          // delta version 8, index log version 11 (optimize).
+          appendAndRefresh(df, path, indexName, None, tsMap)
+          // delta version 9, index long version 11.
+
+          val beforeDataFiles = listFiles(path, getFileIdTracker(systemPath, indexConfig))
+          val beforeIndexDataFiles =
+            listFiles(getIndexDataPath(indexName, 0), getFileIdTracker(systemPath, indexConfig))
+
+          // Calling vacuumIndex on active index deletes outdated data and history.
+          hyperspace.vacuumIndex(indexName)
+
+          val afterDataFiles = listFiles(path, getFileIdTracker(systemPath, indexConfig))
+          val afterIndexDataFiles =
+            listFiles(getIndexDataPath(indexName, 0), getFileIdTracker(systemPath, indexConfig))
+
+          // Data files should not affected by vacuum index
+          assert(beforeDataFiles === afterDataFiles)
+          // Two files should be deleted in the version 0 index data directory
+          assert((beforeIndexDataFiles.toSet -- afterIndexDataFiles.toSet).size == 2)
+
+          // These paths should not be deleted
+          val fs = new Path("/").getFileSystem(new Configuration)
+          val shouldExistPath = Seq(0, 5)
+          shouldExistPath.map(idx => {
+            val indexDataPath = getIndexDataPath(indexName, idx)
+            assert(fs.exists(new Path(indexDataPath)))
+          })
+
+          // These path should be deleted
+          val shouldDeletedPath = Seq(1, 2, 3, 4)
+          shouldDeletedPath.map(idx => {
+            val indexDataPath = getIndexDataPath(indexName, idx)
+            assert(!fs.exists(new Path(indexDataPath)))
+          })
+
+          // Whenever index is used, since every history is also vacuumed,
+          // expected index version is always 13 (the last version after vacuum outdated).
+          checkExpectedIndexUsed(indexName, path, None, 13)
+          checkExpectedIndexUsed(indexName, path, Some(1, tsMap(1)), 13)
+          checkExpectedIndexUsed(indexName, path, Some(2, tsMap(2)), 13)
+          checkExpectedIndexUsed(indexName, path, Some(5, tsMap(5)), 13)
+          checkExpectedIndexUsed(indexName, path, Some(6, tsMap(6)), 13)
+          checkExpectedIndexUsed(indexName, path, Some(7, tsMap(7)), 13)
+          checkExpectedIndexUsed(indexName, path, Some(8, tsMap(8)), 13)
+          checkExpectedIndexUsed(indexName, path, Some(9, tsMap(9)), 13)
+        }
+      }
+    }
+  }
+
   test("DeltaLakeRelation.closestIndex should handle indexes without delta versions.") {
     withTempPathAsString { path =>
       import spark.implicits._
@@ -596,4 +692,20 @@ class DeltaLakeIntegrationTest extends QueryTest with HyperspaceSuite {
       expectedPathsSubStr.exists(p.toString.contains(_))) && expectedPathsSubStr.forall(p =>
       rootPaths.exists(_.toString.contains(p)))
   }
+
+  private def listFiles(path: String, fileIdTracker: FileIdTracker): Seq[FileInfo] = {
+    val absolutePath = PathUtils.makeAbsolute(path)
+    val fs = absolutePath.getFileSystem(new Configuration)
+    fs.listStatus(absolutePath)
+      .toSeq
+      .filter(f => DataPathFilter.accept(f.getPath))
+      .map(f => FileInfo(f, fileIdTracker.addFile(f), asFullPath = true))
+  }
+
+  private def getIndexDataPath(indexName: String, idx: Int): String = {
+    val indexBasePath = spark.conf.get("spark.hyperspace.system.path")
+
+    s"${indexBasePath}/${indexName}/${IndexConstants.INDEX_VERSION_DIRECTORY_PREFIX}=${idx}"
+  }
+
 }
