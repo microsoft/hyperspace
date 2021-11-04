@@ -239,16 +239,62 @@ hs.explain(query, verbose = True)
 
 #### Enable Hyperspace
 
-Now that you have created an index that your query can utilize, you can enable Hyperspace and execute your query:
+Now that you have created an index that your query can utilize, you can enable Hyperspace and execute your query.
+There are two ways to enable Hyperspace:
 
-Scala:
-```scala
-spark.enableHyperspace
-query.show
-```
+1. Using Hyperspace extension
 
-Python:
-```python
-Hyperspace.enable(spark)
-query.show()
-```
+    You can start a session with Hyperspace extension.
+    The follows are examples to use Spark™ with Hyperspace.
+
+    spark-submit:
+    ```
+    spark-submit -c spark.sql.extensions=com.microsoft.hyperspace.HyperspaceSparkSessionExtension ...
+    ```
+
+    Scala:
+    ```scala 
+    val spark = SparkSession
+                .builder()
+                .appName("...")
+                .master("...")
+                .config("spark.sql.extensions", "com.microsoft.hyperspace.HyperspaceSparkSessionExtension")
+                .getOrCreate()
+    ```
+
+    Python:
+    ```python
+    from pyspark.sql import SparkSession
+    
+    spark = SparkSession \
+            .builder \
+            .appName("...") \
+            .master("...") \
+            .config("spark.sql.extensions", "com.microsoft.hyperspace.HyperspaceSparkSessionExtension") \
+            .getOrCreate()
+    ```
+
+    Spark configuration file (default: `$SPARK_HOME/conf/spark-defaults.conf`):
+    
+    ```cs
+    # Add the following line to the configuration file.
+    
+    spark.sql.extensions           com.microsoft.hyperspace.HyperspaceSparkSessionExtension
+    ```
+
+
+2. Calling enableHyperspace function explicitly
+
+    By explicitly calling enableHyperspace (for Scala) or Hyperspace.enable (for Python), Spark will use Hyperspace indexes when it is applicable.
+
+    Scala:
+    ```scala
+    spark.enableHyperspace
+    query.show
+    ```
+
+    Python:
+    ```python
+    Hyperspace.enable(spark)
+    query.show()
+    ```
