@@ -38,7 +38,6 @@ import org.apache.spark.sql.catalyst.rules.Rule
  *       .getOrCreate()
  * }}}
  */
-
 class HyperspaceSparkSessionExtension extends (SparkSessionExtensions => Unit) {
 
   /**
@@ -50,7 +49,7 @@ class HyperspaceSparkSessionExtension extends (SparkSessionExtensions => Unit) {
    * it returns a dummy rule that does nothing. It may increase overhead slightly
    * because enableHyperspace is called once for each evaluation of spark plan.
    */
-  private case class DummyRule() extends Rule[LogicalPlan] {
+  private case object DummyRule extends Rule[LogicalPlan] {
     override def apply(plan: LogicalPlan): LogicalPlan = {
       plan
     }
@@ -62,7 +61,7 @@ class HyperspaceSparkSessionExtension extends (SparkSessionExtensions => Unit) {
       // Enable Hyperspace to leverage indexes.
       sparkSession.enableHyperspace()
       // Return a dummy rule to fit in interface of injectOptimizerRule
-      DummyRule()
+      DummyRule
     }
   }
 }

@@ -38,7 +38,11 @@ package object hyperspace {
      */
     def enableHyperspace(): SparkSession = {
       HyperspaceConf.setHyperspaceApplyEnabled(sparkSession, true)
+      addOptimizationsIfNeeded()
+      sparkSession
+    }
 
+    private def addOptimizationsIfNeeded(): Unit = {
       if (!sparkSession.sessionState.experimentalMethods.extraOptimizations.contains(
           ApplyHyperspace)) {
         sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
@@ -49,7 +53,6 @@ package object hyperspace {
         sparkSession.sessionState.experimentalMethods.extraStrategies ++=
           BucketUnionStrategy :: Nil
       }
-      sparkSession
     }
 
     /**
@@ -70,7 +73,7 @@ package object hyperspace {
      *
      * Note that Hyperspace is enabled when:
      * 1) `ApplyHyperspace` exists in extraOptimization
-     * 2) `BucketUnionStrate` exists in BucketUnionStrategy and
+     * 2) `BucketUnionStrate` exists in extraStrategies and
      * 3) `IndexConstants.HYPERSPACE_APPLY_ENABLED` is true.
      *
      * @return true if Hyperspace is enabled or false otherwise.

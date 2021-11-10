@@ -43,13 +43,10 @@ object ApplyHyperspace
   private[hyperspace] val disableForIndexMaintenance = new ThreadLocal[Boolean]
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
-    if (!HyperspaceConf.hyperspaceApplyEnabled(spark)) {
+    if (!HyperspaceConf.hyperspaceApplyEnabled(spark) || disableForIndexMaintenance.get) {
       return plan
     }
 
-    if (disableForIndexMaintenance.get) {
-      return plan
-    }
     val indexManager = Hyperspace
       .getContext(spark)
       .indexCollectionManager
