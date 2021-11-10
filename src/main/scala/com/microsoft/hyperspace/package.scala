@@ -18,6 +18,7 @@ package com.microsoft
 
 import org.apache.spark.sql.SparkSession
 
+import com.microsoft.hyperspace.HyperspaceSparkSessionExtension
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace
 import com.microsoft.hyperspace.util.HyperspaceConf
@@ -38,21 +39,8 @@ package object hyperspace {
      */
     def enableHyperspace(): SparkSession = {
       HyperspaceConf.setHyperspaceApplyEnabled(sparkSession, true)
-      addOptimizationsIfNeeded()
+      HyperspaceSparkSessionExtension.addOptimizationsIfNeeded(sparkSession)
       sparkSession
-    }
-
-    private def addOptimizationsIfNeeded(): Unit = {
-      if (!sparkSession.sessionState.experimentalMethods.extraOptimizations.contains(
-          ApplyHyperspace)) {
-        sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
-          ApplyHyperspace :: Nil
-      }
-      if (!sparkSession.sessionState.experimentalMethods.extraStrategies.contains(
-          BucketUnionStrategy)) {
-        sparkSession.sessionState.experimentalMethods.extraStrategies ++=
-          BucketUnionStrategy :: Nil
-      }
     }
 
     /**

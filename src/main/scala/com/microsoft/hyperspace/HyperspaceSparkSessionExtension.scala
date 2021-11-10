@@ -20,6 +20,9 @@ import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
 
+import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
+import com.microsoft.hyperspace.index.rules.ApplyHyperspace
+
 /**
  * An extension for Spark SQL to activate Hyperspace.
  *
@@ -55,13 +58,27 @@ class HyperspaceSparkSessionExtension extends (SparkSessionExtensions => Unit) {
     }
   }
 
-  type RuleBuilder = SparkSession => Rule[LogicalPlan]
   override def apply(extensions: SparkSessionExtensions): Unit = {
     extensions.injectOptimizerRule { sparkSession =>
       // Enable Hyperspace to leverage indexes.
-      sparkSession.enableHyperspace()
+      HyperspaceSparkSessionExtension.addOptimizationsIfNeeded(sparkSession)
       // Return a dummy rule to fit in interface of injectOptimizerRule
       DummyRule
+    }
+  }
+}
+
+object HyperspaceSparkSessionExtension {
+  def addOptimizationsIfNeeded(sparkSession: SparkSession): Unit = {
+    if (!sparkSession.sessionState.experimentalMethods.extraOptimizations.contains(
+        ApplyHyperspace)) {
+      sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
+        ApplyHyperspace :: Nil
+    }
+    if (!sparkSession.sessionState.experimentalMethods.extraStrategies.contains(
+        BucketUnionStrategy)) {
+      sparkSession.sessionState.experimentalMethods.extraStrategies ++=
+        BucketUnionStrategy :: Nil
     }
   }
 }
