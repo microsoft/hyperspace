@@ -69,6 +69,13 @@ class HyperspaceSparkSessionExtension extends (SparkSessionExtensions => Unit) {
 }
 
 object HyperspaceSparkSessionExtension {
+
+  /**
+   * Add ApplyHyperspace and BucketUnionStrategy into extraOptimization
+   * and extraStrategies, respectively, to make Spark can use Hyperspace.
+   *
+   * @param sparkSession Spark session that will use Hyperspace
+   */
   def addOptimizationsIfNeeded(sparkSession: SparkSession): Unit = {
     if (!sparkSession.sessionState.experimentalMethods.extraOptimizations.contains(
         ApplyHyperspace)) {
