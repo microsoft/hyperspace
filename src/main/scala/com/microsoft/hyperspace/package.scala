@@ -39,7 +39,7 @@ package object hyperspace {
      */
     def enableHyperspace(): SparkSession = {
       HyperspaceConf.setHyperspaceApplyEnabled(sparkSession, true)
-      HyperspaceSparkSessionExtension.addOptimizationsIfNeeded(sparkSession)
+      addOptimizationsIfNeeded()
       sparkSession
     }
 
@@ -71,6 +71,25 @@ package object hyperspace {
       experimentalMethods.extraOptimizations.contains(ApplyHyperspace) &&
       experimentalMethods.extraStrategies.contains(BucketUnionStrategy) &&
       HyperspaceConf.hyperspaceApplyEnabled(sparkSession)
+    }
+
+    /**
+     * Add ApplyHyperspace and BucketUnionStrategy into extraOptimization
+     * and extraStrategies, respectively, to make Spark can use Hyperspace.
+     *
+     * @param sparkSession Spark session that will use Hyperspace
+     */
+    private[hyperspace] def addOptimizationsIfNeeded(): Unit = {
+      if (!sparkSession.sessionState.experimentalMethods.extraOptimizations.contains(
+          ApplyHyperspace)) {
+        sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
+          ApplyHyperspace :: Nil
+      }
+      if (!sparkSession.sessionState.experimentalMethods.extraStrategies.contains(
+          BucketUnionStrategy)) {
+        sparkSession.sessionState.experimentalMethods.extraStrategies ++=
+          BucketUnionStrategy :: Nil
+      }
     }
   }
 }
