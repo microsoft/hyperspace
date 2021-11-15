@@ -61,31 +61,9 @@ class HyperspaceSparkSessionExtension extends (SparkSessionExtensions => Unit) {
   override def apply(extensions: SparkSessionExtensions): Unit = {
     extensions.injectOptimizerRule { sparkSession =>
       // Enable Hyperspace to leverage indexes.
-      HyperspaceSparkSessionExtension.addOptimizationsIfNeeded(sparkSession)
+      sparkSession.addOptimizationsIfNeeded()
       // Return a dummy rule to fit in interface of injectOptimizerRule
       DummyRule
-    }
-  }
-}
-
-object HyperspaceSparkSessionExtension {
-
-  /**
-   * Add ApplyHyperspace and BucketUnionStrategy into extraOptimization
-   * and extraStrategies, respectively, to make Spark can use Hyperspace.
-   *
-   * @param sparkSession Spark session that will use Hyperspace
-   */
-  def addOptimizationsIfNeeded(sparkSession: SparkSession): Unit = {
-    if (!sparkSession.sessionState.experimentalMethods.extraOptimizations.contains(
-        ApplyHyperspace)) {
-      sparkSession.sessionState.experimentalMethods.extraOptimizations ++=
-        ApplyHyperspace :: Nil
-    }
-    if (!sparkSession.sessionState.experimentalMethods.extraStrategies.contains(
-        BucketUnionStrategy)) {
-      sparkSession.sessionState.experimentalMethods.extraStrategies ++=
-        BucketUnionStrategy :: Nil
     }
   }
 }
