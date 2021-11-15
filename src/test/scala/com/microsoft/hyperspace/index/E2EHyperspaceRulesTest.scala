@@ -33,7 +33,7 @@ import com.microsoft.hyperspace.index.dataskipping.DataSkippingIndexConfig
 import com.microsoft.hyperspace.index.dataskipping.sketches.MinMaxSketch
 import com.microsoft.hyperspace.index.execution.BucketUnionStrategy
 import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector}
-import com.microsoft.hyperspace.util.PathUtils
+import com.microsoft.hyperspace.util.{HyperspaceConf, PathUtils}
 
 class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
   private val testDir = inTempDir("e2eTests")
@@ -91,12 +91,16 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
       spark.sessionState.experimentalMethods.extraStrategies
         .containsSlice(expectedOptimizationStrategy))
 
+    // Since applyHyperspace is called before, extraOptimization contains ApplyHyperspace
+    // This behavior has changed according to following discussion:
+    // https://github.com/microsoft/hyperspace/pull/504/files#r740278070
     spark.disableHyperspace()
+    assert(!HyperspaceConf.hyperspaceApplyEnabled(spark))
     assert(
-      !spark.sessionState.experimentalMethods.extraOptimizations
+      spark.sessionState.experimentalMethods.extraOptimizations
         .containsSlice(expectedOptimizationRuleBatch))
     assert(
-      !spark.sessionState.experimentalMethods.extraStrategies
+      spark.sessionState.experimentalMethods.extraStrategies
         .containsSlice(expectedOptimizationStrategy))
   }
 
