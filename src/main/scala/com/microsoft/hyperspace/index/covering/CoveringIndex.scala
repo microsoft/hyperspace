@@ -19,7 +19,6 @@ package com.microsoft.hyperspace.index.covering
 import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.functions.{col, input_file_name}
-import org.apache.spark.sql.hyperspace.utils.StructTypeUtils
 import org.apache.spark.sql.types.StructType
 
 import com.microsoft.hyperspace.index._
@@ -27,31 +26,34 @@ import com.microsoft.hyperspace.index.DataFrameWriterExtensions.Bucketizer
 import com.microsoft.hyperspace.util.ResolverUtils
 import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
 
+/**
+ * CoveringIndex data is stored as bucketed & sorted by indexedColumns so that it can substitute
+ * for a shuffle node in a join query plan or a data scan node in a filter query plan.
+ */
 case class CoveringIndex(
     override val indexedColumns: Seq[String],
     includedColumns: Seq[String],
     schema: StructType,
     numBuckets: Int,
     override val properties: Map[String, String])
-    extends Index {
+    extends CoveringIndexTrait {
 
   override def kind: String = CoveringIndex.kind
 
   override def kindAbbr: String = CoveringIndex.kindAbbr
 
-  override def referencedColumns: Seq[String] = indexedColumns ++ includedColumns
-
   override def withNewProperties(newProperties: Map[String, String]): CoveringIndex = {
     copy(properties = newProperties)
   }
 
-  override def statistics(extended: Boolean = false): Map[String, String] = {
-    simpleStatistics ++ (if (extended) extendedStatistics else Map.empty)
+  protected def copyIndex(
+      indexedCols: Seq[String],
+      includedCols: Seq[String],
+      schema: StructType): CoveringIndex = {
+    copy(indexedColumns = indexedCols, includedColumns = includedCols, schema = schema)
   }
 
-  override def canHandleDeletedFiles: Boolean = hasLineageColumn
-
-  override def write(ctx: IndexerContext, indexData: DataFrame): Unit = {
+  protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode): Unit = {
     // Run job
     val repartitionedIndexData = {
       // We are repartitioning with normalized columns (e.g., flattened nested column).
@@ -65,95 +67,7 @@ case class CoveringIndex(
         ctx.indexDataPath.toString,
         numBuckets,
         indexedColumns,
-        SaveMode.Overwrite)
-  }
-
-  override def optimize(ctx: IndexerContext, indexDataFilesToOptimize: Seq[FileInfo]): Unit = {
-    // Rewrite index using the eligible files to optimize.
-    val indexData = ctx.spark.read.parquet(indexDataFilesToOptimize.map(_.name): _*)
-    val repartitionedIndexData =
-      indexData.repartition(numBuckets, indexedColumns.map(indexData(_)): _*)
-    repartitionedIndexData.write.saveWithBuckets(
-      repartitionedIndexData,
-      ctx.indexDataPath.toString,
-      numBuckets,
-      indexedColumns,
-      SaveMode.Overwrite)
-  }
-
-  override def refreshIncremental(
-      ctx: IndexerContext,
-      appendedSourceData: Option[DataFrame],
-      deletedSourceDataFiles: Seq[FileInfo],
-      indexContent: Content): (CoveringIndex, Index.UpdateMode) = {
-    val updatedIndex = if (appendedSourceData.nonEmpty) {
-      val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
-        CoveringIndex.createIndexData(
-          ctx,
-          appendedSourceData.get,
-          indexedColumns.map(ResolvedColumn(_).name),
-          includedColumns.map(ResolvedColumn(_).name),
-          hasLineageColumn)
-      write(ctx, indexData)
-      copy(
-        indexedColumns = resolvedIndexedColumns.map(_.normalizedName),
-        includedColumns = resolvedIncludedColumns.map(_.normalizedName),
-        schema = schema.merge(indexData.schema))
-    } else {
-      this
-    }
-    if (deletedSourceDataFiles.nonEmpty) {
-      // For an index with lineage, find all the source data files which have been deleted,
-      // and use index records' lineage to mark and remove index entries which belong to
-      // deleted source data files as those entries are no longer valid.
-      val refreshDF = ctx.spark.read
-        .parquet(indexContent.files.map(_.toString): _*)
-        .filter(!col(IndexConstants.DATA_FILE_NAME_ID).isin(deletedSourceDataFiles.map(_.id): _*))
-
-      // Write refreshed data using Append mode if there are index data files from appended files.
-      val writeMode = if (appendedSourceData.nonEmpty) {
-        SaveMode.Append
-      } else {
-        SaveMode.Overwrite
-      }
-      refreshDF.write.saveWithBuckets(
-        refreshDF,
-        ctx.indexDataPath.toString,
-        numBuckets,
-        indexedColumns,
-        writeMode)
-    }
-
-    // If there is no deleted files, there are index data files only for appended data in this
-    // version and we need to add the index data files of previous index version.
-    // Otherwise, as previous index data is rewritten in this version while excluding
-    // indexed rows from deleted files, all necessary index data files exist in this version.
-    val updatedMode = if (deletedSourceDataFiles.isEmpty) {
-      Index.UpdateMode.Merge
-    } else {
-      Index.UpdateMode.Overwrite
-    }
-    (updatedIndex, updatedMode)
-  }
-
-  override def refreshFull(
-      ctx: IndexerContext,
-      sourceData: DataFrame): (CoveringIndex, DataFrame) = {
-    val (indexData, resolvedIndexedColumns, resolvedIncludedColumns) =
-      CoveringIndex.createIndexData(
-        ctx,
-        sourceData,
-        // As indexed & included columns in previousLogEntry are resolved & prefixed names,
-        // need to remove the prefix to resolve with the dataframe for refresh.
-        indexedColumns.map(ResolvedColumn(_).name),
-        includedColumns.map(ResolvedColumn(_).name),
-        hasLineageColumn)
-    (
-      copy(
-        indexedColumns = resolvedIndexedColumns.map(_.normalizedName),
-        includedColumns = resolvedIncludedColumns.map(_.normalizedName),
-        schema = indexData.schema),
-      indexData)
+        mode)
   }
 
   override def equals(o: Any): Boolean =
@@ -170,22 +84,21 @@ case class CoveringIndex(
     (indexedColumns, includedColumns, numBuckets)
   }
 
-  def bucketSpec: BucketSpec =
-    BucketSpec(
-      numBuckets = numBuckets,
-      bucketColumnNames = indexedColumns,
-      sortColumnNames = indexedColumns)
+  def bucketSpec: Option[BucketSpec] =
+    Some(
+      BucketSpec(
+        numBuckets = numBuckets,
+        bucketColumnNames = indexedColumns,
+        sortColumnNames = indexedColumns))
 
-  def hasLineageColumn: Boolean = IndexUtils.hasLineageColumn(properties)
-
-  private def simpleStatistics: Map[String, String] = {
+  protected def simpleStatistics: Map[String, String] = {
     Map(
       "includedColumns" -> includedColumns.mkString(", "),
       "numBuckets" -> numBuckets.toString,
       "schema" -> schema.json)
   }
 
-  private def extendedStatistics: Map[String, String] = {
+  protected def extendedStatistics: Map[String, String] = {
     Map("hasLineage" -> hasLineageColumn.toString)
   }
 }
@@ -211,7 +124,7 @@ object CoveringIndex {
    * case-insensitive and a column name "Foo.BaR" is given, and the schema is
    * "root |-- foo |-- bar: integer", a resolved column name would be "foo.bar".
    * This step is necessary to make the index work regardless of the current
-   * case-sensitivity setting. Normalization is to supporte nested columns.
+   * case-sensitivity setting. Normalization is to support nested columns.
    * Nested columns in the source data is stored as a normal column in the
    * index data.
    *
