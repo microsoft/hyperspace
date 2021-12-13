@@ -16,8 +16,6 @@
 
 package com.microsoft.hyperspace.index.covering
 
-import java.util.Locale
-
 import org.apache.spark.sql.DataFrame
 
 import com.microsoft.hyperspace.Hyperspace
@@ -40,54 +38,7 @@ case class CoveringIndexConfig(
     override val indexName: String,
     indexedColumns: Seq[String],
     includedColumns: Seq[String] = Seq())
-    extends IndexConfigTrait {
-  if (indexName.isEmpty || indexedColumns.isEmpty) {
-    throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")
-  }
-
-  val lowerCaseIndexedColumns = toLowerCase(indexedColumns)
-  val lowerCaseIncludedColumns = toLowerCase(includedColumns)
-  val lowerCaseIncludedColumnsSet = lowerCaseIncludedColumns.toSet
-
-  if (lowerCaseIndexedColumns.toSet.size < lowerCaseIndexedColumns.size) {
-    throw new IllegalArgumentException("Duplicate indexed column names are not allowed.")
-  }
-
-  if (lowerCaseIncludedColumnsSet.size < lowerCaseIncludedColumns.size) {
-    throw new IllegalArgumentException("Duplicate included column names are not allowed.")
-  }
-
-  for (indexedColumn <- lowerCaseIndexedColumns) {
-    if (lowerCaseIncludedColumns.contains(indexedColumn)) {
-      throw new IllegalArgumentException(
-        "Duplicate column names in indexed/included columns are not allowed.")
-    }
-  }
-
-  override def equals(that: Any): Boolean = {
-    that match {
-      case CoveringIndexConfig(thatIndexName, thatIndexedColumns, thatIncludedColumns) =>
-        indexName.equalsIgnoreCase(thatIndexName) &&
-          lowerCaseIndexedColumns.equals(toLowerCase(thatIndexedColumns)) &&
-          lowerCaseIncludedColumnsSet.equals(toLowerCase(thatIncludedColumns).toSet)
-      case _ => false
-    }
-  }
-
-  override def hashCode(): Int = {
-    lowerCaseIndexedColumns.hashCode + lowerCaseIncludedColumnsSet.hashCode
-  }
-
-  override def toString: String = {
-    val indexedColumnNames = lowerCaseIndexedColumns.mkString(", ")
-    val includedColumnNames = lowerCaseIncludedColumns.mkString(", ")
-    s"[indexName: $indexName; indexedColumns: $indexedColumnNames; " +
-      s"includedColumns: $includedColumnNames]"
-  }
-
-  private def toLowerCase(seq: Seq[String]): Seq[String] = seq.map(_.toLowerCase(Locale.ROOT))
-
-  override def referencedColumns: Seq[String] = indexedColumns ++ includedColumns
+    extends CoveringIndexConfigTrait {
 
   override def createIndex(
       ctx: IndexerContext,
