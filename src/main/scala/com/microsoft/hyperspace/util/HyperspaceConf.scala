@@ -85,6 +85,14 @@ object HyperspaceConf {
       .toBoolean
   }
 
+  def joinV2RuleEnabled(spark: SparkSession): Boolean = {
+    spark.conf
+      .get(
+        IndexConstants.INDEX_JOIN_V2_RULE_ENABLED,
+        IndexConstants.INDEX_JOIN_V2_RULE_ENABLED_DEFAULT)
+      .toBoolean
+  }
+
   def numBucketsForIndex(spark: SparkSession): Int = {
     getConfStringWithMultipleKeys(
       spark,

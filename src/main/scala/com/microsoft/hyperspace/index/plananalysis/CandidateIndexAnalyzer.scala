@@ -24,7 +24,7 @@ import org.apache.spark.sql.hyperspace.utils.DataFrameUtils
 import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index.{IndexLogEntry, IndexLogEntryTags}
-import com.microsoft.hyperspace.index.rules.{CandidateIndexCollector, ScoreBasedIndexPlanOptimizer}
+import com.microsoft.hyperspace.index.rules.{ApplyHyperspace, CandidateIndexCollector, ScoreBasedIndexPlanOptimizer}
 
 object CandidateIndexAnalyzer extends Logging {
   def whyNotIndexString(
@@ -331,7 +331,8 @@ object CandidateIndexAnalyzer extends Logging {
     try {
       prepareTagsForAnalysis(indexes)
       val candidateIndexes = CandidateIndexCollector.apply(plan, indexes)
-      val transformedPlan = new ScoreBasedIndexPlanOptimizer().apply(plan, candidateIndexes)
+      val transformedPlan = new ScoreBasedIndexPlanOptimizer(ApplyHyperspace.availableRules)
+        .apply(plan, candidateIndexes)
       (
         transformedPlan,
         indexes

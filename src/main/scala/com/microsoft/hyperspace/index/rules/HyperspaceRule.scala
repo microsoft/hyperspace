@@ -66,7 +66,7 @@ trait HyperspaceRule extends ActiveSparkSession {
 
     val applicableIndexes = filtersOnQueryPlan
       .foldLeft(candidateIndexes) { (pti, filter) =>
-        filter(plan, pti)
+        filter(plan, pti).filterNot(_._2.isEmpty)
       }
 
     if (applicableIndexes.nonEmpty) {
