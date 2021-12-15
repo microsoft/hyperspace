@@ -21,9 +21,9 @@ import java.util.Locale
 import com.microsoft.hyperspace.index._
 
 trait CoveringIndexConfigTrait extends IndexConfigTrait {
-  val indexName: String
-  val indexedColumns: Seq[String]
-  val includedColumns: Seq[String]
+  def indexName: String
+  def indexedColumns: Seq[String]
+  def includedColumns: Seq[String]
 
   if (indexName.isEmpty || indexedColumns.isEmpty) {
     throw new IllegalArgumentException("Empty index name or indexed columns are not allowed.")

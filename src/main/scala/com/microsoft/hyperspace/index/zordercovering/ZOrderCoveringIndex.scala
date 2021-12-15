@@ -31,8 +31,8 @@ import com.microsoft.hyperspace.util.HyperspaceConf
  */
 case class ZOrderCoveringIndex(
     override val indexedColumns: Seq[String],
-    includedColumns: Seq[String],
-    schema: StructType,
+    override val includedColumns: Seq[String],
+    override val schema: StructType,
     approxBytesPerPartition: Long,
     override val properties: Map[String, String])
     extends CoveringIndexTrait {
@@ -94,7 +94,7 @@ case class ZOrderCoveringIndex(
     resMaps.head ++ resMaps.last
   }
 
-  protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode): Unit = {
+  override protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode): Unit = {
     val relation = RelationUtils.getRelation(ctx.spark, indexData.queryExecution.optimizedPlan)
     val numPartitions = (relation.allFileSizeInBytes / approxBytesPerPartition).toInt.max(2)
 
@@ -150,7 +150,7 @@ case class ZOrderCoveringIndex(
     }
   }
 
-  protected def copyIndex(
+  override protected def copyIndex(
       indexedCols: Seq[String],
       includedCols: Seq[String],
       schema: StructType): ZOrderCoveringIndex = {
@@ -171,11 +171,11 @@ case class ZOrderCoveringIndex(
     (indexedColumns, includedColumns)
   }
 
-  protected def simpleStatistics: Map[String, String] = {
+  override protected def simpleStatistics: Map[String, String] = {
     Map("includedColumns" -> includedColumns.mkString(", "), "schema" -> schema.json)
   }
 
-  protected def extendedStatistics: Map[String, String] = {
+  override protected def extendedStatistics: Map[String, String] = {
     Map("hasLineage" -> hasLineageColumn.toString)
   }
 }

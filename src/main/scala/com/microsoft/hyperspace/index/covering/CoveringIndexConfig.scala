@@ -36,8 +36,8 @@ import com.microsoft.hyperspace.util.HyperspaceConf
  */
 case class CoveringIndexConfig(
     override val indexName: String,
-    indexedColumns: Seq[String],
-    includedColumns: Seq[String] = Seq())
+    override val indexedColumns: Seq[String],
+    override val includedColumns: Seq[String] = Seq())
     extends CoveringIndexConfigTrait {
 
   override def createIndex(
