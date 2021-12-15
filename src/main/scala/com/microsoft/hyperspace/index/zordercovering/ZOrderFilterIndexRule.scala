@@ -14,52 +14,23 @@
  * limitations under the License.
  */
 
-package com.microsoft.hyperspace.index.covering
+package com.microsoft.hyperspace.index.zordercovering
 
-import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import com.microsoft.hyperspace.index.IndexLogEntryTags
+import com.microsoft.hyperspace.index.covering.{CoveringIndexRuleUtils, FilterPlanNodeFilter}
 import com.microsoft.hyperspace.index.plananalysis.FilterReasons
-import com.microsoft.hyperspace.index.rules._
+import com.microsoft.hyperspace.index.rules.{HyperspaceRule, IndexRankFilter, IndexTypeFilter, QueryPlanIndexFilter, RuleUtils}
 import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, PlanToSelectedIndexMap}
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
-
-/**
- * FilterPlanNodeFilter filters indexes out if
- *   1) the given plan is not eligible filter plan node.
- *   2) the source plan of index is not part of the filter plan.
- */
-object FilterPlanNodeFilter extends QueryPlanIndexFilter {
-  override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
-    if (candidateIndexes.isEmpty) {
-      return Map.empty
-    }
-
-    // FilterPlanNodeFilter looks for below patterns, in ordered manner:
-    //  Pattern-1: Scan -> Filter -> Project
-    //  Pattern-2: Scan -> Filter
-    // Pattern-2 covers the case where project node is eliminated or not present.
-    // An example is when all columns are selected.
-    plan match {
-      case Project(_, Filter(_: Expression, ExtractRelation(relation)))
-          if !RuleUtils.isIndexApplied(relation) =>
-        candidateIndexes.filterKeys(relation.plan.equals(_))
-      case Filter(_: Expression, ExtractRelation(relation))
-          if !RuleUtils.isIndexApplied(relation) =>
-        candidateIndexes.filterKeys(relation.plan.equals(_))
-      case _ =>
-        Map.empty
-    }
-  }
-}
 
 /**
  * FilterColumnFilter filters indexes out if
  *   1) an index doesn't have all required output columns.
  *   2) filter condition doesn't have the first indexed column of the given index.
  */
-object FilterColumnFilter extends QueryPlanIndexFilter {
+object ZOrderFilterColumnFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
     if (candidateIndexes.isEmpty || candidateIndexes.size != 1) {
       return Map.empty
@@ -68,7 +39,7 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
     val (projectColumnNames, filterColumnNames) = RuleUtils.getProjectAndFilterColumns(plan)
 
     // Filter candidate indexes if:
-    //  1. Filter predicate's columns include the first 'indexed' column of the index.
+    //  1. Filter predicate's columns include any of 'indexed' columns of the index.
     //  2. The index covers all columns from the filter predicate and output columns list.
     val (rel, indexes) = candidateIndexes.head
     val filteredIndexes =
@@ -76,12 +47,12 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
         withFilterReasonTag(
           plan,
           index,
-          FilterReasons.NoFirstIndexedColCond(
-            index.derivedDataset.indexedColumns.head,
-            filterColumnNames.mkString(","))) {
-          ResolverUtils
-            .resolve(spark, index.derivedDataset.indexedColumns.head, filterColumnNames)
-            .isDefined
+          FilterReasons.IneligibleFilterCondition("No indexed column in filter condition")) {
+          index.derivedDataset.indexedColumns.exists(
+            col =>
+              ResolverUtils
+                .resolve(spark, col, filterColumnNames)
+                .isDefined)
         } &&
         withFilterReasonTag(
           plan,
@@ -105,7 +76,7 @@ object FilterColumnFilter extends QueryPlanIndexFilter {
 /**
  * IndexRankFilter selects the best applicable index.
  */
-object FilterRankFilter extends IndexRankFilter {
+object ZOrderFilterRankFilter extends IndexRankFilter {
   override def apply(
       plan: LogicalPlan,
       applicableIndexes: PlanToIndexesMap): PlanToSelectedIndexMap = {
@@ -113,8 +84,11 @@ object FilterRankFilter extends IndexRankFilter {
       || applicableIndexes.head._2.isEmpty) {
       Map.empty
     } else {
-      val relation = RuleUtils.getRelation(spark, plan).get
-      val selected = FilterIndexRanker.rank(spark, relation.plan, applicableIndexes.head._2).get
+      // TODO Enhance rank algorithm for z-order covering index. Currently, we pick an index
+      //  with the least number of indexed column which might have a better min/max distribution
+      //  for data skipping. However, apparently it is not the best.
+      //  For example, a high cardinality indexed column could be better for data skipping.
+      val selected = applicableIndexes.head._2.minBy(_.indexedColumns.length)
       setFilterReasonTagForRank(plan, applicableIndexes.head._2, selected)
       Map(applicableIndexes.head._1 -> selected)
     }
@@ -122,15 +96,15 @@ object FilterRankFilter extends IndexRankFilter {
 }
 
 /**
- * FilterIndexRule looks for opportunities in a logical plan to replace
- * a relation with an available hash partitioned index according to columns in
- * filter predicate.
+ * ZOrderFilterIndexRule looks for opportunities in a logical plan to replace
+ * a relation with an available z-ordered index according to columns in filter predicate.
  */
-object FilterIndexRule extends HyperspaceRule {
+object ZOrderFilterIndexRule extends HyperspaceRule {
   override val filtersOnQueryPlan: Seq[QueryPlanIndexFilter] =
-    IndexTypeFilter[CoveringIndex]() :: FilterPlanNodeFilter :: FilterColumnFilter :: Nil
+    IndexTypeFilter[ZOrderCoveringIndex]() :: FilterPlanNodeFilter ::
+      ZOrderFilterColumnFilter :: Nil
 
-  override val indexRanker: IndexRankFilter = FilterRankFilter
+  override val indexRanker: IndexRankFilter = ZOrderFilterRankFilter
 
   override def applyIndex(plan: LogicalPlan, indexes: PlanToSelectedIndexMap): LogicalPlan = {
     if (indexes.isEmpty || (indexes.size != 1)) {
@@ -154,6 +128,7 @@ object FilterIndexRule extends HyperspaceRule {
     }
 
     val candidateIndex = indexes.head._2
+    // Filter index rule
     val relation = RuleUtils.getRelation(spark, plan).get
     val commonBytes = candidateIndex
       .getTagValue(relation.plan, IndexLogEntryTags.COMMON_SOURCE_SIZE_IN_BYTES)
@@ -169,6 +144,7 @@ object FilterIndexRule extends HyperspaceRule {
 
     // TODO: Enhance scoring function.
     //  See https://github.com/microsoft/hyperspace/issues/444
-    (50 * (commonBytes.toFloat / relation.allFileSizeInBytes)).round
+    // ZOrderCoveringIndex should be prior to CoveringIndex for a filter query.
+    (60 * (commonBytes.toFloat / relation.allFileSizeInBytes)).round
   }
 }
