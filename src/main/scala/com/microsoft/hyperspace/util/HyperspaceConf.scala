@@ -123,11 +123,11 @@ object HyperspaceConf {
   }
 
   object ZOrderCovering {
-    def approxSourceBytesPerPartition(spark: SparkSession): Long = {
+    def targetSourceBytesPerPartition(spark: SparkSession): Long = {
       spark.conf
         .get(
-          IndexConstants.INDEX_ZORDER_APPROX_SOURCE_BYTES_PER_PARTITION,
-          IndexConstants.INDEX_ZORDER_APPROX_SOURCE_BYTES_PER_PARTITION_DEFAULT)
+          IndexConstants.INDEX_ZORDER_TARGET_SOURCE_BYTES_PER_PARTITION,
+          IndexConstants.INDEX_ZORDER_TARGET_SOURCE_BYTES_PER_PARTITION_DEFAULT)
         .toLong
     }
 

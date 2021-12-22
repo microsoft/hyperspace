@@ -26,9 +26,12 @@ import com.microsoft.hyperspace.index.rules.ApplyHyperspace.{PlanToIndexesMap, P
 import com.microsoft.hyperspace.util.{HyperspaceConf, ResolverUtils}
 
 /**
- * FilterColumnFilter filters indexes out if
+ * ZOrderFilterColumnFilter filters indexes out if
  *   1) an index doesn't have all required output columns.
- *   2) filter condition doesn't have the first indexed column of the given index.
+ *   2) the filter condition doesn't include any of indexed columns of the index.
+ *
+ * The only difference between FilterColumnFilter for CoveringIndex is allowing all indexed columns
+ * in the filter condition, not just the first indexed column.
  */
 object ZOrderFilterColumnFilter extends QueryPlanIndexFilter {
   override def apply(plan: LogicalPlan, candidateIndexes: PlanToIndexesMap): PlanToIndexesMap = {
@@ -39,7 +42,7 @@ object ZOrderFilterColumnFilter extends QueryPlanIndexFilter {
     val (projectColumnNames, filterColumnNames) = RuleUtils.getProjectAndFilterColumns(plan)
 
     // Filter candidate indexes if:
-    //  1. Filter predicate's columns include any of 'indexed' columns of the index.
+    //  1. Filter predicate's columns include any of indexed columns of the index.
     //  2. The index covers all columns from the filter predicate and output columns list.
     val (rel, indexes) = candidateIndexes.head
     val filteredIndexes =

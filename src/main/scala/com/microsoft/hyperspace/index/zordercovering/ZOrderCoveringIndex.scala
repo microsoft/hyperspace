@@ -33,7 +33,7 @@ case class ZOrderCoveringIndex(
     override val indexedColumns: Seq[String],
     override val includedColumns: Seq[String],
     override val schema: StructType,
-    approxBytesPerPartition: Long,
+    targetBytesPerPartition: Long,
     override val properties: Map[String, String])
     extends CoveringIndexTrait {
 
@@ -94,9 +94,12 @@ case class ZOrderCoveringIndex(
     resMaps.head ++ resMaps.last
   }
 
-  override protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode): Unit = {
+  override protected def write(
+      ctx: IndexerContext,
+      indexData: DataFrame,
+      mode: SaveMode): Unit = {
     val relation = RelationUtils.getRelation(ctx.spark, indexData.queryExecution.optimizedPlan)
-    val numPartitions = (relation.allFileSizeInBytes / approxBytesPerPartition).toInt.max(2)
+    val numPartitions = (relation.allFileSizeInBytes / targetBytesPerPartition).toInt.max(2)
 
     if (indexedColumns.size == 1) {
       val repartitionedIndexDataFrame = {

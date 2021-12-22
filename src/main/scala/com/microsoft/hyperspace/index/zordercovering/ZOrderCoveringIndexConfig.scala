@@ -53,7 +53,7 @@ case class ZOrderCoveringIndexConfig(
       resolvedIndexedColumns.map(_.normalizedName),
       resolvedIncludedColumns.map(_.normalizedName),
       indexData.schema,
-      HyperspaceConf.ZOrderCovering.approxSourceBytesPerPartition(ctx.spark),
+      HyperspaceConf.ZOrderCovering.targetSourceBytesPerPartition(ctx.spark),
       properties)
     (index, indexData)
   }
