@@ -25,7 +25,8 @@ import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, InMemoryFil
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig}
 import com.microsoft.hyperspace.actions.Constants
 import com.microsoft.hyperspace.index._
-import com.microsoft.hyperspace.index.covering.{FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.covering.{CoveringIndexConfig, FilterIndexRule, JoinIndexRule}
+import com.microsoft.hyperspace.index.zordercovering.{ZOrderCoveringIndexConfig, ZOrderFilterIndexRule}
 
 class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
   private val testDir = inTempDir("scoreBasedIndexPlanOptimizerTest")
@@ -133,6 +134,53 @@ class ScoreBasedIndexPlanOptimizerTest extends QueryTest with HyperspaceSuite {
             assert(actual.equals(expectedOutput), actual)
           }
         }
+      }
+    }
+  }
+
+  test("Verify ZOrderFilterIndexRule is prior to FilterIndexRule.") {
+    withTempPathAsString { testPath =>
+      withSQLConf(IndexConstants.INDEX_LINEAGE_ENABLED -> "true") {
+        import spark.implicits._
+        val zOrderIndexConfig =
+          ZOrderCoveringIndexConfig("zindex", Seq("c3"), Seq("c4", "c1"))
+        val coveringIndexConfig = CoveringIndexConfig("cindex", Seq("c3"), Seq("c4", "c1"))
+        SampleData.testData
+          .toDF("c1", "c2", "c3", "c4", "c5")
+          .limit(10)
+          .write
+          .parquet(testPath)
+        val df = spark.read.load(testPath)
+
+        // Create indexes.
+        hyperspace.createIndex(df, zOrderIndexConfig)
+        hyperspace.createIndex(df, coveringIndexConfig)
+
+        def query(): DataFrame =
+          spark.read.parquet(testPath).filter("c3 >= 'facebook'").select("c3", "c1")
+
+        // For covering index, the score is 50.
+        // For z-order covering index, the score is 60.
+        val plan = query().queryExecution.optimizedPlan
+        val allIndexes = IndexCollectionManager(spark).getIndexes(Seq(Constants.States.ACTIVE))
+        val candidateIndexes = CandidateIndexCollector.apply(plan, allIndexes)
+        assert(candidateIndexes.size == 1) // 1 source relation
+        assert(candidateIndexes.head._2.size == 2) // both indexes
+
+        val (_, coveringIndexScore) = FilterIndexRule.apply(
+          plan,
+          candidateIndexes.map { kv =>
+            (kv._1, Seq(kv._2.find(idx => idx.name.equals("cindex")).get))
+          })
+        val (_, zOrderIndexScore) = ZOrderFilterIndexRule.apply(
+          plan,
+          candidateIndexes.map { kv =>
+            (kv._1, Seq(kv._2.find(idx => idx.name.equals("zindex")).get))
+          })
+        assert(coveringIndexScore == 50)
+        assert(zOrderIndexScore == 60)
+
+        verifyIndexUsage(query, getIndexFilesPath(zOrderIndexConfig.indexName))
       }
     }
   }

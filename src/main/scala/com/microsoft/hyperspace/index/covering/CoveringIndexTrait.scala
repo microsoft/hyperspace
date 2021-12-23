@@ -30,8 +30,8 @@ import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
  * slice of source data including indexedColumns and includedColumns.
  */
 trait CoveringIndexTrait extends Index {
-  val schema: StructType
-  val includedColumns: Seq[String]
+  def schema: StructType
+  def includedColumns: Seq[String]
   def bucketSpec: Option[BucketSpec]
   protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode)
   protected def copyIndex(

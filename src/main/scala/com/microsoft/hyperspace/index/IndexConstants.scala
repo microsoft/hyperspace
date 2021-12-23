@@ -56,6 +56,23 @@ object IndexConstants {
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC = "spark.hyperspace.index.filterRule.useBucketSpec"
   val INDEX_FILTER_RULE_USE_BUCKET_SPEC_DEFAULT = "false"
 
+  // Config to determine max file size for ZOrderCoveringIndex.
+  // It's an approximate value as it's based on the summation of size of source files
+  // which can vary on file format and compression rates.
+  val INDEX_ZORDER_TARGET_SOURCE_BYTES_PER_PARTITION =
+    "spark.hyperspace.index.zorder.targetSourceBytesPerPartition"
+  val INDEX_ZORDER_TARGET_SOURCE_BYTES_PER_PARTITION_DEFAULT = "1073741824" // 1G
+
+  // If enabled, Z-address will be calculated using percentile number for numeric column types
+  // instead of actual column value. It can mitigate skewed data issue. It is disabled by default
+  // as collecting quantiles takes longer than getting only min/max values.
+  val INDEX_ZORDER_QUANTILE_ENABLED = "spark.hyperspace.index.zorder.quantile.enabled"
+  val INDEX_ZORDER_QUANTILE_ENABLED_DEFAULT = "false"
+
+  // relativeError value when collecting approximate quantiles for numeric columns.
+  val INDEX_ZORDER_QUANTILE_RELATIVE_ERROR = "spark.hyperspace.index.zorder.quantile.relativeError"
+  val INDEX_ZORDER_QUANTILE_RELATIVE_ERROR_DEFAULT = "0.01"
+
   // TODO: Remove dev config when nested column is fully supported.
   val DEV_NESTED_COLUMN_ENABLED = "spark.hyperspace.dev.index.nestedColumn.enabled"
   val DEV_NESTED_COLUMN_ENABLED_DEFAULT = "false"

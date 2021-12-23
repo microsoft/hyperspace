@@ -32,8 +32,8 @@ import com.microsoft.hyperspace.util.ResolverUtils.ResolvedColumn
  */
 case class CoveringIndex(
     override val indexedColumns: Seq[String],
-    includedColumns: Seq[String],
-    schema: StructType,
+    override val includedColumns: Seq[String],
+    override val schema: StructType,
     numBuckets: Int,
     override val properties: Map[String, String])
     extends CoveringIndexTrait {
@@ -46,14 +46,14 @@ case class CoveringIndex(
     copy(properties = newProperties)
   }
 
-  protected def copyIndex(
+  override protected def copyIndex(
       indexedCols: Seq[String],
       includedCols: Seq[String],
       schema: StructType): CoveringIndex = {
     copy(indexedColumns = indexedCols, includedColumns = includedCols, schema = schema)
   }
 
-  protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode): Unit = {
+  override protected def write(ctx: IndexerContext, indexData: DataFrame, mode: SaveMode): Unit = {
     // Run job
     val repartitionedIndexData = {
       // We are repartitioning with normalized columns (e.g., flattened nested column).
@@ -84,21 +84,21 @@ case class CoveringIndex(
     (indexedColumns, includedColumns, numBuckets)
   }
 
-  def bucketSpec: Option[BucketSpec] =
+  override def bucketSpec: Option[BucketSpec] =
     Some(
       BucketSpec(
         numBuckets = numBuckets,
         bucketColumnNames = indexedColumns,
         sortColumnNames = indexedColumns))
 
-  protected def simpleStatistics: Map[String, String] = {
+  override protected def simpleStatistics: Map[String, String] = {
     Map(
       "includedColumns" -> includedColumns.mkString(", "),
       "numBuckets" -> numBuckets.toString,
       "schema" -> schema.json)
   }
 
-  protected def extendedStatistics: Map[String, String] = {
+  override protected def extendedStatistics: Map[String, String] = {
     Map("hasLineage" -> hasLineageColumn.toString)
   }
 }
