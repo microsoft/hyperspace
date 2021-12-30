@@ -1,6 +1,6 @@
 from .hyperspace import Hyperspace
-from .indexconfig import CoveringIndexConfig, IndexConfig
+from .indexconfig import CoveringIndexConfig, ZOrderCoveringIndexConfig, IndexConfig
 
 __all__ = [
-    'Hyperspace', 'CoveringIndexConfig', 'IndexConfig'
+    'Hyperspace', 'CoveringIndexConfig', 'ZOrderCoveringIndexConfig', 'IndexConfig'
 ]

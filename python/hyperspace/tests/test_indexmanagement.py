@@ -34,6 +34,13 @@ class HyperspaceIndexManagementTests(HyperspaceTestCase):
         self.hyperspace.createIndex(self.df, idx_config)
         self.assertEqual(self.hyperspace.indexes().filter("""name = "idx1" """).count(), 1)
 
+    def test_index_create_zorder(self):
+        idx_config = ZOrderCoveringIndexConfig('zidx1', ['name'], ['age'])
+        self.hyperspace.createIndex(self.df, idx_config)
+        self.assertEqual(self.hyperspace.indexes().filter("""name = "zidx1" """).count(), 1)
+        self.assertEqual(self.hyperspace.index("zidx1"). \
+          filter("""kind = "ZOrderCoveringIndex" """).count(), 1)
+
     def test_index_delete(self):
         idx_config = IndexConfig('idx2', ['name'], ['age'])
         self.hyperspace.createIndex(self.df, idx_config)

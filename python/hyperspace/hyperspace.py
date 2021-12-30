@@ -21,9 +21,9 @@ class Hyperspace:
 
     def _getJavaCoveringIndexConfig(self, index_config):
         """
-        Constructs CoveringIndexConfig Java object from python wrapper CoveringIndexConfig object.
-        :param index_config: CoveringIndexConfig java object
-        :return: CoveringIndexConfig python object
+        Constructs CoveringIndexConfig Java object from python wrapper object.
+        :param index_config: CoveringIndexConfig python object
+        :return: CoveringIndexConfig java object
 
         >>> _getJavaCoveringIndexConfig(idx_config)
         """
@@ -32,6 +32,21 @@ class Hyperspace:
         _jindexConfig = self.jvm.com.microsoft.hyperspace.index.covering.CoveringIndexConfig(
             self.jvm.java.lang.String(index_config.indexName), indexed_columns, included_columns)
         return _jindexConfig
+
+    def _getJavaZOrderCoveringIndexConfig(self, index_config):
+        """
+        Constructs ZOrderCoveringIndexConfig Java object from python wrapper object.
+        :param index_config: ZOrderCoveringIndexConfig python object
+        :return: ZOrderCoveringIndexConfig java object
+
+        >>> _getJavaZOrderCoveringIndexConfig(idx_config)
+        """
+        indexed_columns = self._getScalaSeqFromList(index_config.indexedColumns)
+        included_columns = self._getScalaSeqFromList(index_config.includedColumns)
+        index_name = self.jvm.java.lang.String(index_config.indexName)
+        _jZOrderIndexConfig = self.jvm.com.microsoft.hyperspace.index.zordercovering. \
+            ZOrderCoveringIndexConfig(index_name, indexed_columns, included_columns)
+        return _jZOrderIndexConfig
 
     def _getScalaSeqFromList(self, list):
         """
@@ -71,7 +86,14 @@ class Hyperspace:
         >>> df = spark.read.parquet("./sample.parquet").toDF("c1", "c2", "c3")
         >>> hyperspace.createIndex(df, indexConfig)
         """
-        self.hyperspace.createIndex(dataFrame._jdf, self._getJavaCoveringIndexConfig(indexConfig))
+        if isinstance(indexConfig, CoveringIndexConfig):
+            self.hyperspace.createIndex(dataFrame._jdf, \
+                self._getJavaCoveringIndexConfig(indexConfig))
+        elif isinstance(indexConfig, ZOrderCoveringIndexConfig):
+            self.hyperspace.createIndex(dataFrame._jdf, \
+                self._getJavaZOrderCoveringIndexConfig(indexConfig))
+        else:
+            raise Exception("Invalid index config type: " + type(indexConfig).__name__)
 
     def deleteIndex(self, indexName):
         """
