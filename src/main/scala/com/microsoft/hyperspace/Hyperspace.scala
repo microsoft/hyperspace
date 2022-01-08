@@ -16,6 +16,7 @@
 
 package com.microsoft.hyperspace
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import com.microsoft.hyperspace.index._
@@ -25,7 +26,7 @@ import com.microsoft.hyperspace.index.rules.ApplyHyperspace.withHyperspaceRuleDi
 import com.microsoft.hyperspace.index.sources.FileBasedSourceProviderManager
 
 class Hyperspace(spark: SparkSession) {
-  private val indexManager: IndexManager = Hyperspace.getContext(spark).indexCollectionManager
+  private def indexManager: IndexManager = Hyperspace.getContext(spark).indexCollectionManager
 
   /**
    * Collect all the index metadata.
@@ -192,7 +193,7 @@ class Hyperspace(spark: SparkSession) {
   }
 }
 
-object Hyperspace extends ActiveSparkSession {
+object Hyperspace extends ActiveSparkSession with Logging {
   private lazy val context = new ThreadLocal[HyperspaceContext]
 
   private[hyperspace] def getContext(spark: SparkSession): HyperspaceContext = {
@@ -202,6 +203,10 @@ object Hyperspace extends ActiveSparkSession {
       // the one HyperspaceContext is using because Hyperspace depends on the
       // session's properties such as configs, etc.
       context.set(new HyperspaceContext(spark))
+      if (!ctx.spark.equals(spark)) {
+        logWarning("Accessed Hyperspace using different Spark Session. " +
+          "Hyperspace context is newly created.")
+      }
     }
 
     context.get()
