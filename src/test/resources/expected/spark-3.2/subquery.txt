@@ -1,0 +1,42 @@
+=============================================================
+Plan with indexes:
+=============================================================
+Filter (isnotnull(Col1#) AND (Col1# = Subquery scalar-subquery#, [id=#]))
+:  +- Subquery scalar-subquery#, [id=#]
+:     +- *(1) Project [Col1#]
+:        +- *(1) Filter (isnotnull(Col2#) AND (Col2# = 1))
+:           +- *(1) ColumnarToRow
+<----:              +- FileScan Hyperspace(Type: CI, Name: filterIndex, LogVersion: 1) [Col2#,Col1#] Batched: true, DataFilters: [isnotnull(Col2#), (Col2# = 1)], Format: Parquet, Location: $filterIndexLocation, PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ReadSchema: struct<Col2:int,Col1:string>---->
++- ColumnarToRow
+   +- FileScan parquet [Col1#] Batched: true, DataFilters: [isnotnull(Col1#)], Format: Parquet, Location: $sampleParquetDataLocation, PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>
+
+=============================================================
+Plan without indexes:
+=============================================================
+Filter (isnotnull(Col1#) AND (Col1# = Subquery scalar-subquery#, [id=#]))
+:  +- Subquery scalar-subquery#, [id=#]
+:     +- *(1) Project [Col1#]
+:        +- *(1) Filter (isnotnull(Col2#) AND (Col2# = 1))
+:           +- *(1) ColumnarToRow
+<----:              +- FileScan parquet [Col1#,Col2#] Batched: true, DataFilters: [isnotnull(Col2#), (Col2# = 1)], Format: Parquet, Location: $sampleParquetDataLocation, PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,1)], ReadSchema: struct<Col1:string,Col2:int>---->
++- ColumnarToRow
+   +- FileScan parquet [Col1#] Batched: true, DataFilters: [isnotnull(Col1#)], Format: Parquet, Location: $sampleParquetDataLocation, PartitionFilters: [], PushedFilters: [IsNotNull(Col1)], ReadSchema: struct<Col1:string>
+
+=============================================================
+Indexes used:
+=============================================================
+filterIndex:$filterIndexPath
+
+=============================================================
+Physical operator stats:
+=============================================================
++---------------------+-------------------+------------------+----------+
+|    Physical Operator|Hyperspace Disabled|Hyperspace Enabled|Difference|
++---------------------+-------------------+------------------+----------+
+|        ColumnarToRow|                  1|                 1|         0|
+|               Filter|                  1|                 1|         0|
+|         InputAdapter|                  1|                 1|         0|
+|         Scan parquet|                  1|                 1|         0|
+|WholeStageCodegen (1)|                  1|                 1|         0|
++---------------------+-------------------+------------------+----------+
+

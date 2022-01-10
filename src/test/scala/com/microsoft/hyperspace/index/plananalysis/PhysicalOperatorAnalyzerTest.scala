@@ -69,4 +69,7 @@ private case class DummySparkPlan(
   override protected def doExecute(): RDD[InternalRow] = throw new NotImplementedError
   override def output: Seq[Attribute] = Seq.empty
   override def nodeName: String = if (name.isEmpty) super.nodeName else name
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[SparkPlan]): DummySparkPlan = {
+    copy(children = newChildren)
+  }
 }

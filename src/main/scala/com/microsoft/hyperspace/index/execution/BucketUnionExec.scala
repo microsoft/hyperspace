@@ -118,4 +118,8 @@ private[hyperspace] case class BucketUnionExec(children: Seq[SparkPlan], bucketS
         .numPartitions == bucketSpec.numBuckets)
     children.head.outputPartitioning
   }
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[SparkPlan]): BucketUnionExec = {
+    copy(children = newChildren)
+  }
 }

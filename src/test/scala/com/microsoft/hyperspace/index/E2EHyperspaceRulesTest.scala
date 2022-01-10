@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.SortExec
 import org.apache.spark.sql.execution.datasources.{FileIndex, HadoopFsRelation, InMemoryFileIndex, LogicalRelation}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
+import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.{Hyperspace, Implicits, SampleData, TestConfig, TestUtils}
 import com.microsoft.hyperspace.actions.Constants
@@ -477,32 +478,34 @@ class E2EHyperspaceRulesTest extends QueryTest with HyperspaceSuite {
         getIndexFilesPath(indexConfig.indexName, Seq(0, 1)) ++
           getIndexFilesPath(indexConfig.indexName, Seq(0, 1)))
 
-      // With Hyperspace disabled, verify there are shuffle and sort nodes as expected.
-      spark.disableHyperspace()
-      val dfWithHyperspaceDisabled = query()
-      var shuffleNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
-        case s: ShuffleExchangeExec => s
-      }
-      assert(shuffleNodes.size == 2)
-      var sortNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
-        case s: SortExec => s
-      }
-      assert(sortNodes.size == 2)
+      withSQLConf(SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
+        // With Hyperspace disabled, verify there are shuffle and sort nodes as expected.
+        spark.disableHyperspace()
+        val dfWithHyperspaceDisabled = query()
+        var shuffleNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+          case s: ShuffleExchangeExec => s
+        }
+        assert(shuffleNodes.size == 2)
+        var sortNodes = dfWithHyperspaceDisabled.queryExecution.executedPlan.collect {
+          case s: SortExec => s
+        }
+        assert(sortNodes.size == 2)
 
-      // With Hyperspace enabled, verify bucketing works as expected. This is reflected in
-      // shuffle nodes being eliminated.
-      spark.enableHyperspace()
-      val dfWithHyperspaceEnabled = query()
-      shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
-        case s: ShuffleExchangeExec => s
-      }
-      assert(shuffleNodes.isEmpty)
+        // With Hyperspace enabled, verify bucketing works as expected. This is reflected in
+        // shuffle nodes being eliminated.
+        spark.enableHyperspace()
+        val dfWithHyperspaceEnabled = query()
+        shuffleNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+          case s: ShuffleExchangeExec => s
+        }
+        assert(shuffleNodes.isEmpty)
 
-      // SortExec is expected to be present because there are multiple files per bucket.
-      sortNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
-        case s: SortExec => s
+        // SortExec is expected to be present because there are multiple files per bucket.
+        sortNodes = dfWithHyperspaceEnabled.queryExecution.executedPlan.collect {
+          case s: SortExec => s
+        }
+        assert(sortNodes.size == 2)
       }
-      assert(sortNodes.size == 2)
     }
   }
 

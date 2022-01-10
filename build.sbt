@@ -29,7 +29,7 @@ ThisBuild / javaOptions += "-Xmx1024m"
 // The root project is a virtual project aggregating the other projects.
 // It cannot compile, as necessary utility code is only in those projects.
 lazy val root = (project in file("."))
-  .aggregate(spark2_4, spark3_0, spark3_1)
+  .aggregate(spark2_4, spark3_0, spark3_1, spark3_2)
   .settings(
     compile / skip := true,
     publish / skip := true,
@@ -60,6 +60,15 @@ lazy val spark3_1 = (project in file("spark3.1"))
   .settings(
     commonSettings,
     sparkVersion := Version(3, 1, 1),
+    crossScalaVersions := List(scala212), // Spark 3 doesn't support Scala 2.11
+    inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
+    inConfig(Test)(addSparkVersionSpecificSourceDirectories))
+
+lazy val spark3_2 = (project in file("spark3.2"))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    commonSettings,
+    sparkVersion := Version(3, 2, 0),
     crossScalaVersions := List(scala212), // Spark 3 doesn't support Scala 2.11
     inConfig(Compile)(addSparkVersionSpecificSourceDirectories),
     inConfig(Test)(addSparkVersionSpecificSourceDirectories))

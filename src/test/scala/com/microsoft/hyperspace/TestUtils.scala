@@ -18,6 +18,7 @@ package com.microsoft.hyperspace
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
+import org.apache.spark.sql.internal.SQLConf
 
 import com.microsoft.hyperspace.MockEventLogger.reset
 import com.microsoft.hyperspace.index.{FileIdTracker, IndexConfig, IndexConstants, IndexLogEntry, IndexLogManager, IndexLogManagerFactoryImpl}
@@ -112,10 +113,12 @@ object TestConfig {
   val HybridScanEnabled = Seq(
     IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
     IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
-    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99")
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0.99",
+    SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false")
 
   val HybridScanEnabledAppendOnly = Seq(
     IndexConstants.INDEX_HYBRID_SCAN_ENABLED -> "true",
     IndexConstants.INDEX_HYBRID_SCAN_APPENDED_RATIO_THRESHOLD -> "0.99",
-    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0")
+    IndexConstants.INDEX_HYBRID_SCAN_DELETED_RATIO_THRESHOLD -> "0",
+    SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false")
 }

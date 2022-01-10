@@ -29,18 +29,32 @@ object Dependencies {
       "org.apache.spark" %% "spark-catalyst" % sv % "test" classifier "tests",
       "org.apache.spark" %% "spark-core" % sv % "test" classifier "tests",
       "org.apache.spark" %% "spark-sql" % sv % "test" classifier "tests") ++
-      (if (sparkVersion < Version(3, 1, 0))
-         Seq("org.scalatest" %% "scalatest" % "3.0.5" % "test")
-       else
-         Seq("org.scalatest" %% "scalatest" % "3.2.7" % "test")) ++
-      (if (sparkVersion < Version(3, 0, 0))
-         Seq(
-           "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
-           "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources ())
-       else
-         Seq(
-           "io.delta" %% "delta-core" % "0.8.0" % "provided" withSources (),
-           "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.1" % "provided" withSources (),
-           "org.apache.hive" % "hive-metastore" % "2.3.8" % "test"))
+      (sparkVersion match {
+        case Version(2, 4, _) =>
+          Seq(
+            "io.delta" %% "delta-core" % "0.6.1" % "provided" withSources (),
+            "org.apache.iceberg" % "iceberg-spark-runtime" % "0.11.0" % "provided" withSources (),
+            "org.scalatest" %% "scalatest" % "3.0.5" % "test")
+        case Version(3, 0, _) =>
+          Seq(
+            "io.delta" %% "delta-core" % "0.8.0" % "provided" withSources (),
+            "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.1" % "provided" withSources (),
+            "org.apache.hive" % "hive-metastore" % "2.3.8" % "test",
+            "org.scalatest" %% "scalatest" % "3.0.5" % "test")
+        case Version(3, 1, _) =>
+          Seq(
+            "io.delta" %% "delta-core" % "0.8.0" % "provided" withSources (),
+            "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.1" % "provided" withSources (),
+            "org.apache.hive" % "hive-metastore" % "2.3.8" % "test",
+            "org.scalatest" %% "scalatest" % "3.2.7" % "test")
+        case Version(3, 2, _) =>
+          Seq(
+            "io.delta" %% "delta-core" % "1.1.0" % "provided" withSources (),
+            "org.apache.iceberg" % "iceberg-spark3-runtime" % "0.11.1" % "provided" withSources (),
+            "org.apache.hive" % "hive-metastore" % "2.3.8" % "test",
+            "org.scalatest" %% "scalatest" % "3.2.7" % "test")
+        case v =>
+          throw new RuntimeException(s"Invalid version: $v")
+      })
   }
 }

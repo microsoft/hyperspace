@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.DataFrame
 
-import com.microsoft.hyperspace.{Hyperspace, Implicits}
+import com.microsoft.hyperspace.{BuildInfo, Hyperspace, Implicits}
 import com.microsoft.hyperspace.index.{HyperspaceSuite, IndexConfig, IndexConstants}
 import com.microsoft.hyperspace.util.PathUtils
 import com.microsoft.hyperspace.util.PathUtils.DataPathFilter
@@ -38,6 +38,7 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val sparkSession = spark
     spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
     spark.conf.set("spark.sql.legacy.bucketedTableScan.outputOrdering", true) // For Spark 3.0
+    spark.conf.set("spark.sql.adaptive.enabled", false) // For Spark 3.2
 
     import sparkSession.implicits._
     hyperspace = new Hyperspace(sparkSession)
@@ -71,11 +72,11 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val joinIndexPath = getIndexRootPath("joinIndex")
 
     val expectedOutput = getExpectedResult("selfJoin.txt")
-      .replace("$joinIndexLocation", truncate(s"InMemoryFileIndex[$joinIndexFilePath]"))
+      .replace("$joinIndexLocation", truncate(formatLocation(joinIndexFilePath, 3)))
       .replace("$joinIndexPath", joinIndexPath.toString)
       .replace(
         "$sampleParquetDataLocation",
-        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]"))
+        truncate(formatLocation(sampleParquetDataFullPath, 1)))
 
     val selfJoinDf = df.join(df, df("Col1") === df("Col1"))
     verifyExplainOutput(selfJoinDf, expectedOutput.toString(), verbose = true) { df =>
@@ -94,11 +95,11 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val filterIndexPath = getIndexRootPath("filterIndex")
 
     val expectedOutput = getExpectedResult("subquery.txt")
-      .replace("$filterIndexLocation", truncate(s"InMemoryFileIndex[$filterIndexFilePath]"))
+      .replace("$filterIndexLocation", truncate(formatLocation(filterIndexFilePath, 1)))
       .replace("$filterIndexPath", filterIndexPath.toString)
       .replace(
         "$sampleParquetDataLocation",
-        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]"))
+        truncate(formatLocation(sampleParquetDataFullPath, 1)))
 
     val dfSubquery =
       spark.sql("""select Col1 from query where
@@ -140,11 +141,11 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val joinIndexPath = getIndexRootPath("joinIndex")
 
     val expectedOutput = getExpectedResult("selfJoin.txt")
-      .replace("$joinIndexLocation", truncate(s"InMemoryFileIndex[$joinIndexFilePath]"))
+      .replace("$joinIndexLocation", truncate(formatLocation(joinIndexFilePath, 3)))
       .replace("$joinIndexPath", joinIndexPath.toString)
       .replace(
         "$sampleParquetDataLocation",
-        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]"))
+        truncate(formatLocation(sampleParquetDataFullPath, 1)))
 
     val selfJoinDf = df.join(df, df("Col1") === df("Col1"))
 
@@ -167,11 +168,11 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
     val filterIndexPath = getIndexRootPath("filterIndex")
 
     val expectedOutput = getExpectedResult("filter.txt")
-      .replace("$filterIndexLocation", truncate(s"InMemoryFileIndex[$filterIndexFilePath]"))
+      .replace("$filterIndexLocation", truncate(formatLocation(filterIndexFilePath, 3)))
       .replace("$filterIndexPath", filterIndexPath.toString)
       .replace(
         "$sampleParquetDataLocation",
-        truncate(s"InMemoryFileIndex[$sampleParquetDataFullPath]"))
+        truncate(formatLocation(sampleParquetDataFullPath, 1)))
       .replace("$begin", displayMode.beginEndTag.open)
       .replace("$end", displayMode.beginEndTag.close)
       .replace("$highlightBegin", displayMode.highlightTag.open)
@@ -236,5 +237,15 @@ class ExplainTest extends SparkFunSuite with HyperspaceSuite {
    */
   private def truncate(s: String): String = {
     StringUtils.abbreviate(s, 100)
+  }
+
+  private def formatLocation[T](path: T, numPaths: Int): String = {
+    val Array(major, minor) = BuildInfo.sparkShortVersion.split("\\.").map(_.toInt)
+    import scala.math.Ordering.Implicits._
+    if ((major, minor) < (3, 2)) {
+      s"InMemoryFileIndex[$path]"
+    } else {
+      s"InMemoryFileIndex($numPaths paths)[$path]"
+    }
   }
 }

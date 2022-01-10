@@ -284,7 +284,8 @@ trait HybridScanSuite extends QueryTest with HyperspaceSuite {
     assert(leftAppended.isEmpty || leftNodes.count(_.isInstanceOf[BucketUnion]) === 1)
     assert(rightAppended.isEmpty || rightNodes.count(_.isInstanceOf[BucketUnion]) === 1)
 
-    withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false") {
+    withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "false",
+        SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
       val execPlan = spark.sessionState.executePlan(plan).executedPlan
       val execNodes = execPlan.collect {
         case p @ BucketUnionExec(children, bucketSpec) =>

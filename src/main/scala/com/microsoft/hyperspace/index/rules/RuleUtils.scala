@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.optimizer.OptimizeIn
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{LongType, StructType}
 
 import com.microsoft.hyperspace.Hyperspace
@@ -293,7 +294,12 @@ object RuleUtils {
 
       val planForAppended =
         transformPlanToReadAppendedFiles(spark, index, plan, unhandledAppendedFiles)
-      if (useBucketUnionForAppended && useBucketSpec) {
+
+      // TODO: Fix BucketUnion with AE
+      val adaptiveExecutionEnabled = spark.sessionState.conf.getConf(
+        SQLConf.ADAPTIVE_EXECUTION_ENABLED)
+
+      if (useBucketUnionForAppended && useBucketSpec && !adaptiveExecutionEnabled) {
         // If Bucketing information of the index is used to read the index data, we need to
         // shuffle the appended data in the same way to correctly merge with bucketed index data.
 

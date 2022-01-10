@@ -1,0 +1,22 @@
+$begin=============================================================
+Plan with indexes:
+=============================================================
+Project [Col1#]
++- Filter (isnotnull(Col2#) AND (Col2# = 2))
+   +- ColumnarToRow
+      $highlightBegin+- FileScan Hyperspace(Type: CI, Name: filterIndex, LogVersion: 1) [Col2#,Col1#] Batched: true, DataFilters: [isnotnull(Col2#), (Col2# = 2)], Format: Parquet, Location: $filterIndexLocation, PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ReadSchema: struct<Col2:int,Col1:string>$highlightEnd
+
+=============================================================
+Plan without indexes:
+=============================================================
+Project [Col1#]
++- Filter (isnotnull(Col2#) AND (Col2# = 2))
+   +- ColumnarToRow
+      $highlightBegin+- FileScan parquet [Col1#,Col2#] Batched: true, DataFilters: [isnotnull(Col2#), (Col2# = 2)], Format: Parquet, Location: $sampleParquetDataLocation, PartitionFilters: [], PushedFilters: [IsNotNull(Col2), EqualTo(Col2,2)], ReadSchema: struct<Col1:string,Col2:int>$highlightEnd
+
+=============================================================
+Indexes used:
+=============================================================
+filterIndex:$filterIndexPath
+
+$end

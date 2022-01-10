@@ -1,1 +1,1 @@
-ThisBuild / version := "0.5.0-synapse"
+ThisBuild / version := "0.5.1-synapse"
