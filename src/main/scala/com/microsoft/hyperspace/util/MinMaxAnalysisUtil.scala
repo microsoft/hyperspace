@@ -25,7 +25,8 @@ import org.apache.spark.sql.catalyst.util.TypeUtils
 import org.apache.spark.sql.functions.{col, input_file_name, max, min}
 import org.apache.spark.sql.types.{StructField, StructType}
 
-import com.microsoft.hyperspace.HyperspaceException
+import com.microsoft.hyperspace.{Hyperspace, HyperspaceException}
+import com.microsoft.hyperspace.index.IndexLogEntry
 
 case class MinMaxAnalysisResult(
     colName: String,
@@ -776,5 +777,32 @@ object MinMaxAnalysisUtil extends MinMaxAnalysis {
 
   def analyze(df: DataFrame, colNames: Seq[String]): String = {
     analyze(df, colNames, "text")
+  }
+
+  private def latestIndexEntry(spark: SparkSession, indexName: String): IndexLogEntry = {
+    val idxManager = Hyperspace.getContext(spark).indexCollectionManager
+    val latestVer = idxManager.getIndexVersions(indexName, Seq("ACTIVE")).max
+    val indexEntry = idxManager.getIndex(indexName, latestVer).get
+
+    if (!Seq("CoveringIndex", "ZOrderCoveringIndex").contains(indexEntry.derivedDataset.kind)) {
+      throw HyperspaceException(s"Does not support index type: ${indexEntry.derivedDataset.kind}")
+    }
+    indexEntry
+  }
+
+  def analyzeIndex(
+      spark: SparkSession,
+      indexName: String,
+      colNames: Seq[String],
+      format: String): String = {
+    val indexEntry = latestIndexEntry(spark, indexName)
+    val df = spark.read.parquet(indexEntry.content.files.map(_.toString): _*)
+    analyze(df, colNames, format)
+  }
+
+  def analyzeIndex(spark: SparkSession, indexName: String, format: String): String = {
+    val indexEntry = latestIndexEntry(spark, indexName)
+    val df = spark.read.parquet(indexEntry.content.files.map(_.toString): _*)
+    analyze(df, indexEntry.indexedColumns, format)
   }
 }
