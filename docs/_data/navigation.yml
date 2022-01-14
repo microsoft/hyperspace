@@ -21,6 +21,8 @@ docs:
         url: /docs/ug-optimize-index/
       - title: "Supported data formats"
         url: /docs/ug-supported-data-formats/
+      - title: "Supported index types"
+        url: /docs/ug-index-types/
       - title: "Release Notes"
         url: https://github.com/microsoft/hyperspace/releases
 # Needs to be written later
